@@ -11,6 +11,7 @@ use crate::cover;
 use crate::db;
 use crate::mpris::{self, MetaInfo, Snapshot};
 use crate::notify;
+use crate::prefs::{self, Prefs};
 use crate::proto::{self, Now, Request, Response};
 use crate::rules::{self, ScrobbleClock};
 use crate::state::{self, Failure};
@@ -44,6 +45,8 @@ const IDLE_TIMEOUT: Duration = Duration::from_secs(600);
 const RESTART_AFTER_SECS: f64 = 3.0;
 /// Attente avant de conclure que mpv est vraiment retombé au repos.
 const FINISH_GRACE: Duration = Duration::from_millis(800);
+/// Délai avant d'écrire un changement de volume (regroupe les crans successifs).
+const VOLUME_SAVE_DELAY: Duration = Duration::from_secs(1);
 
 /// Fin de lecture demandée par SIGTERM ou SIGINT.
 static TERMINATED: AtomicBool = AtomicBool::new(false);
@@ -123,7 +126,7 @@ fn acquire_lock(path: &std::path::Path) -> Result<Option<std::fs::File>> {
     }
 }
 
-fn new_mpv() -> Result<Mpv> {
+fn new_mpv(volume: u32) -> Result<Mpv> {
     let ao = std::env::var("POSTE_MUSIC_AO")
         .ok()
         .filter(|s| !s.is_empty());
@@ -137,6 +140,12 @@ fn new_mpv() -> Result<Mpv> {
         init.set_option("idle", "yes")?;
         init.set_option("audio-client-name", "Musique")?;
         init.set_option("network-timeout", "15")?;
+        init.set_option("volume", i64::from(volume))?;
+        // Normalisation entre morceaux avec les tags ReplayGain des fichiers
+        // (sans tag : aucune correction, et jamais d'écrêtage).
+        init.set_option("replaygain", "track")?;
+        init.set_option("replaygain-clip", "no")?;
+        init.set_option("replaygain-fallback", "0")?;
         if let Some(ao) = &ao {
             init.set_option("ao", ao.as_str())?;
         }
@@ -228,6 +237,10 @@ struct Engine {
     covers_pending: HashSet<String>,
     last_ping: Option<Instant>,
     idle_timeout: Duration,
+    /// Dernier volume écrit dans `music.toml` d'état (pourcentage).
+    saved_volume: u32,
+    /// Depuis quand le volume actuel diffère de celui qui est écrit.
+    volume_dirty: Option<Instant>,
     next_sync: Instant,
     quit: bool,
 }
@@ -257,7 +270,40 @@ impl Engine {
         self.mpv
             .get_property::<f64>("volume")
             .map(|v| v / 100.0)
-            .unwrap_or(1.0)
+            .unwrap_or(f64::from(prefs::DEFAULT_VOLUME) / 100.0)
+    }
+
+    /// Note un changement de volume pour l'écrire bientôt (regroupé : un geste
+    /// sur la molette donne de nombreux crans, une seule écriture).
+    fn track_volume(&mut self, volume: f64) {
+        let pct = (volume * 100.0).round() as u32;
+        if pct != self.saved_volume && self.volume_dirty.is_none() {
+            self.volume_dirty = Some(Instant::now());
+        }
+        if pct == self.saved_volume {
+            self.volume_dirty = None;
+        }
+    }
+
+    /// Écrit le volume si un changement attend depuis assez longtemps (`force` : tout de suite).
+    fn flush_volume(&mut self, force: bool) {
+        let Some(t) = self.volume_dirty else { return };
+        if !force && t.elapsed() < VOLUME_SAVE_DELAY {
+            return;
+        }
+        let pct = (self.volume() * 100.0).round() as u32;
+        let mut p = Prefs::load(&self.env);
+        p.volume = Some(pct);
+        match p.save(&self.env) {
+            Ok(()) => {
+                self.saved_volume = pct;
+                self.volume_dirty = None;
+            }
+            Err(e) => {
+                dlog!("volume non enregistré : {e:#}");
+                self.volume_dirty = Some(Instant::now());
+            }
+        }
     }
 
     fn current(&self) -> Option<&Entry> {
@@ -296,6 +342,7 @@ impl Engine {
     /// Met à jour l'état partagé et signale les changements sur D-Bus.
     fn publish(&mut self) {
         let new = self.snapshot();
+        self.track_volume(new.volume);
         let old = {
             let mut g = self.shared.lock().unwrap_or_else(|e| e.into_inner());
             if *g == new {
@@ -386,7 +433,7 @@ impl Engine {
                 Ok(())
             }
             Request::SetVolume { volume } => {
-                let v = (volume.clamp(0.0, 1.3) * 100.0).round();
+                let v = (volume.clamp(0.0, f64::from(prefs::MAX_VOLUME) / 100.0) * 100.0).round();
                 self.mpv.set_property("volume", v).map_err(mpv_err)
             }
         };
@@ -741,6 +788,7 @@ impl Engine {
             }
             self.tick();
             self.publish();
+            self.flush_volume(self.quit);
             if self.quit {
                 break;
             }
@@ -783,11 +831,15 @@ pub fn run(env: &Env) -> Result<()> {
     };
     let client = Arc::new(client);
 
-    let mpv = Arc::new(new_mpv()?);
+    let volume = Prefs::load(env).volume();
+    let mpv = Arc::new(new_mpv(volume)?);
     let (tx, rx) = channel::<Msg>();
     spawn_events(&mpv, tx.clone())?;
 
-    let shared = Arc::new(Mutex::new(Snapshot::stopped()));
+    let shared = Arc::new(Mutex::new(Snapshot {
+        volume: f64::from(volume) / 100.0,
+        ..Snapshot::stopped()
+    }));
     let conn = match mpris::start(tx.clone(), shared.clone(), mpv.clone()) {
         Ok(c) => {
             dlog!("MPRIS publié ({})", mpris::bus_name());
@@ -831,6 +883,8 @@ pub fn run(env: &Env) -> Result<()> {
         covers_pending: HashSet::new(),
         last_ping: None,
         idle_timeout: idle_timeout(),
+        saved_volume: volume,
+        volume_dirty: None,
         next_sync: Instant::now() + Duration::from_secs(autosync::daemon_every_secs().max(1)),
         quit: false,
     };

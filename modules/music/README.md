@@ -26,10 +26,14 @@ playlists et mixes calculés localement.
 - `poste music toggle | pause | resume | next | prev | stop` : contrôles. Ils ne démarrent
   jamais le démon (sans démon : « Rien en lecture », code 1). `prev` recommence le morceau
   après 3 s de lecture, sinon revient au précédent. `next` sur le dernier morceau termine la file.
+- `poste music volume [<0-100> | +5 | -5]` : sans argument, affiche le volume ; sinon le règle (0 à 130 %,
+  `+5` et `-5` relatifs). Le volume est mémorisé dans `~/.local/state/poste/music.toml` (écriture regroupée
+  environ 1 s après le dernier changement, qu'il vienne de la commande, de MPRIS ou de l'île) et restauré au
+  démarrage du démon ; 50 % par défaut. Sans démon, la commande écrit seulement la valeur mémorisée.
 - `poste music now [--json]` : morceau, position, qualité, état. Sans démon : état `stopped`.
   JSON : `state` (`playing`, `paused`, `stopped`), `id`, `title`, `artist`, `album`,
   `album_artist`, `duration` et `position` (secondes), `quality`, `cover` (chemin local ou
-  null), `index`, `queue_len`, `volume` (0 à 1), `starred` (le morceau est un favori).
+  null), `index`, `queue_len`, `volume` (0 à 1, comme MPRIS ; 1 = 100 %, jusqu'à 1,3), `starred` (le morceau est un favori).
 - `poste music like [<kind> <id>]`, `unlike [<kind> <id>]`, `like --toggle` : favoris
   (voir « Favoris et playlists »).
 - `poste music playlist add|remove|create|rename|delete|pick` : écriture des playlists.
@@ -59,6 +63,8 @@ journalisés ni exposés), et garde la file en phase avec la playlist de mpv.
   `xesam:comment`, `poste:starred` (booléen, le morceau est un favori) et `poste:quality` (qualité, ex. « FLAC · 24 bit / 96 kHz · 2304 kbps »,
   « MP3 · 320 kbps »). Pas de `xesam:url`. `PropertiesChanged` à chaque changement de
   morceau, d'état ou de volume ; `Seeked` sur déplacement.
+- Volume : démarre au volume mémorisé (50 % la première fois). mpv applique ReplayGain par morceau
+  (`replaygain=track`, `replaygain-clip=no`, `replaygain-fallback=0`) : les fichiers sans tags ne sont pas corrigés.
 - Pochettes : `getCoverArt` (512) dans `~/.cache/poste/music/covers/<id>.img`, une fois, en arrière-plan.
 - Écoutes : `scrobble` `submission=false` au début de chaque morceau, `submission=true` à
   50 % de la durée ou 4 minutes réellement jouées (pauses exclues). Échec ignoré.

@@ -63,7 +63,7 @@ pub enum Request {
         track: u64,
         position_us: i64,
     },
-    /// Volume de 0 à 1 (MPRIS `Volume`).
+    /// Volume de 0 à 1,3 (MPRIS `Volume`) ; 1 = 100 % de mpv.
     SetVolume {
         volume: f64,
     },
@@ -105,7 +105,7 @@ pub struct Now {
     pub index: usize,
     #[serde(default)]
     pub queue_len: usize,
-    /// De 0 à 1.
+    /// De 0 à 1 (1 = 100 %, jusqu'à 1,3).
     #[serde(default)]
     pub volume: f64,
     /// Le morceau en cours est un favori.

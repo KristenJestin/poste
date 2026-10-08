@@ -15,6 +15,7 @@ mod mixcmd;
 mod mpris;
 mod notify;
 mod playlists;
+mod prefs;
 mod proto;
 mod resolve;
 mod rules;
@@ -200,6 +201,11 @@ enum Cmd {
     Prev,
     /// Arrête la lecture et vide la file
     Stop,
+    /// Volume : sans argument l'affiche ; `<0-100>`, `+5` ou `-5` le règle (mémorisé)
+    Volume {
+        #[arg(allow_hyphen_values = true)]
+        change: Option<String>,
+    },
     /// Morceau en cours, position, qualité, état
     Now {
         /// Sortie JSON pour l'île
@@ -306,6 +312,7 @@ fn run(cli: Cli) -> Result<ExitCode> {
         Cmd::Next => Ok(ctl::control(proto::Request::Next)),
         Cmd::Prev => Ok(ctl::control(proto::Request::Prev)),
         Cmd::Stop => Ok(ctl::control(proto::Request::Stop)),
+        Cmd::Volume { change } => Ok(ctl::volume(&env, change.as_deref())),
         Cmd::Now { json } => Ok(ctl::now(json)),
         Cmd::Like { kind, id, toggle } => {
             let mode = if toggle {

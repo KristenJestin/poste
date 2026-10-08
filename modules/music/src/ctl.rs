@@ -3,6 +3,7 @@
 
 use crate::api::Client;
 use crate::notify;
+use crate::prefs::{self, Prefs};
 use crate::proto::{self, Now, Request, Response};
 use crate::resolve;
 use crate::search::Kind;
@@ -271,6 +272,61 @@ pub fn control(req: Request) -> ExitCode {
             ExitCode::from(1)
         }
     }
+}
+
+/// `volume` : sans démon, lit et écrit seulement le volume mémorisé (appliqué au
+/// prochain démarrage) ; avec démon, le règle tout de suite. Ne démarre jamais le démon.
+pub fn volume(env: &Env, change: Option<&str>) -> ExitCode {
+    let stream = connect();
+    let current = match &stream {
+        Some(s) => match exchange(s, &Request::Now) {
+            Ok(Response { now: Some(n), .. }) => (n.volume * 100.0).round() as u32,
+            _ => Prefs::load(env).volume(),
+        },
+        None => Prefs::load(env).volume(),
+    };
+    let Some(arg) = change else {
+        println!("Volume : {current} %");
+        return ExitCode::SUCCESS;
+    };
+    let target = match prefs::parse_change(arg, current) {
+        Ok(v) => v,
+        Err(e) => {
+            eprintln!("{e}");
+            return ExitCode::from(1);
+        }
+    };
+    match stream {
+        Some(s) => {
+            let req = Request::SetVolume {
+                volume: f64::from(target) / 100.0,
+            };
+            match exchange(&s, &req) {
+                Ok(r) if r.ok => {}
+                Ok(r) => {
+                    eprintln!(
+                        "{}",
+                        r.error.unwrap_or_else(|| "refusé par le démon".into())
+                    );
+                    return ExitCode::from(1);
+                }
+                Err(e) => {
+                    eprintln!("poste music : {e:#}");
+                    return ExitCode::from(1);
+                }
+            }
+        }
+        None => {
+            let mut p = Prefs::load(env);
+            p.volume = Some(target);
+            if let Err(e) = p.save(env) {
+                eprintln!("poste music : {e:#}");
+                return ExitCode::from(3);
+            }
+        }
+    }
+    println!("Volume : {target} %");
+    ExitCode::SUCCESS
 }
 
 /// Texte de `now`.

@@ -352,10 +352,10 @@ fn lecture_complete_mpris_scrobble_skip_et_fin() {
         .unwrap();
         assert_eq!(ident, "Musique");
         let vol: f64 = p.get_property("Volume").unwrap();
-        assert!((vol - 1.0).abs() < 1e-9);
-        p.set_property("Volume", 0.5f64).unwrap();
+        assert!((vol - 0.5).abs() < 1e-9, "volume par défaut : {vol}");
+        p.set_property("Volume", 0.8f64).unwrap();
         wait_until(3, "volume", || {
-            (p.get_property::<f64>("Volume").unwrap() - 0.5).abs() < 1e-9
+            (p.get_property::<f64>("Volume").unwrap() - 0.8).abs() < 1e-9
         });
     }
 
@@ -991,4 +991,58 @@ fn demon_synchronise_au_demarrage_puis_periodiquement() {
     play(&sb, "1");
     wait_until(10, "sync périodique", || scans(&sb) >= 1);
     quit_daemon(&sb);
+}
+
+fn volume_file(sb: &Sandbox) -> String {
+    std::fs::read_to_string(sb.home().join(".local/state/poste/music.toml")).unwrap_or_default()
+}
+
+#[test]
+fn volume_defaut_commande_mpris_et_memoire() {
+    let sb = Sandbox::new(true);
+    sb.ok(&["sync", "--full"]);
+    // Sans démon : valeur par défaut, et un réglage est mémorisé pour le prochain démarrage.
+    assert_eq!(sb.ok(&["volume"]), "Volume : 50 %\n");
+    assert_eq!(sb.ok(&["volume", "-5"]), "Volume : 45 %\n");
+    assert!(volume_file(&sb).contains("volume = 45"));
+    assert!(!sb.run(&["volume", "fort"]).status.success());
+
+    // Le démon démarre au volume mémorisé.
+    sb.ok(&["play", "album", "al1"]);
+    wait_until(5, "démon", || sb.now()["state"] == "playing");
+    assert!((sb.now()["volume"].as_f64().unwrap() - 0.45).abs() < 1e-9);
+
+    // Par la commande : absolu, relatif, bornes.
+    assert_eq!(sb.ok(&["volume", "30"]), "Volume : 30 %\n");
+    assert_eq!(sb.ok(&["volume", "+5"]), "Volume : 35 %\n");
+    assert_eq!(sb.ok(&["volume", "-90"]), "Volume : 0 %\n");
+    assert_eq!(sb.ok(&["volume", "250"]), "Volume : 130 %\n");
+    assert_eq!(sb.ok(&["volume", "60"]), "Volume : 60 %\n");
+    assert!((sb.now()["volume"].as_f64().unwrap() - 0.6).abs() < 1e-9);
+    assert_eq!(sb.ok(&["volume"]), "Volume : 60 %\n");
+
+    // Par MPRIS (bus privé).
+    if let Some(addr) = &sb.bus_addr {
+        let conn = zbus::blocking::connection::Builder::address(addr.as_str())
+            .unwrap()
+            .build()
+            .unwrap();
+        let p = mpris(&conn, &format!("org.mpris.MediaPlayer2.{}", sb.bus_name));
+        p.set_property("Volume", 0.7f64).unwrap();
+        wait_until(3, "volume MPRIS", || {
+            (sb.now()["volume"].as_f64().unwrap() - 0.7).abs() < 1e-9
+        });
+    } else {
+        eprintln!("dbus-daemon absent : volume MPRIS sauté");
+        sb.ok(&["volume", "70"]);
+    }
+
+    // Écriture regroupée, puis restauration après redémarrage du démon.
+    wait_until(5, "volume écrit", || {
+        volume_file(&sb).contains("volume = 70")
+    });
+    quit_daemon(&sb);
+    sb.ok(&["play", "album", "al1"]);
+    wait_until(5, "démon relancé", || sb.now()["state"] == "playing");
+    assert!((sb.now()["volume"].as_f64().unwrap() - 0.7).abs() < 1e-9);
 }
