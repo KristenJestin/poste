@@ -1,0 +1,10 @@
+name = "music"
+description = "Client Navidrome : connexion, copie locale de la bibliothèque, recherche"
+commands = [
+  { name = "login", description = "se connecte à un serveur Navidrome (secret dans le trousseau)" },
+  { name = "logout", description = "supprime le secret du trousseau" },
+  { name = "status", description = "serveur, utilisateur, état de la connexion, copie locale" },
+  { name = "sync", description = "met à jour la copie locale (--full pour tout recopier)" },
+  { name = "search", description = "cherche dans la copie locale (--json pour le lanceur)" },
+  { name = "playlists", description = "liste les playlists (--json pour le lanceur)" },
+]

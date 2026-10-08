@@ -11,6 +11,7 @@ pub struct Env {
     pub data_home: PathBuf,
     pub config_home: PathBuf,
     pub state_home: PathBuf,
+    pub cache_home: PathBuf,
     pub path: Vec<PathBuf>,
 }
 
@@ -40,6 +41,7 @@ impl Env {
             data_home: xdg("XDG_DATA_HOME", home.join(".local/share")),
             config_home: xdg("XDG_CONFIG_HOME", home.join(".config")),
             state_home: xdg("XDG_STATE_HOME", home.join(".local/state")),
+            cache_home: xdg("XDG_CACHE_HOME", home.join(".cache")),
             home,
             path,
         })
@@ -52,6 +54,7 @@ impl Env {
             data_home: home.join(".local/share"),
             config_home: home.join(".config"),
             state_home: home.join(".local/state"),
+            cache_home: home.join(".cache"),
             path: Vec::new(),
             home,
         }
@@ -75,6 +78,11 @@ impl Env {
     /// `$XDG_STATE_HOME/poste`.
     pub fn state_dir(&self) -> PathBuf {
         self.state_home.join("poste")
+    }
+
+    /// `$XDG_CACHE_HOME/poste`.
+    pub fn cache_dir(&self) -> PathBuf {
+        self.cache_home.join("poste")
     }
 
     /// Liste de ce qui a été posé par `poste sys setup`.
@@ -127,6 +135,7 @@ mod tests {
             e.manifest_file(),
             PathBuf::from("/h/.local/state/poste/installed.json")
         );
+        assert_eq!(e.cache_dir(), PathBuf::from("/h/.cache/poste"));
         assert_eq!(e.bin_dir(), PathBuf::from("/h/.local/bin"));
     }
 
