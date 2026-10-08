@@ -1,0 +1,10 @@
+[package]
+name = "poste"
+description = "Aiguillage de poste : poste <module> exécute poste-<module>"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+poste-core.workspace = true

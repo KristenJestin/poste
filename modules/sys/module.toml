@@ -1,0 +1,8 @@
+name = "sys"
+description = "Gère le dépôt poste : construction, installation, état, git"
+commands = [
+  { name = "setup", description = "construit et installe poste et ses modules (--yes, --dry-run)" },
+  { name = "status", description = "état du dépôt, des modules installés et des fichiers posés" },
+  { name = "git", description = "lance git -C <dépôt> <args…>" },
+  { name = "cd", description = "affiche le chemin du dépôt" },
+]

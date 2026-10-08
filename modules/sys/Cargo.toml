@@ -1,0 +1,19 @@
+[package]
+name = "poste-sys"
+description = "Module sys de poste : gestion du dépôt et installation"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+clap.workspace = true
+poste-core.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+toml.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

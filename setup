@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+# Premier lancement de poste : enregistre l'emplacement du dépôt, construit,
+# puis laisse `poste-sys setup` installer. Options : --yes, --dry-run.
+set -euo pipefail
+
+repo="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+
+pass=()
+for arg in "$@"; do
+  case "$arg" in
+    -y | --yes) pass+=(--yes) ;;
+    -n | --dry-run) pass+=(--dry-run) ;;
+    -h | --help)
+      echo "Usage : ./setup [--yes] [--dry-run]"
+      exit 0
+      ;;
+    *)
+      echo "setup : option inconnue : $arg" >&2
+      exit 2
+      ;;
+  esac
+done
+
+if ! command -v cargo > /dev/null 2>&1; then
+  echo "setup : cargo est introuvable. Installez Rust (pacman -S rust ou rustup)." >&2
+  exit 1
+fi
+
+# Écrit (ou met à jour) la clé `repo` sans toucher au reste de la config.
+config="${XDG_CONFIG_HOME:-$HOME/.config}/poste/config.toml"
+mkdir -p "$(dirname "$config")"
+value="${repo//\\/\\\\}"
+value="${value//\"/\\\"}"
+line="repo = \"$value\""
+tmp="$(mktemp "$config.XXXXXX")"
+if [[ -f $config ]] && grep -Eq '^[[:space:]]*repo[[:space:]]*=' "$config"; then
+  # La clé existe : on remplace seulement cette ligne.
+  NEWLINE="$line" awk '
+    !done && /^[[:space:]]*repo[[:space:]]*=/ { print ENVIRON["NEWLINE"]; done = 1; next }
+    { print }
+  ' "$config" > "$tmp"
+else
+  # Une clé de premier niveau doit précéder toute table : on l'ajoute en tête.
+  { echo "$line"; [[ -f $config ]] && cat "$config"; true; } > "$tmp"
+fi
+if [[ -f $config ]] && cmp -s "$tmp" "$config"; then
+  rm -f "$tmp"
+else
+  chmod 644 "$tmp"
+  mv "$tmp" "$config"
+  echo "Config : repo enregistré dans $config"
+fi
+
+echo "Construction de l'espace de travail (release)…"
+cargo build --release --manifest-path "$repo/Cargo.toml"
+
+case ":$PATH:" in
+  *":$HOME/.local/bin:"*) ;;
+  *) echo "Attention : $HOME/.local/bin n'est pas dans votre PATH, la commande « poste » ne sera pas trouvée." >&2 ;;
+esac
+
+exec "$repo/target/release/poste-sys" setup "${pass[@]}"
