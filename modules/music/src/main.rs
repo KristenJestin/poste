@@ -259,7 +259,7 @@ enum Cmd {
         #[arg(long)]
         json: bool,
     },
-    /// Contenu du lanceur sans saisie : mixes puis playlists
+    /// Contenu du lanceur sans saisie : playlists puis mixes
     Home {
         #[arg(long)]
         json: bool,

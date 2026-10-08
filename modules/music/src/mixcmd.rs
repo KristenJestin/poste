@@ -182,17 +182,15 @@ pub fn mixes_in(conn: &rusqlite::Connection) -> Result<Vec<Value>, Failure> {
     Ok(out)
 }
 
-/// Contenu de l'extension du lanceur sans saisie : les mixes, puis les playlists.
+/// Contenu de l'extension du lanceur sans saisie : les playlists, puis les mixes.
 pub fn home(env: &Env) -> Result<Vec<Value>, Failure> {
     let conn = crate::library(env)?;
     home_in(&conn)
 }
 
 pub fn home_in(conn: &rusqlite::Connection) -> Result<Vec<Value>, Failure> {
-    let mut out = mixes_in(conn)?;
-    for h in crate::search::playlists(conn)? {
-        out.push(h.to_json());
-    }
+    let mut out: Vec<Value> = crate::search::playlists(conn)?.iter().map(|h| h.to_json()).collect();
+    out.extend(mixes_in(conn)?);
     Ok(out)
 }
 
@@ -219,10 +217,9 @@ mod tests {
         tx.commit().unwrap();
         let v = home_in(&conn).unwrap();
         let ids: Vec<&str> = v.iter().map(|e| e["id"].as_str().unwrap()).collect();
-        assert_eq!(&ids[..2], ["mix:me", "mix:rediscover"]);
-        assert_eq!(ids.last(), Some(&"playlist:p1"));
-        let first_pl = ids.iter().position(|i| i.starts_with("playlist:")).unwrap();
-        assert!(ids[..first_pl].iter().all(|i| i.starts_with("mix:")));
-        assert_eq!(v.last().unwrap()["_cover"], "pl-p1");
+        assert_eq!(ids[0], "playlist:p1");
+        assert_eq!(&ids[1..3], ["mix:me", "mix:rediscover"]);
+        assert!(ids[1..].iter().all(|i| i.starts_with("mix:")));
+        assert_eq!(v[0]["_cover"], "pl-p1");
     }
 }
