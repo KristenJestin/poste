@@ -11,10 +11,11 @@ playlists et mixes calculés localement.
   l'utilisateur, puis le mot de passe sans écho. Calcule le jeton Subsonic
   `t = md5(motdepasse + sel)` (sel aléatoire de 16 caractères alphanumériques), oublie le
   mot de passe, vérifie avec `ping.view`, puis range `{"u","t","s"}` dans le trousseau
-  (Secret Service, attributs `service=poste-music` et `url=<serveur>`).
+  (Secret Service, attributs `service=poste-music` et `url=<serveur>`). Puis lance la copie
+  de la bibliothèque en arrière-plan (« Copie de la bibliothèque en cours en arrière-plan »).
 - `poste music logout` : supprime le secret du trousseau et l'utilisateur de `music.toml`.
-- `poste music status` : serveur, utilisateur, état de la connexion, taille et date de la copie.
-- `poste music sync [--full]` : met à jour la copie locale.
+- `poste music status` : serveur, utilisateur, état de la connexion, taille, date et âge de la copie, synchronisation en cours ou non.
+- `poste music sync [--full]` : met à jour la copie locale à la main. Inutile en usage normal (voir « Synchronisation automatique »).
 - `poste music search <texte…> [--json]` : recherche dans la copie locale.
 - `poste music playlists [--json]` : liste des playlists.
 - `poste music play <kind> <id> [--shuffle]` : `kind` = `playlist`, `album`, `artist`, `track`.
@@ -144,7 +145,7 @@ reproductible), `--size N` (50 par défaut).
 - `~/.cache/poste/music/covers/` : pochettes locales (512 px, démon) ; `covers/thumbs/` : vignettes
   de 128 px pour le lanceur ; `<id>.img.none` : l'image par défaut de Navidrome (écartée).
 - `$XDG_RUNTIME_DIR/poste/music.sock`, `music.lock` : socket et verrou du démon.
-- `~/.local/state/poste/music.log` : journal du démon.
+- `~/.local/state/poste/music.log` : journal du démon ; `music-sync.log` : journal des synchronisations de fond.
 - `~/.cache/poste/music/auth-refused` : marqueur du dernier refus du serveur (voir plus bas).
 
 ## États de connexion
@@ -166,7 +167,8 @@ ne lisent que la copie locale ; `mix` n'a besoin du serveur que pour jouer (hors
 `search` et `playlists` interrogent la copie locale sans réseau ni trousseau : l'état n'est
 donc connu que par `music.toml` (absent ou sans utilisateur : `no-login`) et par le marqueur
 `auth-refused`, posé par `status`, `sync` ou `login` quand le serveur refuse le jeton, effacé
-au premier succès. Sans copie locale, ils lancent d'abord une synchronisation complète.
+au premier succès. Sans copie locale, ils lancent une synchronisation complète en arrière-plan et répondent
+tout de suite « Copie de la bibliothèque en cours… » (voir « Synchronisation automatique »).
 
 ## Copie locale
 
@@ -177,6 +179,29 @@ au premier succès. Sans copie locale, ils lancent d'abord une synchronisation c
   morceaux d'un album dont les compteurs ont bougé sont relus avec `getAlbum`) ; changé : sync complète.
 - Recherche : préfixes FTS5 (« daf pun » trouve « Daft Punk »), sans casse ni accents. Ordre :
   playlists (5), artistes (5), albums (8), morceaux (12).
+
+## Synchronisation automatique
+
+L'utilisateur n'a jamais à lancer `poste music sync`. Toutes les synchronisations de fond sont
+un processus détaché (`poste-music sync --background`, nouvelle session, entrées et sorties
+fermées) qui relit lui-même le trousseau : aucun identifiant dans les arguments ni l'environnement.
+
+- Après un `login` réussi : synchronisation complète de fond.
+- `search`, `home`, `playlists`, `mixes`, `mix` : avec une copie de plus d'1 heure (`synced_at` de
+  `meta`), la réponse vient tout de suite de la copie actuelle et une synchronisation incrémentale
+  part en fond. Sans copie : une synchronisation complète part en fond (le lanceur n'attend pas)
+  et la réponse est l'entrée « Copie de la bibliothèque en cours… » (󰑓, sans action) en `--json`,
+  ce message sur stderr (code 4) en sortie lisible. Une synchronisation déjà en cours n'est pas relancée.
+- Démon : incrémentale à son démarrage si la copie manque ou a plus de 15 minutes, puis toutes les
+  30 minutes tant qu'il tourne (compteurs d'écoute, « joués récemment » des mixes).
+- Une seule synchronisation à la fois (`$XDG_RUNTIME_DIR/poste/music-sync.lock`, `flock`) ; une
+  demande faite pendant qu'une autre tourne est ignorée (la commande `sync` à la main le dit).
+- Erreurs de fond : `~/.local/state/poste/music-sync.log` (une ligne par synchronisation, sans
+  jeton, repris à zéro au-delà de 64 Ko). Un refus d'authentification pose le marqueur
+  `auth-refused` : le lanceur affiche alors « Se connecter ». Pas de nouvelle synchronisation
+  de fond tant que le marqueur est là.
+- Réservées aux tests : `POSTE_MUSIC_STALE_SECS` (1 h), `POSTE_MUSIC_DAEMON_FRESH_SECS` (15 min),
+  `POSTE_MUSIC_DAEMON_EVERY_SECS` (30 min).
 
 ## Format JSON des résultats
 

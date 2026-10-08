@@ -6,6 +6,7 @@
 //! événements de mpv, D-Bus) lui envoient des messages.
 
 use crate::api::Client;
+use crate::autosync;
 use crate::cover;
 use crate::db;
 use crate::mpris::{self, MetaInfo, Snapshot};
@@ -227,6 +228,7 @@ struct Engine {
     covers_pending: HashSet<String>,
     last_ping: Option<Instant>,
     idle_timeout: Duration,
+    next_sync: Instant,
     quit: bool,
 }
 
@@ -638,10 +640,38 @@ impl Engine {
         });
     }
 
+    // ---- synchronisation de la copie ----
+
+    /// Lance une synchronisation incrémentale détachée (ignorée si une autre tourne :
+    /// le processus lancé prend le verrou). Rien après un refus d'authentification.
+    fn spawn_sync(&self) {
+        if store::auth_refused_marked(&self.env) || autosync::is_running() {
+            return;
+        }
+        if let Err(e) = autosync::spawn_background(false) {
+            dlog!("synchronisation non lancée : {e:#}");
+        }
+    }
+
+    /// Au démarrage : synchronise si la copie manque ou a plus de 15 minutes.
+    fn sync_at_start(&self) {
+        let age = db::open_existing(&self.env)
+            .ok()
+            .flatten()
+            .map(|c| autosync::age_secs(&c));
+        if age.is_none_or(|a| a > autosync::daemon_fresh_secs()) {
+            self.spawn_sync();
+        }
+    }
+
     // ---- cadence ----
 
     fn tick(&mut self) {
         let now = Instant::now();
+        if now >= self.next_sync {
+            self.next_sync = now + Duration::from_secs(autosync::daemon_every_secs().max(1));
+            self.spawn_sync();
+        }
         let dt = now.duration_since(self.last_tick).as_secs_f64().min(2.0);
         self.last_tick = now;
 
@@ -801,8 +831,10 @@ pub fn run(env: &Env) -> Result<()> {
         covers_pending: HashSet::new(),
         last_ping: None,
         idle_timeout: idle_timeout(),
+        next_sync: Instant::now() + Duration::from_secs(autosync::daemon_every_secs().max(1)),
         quit: false,
     };
+    engine.sync_at_start();
     engine.run(rx);
 
     // Sortie propre : plus de son, plus de service MPRIS, plus de socket.

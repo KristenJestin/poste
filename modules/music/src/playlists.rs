@@ -169,7 +169,7 @@ pub fn create(
     let mut p = r["playlist"].clone();
     let Some(id) = p["id"].as_str().map(str::to_string) else {
         return Err(Failure::Internal(anyhow!(
-            "le serveur n'a pas renvoyé la playlist créée (lance `poste music sync`)"
+            "le serveur n'a pas renvoyé la playlist créée (la copie se met à jour toute seule, réessaie)"
         )));
     };
     if let Some(c) = conn {

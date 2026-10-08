@@ -826,3 +826,169 @@ fn favoris_et_mixes_selon_l_etat_de_connexion() {
     assert!(!sb.socket().exists());
     assert!(!sb.home().join(".cache/poste/music/auth-refused").exists());
 }
+
+// ---- synchronisation automatique de la copie ----
+
+fn set_synced_at(sb: &Sandbox, t: u64) {
+    let conn = rusqlite::Connection::open(sb.db()).unwrap();
+    conn.execute(
+        "INSERT OR REPLACE INTO meta (key, value) VALUES ('synced_at', ?1)",
+        [t.to_string()],
+    )
+    .unwrap();
+}
+
+fn synced_at(sb: &Sandbox) -> u64 {
+    let conn = rusqlite::Connection::open(sb.db()).unwrap();
+    conn.query_row("SELECT value FROM meta WHERE key='synced_at'", [], |r| {
+        r.get::<_, String>(0)
+    })
+    .unwrap()
+    .parse()
+    .unwrap()
+}
+
+fn scans(sb: &Sandbox) -> usize {
+    sb.calls()
+        .iter()
+        .filter(|c| c.starts_with("getScanStatus"))
+        .count()
+}
+
+fn sync_log(sb: &Sandbox) -> String {
+    std::fs::read_to_string(sb.home().join(".local/state/poste/music-sync.log")).unwrap_or_default()
+}
+
+fn quit_daemon(sb: &Sandbox) {
+    let mut s = UnixStream::connect(sb.socket()).unwrap();
+    s.write_all(b"{\"cmd\":\"quit\"}\n").unwrap();
+    let mut l = String::new();
+    let _ = BufReader::new(&s).read_line(&mut l);
+    wait_until(10, "arrêt du démon", || !sb.socket().exists());
+}
+
+/// Tient le verrou de synchronisation comme le ferait une synchronisation en cours.
+fn hold_sync_lock(sb: &Sandbox) -> std::fs::File {
+    use std::os::fd::AsRawFd;
+    let dir = sb.run_dir().join("poste");
+    std::fs::create_dir_all(&dir).unwrap();
+    let f = std::fs::File::create(dir.join("music-sync.lock")).unwrap();
+    assert_eq!(
+        unsafe { libc::flock(f.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) },
+        0
+    );
+    f
+}
+
+#[test]
+fn sans_copie_entree_en_cours_puis_copie_en_fond() {
+    let sb = Sandbox::new(true);
+    let t = Instant::now();
+    let out = sb.ok(&["search", "--json", "titre"]);
+    assert!(t.elapsed() < Duration::from_secs(2), "{:?}", t.elapsed());
+    let v: Value = serde_json::from_str(&out).unwrap();
+    assert_eq!(v.as_array().unwrap().len(), 1);
+    assert_eq!(v[0]["name"], "Copie de la bibliothèque en cours…");
+    assert_eq!(v[0]["icon"], "󰑓");
+    assert!(v[0].get("action").is_none());
+    // Sortie lisible : le dire, sans bloquer.
+    let o = sb.run(&["playlists"]);
+    assert!(String::from_utf8_lossy(&o.stderr).contains("Copie de la bibliothèque en cours"));
+    // La copie arrive toute seule.
+    wait_until(10, "copie complète en fond", || sb.db().is_file());
+    wait_until(10, "synchronisation terminée", || {
+        sync_log(&sb).contains("terminée")
+    });
+    let out = sb.ok(&["search", "--json", "titre"]);
+    let v: Value = serde_json::from_str(&out).unwrap();
+    assert!(v.as_array().unwrap().iter().any(|e| e["id"] == "track:t1"));
+}
+
+#[test]
+fn copie_vieille_repond_tout_de_suite_et_se_met_a_jour() {
+    let sb = Sandbox::new(true);
+    sb.ok(&["sync", "--full"]);
+    // Copie jeune : aucun appel au serveur.
+    sb.fake.clear_calls();
+    sb.ok(&["search", "--json", "titre"]);
+    std::thread::sleep(Duration::from_millis(500));
+    assert_eq!(scans(&sb), 0);
+    // Copie vieille : réponse immédiate avec la copie actuelle, puis sync incrémentale.
+    set_synced_at(&sb, 1);
+    let out = sb.ok(&["home", "--json"]);
+    assert!(out.contains("playlist:") || out.contains("mix:me"), "{out}");
+    wait_until(10, "synchronisation de fond", || synced_at(&sb) > 1);
+    assert!(scans(&sb) >= 1);
+    assert!(sync_log(&sb).contains("incrémentale"));
+}
+
+#[test]
+fn une_sync_a_la_fois() {
+    let sb = Sandbox::new(true);
+    sb.ok(&["sync", "--full"]);
+    set_synced_at(&sb, 1);
+    sb.fake.clear_calls();
+    let lock = hold_sync_lock(&sb);
+    sb.ok(&["search", "--json", "titre"]);
+    sb.ok(&["mixes", "--json"]);
+    let out = sb.ok(&["sync"]);
+    assert!(out.contains("déjà en cours"), "{out}");
+    assert!(sb.ok(&["status"]).contains("Synchro     : en cours"));
+    std::thread::sleep(Duration::from_millis(800));
+    assert_eq!(scans(&sb), 0);
+    assert_eq!(synced_at(&sb), 1);
+    drop(lock);
+    sb.ok(&["search", "--json", "titre"]);
+    wait_until(10, "sync une fois le verrou libre", || synced_at(&sb) > 1);
+    let st = sb.ok(&["status"]);
+    assert!(st.contains("Synchro     : aucune en cours"), "{st}");
+    assert!(st.contains("il y a"), "{st}");
+}
+
+#[test]
+fn refus_en_fond_pose_le_marqueur_sans_jeton() {
+    let sb = Sandbox::new(true);
+    sb.ok(&["sync", "--full"]);
+    set_synced_at(&sb, 1);
+    *sb.fake.state.fail_code.lock().unwrap() = Some(40);
+    sb.ok(&["search", "--json", "titre"]);
+    let marker = sb.home().join(".cache/poste/music/auth-refused");
+    wait_until(10, "marqueur auth-refused", || marker.exists());
+    wait_until(5, "journal", || sync_log(&sb).contains("auth-refused"));
+    let log = sync_log(&sb);
+    assert!(!log.contains(TOKEN) && !log.contains(SALT), "{log}");
+    let out = sb.ok(&["search", "--json", "titre"]);
+    let v: Value = serde_json::from_str(&out).unwrap();
+    assert_eq!(v[0]["name"], "Se connecter à Navidrome");
+}
+
+#[test]
+fn demon_synchronise_au_demarrage_puis_periodiquement() {
+    let sb = Sandbox::new(true);
+    sb.ok(&["sync", "--full"]);
+    // Copie jeune (moins de 15 min) : rien au démarrage, ni dans la période par défaut.
+    sb.fake.clear_calls();
+    let play = |sb: &Sandbox, every: &str| {
+        let mut c = sb.cmd(&["play", "album", "al1"]);
+        c.env("POSTE_MUSIC_DAEMON_EVERY_SECS", every);
+        let o = c.output().unwrap();
+        assert!(o.status.success(), "{}", String::from_utf8_lossy(&o.stderr));
+        wait_until(5, "démon", || sb.now()["state"] == "playing");
+    };
+    play(&sb, "1000");
+    std::thread::sleep(Duration::from_millis(1500));
+    assert_eq!(scans(&sb), 0);
+    quit_daemon(&sb);
+
+    // Copie vieille : synchronisation au démarrage.
+    set_synced_at(&sb, 1);
+    play(&sb, "1000");
+    wait_until(10, "sync au démarrage", || synced_at(&sb) > 1);
+    quit_daemon(&sb);
+
+    // Copie jeune, période de 1 s : une sync périodique suit.
+    sb.fake.clear_calls();
+    play(&sb, "1");
+    wait_until(10, "sync périodique", || scans(&sb) >= 1);
+    quit_daemon(&sb);
+}

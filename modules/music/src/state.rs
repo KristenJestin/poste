@@ -20,6 +20,8 @@ pub enum Failure {
         url: String,
         detail: String,
     },
+    /// Aucune copie locale : la première synchronisation tourne en arrière-plan.
+    Syncing,
     /// Problème local (trousseau, disque, base) : jamais muet, jamais confondu avec un état.
     Internal(anyhow::Error),
 }
@@ -31,6 +33,7 @@ impl Failure {
             Failure::NoLogin => "no-login",
             Failure::AuthRefused(_) => "auth-refused",
             Failure::Unreachable { .. } => "unreachable",
+            Failure::Syncing => "syncing",
             Failure::Internal(_) => "error",
         }
     }
@@ -41,6 +44,7 @@ impl Failure {
             Failure::NoLogin | Failure::AuthRefused(_) => 1,
             Failure::Unreachable { .. } => 2,
             Failure::Internal(_) => 3,
+            Failure::Syncing => 4,
         }
     }
 
@@ -59,6 +63,12 @@ impl Failure {
                 "name": "Navidrome injoignable",
                 "subtitle": url,
                 "icon": "󰅛"
+            }),
+            Failure::Syncing => json!({
+                "id": "syncing",
+                "name": "Copie de la bibliothèque en cours…",
+                "subtitle": "Les résultats arrivent dans un instant",
+                "icon": "󰑓"
             }),
             Failure::Internal(e) => json!({
                 "id": "error",
@@ -81,6 +91,10 @@ impl fmt::Display for Failure {
             Failure::Unreachable { url, detail } => {
                 write!(f, "Serveur injoignable ({url}) : {detail}")
             }
+            Failure::Syncing => write!(
+                f,
+                "Copie de la bibliothèque en cours en arrière-plan : réessaie dans un instant"
+            ),
             Failure::Internal(e) => write!(f, "{e:#}"),
         }
     }
@@ -161,6 +175,16 @@ mod tests {
                 "xdg-terminal-exec poste music login"
             );
         }
+    }
+
+    #[test]
+    fn entree_copie_en_cours() {
+        let e = Failure::Syncing.launcher_entry();
+        assert_eq!(e["id"], "syncing");
+        assert_eq!(e["name"], "Copie de la bibliothèque en cours…");
+        assert_eq!(e["icon"], "󰑓");
+        assert!(e.get("action").is_none());
+        assert!(!Failure::Syncing.to_string().contains("poste music login"));
     }
 
     #[test]

@@ -2,6 +2,7 @@
 //! de la bibliothèque, recherche, et lecteur de fond (démon libmpv + MPRIS).
 
 mod api;
+mod autosync;
 mod cover;
 mod ctl;
 mod daemon;
@@ -160,6 +161,9 @@ enum Cmd {
         /// Copie complète, sans comparer le dernier scan du serveur
         #[arg(long)]
         full: bool,
+        /// Synchronisation de fond (lancée par le module : silencieuse, journal dans music-sync.log)
+        #[arg(long, hide = true)]
+        background: bool,
     },
     /// Cherche dans la copie locale
     Search {
@@ -279,7 +283,14 @@ fn run(cli: Cli) -> Result<ExitCode> {
         Cmd::Login => login(&env),
         Cmd::Logout => logout(&env),
         Cmd::Status => status(&env),
-        Cmd::Sync { full } => Ok(done(sync_cmd(&env, full))),
+        Cmd::Sync { full, background } => {
+            if background {
+                autosync::run_background(&env, full)?;
+                Ok(ExitCode::SUCCESS)
+            } else {
+                Ok(done(sync_cmd(&env, full)))
+            }
+        }
         Cmd::Search { text, json } => {
             let text = text.join(" ");
             Ok(emit(&env, search_cmd(&env, &text), json))
@@ -478,21 +489,9 @@ fn emit(env: &Env, r: Result<Vec<search::Hit>, Failure>, json: bool) -> ExitCode
     }
 }
 
-/// Copie locale prête à interroger : garde-fou rapide, sinon première synchronisation.
+/// Copie locale prête à interroger, sans jamais attendre le réseau : voir `autosync::library_with`.
 fn library(env: &Env) -> Result<Connection, Failure> {
-    state::quick_check(env)?;
-    if let Some(conn) = db::open_existing(env)? {
-        return Ok(conn);
-    }
-    eprintln!("Première synchronisation de la bibliothèque…");
-    let r = state::open_client(env).and_then(|c| sync::run(env, &c, true));
-    state::record(env, &r);
-    r?;
-    db::open_existing(env)?.ok_or_else(|| {
-        Failure::Internal(anyhow::anyhow!(
-            "copie locale introuvable après synchronisation"
-        ))
-    })
+    autosync::library(env)
 }
 
 fn search_cmd(env: &Env, text: &str) -> Result<Vec<search::Hit>, Failure> {
@@ -506,6 +505,11 @@ fn playlists_cmd(env: &Env) -> Result<Vec<search::Hit>, Failure> {
 }
 
 fn sync_cmd(env: &Env, full: bool) -> Result<(), Failure> {
+    // Une seule synchronisation à la fois, celle-ci comprise.
+    let Some(_lock) = autosync::try_lock(&autosync::lock_path()?)? else {
+        println!("Une synchronisation est déjà en cours");
+        return Ok(());
+    };
     let r = state::open_client(env).and_then(|c| sync::run(env, &c, full));
     state::record(env, &r);
     let report = r?;
@@ -564,6 +568,10 @@ fn login(env: &Env) -> Result<ExitCode> {
             .save(env)?;
             store::clear_auth_refused(env);
             println!("Connecté à {url} en tant que {user}");
+            match autosync::spawn_background(true) {
+                Ok(()) => println!("Copie de la bibliothèque en cours en arrière-plan"),
+                Err(e) => eprintln!("Copie de la bibliothèque impossible à lancer : {e:#}"),
+            }
             Ok(ExitCode::SUCCESS)
         }
         Err(e) => {
@@ -596,6 +604,15 @@ fn logout(env: &Env) -> Result<ExitCode> {
 
 fn megabytes(bytes: u64) -> String {
     format!("{:.1} Mo", bytes as f64 / 1_048_576.0)
+}
+
+fn human_age(secs: u64) -> String {
+    match secs {
+        0..=59 => "moins d'une minute".into(),
+        60..=3599 => format!("{} min", secs / 60),
+        3600..=86399 => format!("{} h {:02} min", secs / 3600, secs % 3600 / 60),
+        _ => format!("{} j", secs / 86400),
+    }
 }
 
 fn status(env: &Env) -> Result<ExitCode> {
@@ -632,13 +649,25 @@ fn status(env: &Env) -> Result<ExitCode> {
                 .and_then(|s| s.parse::<u64>().ok())
                 .map(rfc3339)
                 .unwrap_or_else(|| "date inconnue".into());
+            let age = match autosync::age_secs(&conn) {
+                u64::MAX => String::new(),
+                a => format!(" (il y a {})", human_age(a)),
+            };
             println!(
-                "Copie       : {} morceaux, {} albums, {} artistes, {} playlists ({}), synchronisée le {when}",
+                "Copie       : {} morceaux, {} albums, {} artistes, {} playlists ({}), synchronisée le {when}{age}",
                 c.tracks, c.albums, c.artists, c.playlists, megabytes(size)
             );
         }
-        None => println!("Copie       : aucune (lance `poste music sync`)"),
+        None => println!("Copie       : aucune (elle se fait toute seule après la connexion)"),
     }
+    println!(
+        "Synchro     : {}",
+        if autosync::is_running() {
+            "en cours"
+        } else {
+            "aucune en cours"
+        }
+    );
     Ok(match state {
         Ok(()) => ExitCode::SUCCESS,
         Err(f) => ExitCode::from(f.exit_code()),
