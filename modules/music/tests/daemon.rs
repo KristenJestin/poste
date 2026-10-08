@@ -516,3 +516,313 @@ fn pas_de_demarrage_sans_connexion_ni_serveur() {
         assert_eq!(sb.run(&[c]).status.code(), Some(1), "{c}");
     }
 }
+
+fn query_count(sb: &Sandbox, method: &str, needle: &str) -> usize {
+    sb.calls()
+        .iter()
+        .filter(|c| c.starts_with(&format!("{method}?")) && c.contains(needle))
+        .count()
+}
+
+fn db_value<T: rusqlite::types::FromSql>(sb: &Sandbox, sql: &str) -> T {
+    rusqlite::Connection::open(sb.db())
+        .unwrap()
+        .query_row(sql, [], |r| r.get(0))
+        .unwrap()
+}
+
+#[test]
+fn favoris_playlists_et_mixes_de_bout_en_bout() {
+    let sb = Sandbox::new(true);
+    sb.ok(&["sync", "--full"]);
+    let starred = |id: &str| -> bool {
+        db_value(
+            &sb,
+            &format!("SELECT starred IS NOT NULL FROM tracks WHERE id = '{id}'"),
+        )
+    };
+
+    // Favoris explicites : requête reçue, copie locale mise à jour sans resynchronisation.
+    let before = sb.calls().len();
+    let out = sb.ok(&["like", "track", "t2"]);
+    assert!(out.contains("♥ Ajouté aux favoris : Titre 2"), "{out}");
+    assert!(starred("t2"));
+    assert_eq!(query_count(&sb, "star", "&id=t2"), 1);
+    assert_eq!(
+        sb.calls().len(),
+        before + 1,
+        "un seul appel, pas de synchronisation"
+    );
+    sb.ok(&["unlike", "track", "t2"]);
+    assert!(!starred("t2"));
+    assert_eq!(query_count(&sb, "unstar", "&id=t2"), 1);
+    sb.ok(&["like", "--toggle", "track", "t2"]);
+    assert!(starred("t2"));
+    sb.ok(&["like", "--toggle", "track", "t2"]);
+    assert!(!starred("t2"));
+    sb.ok(&["like", "album", "al1"]);
+    sb.ok(&["like", "artist", "ar1"]);
+    assert_eq!(query_count(&sb, "star", "&albumId=al1"), 1);
+    assert_eq!(query_count(&sb, "star", "&artistId=ar1"), 1);
+    assert!(db_value::<bool>(
+        &sb,
+        "SELECT starred IS NOT NULL FROM albums WHERE id = 'al1'"
+    ));
+    // Sans argument et sans lecture : « Rien en lecture », code 1, aucun appel au serveur.
+    let n = sb.calls().len();
+    let o = sb.run(&["like"]);
+    assert_eq!(o.status.code(), Some(1));
+    assert!(String::from_utf8_lossy(&o.stderr).contains("Rien en lecture"));
+    assert_eq!(sb.calls().len(), n);
+    // kind sans id : refusé par la ligne de commande.
+    assert!(!sb.run(&["like", "track"]).status.success());
+
+    // Playlists.
+    let count = || db_value::<i64>(&sb, "SELECT songCount FROM playlists WHERE id = 'p1'");
+    assert_eq!(count(), 42);
+    sb.ok(&["playlist", "add", "p1", "track", "t3"]);
+    assert_eq!(query_count(&sb, "updatePlaylist", "songIdToAdd=t3"), 1);
+    assert_eq!(count(), 43);
+    sb.ok(&["playlist", "add", "p1", "album", "al1"]);
+    let album_add = sb
+        .calls()
+        .into_iter()
+        .rev()
+        .find(|c| c.starts_with("updatePlaylist?"))
+        .unwrap();
+    for id in ["t1", "t2", "t3"] {
+        assert!(
+            album_add.contains(&format!("songIdToAdd={id}")),
+            "{album_add}"
+        );
+    }
+    assert_eq!(count(), 46);
+    sb.ok(&["playlist", "remove", "p1", "0"]);
+    assert_eq!(query_count(&sb, "updatePlaylist", "songIndexToRemove=0"), 1);
+    assert_eq!(count(), 45);
+    let o = sb.run(&["playlist", "remove", "p1", "99"]);
+    assert!(!o.status.success());
+    assert_eq!(count(), 45);
+    sb.ok(&["playlist", "create", "Ma liste", "track", "t1"]);
+    assert_eq!(query_count(&sb, "createPlaylist", "songId=t1"), 1);
+    assert_eq!(
+        db_value::<String>(&sb, "SELECT name FROM playlists WHERE id = 'p9'"),
+        "Ma liste"
+    );
+    sb.ok(&["playlist", "rename", "p9", "Autre", "nom"]);
+    assert_eq!(
+        db_value::<String>(&sb, "SELECT name FROM playlists WHERE id = 'p9'"),
+        "Autre nom"
+    );
+    sb.ok(&["playlist", "delete", "p9"]);
+    assert_eq!(
+        db_value::<i64>(&sb, "SELECT count(*) FROM playlists WHERE id = 'p9'"),
+        0
+    );
+    // Sous-menu du lanceur.
+    let pick: Value =
+        serde_json::from_str(&sb.ok(&["playlist", "pick", "--json", "track", "t1"])).unwrap();
+    assert_eq!(pick[0]["name"], "Nouvelle playlist…");
+    assert_eq!(
+        pick[0]["action"]["command"],
+        "xdg-terminal-exec poste music playlist create --prompt track t1"
+    );
+    assert_eq!(
+        pick[1]["action"]["command"],
+        "poste music playlist add p1 track t1"
+    );
+
+    // Mixes locaux.
+    let mixes: Value = serde_json::from_str(&sb.ok(&["mixes", "--json"])).unwrap();
+    assert_eq!(mixes[0]["name"], "Mix perso");
+    assert_eq!(mixes[0]["icon"], "󰒝");
+    assert_eq!(mixes[0]["action"]["command"], "poste music mix me");
+    assert_eq!(mixes[1]["name"], "Redécouvertes");
+    assert_eq!(mixes[1]["icon"], "󰄉");
+    let streams = sb
+        .calls()
+        .iter()
+        .filter(|c| c.starts_with("stream?"))
+        .count();
+    let printed = sb.ok(&["mix", "me", "--print", "--seed", "1"]);
+    assert_eq!(printed.lines().count(), 3, "{printed}");
+    assert_eq!(
+        printed,
+        sb.ok(&["mix", "me", "--print", "--seed", "1"]),
+        "même graine, même mix"
+    );
+    let list: Value =
+        serde_json::from_str(&sb.ok(&["mix", "me", "--json", "--seed", "1"])).unwrap();
+    assert_eq!(list.as_array().unwrap().len(), 3);
+    assert!(list[0]["action"]["command"]
+        .as_str()
+        .unwrap()
+        .starts_with("poste music play track t"));
+    assert_eq!(
+        sb.calls()
+            .iter()
+            .filter(|c| c.starts_with("stream?"))
+            .count(),
+        streams
+    );
+    assert!(
+        !sb.socket().exists(),
+        "--print et --json ne lancent pas le démon"
+    );
+    assert!(!sb
+        .run(&["mix", "genre", "Disco", "--print"])
+        .status
+        .success());
+
+    // Lecture d'un mix, favori du morceau en cours (now, MPRIS), ajout à une playlist.
+    let n_api = sb
+        .calls()
+        .iter()
+        .filter(|c| c.starts_with("getSong?") || c.starts_with("getAlbum?"))
+        .count();
+    let out = sb.ok(&["mix", "me", "--seed", "1"]);
+    assert!(out.contains("3 morceaux"), "{out}");
+    wait_until(5, "lecture du mix", || sb.now()["state"] == "playing");
+    assert_eq!(
+        sb.calls()
+            .iter()
+            .filter(|c| c.starts_with("getSong?") || c.starts_with("getAlbum?"))
+            .count(),
+        n_api,
+        "les morceaux du mix sont résolus localement"
+    );
+    let cur = sb.now();
+    let id = cur["id"].as_str().unwrap().to_string();
+    assert_eq!(cur["starred"], false);
+    let conn = sb.bus_addr.as_ref().map(|a| {
+        zbus::blocking::connection::Builder::address(a.as_str())
+            .unwrap()
+            .build()
+            .unwrap()
+    });
+    let proxy = conn
+        .as_ref()
+        .map(|c| mpris(c, &format!("org.mpris.MediaPlayer2.{}", sb.bus_name)));
+    let mpris_starred = |p: &Proxy<'_>| -> bool {
+        metadata(p)["poste:starred"]
+            .try_clone()
+            .unwrap()
+            .try_into()
+            .unwrap()
+    };
+    if let Some(p) = &proxy {
+        wait_until(5, "MPRIS", || metadata(p).contains_key("poste:starred"));
+        assert!(!mpris_starred(p));
+    }
+    let out = sb.ok(&["like"]);
+    assert!(out.contains("Ajouté aux favoris"), "{out}");
+    assert_eq!(sb.now()["starred"], true);
+    assert_eq!(query_count(&sb, "star", &format!("&id={id}")), 1);
+    assert!(db_value::<bool>(
+        &sb,
+        &format!("SELECT starred IS NOT NULL FROM tracks WHERE id = '{id}'")
+    ));
+    if let Some(p) = &proxy {
+        wait_until(3, "poste:starred", || mpris_starred(p));
+    }
+    sb.ok(&["like", "--toggle"]);
+    assert_eq!(sb.now()["starred"], false);
+    if let Some(p) = &proxy {
+        wait_until(3, "poste:starred retiré", || !mpris_starred(p));
+    }
+    let adds = query_count(&sb, "updatePlaylist", &format!("songIdToAdd={id}"));
+    sb.ok(&["playlist", "add", "p1"]);
+    assert_eq!(
+        query_count(&sb, "updatePlaylist", &format!("songIdToAdd={id}")),
+        adds + 1
+    );
+    let searched: Value = serde_json::from_str(&sb.ok(&["search", "--json", "Titre"])).unwrap();
+    let labels: Vec<&str> = searched
+        .as_array()
+        .unwrap()
+        .iter()
+        .flat_map(|e| e["actions"].as_array().unwrap())
+        .map(|a| a["label"].as_str().unwrap())
+        .collect();
+    assert!(labels.contains(&"J'aime") && labels.contains(&"Ajouter à une playlist…"));
+    // Mix instantané à la suite de la file.
+    let len = sb.now()["queue_len"].as_u64().unwrap();
+    sb.ok(&["mix", "album", "al1", "--queue", "--seed", "2"]);
+    assert!(sb.now()["queue_len"].as_u64().unwrap() > len);
+    sb.ok(&["stop"]);
+    assert!(!sb.log().contains(TOKEN));
+}
+
+#[test]
+fn favoris_et_mixes_selon_l_etat_de_connexion() {
+    // Pas connecté.
+    let sb = Sandbox::new(false);
+    for args in [
+        &["like", "track", "t1"][..],
+        &["playlist", "add", "p1", "track", "t1"],
+        &["playlist", "create", "x"],
+        &["playlist", "delete", "p1"],
+    ] {
+        let o = sb.run(args);
+        assert_eq!(o.status.code(), Some(1), "{args:?}");
+        assert!(
+            String::from_utf8_lossy(&o.stderr).contains("poste music login"),
+            "{args:?}"
+        );
+    }
+    for args in [
+        &["mixes", "--json"][..],
+        &["mix", "me", "--json"],
+        &["playlist", "pick", "--json"],
+    ] {
+        let o = sb.run(args);
+        assert_eq!(o.status.code(), Some(0), "{args:?}");
+        let v: Value = serde_json::from_slice(&o.stdout).unwrap();
+        assert_eq!(v.as_array().unwrap().len(), 1);
+        assert_eq!(v[0]["id"], "login");
+    }
+    assert_eq!(sb.run(&["mix", "me"]).status.code(), Some(1));
+
+    // Jeton refusé : une seule entrée en JSON, code 1 sinon, marqueur posé.
+    let sb = Sandbox::new(true);
+    sb.ok(&["sync", "--full"]);
+    *sb.fake.state.expected_token.lock().unwrap() = "autre".into();
+    let o = sb.run(&["like", "track", "t1"]);
+    assert_eq!(o.status.code(), Some(1));
+    assert!(sb.home().join(".cache/poste/music/auth-refused").exists());
+    assert!(!db_value::<bool>(
+        &sb,
+        "SELECT starred IS NOT NULL FROM tracks WHERE id = 't1'"
+    ));
+    let o = sb.run(&["mixes", "--json"]);
+    assert_eq!(o.status.code(), Some(0));
+    assert_eq!(
+        serde_json::from_slice::<Value>(&o.stdout).unwrap()[0]["id"],
+        "login"
+    );
+
+    // Serveur injoignable : code 2, copie inchangée, pas de demande de reconnexion.
+    let sb = Sandbox::new(true);
+    sb.ok(&["sync", "--full"]);
+    *sb.fake.state.raw.lock().unwrap() = Some((503, "x".into()));
+    let o = sb.run(&["like", "track", "t1"]);
+    assert_eq!(o.status.code(), Some(2));
+    assert!(!String::from_utf8_lossy(&o.stderr).contains("poste music login"));
+    let o = sb.run(&["playlist", "add", "p1", "track", "t1"]);
+    assert_eq!(o.status.code(), Some(2));
+    assert_eq!(
+        db_value::<i64>(&sb, "SELECT songCount FROM playlists WHERE id = 'p1'"),
+        42
+    );
+    // Les mixes ne dépendent que de la copie : ils marchent hors ligne ; jouer demande le serveur.
+    assert_eq!(
+        sb.ok(&["mix", "me", "--print", "--seed", "1"])
+            .lines()
+            .count(),
+        3
+    );
+    let o = sb.run(&["mix", "me", "--seed", "1"]);
+    assert_eq!(o.status.code(), Some(2));
+    assert!(!sb.socket().exists());
+    assert!(!sb.home().join(".cache/poste/music/auth-refused").exists());
+}

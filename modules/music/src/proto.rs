@@ -67,6 +67,11 @@ pub enum Request {
     SetVolume {
         volume: f64,
     },
+    /// Un morceau vient d'être aimé ou ne l'est plus : met à jour la file.
+    SetStarred {
+        id: String,
+        starred: bool,
+    },
 }
 
 /// État de lecture, pour `now`.
@@ -103,6 +108,9 @@ pub struct Now {
     /// De 0 à 1.
     #[serde(default)]
     pub volume: f64,
+    /// Le morceau en cours est un favori.
+    #[serde(default)]
+    pub starred: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
@@ -197,6 +205,10 @@ mod tests {
                 position_us: 10,
             },
             Request::SetVolume { volume: 0.5 },
+            Request::SetStarred {
+                id: "s1".into(),
+                starred: true,
+            },
         ];
         for r in reqs {
             let line = encode(&r).unwrap();

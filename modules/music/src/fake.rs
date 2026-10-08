@@ -27,11 +27,41 @@ pub struct State {
     pub n_requests: AtomicUsize,
 }
 
+/// Décode `%XX` et `+` d'une valeur de requête.
+fn decode(v: &str) -> String {
+    let b = v.as_bytes();
+    let mut out = Vec::with_capacity(b.len());
+    let mut i = 0;
+    while i < b.len() {
+        match b[i] {
+            b'+' => out.push(b' '),
+            b'%' if i + 2 < b.len() && u8::from_str_radix(&v[i + 1..i + 3], 16).is_ok() => {
+                out.push(u8::from_str_radix(&v[i + 1..i + 3], 16).unwrap());
+                i += 2;
+            }
+            c => out.push(c),
+        }
+        i += 1;
+    }
+    String::from_utf8_lossy(&out).to_string()
+}
+
 fn param(query: &str, key: &str) -> Option<String> {
     query.split('&').find_map(|kv| {
         let (k, v) = kv.split_once('=')?;
-        (k == key).then(|| v.replace("%20", " "))
+        (k == key).then(|| decode(v))
     })
+}
+
+/// Toutes les valeurs d'un paramètre répété.
+pub fn params(query: &str, key: &str) -> Vec<String> {
+    query
+        .split('&')
+        .filter_map(|kv| {
+            let (k, v) = kv.split_once('=')?;
+            (k == key).then(|| decode(v))
+        })
+        .collect()
 }
 
 fn page(items: &[Value], query: &str, count: &str, offset: &str) -> Vec<Value> {
@@ -212,7 +242,15 @@ impl State {
             ),
             "getPlaylist" => ok(json!({"playlist": {"id": "p1", "name": "Daft Mix",
                 "entry": songs}})),
-            "scrobble" => ok(json!({})),
+            "scrobble" | "star" | "unstar" | "updatePlaylist" | "deletePlaylist" => ok(json!({})),
+            "createPlaylist" => {
+                let n = params(query, "songId").len();
+                ok(
+                    json!({"playlist": {"id": "p9", "name": param(query, "name").unwrap_or_default(),
+                    "songCount": n, "duration": n * 200, "owner": "kris",
+                    "changed": "2026-10-08T10:00:00Z"}}),
+                )
+            }
             _ => no_such(method),
         }
     }

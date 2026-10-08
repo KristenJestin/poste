@@ -48,7 +48,7 @@ commands = [{ name = "status", description = "état du dépôt" }]   # facultati
 | Module | Rôle |
 | --- | --- |
 | [`sys`](modules/sys/README.md) | gère le dépôt : construction, installation, état, git. Toujours installé. |
-| [`music`](modules/music/README.md) | client Navidrome : connexion, copie locale de la bibliothèque, recherche. |
+| [`music`](modules/music/README.md) | client Navidrome : connexion, copie locale, recherche, lecture, favoris, playlists, mixes. |
 
 Un module est une application à part, dans `modules/<nom>/`, avec son `README.md`,
 son `AGENTS.md` et sa fiche `module.toml`. Il peut fournir des dossiers facultatifs

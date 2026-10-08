@@ -30,6 +30,8 @@ pub struct MetaInfo {
     pub length_us: i64,
     pub art_url: Option<String>,
     pub quality: String,
+    /// Morceau aimé (clé `poste:starred`).
+    pub starred: bool,
 }
 
 /// État publié : lu par les propriétés, comparé pour signaler les changements.
@@ -98,6 +100,7 @@ pub fn metadata(meta: &Option<MetaInfo>) -> HashMap<String, OwnedValue> {
     if let Some(u) = &t.art_url {
         m.insert("mpris:artUrl".into(), owned(Value::from(u.clone())));
     }
+    m.insert("poste:starred".into(), owned(Value::Bool(t.starred)));
     if !t.quality.is_empty() {
         m.insert("xesam:comment".into(), string_list(vec![t.quality.clone()]));
         m.insert(
@@ -394,6 +397,7 @@ mod tests {
             length_us: 200_000_000,
             art_url: Some("file:///c/a.img".into()),
             quality: "FLAC · 16 bit / 44.1 kHz · 900 kbps".into(),
+            starred: true,
         }
     }
 
@@ -417,6 +421,7 @@ mod tests {
                 "mpris:length",
                 "mpris:trackid",
                 "poste:quality",
+                "poste:starred",
                 "xesam:album",
                 "xesam:albumArtist",
                 "xesam:artist",
@@ -425,6 +430,7 @@ mod tests {
             ]
         );
         assert!(!m.contains_key("xesam:url"));
+        assert!(m["poste:starred"].downcast_ref::<bool>().unwrap());
         let text = format!("{m:?}");
         assert!(!text.contains("stream.view") && !text.contains("http"));
         assert_eq!(

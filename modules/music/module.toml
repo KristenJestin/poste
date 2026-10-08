@@ -1,5 +1,5 @@
 name = "music"
-description = "Client Navidrome : connexion, copie locale de la bibliothèque, recherche, lecture"
+description = "Client Navidrome : connexion, copie locale de la bibliothèque, recherche, lecture, favoris, playlists, mixes"
 commands = [
   { name = "login", description = "se connecte à un serveur Navidrome (secret dans le trousseau)" },
   { name = "logout", description = "supprime le secret du trousseau" },
@@ -16,4 +16,9 @@ commands = [
   { name = "prev", description = "morceau précédent (ou début du morceau)" },
   { name = "stop", description = "arrête la lecture et vide la file" },
   { name = "now", description = "morceau en cours, position, qualité, état (--json pour l'île)" },
+  { name = "like", description = "aime le morceau en cours ou like <track|album|artist> <id> (--toggle pour inverser)" },
+  { name = "unlike", description = "retire des favoris (morceau en cours ou unlike <kind> <id>)" },
+  { name = "playlist", description = "écrit dans les playlists : add, remove, create, rename, delete, pick" },
+  { name = "mix", description = "mix local : me, rediscover, track|album|artist|genre <id ou nom> (--print, --queue, --json, --seed)" },
+  { name = "mixes", description = "mixes proposés au lanceur : perso, redécouvertes, genres (--json)" },
 ]

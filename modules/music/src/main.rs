@@ -8,8 +8,12 @@ mod daemon;
 mod db;
 #[cfg(test)]
 mod fake;
+mod likes;
+mod mix;
+mod mixcmd;
 mod mpris;
 mod notify;
+mod playlists;
 mod proto;
 mod resolve;
 mod rules;
@@ -58,6 +62,89 @@ impl From<KindArg> for search::Kind {
             KindArg::Track => search::Kind::Track,
         }
     }
+}
+
+/// Ce qu'on peut aimer.
+#[derive(Clone, Copy, ValueEnum)]
+enum StarArg {
+    Track,
+    Album,
+    Artist,
+}
+
+impl From<StarArg> for db::StarKind {
+    fn from(k: StarArg) -> Self {
+        match k {
+            StarArg::Track => db::StarKind::Track,
+            StarArg::Album => db::StarKind::Album,
+            StarArg::Artist => db::StarKind::Artist,
+        }
+    }
+}
+
+/// Un mix.
+#[derive(Subcommand)]
+enum MixWhat {
+    /// Mix personnel sur toute la bibliothèque
+    Me,
+    /// Albums écoutés mais pas depuis 90 jours
+    Rediscover,
+    /// Mix instantané autour d'un morceau (identifiant ou titre)
+    Track {
+        #[arg(required = true, num_args = 1..)]
+        id: Vec<String>,
+    },
+    /// Mix instantané autour d'un album (identifiant ou nom)
+    Album {
+        #[arg(required = true, num_args = 1..)]
+        id: Vec<String>,
+    },
+    /// Mix instantané autour d'un artiste (identifiant ou nom)
+    Artist {
+        #[arg(required = true, num_args = 1..)]
+        id: Vec<String>,
+    },
+    /// Mix d'un genre (nom)
+    Genre {
+        #[arg(required = true, num_args = 1..)]
+        name: Vec<String>,
+    },
+}
+
+/// Écriture des playlists.
+#[derive(Subcommand)]
+enum PlaylistCmd {
+    /// Ajoute un morceau, un album ou le morceau en cours (défaut) à une playlist
+    Add {
+        playlist_id: String,
+        /// `current`, `track <id>` ou `album <id>`
+        target: Vec<String>,
+    },
+    /// Retire le morceau de rang <index> (à partir de 0)
+    Remove { playlist_id: String, index: usize },
+    /// Crée une playlist, éventuellement avec un morceau, un album ou le morceau en cours
+    Create {
+        /// <nom> puis `current`, `track <id>` ou `album <id>` (avec --prompt : la cible seule)
+        args: Vec<String>,
+        /// Demande le nom au clavier
+        #[arg(long)]
+        prompt: bool,
+    },
+    /// Renomme une playlist
+    Rename {
+        playlist_id: String,
+        #[arg(required = true, num_args = 1..)]
+        name: Vec<String>,
+    },
+    /// Supprime une playlist
+    Delete { playlist_id: String },
+    /// Liste des playlists de l'utilisateur, avec l'action d'ajout (sous-menu du lanceur)
+    Pick {
+        #[arg(long)]
+        json: bool,
+        /// `current` (défaut), `track <id>` ou `album <id>`
+        target: Vec<String>,
+    },
 }
 
 #[derive(Subcommand)]
@@ -115,6 +202,53 @@ enum Cmd {
         #[arg(long)]
         json: bool,
     },
+    /// Aime le morceau en cours, ou un morceau, album ou artiste
+    Like {
+        #[arg(requires = "id")]
+        kind: Option<StarArg>,
+        #[arg(requires = "kind")]
+        id: Option<String>,
+        /// Inverse l'état actuel au lieu d'aimer
+        #[arg(long)]
+        toggle: bool,
+    },
+    /// Retire des favoris le morceau en cours, ou un morceau, album ou artiste
+    Unlike {
+        #[arg(requires = "id")]
+        kind: Option<StarArg>,
+        #[arg(requires = "kind")]
+        id: Option<String>,
+    },
+    /// Écrit dans les playlists du serveur
+    Playlist {
+        #[command(subcommand)]
+        cmd: PlaylistCmd,
+    },
+    /// Calcule un mix sur la copie locale et le lit
+    Mix {
+        #[command(subcommand)]
+        what: MixWhat,
+        /// Ajoute à la file au lieu de la remplacer
+        #[arg(long, global = true)]
+        queue: bool,
+        /// Affiche la liste sans rien jouer
+        #[arg(long, global = true)]
+        print: bool,
+        /// Sortie JSON au format du lanceur (sans rien jouer)
+        #[arg(long, global = true)]
+        json: bool,
+        /// Graine du hasard (résultats reproductibles)
+        #[arg(long, global = true)]
+        seed: Option<u64>,
+        /// Nombre de morceaux
+        #[arg(long, global = true, default_value_t = mix::DEFAULT_SIZE)]
+        size: usize,
+    },
+    /// Mixes proposés au lanceur : mix perso, redécouvertes, genres
+    Mixes {
+        #[arg(long)]
+        json: bool,
+    },
     /// Démon de lecture (lancé par `play` et `queue`)
     #[command(hide = true)]
     Daemon,
@@ -154,10 +288,142 @@ fn run(cli: Cli) -> Result<ExitCode> {
         Cmd::Prev => Ok(ctl::control(proto::Request::Prev)),
         Cmd::Stop => Ok(ctl::control(proto::Request::Stop)),
         Cmd::Now { json } => Ok(ctl::now(json)),
+        Cmd::Like { kind, id, toggle } => {
+            let mode = if toggle {
+                likes::Mode::Toggle
+            } else {
+                likes::Mode::Like
+            };
+            Ok(likes::run(&env, star_target(kind, id), mode))
+        }
+        Cmd::Unlike { kind, id } => {
+            Ok(likes::run(&env, star_target(kind, id), likes::Mode::Unlike))
+        }
+        Cmd::Playlist { cmd } => Ok(playlist_cmd(&env, cmd)),
+        Cmd::Mix {
+            what,
+            queue,
+            print,
+            json,
+            seed,
+            size,
+        } => {
+            let what = match what {
+                MixWhat::Me => mixcmd::What::Me,
+                MixWhat::Rediscover => mixcmd::What::Rediscover,
+                MixWhat::Track { id } => mixcmd::What::Source(mix::SourceKind::Track, id.join(" ")),
+                MixWhat::Album { id } => mixcmd::What::Source(mix::SourceKind::Album, id.join(" ")),
+                MixWhat::Artist { id } => {
+                    mixcmd::What::Source(mix::SourceKind::Artist, id.join(" "))
+                }
+                MixWhat::Genre { name } => {
+                    mixcmd::What::Source(mix::SourceKind::Genre, name.join(" "))
+                }
+            };
+            let o = mixcmd::Opts {
+                queue,
+                print,
+                json,
+                seed,
+                size: size.max(1),
+            };
+            Ok(mixcmd::run(&env, &what, &o))
+        }
+        Cmd::Mixes { json } => Ok(emit_values(mixcmd::mixes(&env), json)),
         Cmd::Daemon => {
             daemon::run(&env)?;
             Ok(ExitCode::SUCCESS)
         }
+    }
+}
+
+fn star_target(kind: Option<StarArg>, id: Option<String>) -> likes::Target {
+    match (kind, id) {
+        (Some(k), Some(id)) => likes::Target::Item(k.into(), id),
+        _ => likes::Target::Current,
+    }
+}
+
+fn playlist_cmd(env: &Env, cmd: PlaylistCmd) -> ExitCode {
+    let target =
+        |args: &[String]| playlists::Target::parse(args).map_err(|m| anyhow::anyhow!("{m}"));
+    let r: Result<ExitCode> = (|| {
+        Ok(match cmd {
+            PlaylistCmd::Add {
+                playlist_id,
+                target: t,
+            } => playlists::add_cmd(env, &playlist_id, &target(&t)?),
+            PlaylistCmd::Remove { playlist_id, index } => {
+                playlists::remove_cmd(env, &playlist_id, index)
+            }
+            PlaylistCmd::Create { args, prompt } => {
+                let (name, rest) = if prompt {
+                    (ask("Nom de la playlist", None)?, &args[..])
+                } else {
+                    match args.split_first() {
+                        Some((n, rest)) => (n.clone(), rest),
+                        None => bail!("nom de playlist attendu (ou --prompt)"),
+                    }
+                };
+                let t = if rest.is_empty() {
+                    None
+                } else {
+                    Some(target(rest)?)
+                };
+                playlists::create_cmd(env, &name, t.as_ref())
+            }
+            PlaylistCmd::Rename { playlist_id, name } => {
+                playlists::rename_cmd(env, &playlist_id, &name.join(" "))
+            }
+            PlaylistCmd::Delete { playlist_id } => playlists::delete_cmd(env, &playlist_id),
+            PlaylistCmd::Pick { json, target: t } => {
+                let t = target(&t)?;
+                match (playlists::pick_cmd(env, &t), json) {
+                    (Ok(v), true) => {
+                        println!("{}", serde_json::Value::Array(v));
+                        ExitCode::SUCCESS
+                    }
+                    (Ok(v), false) => {
+                        print!("{}", playlists::render_pick(&v));
+                        ExitCode::SUCCESS
+                    }
+                    (Err(f), true) => {
+                        println!("{}", serde_json::Value::Array(vec![f.launcher_entry()]));
+                        ExitCode::SUCCESS
+                    }
+                    (Err(f), false) => fail(&f),
+                }
+            }
+        })
+    })();
+    r.unwrap_or_else(|e| {
+        eprintln!("poste music : {e:#}");
+        ExitCode::from(1)
+    })
+}
+
+/// Comme `emit`, pour des entrées JSON déjà prêtes.
+fn emit_values(r: Result<Vec<serde_json::Value>, Failure>, json: bool) -> ExitCode {
+    match (r, json) {
+        (Ok(v), true) => {
+            println!("{}", serde_json::Value::Array(v));
+            ExitCode::SUCCESS
+        }
+        (Ok(v), false) => {
+            for e in v {
+                println!(
+                    "{}\n    {}",
+                    e["name"].as_str().unwrap_or(""),
+                    e["subtitle"].as_str().unwrap_or("")
+                );
+            }
+            ExitCode::SUCCESS
+        }
+        (Err(f), true) => {
+            println!("{}", serde_json::Value::Array(vec![f.launcher_entry()]));
+            ExitCode::SUCCESS
+        }
+        (Err(f), false) => fail(&f),
     }
 }
 

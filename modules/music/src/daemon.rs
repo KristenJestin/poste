@@ -279,6 +279,7 @@ impl Engine {
             length_us: (e.info.duration * 1_000_000) as i64,
             art_url: art,
             quality: e.info.quality(),
+            starred: e.info.starred,
         }
     }
 
@@ -338,6 +339,7 @@ impl Engine {
             index: self.cur.map_or(0, |i| i + 1),
             queue_len: self.queue.len(),
             volume: self.volume(),
+            starred: e.info.starred,
         }
     }
 
@@ -375,6 +377,12 @@ impl Engine {
             }
             Request::Seek { offset_us } => self.seek_relative(offset_us),
             Request::SetPosition { track, position_us } => self.seek_absolute(track, position_us),
+            Request::SetStarred { id, starred } => {
+                for e in self.queue.iter_mut().filter(|e| e.info.id == id) {
+                    e.info.starred = starred;
+                }
+                Ok(())
+            }
             Request::SetVolume { volume } => {
                 let v = (volume.clamp(0.0, 1.3) * 100.0).round();
                 self.mpv.set_property("volume", v).map_err(mpv_err)
@@ -578,6 +586,12 @@ impl Engine {
 
     fn start_track(&mut self, index: usize) {
         self.cur = Some(index);
+        // La copie locale est plus fraîche que la file (favoris changés ailleurs).
+        if let Some(id) = self.queue.get(index).map(|e| e.info.id.clone()) {
+            if let Ok(Some(s)) = db::track_starred(&self.env, &id) {
+                self.queue[index].info.starred = s;
+            }
+        }
         let Some(e) = self.queue.get(index) else {
             return;
         };

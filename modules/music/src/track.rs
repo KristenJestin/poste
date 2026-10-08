@@ -20,6 +20,9 @@ pub struct TrackInfo {
     pub sampling_rate: u64,
     /// Identifiant de pochette (`coverArt`).
     pub cover: Option<String>,
+    /// Morceau aimé (favori).
+    #[serde(default)]
+    pub starred: bool,
 }
 
 fn text(v: &Value, k: &str) -> String {
@@ -64,6 +67,7 @@ impl TrackInfo {
             bit_depth: num(v, "bitDepth"),
             sampling_rate: num(v, "samplingRate"),
             cover,
+            starred: v.get("starred").is_some_and(|s| !s.is_null()),
         })
     }
 
@@ -150,14 +154,16 @@ mod tests {
     #[test]
     fn morceau_depuis_l_api() {
         let v = json!({"id":"s1","title":"T","artist":"A","album":"B","duration":200,
-            "suffix":"flac","bitRate":900,"bitDepth":16,"samplingRate":44100,"coverArt":"mf-s1"});
+            "suffix":"flac","bitRate":900,"bitDepth":16,"samplingRate":44100,"coverArt":"mf-s1","starred":"2026-01-01T00:00:00Z"});
         let t = TrackInfo::from_api(&v).unwrap();
+        assert!(t.starred);
         assert_eq!(t.album_artist, "A");
         assert_eq!(t.cover.as_deref(), Some("mf-s1"));
         assert_eq!(t.quality(), "FLAC · 16 bit / 44.1 kHz · 900 kbps");
         let v = json!({"id":"s2","title":"T","artist":"A","displayAlbumArtist":"Various"});
         assert_eq!(TrackInfo::from_api(&v).unwrap().album_artist, "Various");
         assert!(TrackInfo::from_api(&json!({"title":"x"})).is_none());
+        assert!(!TrackInfo::from_api(&json!({"id":"s3"})).unwrap().starred);
     }
 
     #[test]

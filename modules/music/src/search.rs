@@ -10,9 +10,13 @@ pub const LIMIT_ALBUMS: usize = 8;
 pub const LIMIT_TRACKS: usize = 12;
 
 /// Icônes Nerd Font des actions secondaires.
-const ICON_PLAY: &str = "\u{f040a}";
+pub const ICON_PLAY: &str = "\u{f040a}";
 const ICON_SHUFFLE: &str = "\u{f049f}";
-const ICON_QUEUE: &str = "\u{f0415}";
+pub const ICON_QUEUE: &str = "\u{f0415}";
+pub const ICON_MIX: &str = "\u{f049d}";
+const ICON_LIKE: &str = "\u{f02d1}";
+const ICON_UNLIKE: &str = "\u{f02d5}";
+const ICON_TO_PLAYLIST: &str = "\u{f0cb8}";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Kind {
@@ -54,6 +58,8 @@ pub struct Hit {
     pub count: i64,
     pub duration: i64,
     pub cover: Option<String>,
+    /// Favori d'après la copie locale.
+    pub starred: bool,
 }
 
 /// Requête FTS5 à préfixes : « daf pun » donne `"daf"* "pun"*`.
@@ -94,6 +100,7 @@ pub fn search(conn: &Connection, input: &str) -> Result<Vec<Hit>> {
         count: 0,
         duration: 0,
         cover: None,
+        starred: false,
     };
     let mut out = hits(
         conn,
@@ -113,7 +120,7 @@ pub fn search(conn: &Connection, input: &str) -> Result<Vec<Hit>> {
     )?;
     out.extend(hits(
         conn,
-        "SELECT a.id, a.name, a.albumCount, a.coverArt
+        "SELECT a.id, a.name, a.albumCount, a.coverArt, a.starred IS NOT NULL
          FROM fts_artists f JOIN artists a ON a.id = f.id
          WHERE fts_artists MATCH ?1 ORDER BY f.rank LIMIT ?2",
         &q,
@@ -122,13 +129,14 @@ pub fn search(conn: &Connection, input: &str) -> Result<Vec<Hit>> {
             Ok(Hit {
                 count: r.get(2)?,
                 cover: r.get(3)?,
+                starred: r.get(4)?,
                 ..blank(Kind::Artist, r.get(0)?, r.get(1)?)
             })
         },
     )?);
     out.extend(hits(
         conn,
-        "SELECT a.id, a.name, a.artist, a.year, a.coverArt
+        "SELECT a.id, a.name, a.artist, a.year, a.coverArt, a.starred IS NOT NULL
          FROM fts_albums f JOIN albums a ON a.id = f.id
          WHERE fts_albums MATCH ?1 ORDER BY f.rank LIMIT ?2",
         &q,
@@ -138,13 +146,14 @@ pub fn search(conn: &Connection, input: &str) -> Result<Vec<Hit>> {
                 artist: r.get(2)?,
                 year: r.get(3)?,
                 cover: r.get(4)?,
+                starred: r.get(5)?,
                 ..blank(Kind::Album, r.get(0)?, r.get(1)?)
             })
         },
     )?);
     out.extend(hits(
         conn,
-        "SELECT t.id, t.title, t.artist, t.album, t.coverArt
+        "SELECT t.id, t.title, t.artist, t.album, t.coverArt, t.starred IS NOT NULL
          FROM fts_tracks f JOIN tracks t ON t.id = f.id
          WHERE fts_tracks MATCH ?1 ORDER BY f.rank, t.playCount DESC LIMIT ?2",
         &q,
@@ -154,6 +163,7 @@ pub fn search(conn: &Connection, input: &str) -> Result<Vec<Hit>> {
                 artist: r.get(2)?,
                 album: r.get(3)?,
                 cover: r.get(4)?,
+                starred: r.get(5)?,
                 ..blank(Kind::Track, r.get(0)?, r.get(1)?)
             })
         },
@@ -178,6 +188,7 @@ pub fn playlists(conn: &Connection) -> Result<Vec<Hit>> {
             count: r.get(2)?,
             duration: r.get(3)?,
             cover: r.get(4)?,
+            starred: false,
         })
     })?;
     Ok(rows.collect::<rusqlite::Result<_>>()?)
@@ -213,7 +224,7 @@ impl Hit {
                 }
                 s
             }
-            Kind::Track => format!("Track · {} — {}", self.artist, self.album),
+            Kind::Track => format!("Track · {} · {}", self.artist, self.album),
         }
     }
 
@@ -247,6 +258,23 @@ impl Hit {
             ICON_QUEUE,
             self.command("queue", ""),
         ));
+        if self.kind != Kind::Playlist {
+            actions.push(act("Mix instantané", ICON_MIX, self.command("mix", "")));
+            let (label, icon, verb) = if self.starred {
+                ("Je n'aime plus", ICON_UNLIKE, "unlike")
+            } else {
+                ("J'aime", ICON_LIKE, "like")
+            };
+            actions.push(act(label, icon, self.command(verb, "")));
+        }
+        if matches!(self.kind, Kind::Track | Kind::Album) {
+            actions.push(json!({
+                "label": "Ajouter à une playlist…",
+                "icon": ICON_TO_PLAYLIST,
+                "action": {"type": "submenu",
+                    "command": format!("poste music playlist pick --json {} {}", self.kind.word(), shell_word(&self.id))}
+            }));
+        }
         let mut v = json!({
             "id": format!("{}:{}", self.kind.word(), self.id),
             "name": self.name,
@@ -395,14 +423,94 @@ mod tests {
         );
         // Un morceau n'a pas de lecture aléatoire.
         let t = v[3]["actions"].as_array().unwrap();
-        assert_eq!(t.len(), 2);
-        assert_eq!(t[1]["label"], "Ajouter à la file");
+        let labels: Vec<_> = t.iter().map(|a| a["label"].as_str().unwrap()).collect();
+        assert_eq!(
+            labels,
+            [
+                "Lire",
+                "Ajouter à la file",
+                "Mix instantané",
+                "J'aime",
+                "Ajouter à une playlist…"
+            ]
+        );
+        assert_eq!(t[2]["icon"], "󰒝");
+        assert_eq!(t[2]["action"]["command"], "poste music mix track t1");
+        assert_eq!(t[3]["icon"], "󰋑");
+        assert_eq!(t[3]["action"]["command"], "poste music like track t1");
+        assert_eq!(t[4]["icon"], "󰲸");
+        assert_eq!(t[4]["action"]["type"], "submenu");
+        assert_eq!(
+            t[4]["action"]["command"],
+            "poste music playlist pick --json track t1"
+        );
+        // Album : même sous-menu, avec `album <id>` ; artiste : pas de playlist ; playlist : ni l'un ni l'autre.
+        let al: Vec<_> = v[2]["actions"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|a| a["label"].as_str().unwrap())
+            .collect();
+        assert_eq!(
+            al,
+            [
+                "Lire",
+                "Shuffle",
+                "Ajouter à la file",
+                "Mix instantané",
+                "J'aime",
+                "Ajouter à une playlist…"
+            ]
+        );
+        assert_eq!(
+            v[2]["actions"][5]["action"]["command"],
+            "poste music playlist pick --json album al1"
+        );
+        assert_eq!(
+            v[2]["actions"][3]["action"]["command"],
+            "poste music mix album al1"
+        );
+        let ar: Vec<_> = v[1]["actions"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|a| a["label"].as_str().unwrap())
+            .collect();
+        assert_eq!(
+            ar,
+            [
+                "Lire",
+                "Shuffle",
+                "Ajouter à la file",
+                "Mix instantané",
+                "J'aime"
+            ]
+        );
         assert_eq!(v[1]["subtitle"], "Artist · 4 albums");
         assert_eq!(v[1]["_cover"], "ar-ar1");
         assert_eq!(v[2]["subtitle"], "Album · Daft Punk · 2001");
-        assert_eq!(v[3]["subtitle"], "Track · Daft Punk — Discovery");
+        assert_eq!(v[3]["subtitle"], "Track · Daft Punk · Discovery");
         assert_eq!(v[3]["action"]["command"], "poste music play track t1");
         assert_eq!(v[3]["_cover"], "mf-t1");
+    }
+
+    #[test]
+    fn etat_du_favori_dans_les_actions() {
+        let (_d, conn) = sample();
+        conn.execute(
+            "UPDATE tracks SET starred = '2026-01-01T00:00:00Z' WHERE id = 't1'",
+            [],
+        )
+        .unwrap();
+        let r = search(&conn, "daft").unwrap();
+        let t = r.iter().find(|h| h.kind == Kind::Track).unwrap();
+        assert!(t.starred);
+        let v = t.to_json();
+        let a = &v["actions"][3];
+        assert_eq!(a["label"], "Je n'aime plus");
+        assert_eq!(a["icon"], "󰋕");
+        assert_eq!(a["action"]["command"], "poste music unlike track t1");
+        assert!(!r.iter().find(|h| h.kind == Kind::Album).unwrap().starred);
     }
 
     #[test]

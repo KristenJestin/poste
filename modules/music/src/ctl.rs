@@ -84,7 +84,7 @@ fn exchange(stream: &UnixStream, req: &Request) -> Result<Response> {
 
 /// Échec présenté à l'utilisateur : message, notification (depuis le lanceur),
 /// code de sortie.
-fn report(f: &Failure) -> ExitCode {
+pub fn report(f: &Failure) -> ExitCode {
     eprintln!("{f}");
     let summary = match f {
         Failure::NoLogin | Failure::AuthRefused(_) => "Navidrome : connexion requise",
@@ -95,40 +95,123 @@ fn report(f: &Failure) -> ExitCode {
     ExitCode::from(f.exit_code())
 }
 
+/// Échec d'une commande qui peut viser le morceau en cours.
+pub enum Oops {
+    /// Le démon ne tourne pas, ou la file est vide.
+    NothingPlaying,
+    Failure(Failure),
+}
+
+impl From<Failure> for Oops {
+    fn from(f: Failure) -> Self {
+        Oops::Failure(f)
+    }
+}
+
+impl From<anyhow::Error> for Oops {
+    fn from(e: anyhow::Error) -> Self {
+        Oops::Failure(Failure::Internal(e))
+    }
+}
+
+/// Présente un échec : « Rien en lecture » (code 1) ou l'état de connexion.
+pub fn report_oops(o: &Oops) -> ExitCode {
+    match o {
+        Oops::NothingPlaying => {
+            eprintln!("Rien en lecture (le démon ne tourne pas ou la file est vide)");
+            notify::send("Musique", "Rien en lecture");
+            ExitCode::from(1)
+        }
+        Oops::Failure(f) => report(f),
+    }
+}
+
+/// Morceau en cours d'après le démon, sans jamais le démarrer.
+pub fn current_track() -> Result<Now, Oops> {
+    let Some(stream) = connect() else {
+        return Err(Oops::NothingPlaying);
+    };
+    match exchange(&stream, &Request::Now) {
+        Ok(Response { now: Some(n), .. }) if n.state != "stopped" && !n.id.is_empty() => Ok(n),
+        Ok(Response { now: Some(_), .. }) => Err(Oops::NothingPlaying),
+        Ok(r) => Err(Oops::Failure(Failure::Internal(anyhow!(
+            "{}",
+            r.error
+                .unwrap_or_else(|| "réponse inattendue du démon".into())
+        )))),
+        Err(e) => Err(Oops::Failure(Failure::Internal(e))),
+    }
+}
+
+/// Prévient le démon (s'il tourne) qu'un morceau a changé d'état de favori.
+pub fn tell_starred(id: &str, starred: bool) {
+    if let Some(stream) = connect() {
+        let _ = exchange(
+            &stream,
+            &Request::SetStarred {
+                id: id.to_string(),
+                starred,
+            },
+        );
+    }
+}
+
 /// `play` et `queue` : prépare la liste, démarre le démon si besoin, l'envoie.
 pub fn play_or_queue(env: &Env, kind: Kind, id: &str, shuffle: bool, queue: bool) -> ExitCode {
     match try_play_or_queue(env, kind, id, shuffle, queue) {
-        Ok(()) => ExitCode::SUCCESS,
+        Ok(n) => {
+            announce(n, queue);
+            ExitCode::SUCCESS
+        }
         Err(f) => report(&f),
     }
 }
 
-fn try_play_or_queue(
-    env: &Env,
-    kind: Kind,
-    id: &str,
-    shuffle: bool,
-    queue: bool,
-) -> Result<(), Failure> {
+fn announce(n: usize, queue: bool) {
+    println!(
+        "{} {n} morceau{}",
+        if queue {
+            "Ajouté à la file :"
+        } else {
+            "Lecture :"
+        },
+        if n > 1 { "x" } else { "" }
+    );
+}
+
+/// Connexion vérifiée avant d'envoyer quoi que ce soit au démon : le démon ne
+/// démarre que si le serveur est joignable et le jeton accepté.
+pub struct Ready {
+    running: Option<UnixStream>,
+}
+
+pub fn prepare(env: &Env) -> Result<(Client, Ready), Failure> {
     let running = connect();
     state::quick_check(env)?;
     let client: Client = state::open_client(env)?;
     if running.is_none() {
-        // Le démon ne démarre que si le serveur est joignable et le jeton accepté.
         let r = client.ping().map_err(|e| state::from_api(e, client.url()));
         state::record(env, &r);
         r?;
     }
-    let result = resolve::resolve(&client, kind, id);
-    state::record(env, &result);
-    let tracks = result?;
+    Ok((client, Ready { running }))
+}
+
+/// Envoie des morceaux au démon (démarré au besoin) : remplace la file ou l'allonge.
+pub fn deliver(
+    env: &Env,
+    ready: Ready,
+    tracks: Vec<crate::track::TrackInfo>,
+    shuffle: bool,
+    queue: bool,
+) -> Result<usize, Failure> {
     let n = tracks.len();
     let req = if queue {
         Request::Queue { tracks }
     } else {
         Request::Play { tracks, shuffle }
     };
-    let stream = match running {
+    let stream = match ready.running {
         Some(s) => s,
         None => ensure_daemon(env)?,
     };
@@ -139,16 +222,32 @@ fn try_play_or_queue(
             reply.error.unwrap_or_else(|| "refusé par le démon".into())
         )));
     }
-    println!(
-        "{} {n} morceau{}",
-        if queue {
-            "Ajouté à la file :"
-        } else {
-            "Lecture :"
-        },
-        if n > 1 { "x" } else { "" }
-    );
-    Ok(())
+    Ok(n)
+}
+
+fn try_play_or_queue(
+    env: &Env,
+    kind: Kind,
+    id: &str,
+    shuffle: bool,
+    queue: bool,
+) -> Result<usize, Failure> {
+    let (client, ready) = prepare(env)?;
+    let result = resolve::resolve(&client, kind, id);
+    state::record(env, &result);
+    deliver(env, ready, result?, shuffle, queue)
+}
+
+/// `mix` : envoie une liste déjà calculée localement.
+pub fn play_list(
+    env: &Env,
+    tracks: Vec<crate::track::TrackInfo>,
+    queue: bool,
+) -> Result<usize, Failure> {
+    let (_client, ready) = prepare(env)?;
+    let n = deliver(env, ready, tracks, false, queue)?;
+    announce(n, queue);
+    Ok(n)
 }
 
 /// Contrôles simples (`toggle`, `pause`…) : ne démarrent jamais le démon.

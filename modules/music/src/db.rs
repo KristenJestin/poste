@@ -368,6 +368,144 @@ pub fn update_track_counters(tx: &Transaction, songs: &[Value]) -> Result<()> {
     Ok(())
 }
 
+/// Table (et colonne de nom) d'un type de favori.
+fn star_table(kind: StarKind) -> (&'static str, &'static str) {
+    match kind {
+        StarKind::Track => ("tracks", "title"),
+        StarKind::Album => ("albums", "name"),
+        StarKind::Artist => ("artists", "name"),
+    }
+}
+
+/// Ce qu'on peut aimer.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StarKind {
+    Track,
+    Album,
+    Artist,
+}
+
+impl StarKind {
+    /// Paramètre de `star.view` / `unstar.view`.
+    pub fn api_param(self) -> &'static str {
+        match self {
+            StarKind::Track => "id",
+            StarKind::Album => "albumId",
+            StarKind::Artist => "artistId",
+        }
+    }
+}
+
+/// Pose (`Some(date)`) ou retire (`None`) le favori dans la copie. `false` si l'élément est inconnu.
+pub fn set_starred(conn: &Connection, kind: StarKind, id: &str, at: Option<&str>) -> Result<bool> {
+    let (table, _) = star_table(kind);
+    let n = conn.execute(
+        &format!("UPDATE {table} SET starred = ?2 WHERE id = ?1"),
+        params![id, at],
+    )?;
+    Ok(n > 0)
+}
+
+/// État de favori local d'un élément ; `None` s'il est inconnu.
+pub fn is_starred(conn: &Connection, kind: StarKind, id: &str) -> Option<bool> {
+    let (table, _) = star_table(kind);
+    conn.query_row(
+        &format!("SELECT starred IS NOT NULL FROM {table} WHERE id = ?1"),
+        [id],
+        |r| r.get(0),
+    )
+    .ok()
+}
+
+/// Nom (titre) local d'un élément.
+pub fn name_of(conn: &Connection, kind: StarKind, id: &str) -> Option<String> {
+    let (table, col) = star_table(kind);
+    conn.query_row(
+        &format!("SELECT {col} FROM {table} WHERE id = ?1"),
+        [id],
+        |r| r.get(0),
+    )
+    .ok()
+}
+
+/// Favori d'un morceau d'après la copie, sans la créer (`None` : pas de copie ou morceau inconnu).
+pub fn track_starred(env: &Env, id: &str) -> Result<Option<bool>> {
+    let Some(conn) = open_existing(env)? else {
+        return Ok(None);
+    };
+    Ok(is_starred(&conn, StarKind::Track, id))
+}
+
+/// Durée locale d'un morceau, en secondes.
+pub fn track_duration(conn: &Connection, id: &str) -> Option<i64> {
+    conn.query_row("SELECT duration FROM tracks WHERE id = ?1", [id], |r| {
+        r.get(0)
+    })
+    .ok()
+}
+
+/// Ajoute `d_count` morceaux et `d_secs` secondes à une playlist de la copie.
+pub fn playlist_adjust(
+    conn: &Connection,
+    id: &str,
+    d_count: i64,
+    d_secs: i64,
+    at: &str,
+) -> Result<()> {
+    conn.execute(
+        "UPDATE playlists SET songCount = MAX(0, songCount + ?2), duration = MAX(0, duration + ?3),
+           changed = ?4 WHERE id = ?1",
+        params![id, d_count, d_secs, at],
+    )?;
+    Ok(())
+}
+
+/// Insère une playlist créée sur le serveur.
+pub fn playlist_insert(conn: &Connection, v: &Value) -> Result<bool> {
+    let (Some(pid), Some(name)) = (id(v), text(v, "name")) else {
+        return Ok(false);
+    };
+    conn.execute("DELETE FROM playlists WHERE id = ?1", [&pid])?;
+    conn.execute("DELETE FROM fts_playlists WHERE id = ?1", [&pid])?;
+    conn.execute(
+        "INSERT INTO playlists(id, name, songCount, duration, changed, coverArt, owner)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+        params![
+            pid,
+            name,
+            num(v, "songCount"),
+            num(v, "duration"),
+            text(v, "changed"),
+            cover(v),
+            text(v, "owner")
+        ],
+    )?;
+    conn.execute(
+        "INSERT INTO fts_playlists(id, name) VALUES (?1, ?2)",
+        params![pid, name],
+    )?;
+    Ok(true)
+}
+
+pub fn playlist_rename(conn: &Connection, id: &str, name: &str, at: &str) -> Result<()> {
+    conn.execute(
+        "UPDATE playlists SET name = ?2, changed = ?3 WHERE id = ?1",
+        params![id, name, at],
+    )?;
+    conn.execute("DELETE FROM fts_playlists WHERE id = ?1", [id])?;
+    conn.execute(
+        "INSERT INTO fts_playlists(id, name) VALUES (?1, ?2)",
+        params![id, name],
+    )?;
+    Ok(())
+}
+
+pub fn playlist_delete(conn: &Connection, id: &str) -> Result<()> {
+    conn.execute("DELETE FROM playlists WHERE id = ?1", [id])?;
+    conn.execute("DELETE FROM fts_playlists WHERE id = ?1", [id])?;
+    Ok(())
+}
+
 /// Effectifs de la copie.
 #[derive(Debug, Default, PartialEq, Eq)]
 pub struct Counts {
