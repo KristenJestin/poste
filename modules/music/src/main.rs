@@ -249,6 +249,14 @@ enum Cmd {
         #[arg(long)]
         json: bool,
     },
+    /// Contenu du lanceur sans saisie : mixes puis playlists
+    Home {
+        #[arg(long)]
+        json: bool,
+    },
+    /// Télécharge des vignettes (identifiants sur l'entrée standard, lancé par la recherche)
+    #[command(hide = true)]
+    CoverFetch,
     /// Démon de lecture (lancé par `play` et `queue`)
     #[command(hide = true)]
     Daemon,
@@ -274,9 +282,9 @@ fn run(cli: Cli) -> Result<ExitCode> {
         Cmd::Sync { full } => Ok(done(sync_cmd(&env, full))),
         Cmd::Search { text, json } => {
             let text = text.join(" ");
-            Ok(emit(search_cmd(&env, &text), json))
+            Ok(emit(&env, search_cmd(&env, &text), json))
         }
-        Cmd::Playlists { json } => Ok(emit(playlists_cmd(&env), json)),
+        Cmd::Playlists { json } => Ok(emit(&env, playlists_cmd(&env), json)),
         Cmd::Play { kind, id, shuffle } => {
             Ok(ctl::play_or_queue(&env, kind.into(), &id, shuffle, false))
         }
@@ -329,7 +337,12 @@ fn run(cli: Cli) -> Result<ExitCode> {
             };
             Ok(mixcmd::run(&env, &what, &o))
         }
-        Cmd::Mixes { json } => Ok(emit_values(mixcmd::mixes(&env), json)),
+        Cmd::Mixes { json } => Ok(emit_values(&env, mixcmd::mixes(&env), json)),
+        Cmd::Home { json } => Ok(emit_values(&env, mixcmd::home(&env), json)),
+        Cmd::CoverFetch => {
+            cover::fetch_cmd(&env)?;
+            Ok(ExitCode::SUCCESS)
+        }
         Cmd::Daemon => {
             daemon::run(&env)?;
             Ok(ExitCode::SUCCESS)
@@ -380,7 +393,7 @@ fn playlist_cmd(env: &Env, cmd: PlaylistCmd) -> ExitCode {
                 let t = target(&t)?;
                 match (playlists::pick_cmd(env, &t), json) {
                     (Ok(v), true) => {
-                        println!("{}", serde_json::Value::Array(v));
+                        println!("{}", launcher_array(env, v));
                         ExitCode::SUCCESS
                     }
                     (Ok(v), false) => {
@@ -403,10 +416,10 @@ fn playlist_cmd(env: &Env, cmd: PlaylistCmd) -> ExitCode {
 }
 
 /// Comme `emit`, pour des entrées JSON déjà prêtes.
-fn emit_values(r: Result<Vec<serde_json::Value>, Failure>, json: bool) -> ExitCode {
+fn emit_values(env: &Env, r: Result<Vec<serde_json::Value>, Failure>, json: bool) -> ExitCode {
     match (r, json) {
         (Ok(v), true) => {
-            println!("{}", serde_json::Value::Array(v));
+            println!("{}", launcher_array(env, v));
             ExitCode::SUCCESS
         }
         (Ok(v), false) => {
@@ -427,6 +440,12 @@ fn emit_values(r: Result<Vec<serde_json::Value>, Failure>, json: bool) -> ExitCo
     }
 }
 
+/// Tableau JSON du lanceur : `_cover` devient `icon` (chemin local) quand la pochette est là.
+pub fn launcher_array(env: &Env, mut entries: Vec<serde_json::Value>) -> serde_json::Value {
+    cover::apply(env, &mut entries);
+    serde_json::Value::Array(entries)
+}
+
 /// Affiche un échec en sortie lisible : message sur stderr, code non nul.
 fn fail(f: &Failure) -> ExitCode {
     eprintln!("{f}");
@@ -441,10 +460,10 @@ fn done(r: Result<(), Failure>) -> ExitCode {
 }
 
 /// Résultat de `search` ou `playlists` : JSON (échec = une entrée, code 0) ou texte.
-fn emit(r: Result<Vec<search::Hit>, Failure>, json: bool) -> ExitCode {
+fn emit(env: &Env, r: Result<Vec<search::Hit>, Failure>, json: bool) -> ExitCode {
     match (r, json) {
         (Ok(hits), true) => {
-            println!("{}", search::to_json(&hits));
+            println!("{}", launcher_array(env, search::to_json(&hits)));
             ExitCode::SUCCESS
         }
         (Ok(hits), false) => {

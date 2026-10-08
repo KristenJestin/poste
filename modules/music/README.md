@@ -32,6 +32,8 @@ playlists et mixes calculés localement.
 - `poste music like [<kind> <id>]`, `unlike [<kind> <id>]`, `like --toggle` : favoris
   (voir « Favoris et playlists »).
 - `poste music playlist add|remove|create|rename|delete|pick` : écriture des playlists.
+- `poste music home [--json]` : contenu du lanceur sans saisie, d'abord les entrées de `mixes`, puis les
+  playlists (mêmes états de connexion que `search`).
 - `poste music mix me|rediscover|track|album|artist|genre …` et `poste music mixes [--json]` :
   mixes locaux (voir « Mixes »).
 
@@ -139,14 +141,15 @@ reproductible), `--size N` (50 par défaut).
 - `~/.config/poste/music.toml` : `url` et `user` (rien de secret).
 - `~/.cache/poste/music/library.db` : copie locale (SQLite, FTS5 `unicode61 remove_diacritics 2`),
   `XDG_CACHE_HOME` respecté. Recréée à chaque synchronisation complète (fichier `.tmp` puis renommage).
-- `~/.cache/poste/music/covers/` : pochettes locales.
+- `~/.cache/poste/music/covers/` : pochettes locales (512 px, démon) ; `covers/thumbs/` : vignettes
+  de 128 px pour le lanceur ; `<id>.img.none` : l'image par défaut de Navidrome (écartée).
 - `$XDG_RUNTIME_DIR/poste/music.sock`, `music.lock` : socket et verrou du démon.
 - `~/.local/state/poste/music.log` : journal du démon.
 - `~/.cache/poste/music/auth-refused` : marqueur du dernier refus du serveur (voir plus bas).
 
 ## États de connexion
 
-| État | Cause | Sortie lisible | Avec `--json` (`search`, `playlists`, `playlist pick`, `mixes`, `mix`) |
+| État | Cause | Sortie lisible | Avec `--json` (`search`, `playlists`, `playlist pick`, `mixes`, `home`, `mix`) |
 | --- | --- | --- | --- |
 | `no-login` | pas de secret ou de configuration | « Pas connecté : lance `poste music login` », code 1 | entrée « Se connecter à Navidrome » (`xdg-terminal-exec poste music login`), code 0 |
 | `auth-refused` | `status="failed"`, code Subsonic 40 à 44 | idem (traité comme `no-login`), code 1 | idem |
@@ -179,13 +182,27 @@ au premier succès. Sans copie locale, ils lancent d'abord une synchronisation c
 
 Une entrée par résultat, au format du lanceur de l'île : `id` (`<kind>:<id>`), `name`,
 `subtitle`, `icon`, `verb: "Play"`, `action` (`poste music play <kind> <id>`), `actions`
-et `_cover` (identifiant de pochette) quand il existe. Chaque action secondaire est
+et, quand la pochette existe, `icon` = chemin local de l'image (voir « Pochettes du lanceur »). Chaque action secondaire est
 `{"label", "icon" (glyphe Nerd Font), "action": {"type":"command","command":…}}` :
 « Lire », « Shuffle » (sauf pour un morceau), « Ajouter à la file », puis, hors playlists,
 « Mix instantané » (󰒝, `mix <kind> <id>`) et « J'aime » (󰋑) ou « Je n'aime plus » (󰋕) selon
 l'état local ; pour les morceaux et les albums, « Ajouter à une playlist… » (󰲸) dont l'action est
 `{"type":"submenu","command":"poste music playlist pick --json <kind> <id>"}`. Le sous-titre d'un
 morceau est « Track · Artiste · Album ».
+
+## Pochettes du lanceur
+
+Pour toutes les sorties `--json` (`search`, `playlists`, `home`, `mixes`, `mix`, `playlist pick`),
+l'identifiant de pochette interne (`_cover`) est remplacé par `"icon": "<chemin local>"` :
+d'abord la vignette `covers/thumbs/<id>.img` (128 px), à défaut la pochette du démon
+(`covers/<id>.img`). Ce qui manque est téléchargé en parallèle (8 requêtes, `getCoverArt` 128)
+avec un budget total de 250 ms ; au-delà, l'entrée garde son glyphe et le reste est confié à un
+processus détaché (`poste-music cover-fetch`, nouvelle session, sous-commande cachée) pour la
+frappe suivante. Les identifiants lui parviennent par son entrée standard et il relit le
+trousseau lui-même : aucun jeton dans les arguments, l'environnement ou la sortie. Un seul
+`cover-fetch` à la fois (verrou `covers/.fetch.lock`). Le trousseau n'est lu que s'il manque
+une vignette. L'image par défaut de Navidrome (md5 `fcec14e686ad5159a8ed7c51936116d7`) n'est jamais
+affichée : un marqueur `.none` évite de la retélécharger.
 
 ## Sécurité
 

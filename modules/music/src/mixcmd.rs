@@ -101,8 +101,8 @@ pub fn run(env: &Env, what: &What, o: &Opts) -> ExitCode {
     if o.json {
         return match r {
             Ok(list) => {
-                let hits: Vec<Hit> = list.iter().map(hit).collect();
-                println!("{}", crate::search::to_json(&hits));
+                let entries = list.iter().map(|d| hit(d).to_json()).collect();
+                println!("{}", crate::launcher_array(env, entries));
                 ExitCode::SUCCESS
             }
             Err(f) => {
@@ -145,7 +145,12 @@ fn entry(id: &str, name: &str, subtitle: &str, icon: &str, command: &str) -> Val
 /// Entrées du lanceur : mix personnel, redécouvertes, six genres principaux.
 pub fn mixes(env: &Env) -> Result<Vec<Value>, Failure> {
     let conn = crate::library(env)?;
-    let lib = Library::load(&conn, now_secs() as i64)?;
+    mixes_in(&conn)
+}
+
+/// Comme `mixes`, sur une copie déjà ouverte.
+pub fn mixes_in(conn: &rusqlite::Connection) -> Result<Vec<Value>, Failure> {
+    let lib = Library::load(conn, now_secs() as i64)?;
     let mut out = vec![
         entry(
             "mix:me",
@@ -175,4 +180,49 @@ pub fn mixes(env: &Env) -> Result<Vec<Value>, Failure> {
         ));
     }
     Ok(out)
+}
+
+/// Contenu de l'extension du lanceur sans saisie : les mixes, puis les playlists.
+pub fn home(env: &Env) -> Result<Vec<Value>, Failure> {
+    let conn = crate::library(env)?;
+    home_in(&conn)
+}
+
+pub fn home_in(conn: &rusqlite::Connection) -> Result<Vec<Value>, Failure> {
+    let mut out = mixes_in(conn)?;
+    for h in crate::search::playlists(conn)? {
+        out.push(h.to_json());
+    }
+    Ok(out)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::db;
+
+    #[test]
+    fn accueil_mixes_puis_playlists() {
+        let d = tempfile::tempdir().unwrap();
+        let mut conn = db::create(&d.path().join("l.db")).unwrap();
+        let tx = conn.transaction().unwrap();
+        db::insert_track(
+            &tx,
+            &json!({"id":"t1","title":"A","artist":"X","album":"Y","genres":[{"name":"Electro"}]}),
+        )
+        .unwrap();
+        db::replace_playlists(
+            &tx,
+            &[json!({"id":"p1","name":"Daft Mix","songCount":3,"duration":600,"coverArt":"pl-p1"})],
+        )
+        .unwrap();
+        tx.commit().unwrap();
+        let v = home_in(&conn).unwrap();
+        let ids: Vec<&str> = v.iter().map(|e| e["id"].as_str().unwrap()).collect();
+        assert_eq!(&ids[..2], ["mix:me", "mix:rediscover"]);
+        assert_eq!(ids.last(), Some(&"playlist:p1"));
+        let first_pl = ids.iter().position(|i| i.starts_with("playlist:")).unwrap();
+        assert!(ids[..first_pl].iter().all(|i| i.starts_with("mix:")));
+        assert_eq!(v.last().unwrap()["_cover"], "pl-p1");
+    }
 }

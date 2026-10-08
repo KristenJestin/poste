@@ -303,8 +303,8 @@ pub fn shell_word(s: &str) -> String {
     }
 }
 
-pub fn to_json(hits: &[Hit]) -> Value {
-    Value::Array(hits.iter().map(Hit::to_json).collect())
+pub fn to_json(hits: &[Hit]) -> Vec<Value> {
+    hits.iter().map(Hit::to_json).collect()
 }
 
 /// Sortie lisible.

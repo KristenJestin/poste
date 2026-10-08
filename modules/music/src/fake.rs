@@ -25,6 +25,8 @@ pub struct State {
     /// Durée en secondes des flux servis.
     pub stream_secs: AtomicUsize,
     pub n_requests: AtomicUsize,
+    /// Délai en millisecondes avant chaque pochette servie.
+    pub cover_delay_ms: AtomicUsize,
 }
 
 /// Décode `%XX` et `+` d'une valeur de requête.
@@ -94,6 +96,7 @@ impl Fake {
             stop: AtomicBool::new(false),
             stream_secs: AtomicUsize::new(3),
             n_requests: AtomicUsize::new(0),
+            cover_delay_ms: AtomicUsize::new(0),
         });
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
         let url = format!("http://{}", listener.local_addr().unwrap());
@@ -266,6 +269,8 @@ impl State {
             let secs = self.stream_secs.load(Ordering::SeqCst) as u32;
             (200, "audio/wav", wav_silence(secs))
         } else {
+            let ms = self.cover_delay_ms.load(Ordering::SeqCst) as u64;
+            std::thread::sleep(std::time::Duration::from_millis(ms));
             (200, "image/png", PNG.to_vec())
         }
     }
@@ -302,7 +307,7 @@ pub fn wav_silence(secs: u32) -> Vec<u8> {
 }
 
 /// PNG 1x1 valide.
-const PNG: &[u8] = &[
+pub const PNG: &[u8] = &[
     0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52,
     0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x08, 0x06, 0x00, 0x00, 0x00, 0x1F, 0x15, 0xC4,
     0x89, 0x00, 0x00, 0x00, 0x0D, 0x49, 0x44, 0x41, 0x54, 0x78, 0x9C, 0x63, 0xF8, 0xFF, 0xFF, 0x3F,
