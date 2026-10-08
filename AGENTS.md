@@ -8,3 +8,4 @@
 - Pas de `sudo`.
 - Tester avant de commiter : `cargo test` et `cargo clippy -- -D warnings`.
 - Ne pas modifier ce qui n'appartient pas à poste (`~/.config/*` existants, chezmoi, Hyprland, l'île Quickshell) tant que le projet ne l'a pas décidé.
+- Jamais de test de charge sur la machine (boucles qui occupent le processeur, dizaines de processus en parallèle) : c'est le poste de travail réel de l'utilisateur. Pour un test instable, chercher la cause par lecture et par répétitions simples (`--test-threads=1`, une dizaine de passages au plus).
