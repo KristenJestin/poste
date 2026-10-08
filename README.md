@@ -83,7 +83,7 @@ modules/    un dossier par module (sys, music, …)
 setup       premier lancement
 ```
 
-Vérifications avant commit : `cargo test` et `cargo clippy -- -D warnings`.
+Vérifications avant commit : `cargo test` et `cargo clippy --all-targets -- -D warnings`.
 
 ## À venir
 

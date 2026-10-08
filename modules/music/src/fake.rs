@@ -22,6 +22,8 @@ pub struct State {
     pub calls: Mutex<Vec<String>>,
     pub tokens_seen: Mutex<Vec<String>>,
     pub stop: AtomicBool,
+    /// Durée en secondes des flux servis.
+    pub stream_secs: AtomicUsize,
     pub n_requests: AtomicUsize,
 }
 
@@ -60,6 +62,7 @@ impl Fake {
             calls: Mutex::new(Vec::new()),
             tokens_seen: Mutex::new(Vec::new()),
             stop: AtomicBool::new(false),
+            stream_secs: AtomicUsize::new(3),
             n_requests: AtomicUsize::new(0),
         });
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
@@ -89,6 +92,16 @@ impl Fake {
                     st.calls.lock().unwrap().push(format!("{method}?{query}"));
                     if let Some(t) = param(query, "t") {
                         st.tokens_seen.lock().unwrap().push(t);
+                    }
+                    if matches!(method.as_str(), "stream" | "getCoverArt") {
+                        let (status, ctype, body) = st.binary(&method, query);
+                        let head = format!(
+                            "HTTP/1.1 {status} X\r\nContent-Type: {ctype}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                            body.len()
+                        );
+                        let _ = s.write_all(head.as_bytes());
+                        let _ = s.write_all(&body);
+                        return;
                     }
                     let (status, body) = st.respond(&method, query);
                     let reply = format!(
@@ -170,14 +183,91 @@ impl State {
                 {"id":"s1","starred":"2026-09-01T00:00:00Z"}]}})),
             "getAlbumList2" => ok(json!({"albumList2": {"album": [
                 {"id":"al1","name":"Discovery","playCount":7,"played":"2026-10-02T00:00:00Z"}]}})),
-            "getAlbum" => ok(json!({"album": {"id":"al1", "song": [
-                {"id":"s0","playCount":5,"played":"2026-10-02T00:00:00Z"}]}})),
-            _ => (
-                200,
-                json!({"subsonic-response": {"status": "failed", "version": "1.16.1",
-                       "error": {"code": 70, "message": "inconnu"}}})
-                .to_string(),
+            "getAlbum" => {
+                let id = param(query, "id").unwrap_or_default();
+                let mut in_album: Vec<Value> = songs
+                    .iter()
+                    .filter(|s| s["albumId"] == id.as_str())
+                    .cloned()
+                    .collect();
+                for s in &mut in_album {
+                    if s["id"] == "s0" {
+                        s["playCount"] = json!(5);
+                        s["played"] = json!("2026-10-02T00:00:00Z");
+                    }
+                }
+                ok(json!({"album": {"id": id, "song": in_album}}))
+            }
+            "getSong" => {
+                let id = param(query, "id").unwrap_or_default();
+                match songs.iter().find(|s| s["id"] == id.as_str()) {
+                    Some(s) => ok(json!({"song": s})),
+                    None => no_such("getSong"),
+                }
+            }
+            "getArtist" => ok(
+                json!({"artist": {"id": "ar1", "name": "Daft Punk", "album": [
+                {"id":"al1","name":"Discovery","year":2001},
+                {"id":"al2","name":"Homework","year":1997}]}}),
             ),
+            "getPlaylist" => ok(json!({"playlist": {"id": "p1", "name": "Daft Mix",
+                "entry": songs}})),
+            "scrobble" => ok(json!({})),
+            _ => no_such(method),
+        }
+    }
+
+    /// Réponses non JSON : flux audio (WAV de silence) et pochette (PNG).
+    /// Le jeton est vérifié comme ailleurs ; sinon, erreur Subsonic en JSON.
+    fn binary(&self, method: &str, query: &str) -> (u16, &'static str, Vec<u8>) {
+        let (status, body) = self.respond("ping", query);
+        if status != 200 || !body.contains("\"status\":\"ok\"") {
+            return (200, "application/json", body.into_bytes());
+        }
+        if method == "stream" {
+            let secs = self.stream_secs.load(Ordering::SeqCst) as u32;
+            (200, "audio/wav", wav_silence(secs))
+        } else {
+            (200, "image/png", PNG.to_vec())
         }
     }
 }
+
+fn no_such(method: &str) -> (u16, String) {
+    (
+        200,
+        json!({"subsonic-response": {"status": "failed", "version": "1.16.1",
+               "error": {"code": 70, "message": format!("inconnu : {method}")}}})
+        .to_string(),
+    )
+}
+
+/// WAV mono 8 kHz 16 bits de `secs` secondes de silence.
+pub fn wav_silence(secs: u32) -> Vec<u8> {
+    let rate = 8000u32;
+    let data = rate * 2 * secs;
+    let mut w = Vec::with_capacity(44 + data as usize);
+    w.extend_from_slice(b"RIFF");
+    w.extend_from_slice(&(36 + data).to_le_bytes());
+    w.extend_from_slice(b"WAVEfmt ");
+    w.extend_from_slice(&16u32.to_le_bytes());
+    w.extend_from_slice(&1u16.to_le_bytes());
+    w.extend_from_slice(&1u16.to_le_bytes());
+    w.extend_from_slice(&rate.to_le_bytes());
+    w.extend_from_slice(&(rate * 2).to_le_bytes());
+    w.extend_from_slice(&2u16.to_le_bytes());
+    w.extend_from_slice(&16u16.to_le_bytes());
+    w.extend_from_slice(b"data");
+    w.extend_from_slice(&data.to_le_bytes());
+    w.resize(44 + data as usize, 0);
+    w
+}
+
+/// PNG 1x1 valide.
+const PNG: &[u8] = &[
+    0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52,
+    0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x08, 0x06, 0x00, 0x00, 0x00, 0x1F, 0x15, 0xC4,
+    0x89, 0x00, 0x00, 0x00, 0x0D, 0x49, 0x44, 0x41, 0x54, 0x78, 0x9C, 0x63, 0xF8, 0xFF, 0xFF, 0x3F,
+    0x00, 0x05, 0xFE, 0x02, 0xFE, 0xA7, 0x35, 0x81, 0x84, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4E,
+    0x44, 0xAE, 0x42, 0x60, 0x82,
+];

@@ -1,5 +1,5 @@
 name = "music"
-description = "Client Navidrome : connexion, copie locale de la bibliothèque, recherche"
+description = "Client Navidrome : connexion, copie locale de la bibliothèque, recherche, lecture"
 commands = [
   { name = "login", description = "se connecte à un serveur Navidrome (secret dans le trousseau)" },
   { name = "logout", description = "supprime le secret du trousseau" },
@@ -7,4 +7,13 @@ commands = [
   { name = "sync", description = "met à jour la copie locale (--full pour tout recopier)" },
   { name = "search", description = "cherche dans la copie locale (--json pour le lanceur)" },
   { name = "playlists", description = "liste les playlists (--json pour le lanceur)" },
+  { name = "play", description = "lit une playlist, un album, un artiste ou un morceau (play <kind> <id> [--shuffle])" },
+  { name = "queue", description = "ajoute à la fin de la file (queue <kind> <id>)" },
+  { name = "toggle", description = "lecture ou pause" },
+  { name = "pause", description = "met en pause" },
+  { name = "resume", description = "reprend la lecture" },
+  { name = "next", description = "morceau suivant" },
+  { name = "prev", description = "morceau précédent (ou début du morceau)" },
+  { name = "stop", description = "arrête la lecture et vide la file" },
+  { name = "now", description = "morceau en cours, position, qualité, état (--json pour l'île)" },
 ]

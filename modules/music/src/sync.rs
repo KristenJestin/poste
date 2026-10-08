@@ -129,6 +129,11 @@ fn full(env: &Env, client: &Client) -> Result<Report, Failure> {
     let result = full_into(client, &tmp);
     match result {
         Ok(report) => {
+            // Les morceaux passés ne viennent pas du serveur : on les garde.
+            if let Err(e) = db::carry_skips(&target, &tmp) {
+                let _ = std::fs::remove_file(&tmp);
+                return Err(e.into());
+            }
             std::fs::rename(&tmp, &target)
                 .map_err(|e| anyhow::anyhow!("remplacement de {} : {e}", target.display()))?;
             Ok(report)

@@ -38,6 +38,8 @@ CREATE TABLE tracks (
   channelCount INTEGER NOT NULL DEFAULT 0, playCount INTEGER NOT NULL DEFAULT 0, played TEXT,
   starred TEXT, userRating INTEGER NOT NULL DEFAULT 0, coverArt TEXT
 );
+CREATE TABLE skips (id TEXT NOT NULL, at INTEGER NOT NULL);
+CREATE INDEX skips_at ON skips(at);
 CREATE INDEX tracks_album ON tracks(albumId);
 CREATE INDEX tracks_artist ON tracks(artistId);
 CREATE TABLE playlists (
@@ -60,6 +62,48 @@ pub fn create(path: &std::path::Path) -> Result<Connection> {
     conn.execute_batch("PRAGMA journal_mode = OFF; PRAGMA synchronous = OFF;")?;
     conn.execute_batch(SCHEMA)?;
     Ok(conn)
+}
+
+/// Note qu'un morceau a été passé (`next` trop tôt). La table est créée si
+/// la copie date d'avant son apparition. Ne crée pas la base : sans copie
+/// locale, rien n'est noté (`false`).
+pub fn record_skip(env: &Env, track_id: &str, at: u64) -> Result<bool> {
+    let Some(conn) = open_existing(env)? else {
+        return Ok(false);
+    };
+    conn.busy_timeout(std::time::Duration::from_secs(2))?;
+    conn.execute_batch(
+        "CREATE TABLE IF NOT EXISTS skips (id TEXT NOT NULL, at INTEGER NOT NULL);
+         CREATE INDEX IF NOT EXISTS skips_at ON skips(at);",
+    )?;
+    conn.execute(
+        "INSERT INTO skips(id, at) VALUES (?1, ?2)",
+        params![track_id, at as i64],
+    )?;
+    Ok(true)
+}
+
+/// Reporte les morceaux passés de l'ancienne copie dans la nouvelle (une
+/// synchronisation complète recrée le fichier).
+pub fn carry_skips(old: &std::path::Path, new: &std::path::Path) -> Result<()> {
+    if !old.is_file() {
+        return Ok(());
+    }
+    let conn = Connection::open(new)?;
+    conn.execute(
+        "ATTACH DATABASE ?1 AS old",
+        [old.to_string_lossy().as_ref()],
+    )?;
+    let has: bool = conn.query_row(
+        "SELECT count(*) > 0 FROM old.sqlite_master WHERE type = 'table' AND name = 'skips'",
+        [],
+        |r| r.get(0),
+    )?;
+    if has {
+        conn.execute("INSERT INTO skips(id, at) SELECT id, at FROM old.skips", [])?;
+    }
+    conn.execute_batch("DETACH DATABASE old")?;
+    Ok(())
 }
 
 /// Ouvre la copie existante ; `None` si elle n'existe pas.
@@ -343,4 +387,46 @@ pub fn counts(conn: &Connection) -> Result<Counts> {
         artists: n("artists")?,
         playlists: n("playlists")?,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn morceaux_passes_notes_et_reportes() {
+        let d = tempfile::tempdir().unwrap();
+        let env = Env::with_home(d.path());
+        // Sans copie locale, rien n'est noté et rien n'est créé.
+        assert!(!record_skip(&env, "t1", 10).unwrap());
+        assert!(!db_path(&env).exists());
+
+        create(&db_path(&env)).unwrap();
+        assert!(record_skip(&env, "t1", 10).unwrap());
+        assert!(record_skip(&env, "t2", 20).unwrap());
+
+        // Une copie plus ancienne, sans la table, est complétée.
+        let old = d.path().join("ancienne.db");
+        Connection::open(&old)
+            .unwrap()
+            .execute_batch("CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);")
+            .unwrap();
+        let env2 = Env::with_home(d.path().join("autre"));
+        std::fs::create_dir_all(cache_dir(&env2)).unwrap();
+        std::fs::copy(&old, db_path(&env2)).unwrap();
+        assert!(record_skip(&env2, "t9", 5).unwrap());
+
+        // Une synchronisation complète recrée le fichier : les passés suivent.
+        let fresh = d.path().join("neuve.db");
+        create(&fresh).unwrap();
+        carry_skips(&db_path(&env), &fresh).unwrap();
+        let conn = Connection::open(&fresh).unwrap();
+        let n: i64 = conn
+            .query_row("SELECT count(*) FROM skips", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(n, 2);
+        // Ancienne copie sans table : rien à reporter, sans erreur.
+        carry_skips(&old, &fresh).unwrap();
+        carry_skips(&d.path().join("absente.db"), &fresh).unwrap();
+    }
 }

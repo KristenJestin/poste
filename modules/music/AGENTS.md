@@ -10,6 +10,12 @@
 - En `--json`, un état d'échec donne une seule entrée du lanceur et le code 0.
 - `search` ne touche ni au réseau ni au trousseau quand la copie existe (objectif : moins de 30 ms).
 - La copie complète s'écrit dans un fichier temporaire puis est renommée : un échec garde l'ancienne.
+- L'adresse d'un flux (jeton compris) n'existe que dans `api::SecretUrl` (`Display` et `Debug` masqués) et dans mpv : jamais dans le journal, MPRIS ou une réponse du socket.
 - Pas de tokio, pas de dépendance à libdbus (Secret Service par `zbus` pur Rust).
 - Ne jamais chercher d'identifiants hors de `login` (pas de lecture de la config d'autres applications).
 - Les tests parlent à un faux serveur local (`src/fake.rs`), jamais au vrai.
+- Tests du démon : jamais de son réel (`POSTE_MUSIC_AO=null`), jamais le vrai serveur, jamais le vrai bus D-Bus
+  de session (le faux lecteur apparaîtrait dans l'île). Le test d'intégration lance son propre `dbus-daemon`
+  privé ; pour un essai à la main, utiliser `dbus-run-session -- <commande>`. Arrêter tout démon de test restant.
+- `POSTE_MUSIC_TEST_SECRET` (fichier tenant lieu de trousseau), `POSTE_MUSIC_MPRIS_NAME` et
+  `POSTE_MUSIC_IDLE_SECS` sont réservés aux tests ; avec le premier défini, aucune notification n'est envoyée.

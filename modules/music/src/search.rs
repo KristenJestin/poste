@@ -9,6 +9,11 @@ pub const LIMIT_ARTISTS: usize = 5;
 pub const LIMIT_ALBUMS: usize = 8;
 pub const LIMIT_TRACKS: usize = 12;
 
+/// Icônes Nerd Font des actions secondaires.
+const ICON_PLAY: &str = "\u{f040a}";
+const ICON_SHUFFLE: &str = "\u{f049f}";
+const ICON_QUEUE: &str = "\u{f0415}";
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Kind {
     Playlist,
@@ -228,15 +233,20 @@ impl Hit {
     /// Entrée au format du lanceur de l'île.
     pub fn to_json(&self) -> Value {
         let cmd = |c: String| json!({"type": "command", "command": c});
-        let mut actions = vec![json!({"name": "Lire", "action": cmd(self.command("play", ""))})];
+        let act = |label: &str, icon: &str, c: String| json!({"label": label, "icon": icon, "action": cmd(c)});
+        let mut actions = vec![act("Lire", ICON_PLAY, self.command("play", ""))];
         if self.kind != Kind::Track {
-            actions.push(json!({
-                "name": "Lecture aléatoire",
-                "action": cmd(self.command("play", "--shuffle"))
-            }));
+            actions.push(act(
+                "Shuffle",
+                ICON_SHUFFLE,
+                self.command("play", "--shuffle"),
+            ));
         }
-        actions
-            .push(json!({"name": "Ajouter à la file", "action": cmd(self.command("queue", ""))}));
+        actions.push(act(
+            "Ajouter à la file",
+            ICON_QUEUE,
+            self.command("queue", ""),
+        ));
         let mut v = json!({
             "id": format!("{}:{}", self.kind.word(), self.id),
             "name": self.name,
@@ -365,7 +375,28 @@ mod tests {
         assert_eq!(pl["action"]["type"], "command");
         assert_eq!(pl["action"]["command"], "poste music play playlist p1");
         assert!(pl.get("_cover").is_none());
-        assert!(pl["actions"].as_array().unwrap().len() >= 2);
+        let acts = pl["actions"].as_array().unwrap();
+        let labels: Vec<_> = acts.iter().map(|a| a["label"].as_str().unwrap()).collect();
+        assert_eq!(labels, ["Lire", "Shuffle", "Ajouter à la file"]);
+        for a in acts {
+            assert!(a.get("name").is_none());
+            assert!(!a["icon"].as_str().unwrap().is_empty());
+            assert_eq!(a["action"]["type"], "command");
+        }
+        assert_eq!(acts[1]["icon"], "󰒟");
+        assert_eq!(
+            acts[1]["action"]["command"],
+            "poste music play playlist p1 --shuffle"
+        );
+        assert_eq!(acts[2]["icon"], "󰐕");
+        assert_eq!(
+            acts[2]["action"]["command"],
+            "poste music queue playlist p1"
+        );
+        // Un morceau n'a pas de lecture aléatoire.
+        let t = v[3]["actions"].as_array().unwrap();
+        assert_eq!(t.len(), 2);
+        assert_eq!(t[1]["label"], "Ajouter à la file");
         assert_eq!(v[1]["subtitle"], "Artist · 4 albums");
         assert_eq!(v[1]["_cover"], "ar-ar1");
         assert_eq!(v[2]["subtitle"], "Album · Daft Punk · 2001");

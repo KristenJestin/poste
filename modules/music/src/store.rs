@@ -76,8 +76,21 @@ fn attrs(url: Option<&str>) -> HashMap<&str, &str> {
     a
 }
 
+/// Réservé aux tests : si `POSTE_MUSIC_TEST_SECRET` est défini, il désigne un
+/// fichier qui tient lieu de trousseau (jamais le vrai trousseau).
+pub const TEST_SECRET_VAR: &str = "POSTE_MUSIC_TEST_SECRET";
+
+fn test_secret_file() -> Option<PathBuf> {
+    std::env::var_os(TEST_SECRET_VAR)
+        .filter(|v| !v.is_empty())
+        .map(PathBuf::from)
+}
+
 /// Range le secret `{"u","t","s"}` dans le trousseau, en remplaçant l'ancien.
 pub fn save_secret(url: &str, creds: &Creds) -> Result<()> {
+    if let Some(f) = test_secret_file() {
+        return write_atomic(&f, &serde_json::to_vec(creds)?);
+    }
     let ss = SecretService::connect(EncryptionType::Dh).map_err(ss_err)?;
     let col = ss.get_default_collection().map_err(ss_err)?;
     col.unlock().map_err(ss_err)?;
@@ -95,6 +108,11 @@ pub fn save_secret(url: &str, creds: &Creds) -> Result<()> {
 
 /// Lit le secret du serveur `url`, `None` s'il n'y en a pas.
 pub fn load_secret(url: &str) -> Result<Option<Creds>> {
+    if let Some(f) = test_secret_file() {
+        return Ok(std::fs::read(&f)
+            .ok()
+            .and_then(|raw| serde_json::from_slice(&raw).ok()));
+    }
     let ss = SecretService::connect(EncryptionType::Dh).map_err(ss_err)?;
     let found = ss.search_items(attrs(Some(url))).map_err(ss_err)?;
     let item = match (found.unlocked.first(), found.locked.first()) {
@@ -112,6 +130,9 @@ pub fn load_secret(url: &str) -> Result<Option<Creds>> {
 
 /// Supprime les secrets de ce module (tous serveurs). Renvoie leur nombre.
 pub fn delete_secrets() -> Result<usize> {
+    if let Some(f) = test_secret_file() {
+        return Ok(usize::from(std::fs::remove_file(&f).is_ok()));
+    }
     let ss = SecretService::connect(EncryptionType::Dh).map_err(ss_err)?;
     let found = ss.search_items(attrs(None)).map_err(ss_err)?;
     let mut n = 0;

@@ -14,6 +14,7 @@ const API_VERSION: &str = "1.16.1";
 const CLIENT_NAME: &str = "poste-music";
 const TIMEOUT: Duration = Duration::from_secs(8);
 const MAX_BODY: u64 = 64 * 1024 * 1024;
+const MAX_IMAGE: u64 = 16 * 1024 * 1024;
 
 /// Authentification Subsonic par jeton : le mot de passe n'y figure pas.
 #[derive(Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -140,7 +141,43 @@ impl Request {
     }
 }
 
+/// URL d'un flux, jeton compris : jamais affichée ni journalisée (`Display` et
+/// `Debug` ne montrent rien), seul `expose` donne le texte, pour mpv.
+pub struct SecretUrl(String);
+
+impl SecretUrl {
+    pub fn expose(&self) -> &str {
+        &self.0
+    }
+}
+
+impl fmt::Display for SecretUrl {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "<url masquée>")
+    }
+}
+
+impl fmt::Debug for SecretUrl {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "SecretUrl(<masquée>)")
+    }
+}
+
+/// Encodage pourcentage de tout sauf les caractères non réservés.
+pub fn pct_encode(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    for b in s.bytes() {
+        if b.is_ascii_alphanumeric() || b"-._~".contains(&b) {
+            out.push(b as char);
+        } else {
+            out.push_str(&format!("%{b:02X}"));
+        }
+    }
+    out
+}
+
 /// Client d'un serveur, avec ses identifiants.
+#[derive(Clone)]
 pub struct Client {
     base: String,
     creds: Creds,
@@ -196,8 +233,8 @@ impl Client {
         }
     }
 
-    /// Appelle une méthode et renvoie le contenu de `subsonic-response`.
-    pub fn call(&self, method: &str, extra: &[(&str, String)]) -> Result<Value, ApiError> {
+    /// Envoie une requête et renvoie la réponse HTTP (statut 200 vérifié).
+    fn send(&self, method: &str, extra: &[(&str, String)]) -> Result<ureq::Response, ApiError> {
         let req = self.request(method, extra);
         let mut r = self.agent.get(&req.endpoint());
         for (k, v) in req.params() {
@@ -220,14 +257,49 @@ impl Client {
                 resp.status()
             )));
         }
+        Ok(resp)
+    }
+
+    fn read_body(&self, method: &str, resp: ureq::Response, max: u64) -> Result<Vec<u8>, ApiError> {
         let mut body = Vec::new();
         resp.into_reader()
-            .take(MAX_BODY)
+            .take(max)
             .read_to_end(&mut body)
             .map_err(|e| ApiError::Unreachable(self.scrub(&format!("{method} : lecture : {e}"))))?;
+        Ok(body)
+    }
+
+    /// Appelle une méthode et renvoie le contenu de `subsonic-response`.
+    pub fn call(&self, method: &str, extra: &[(&str, String)]) -> Result<Value, ApiError> {
+        let resp = self.send(method, extra)?;
+        let body = self.read_body(method, resp, MAX_BODY)?;
         let value: Value = serde_json::from_slice(&body)
             .map_err(|_| ApiError::Unreachable(format!("{method} : réponse JSON invalide")))?;
         parse_response(method, value)
+    }
+
+    /// Télécharge un contenu binaire (pochette). Une réponse JSON est une erreur Subsonic.
+    pub fn fetch(&self, method: &str, extra: &[(&str, String)]) -> Result<Vec<u8>, ApiError> {
+        let resp = self.send(method, extra)?;
+        let body = self.read_body(method, resp, MAX_IMAGE)?;
+        if body.first() == Some(&b'{') {
+            if let Ok(v) = serde_json::from_slice::<Value>(&body) {
+                return parse_response(method, v).map(|_| Vec::new());
+            }
+        }
+        Ok(body)
+    }
+
+    /// Adresse de lecture d'un morceau, pour mpv seulement.
+    pub fn stream_url(&self, id: &str) -> SecretUrl {
+        SecretUrl(format!(
+            "{}/rest/stream.view?id={}&format=raw&u={}&t={}&s={}&v={API_VERSION}&c={CLIENT_NAME}",
+            self.base,
+            pct_encode(id),
+            pct_encode(&self.creds.u),
+            self.creds.t,
+            self.creds.s
+        ))
     }
 
     /// Retire de `s` tout ce qui ressemble au jeton ou au sel.
@@ -362,6 +434,23 @@ mod tests {
         ] {
             assert!(!text.contains(&creds.t), "fuite du jeton : {text}");
             assert!(!text.contains(&creds.s), "fuite du sel : {text}");
+        }
+    }
+
+    #[test]
+    fn url_de_flux_sans_fuite() {
+        let creds = Creds::from_password("kr is", "sesame").unwrap();
+        let client = Client::new("http://h:4533/", creds.clone());
+        let url = client.stream_url("a b&c");
+        let raw = url.expose();
+        assert!(
+            raw.starts_with("http://h:4533/rest/stream.view?id=a%20b%26c&format=raw&u=kr%20is&t=")
+        );
+        assert!(raw.contains(&creds.t) && raw.contains(&creds.s));
+        assert!(raw.ends_with("&v=1.16.1&c=poste-music"));
+        for text in [format!("{url}"), format!("{url:?}")] {
+            assert!(!text.contains(&creds.t) && !text.contains(&creds.s));
+            assert!(!text.contains("stream.view"));
         }
     }
 

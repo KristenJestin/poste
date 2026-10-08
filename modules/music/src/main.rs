@@ -1,17 +1,26 @@
 //! `poste-music` : client Navidrome (API Subsonic/OpenSubsonic), copie locale
-//! de la bibliothèque et recherche. Pas de lecture à cette étape.
+//! de la bibliothèque, recherche, et lecteur de fond (démon libmpv + MPRIS).
 
 mod api;
+mod cover;
+mod ctl;
+mod daemon;
 mod db;
 #[cfg(test)]
 mod fake;
+mod mpris;
+mod notify;
+mod proto;
+mod resolve;
+mod rules;
 mod search;
 mod state;
 mod store;
 mod sync;
+mod track;
 
 use anyhow::{bail, Result};
-use clap::{Parser, Subcommand};
+use clap::{Parser, Subcommand, ValueEnum};
 use poste_core::time::rfc3339;
 use poste_core::Env;
 use rusqlite::Connection;
@@ -29,6 +38,26 @@ use std::process::ExitCode;
 struct Cli {
     #[command(subcommand)]
     command: Cmd,
+}
+
+/// Ce qu'on peut lire.
+#[derive(Clone, Copy, ValueEnum)]
+enum KindArg {
+    Playlist,
+    Album,
+    Artist,
+    Track,
+}
+
+impl From<KindArg> for search::Kind {
+    fn from(k: KindArg) -> Self {
+        match k {
+            KindArg::Playlist => search::Kind::Playlist,
+            KindArg::Album => search::Kind::Album,
+            KindArg::Artist => search::Kind::Artist,
+            KindArg::Track => search::Kind::Track,
+        }
+    }
 }
 
 #[derive(Subcommand)]
@@ -58,6 +87,37 @@ enum Cmd {
         #[arg(long)]
         json: bool,
     },
+    /// Lance la lecture d'une playlist, d'un album, d'un artiste ou d'un morceau
+    Play {
+        kind: KindArg,
+        id: String,
+        /// Mélange la file
+        #[arg(long)]
+        shuffle: bool,
+    },
+    /// Ajoute à la fin de la file
+    Queue { kind: KindArg, id: String },
+    /// Lecture ou pause
+    Toggle,
+    /// Met en pause
+    Pause,
+    /// Reprend la lecture
+    Resume,
+    /// Morceau suivant
+    Next,
+    /// Morceau précédent (ou début du morceau en cours)
+    Prev,
+    /// Arrête la lecture et vide la file
+    Stop,
+    /// Morceau en cours, position, qualité, état
+    Now {
+        /// Sortie JSON pour l'île
+        #[arg(long)]
+        json: bool,
+    },
+    /// Démon de lecture (lancé par `play` et `queue`)
+    #[command(hide = true)]
+    Daemon,
 }
 
 fn main() -> ExitCode {
@@ -83,6 +143,21 @@ fn run(cli: Cli) -> Result<ExitCode> {
             Ok(emit(search_cmd(&env, &text), json))
         }
         Cmd::Playlists { json } => Ok(emit(playlists_cmd(&env), json)),
+        Cmd::Play { kind, id, shuffle } => {
+            Ok(ctl::play_or_queue(&env, kind.into(), &id, shuffle, false))
+        }
+        Cmd::Queue { kind, id } => Ok(ctl::play_or_queue(&env, kind.into(), &id, false, true)),
+        Cmd::Toggle => Ok(ctl::control(proto::Request::Toggle)),
+        Cmd::Pause => Ok(ctl::control(proto::Request::Pause)),
+        Cmd::Resume => Ok(ctl::control(proto::Request::Resume)),
+        Cmd::Next => Ok(ctl::control(proto::Request::Next)),
+        Cmd::Prev => Ok(ctl::control(proto::Request::Prev)),
+        Cmd::Stop => Ok(ctl::control(proto::Request::Stop)),
+        Cmd::Now { json } => Ok(ctl::now(json)),
+        Cmd::Daemon => {
+            daemon::run(&env)?;
+            Ok(ExitCode::SUCCESS)
+        }
     }
 }
 

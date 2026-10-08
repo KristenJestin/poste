@@ -1,9 +1,8 @@
 # poste music
 
-Client de serveur Navidrome (API Subsonic/OpenSubsonic, serveur 0.63). Étape 2.1 :
+Client de serveur Navidrome (API Subsonic/OpenSubsonic, serveur 0.63). Étapes 2.1 et 2.3 :
 connexion, gestion du jeton, copie locale de la bibliothèque, recherche en ligne de
-commande. Pas encore de lecture audio, de MPRIS ni d'intégration à l'île ; la commande
-`poste music play <kind> <id>` citée dans les résultats JSON n'existe pas encore.
+commande, et lecteur de fond (démon libmpv, MPRIS, écoutes signalées au serveur).
 
 ## Commandes
 
@@ -17,12 +16,63 @@ commande. Pas encore de lecture audio, de MPRIS ni d'intégration à l'île ; la
 - `poste music sync [--full]` : met à jour la copie locale.
 - `poste music search <texte…> [--json]` : recherche dans la copie locale.
 - `poste music playlists [--json]` : liste des playlists.
+- `poste music play <kind> <id> [--shuffle]` : `kind` = `playlist`, `album`, `artist`, `track`.
+  Remplace la file et lance la lecture. Un artiste donne tous ses albums (année puis nom),
+  morceaux dans l'ordre du serveur ; un morceau se joue seul. La liste vient de l'API
+  (`getPlaylist`, `getAlbum`, `getArtist`, `getSong`), pas de la copie locale.
+- `poste music queue <kind> <id>` : ajoute à la fin de la file (lance la lecture si la file est vide).
+- `poste music toggle | pause | resume | next | prev | stop` : contrôles. Ils ne démarrent
+  jamais le démon (sans démon : « Rien en lecture », code 1). `prev` recommence le morceau
+  après 3 s de lecture, sinon revient au précédent. `next` sur le dernier morceau termine la file.
+- `poste music now [--json]` : morceau, position, qualité, état. Sans démon : état `stopped`.
+  JSON : `state` (`playing`, `paused`, `stopped`), `id`, `title`, `artist`, `album`,
+  `album_artist`, `duration` et `position` (secondes), `quality`, `cover` (chemin local ou
+  null), `index`, `queue_len`, `volume` (0 à 1).
+
+`play` et `queue` démarrent le démon s'il ne tourne pas, mais seulement si la connexion est
+bonne : `no-login`, `auth-refused` et `unreachable` donnent un message clair (code 1, 1 ou 2)
+et une notification `notify-send -a "Musique"`, sans lancer le démon.
+
+## Le démon
+
+`poste-music daemon` (sous-commande cachée) est lancé détaché (nouvelle session) par `play`
+ou `queue`. Un seul à la fois (verrou `$XDG_RUNTIME_DIR/poste/music.lock`). Il contient
+libmpv (crate `libmpv2`, `ao` par défaut donc PipeWire), lit les flux
+`<serveur>/rest/stream.view?id=…&format=raw&…` passés à mpv en mémoire (jamais écrits,
+journalisés ni exposés), et garde la file en phase avec la playlist de mpv.
+
+- Contrôle : socket Unix `$XDG_RUNTIME_DIR/poste/music.sock` (0600, dossier 0700), une
+  requête JSON par ligne (`{"cmd":"next"}`), une réponse JSON par ligne
+  (`{"ok":true}` ou `{"ok":false,"error":"…"}`, `now` ajoute l'objet `now`).
+- MPRIS 2 : `org.mpris.MediaPlayer2.poste_music`, identité « Musique », sans DesktopEntry.
+  Métadonnées : `mpris:trackid` (`/org/poste/music/track/<n>`), `mpris:length`, `xesam:title`,
+  `xesam:artist`, `xesam:album`, `xesam:albumArtist`, `mpris:artUrl` (pochette locale),
+  `xesam:comment` et `poste:quality` (qualité, ex. « FLAC · 24 bit / 96 kHz · 2304 kbps »,
+  « MP3 · 320 kbps »). Pas de `xesam:url`. `PropertiesChanged` à chaque changement de
+  morceau, d'état ou de volume ; `Seeked` sur déplacement.
+- Pochettes : `getCoverArt` (512) dans `~/.cache/poste/music/covers/<id>.img`, une fois, en arrière-plan.
+- Écoutes : `scrobble` `submission=false` au début de chaque morceau, `submission=true` à
+  50 % de la durée ou 4 minutes réellement jouées (pauses exclues). Échec ignoré.
+- Morceaux passés : un `next` avant 50 % de la durée (30 s au plus) note `(id, date)` dans la
+  table `skips` de `library.db` (conservée par les synchronisations complètes), pour exclure
+  ces titres des mixes pendant 7 jours. Rien n'est noté sans copie locale.
+- Erreurs : un flux illisible est noté dans le journal et mpv passe au suivant ; un `ping`
+  teste alors le serveur. Refus d'authentification : arrêt, marqueur `auth-refused`,
+  notification « Navidrome : reconnexion requise » (un clic lance `xdg-terminal-exec poste music login`).
+- Fin : file terminée, `Quit` MPRIS, ou pause/arrêt pendant 10 minutes : le démon quitte
+  (service MPRIS retiré, socket supprimé). SIGTERM aussi.
+- Journal : `~/.local/state/poste/music.log`, écrasé à chaque démarrage, sans jeton.
+- Variables : `POSTE_MUSIC_AO` fixe la sortie audio de mpv (`null` pour les tests).
+  Réservées aux tests : `POSTE_MUSIC_TEST_SECRET`, `POSTE_MUSIC_MPRIS_NAME`, `POSTE_MUSIC_IDLE_SECS`.
 
 ## Fichiers
 
 - `~/.config/poste/music.toml` : `url` et `user` (rien de secret).
 - `~/.cache/poste/music/library.db` : copie locale (SQLite, FTS5 `unicode61 remove_diacritics 2`),
   `XDG_CACHE_HOME` respecté. Recréée à chaque synchronisation complète (fichier `.tmp` puis renommage).
+- `~/.cache/poste/music/covers/` : pochettes locales.
+- `$XDG_RUNTIME_DIR/poste/music.sock`, `music.lock` : socket et verrou du démon.
+- `~/.local/state/poste/music.log` : journal du démon.
 - `~/.cache/poste/music/auth-refused` : marqueur du dernier refus du serveur (voir plus bas).
 
 ## États de connexion
@@ -55,8 +105,9 @@ au premier succès. Sans copie locale, ils lancent d'abord une synchronisation c
 
 Une entrée par résultat, au format du lanceur de l'île : `id` (`<kind>:<id>`), `name`,
 `subtitle`, `icon`, `verb: "Play"`, `action` (`poste music play <kind> <id>`), `actions`
-(lire, lecture aléatoire sauf pour un morceau, ajouter à la file) et `_cover` (identifiant
-de pochette) quand il existe.
+et `_cover` (identifiant de pochette) quand il existe. Chaque action secondaire est
+`{"label", "icon" (glyphe Nerd Font), "action": {"type":"command","command":…}}` :
+« Lire », « Shuffle » (sauf pour un morceau), « Ajouter à la file ».
 
 ## Sécurité
 
