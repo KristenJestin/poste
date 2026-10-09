@@ -103,13 +103,6 @@ requires = "omarchy"
 check = ["sh", "-c", "[ \"$(omarchy-theme-current | tr 'A-Z ' 'a-z-')\" = poste-theme ]"]
 run = [["omarchy", "theme", "set", "poste-theme"]]
 
-[[user]]
-id = "poste-icons-font"
-title = "police Poste Nerd Font (FiraCode, icônes Tabler) dans ~/.local/share/fonts/poste"
-# Voir icons/README.md. check : empreinte des sources (script, glyphs.tsv, webfont, FiraCode).
-requires = "uv"
-check = ["python3", "@BOOTSTRAP@/icons/poste-icons.py", "check"]
-run = [["uv", "run", "--quiet", "--no-project", "--with", "fonttools==4.66.1", "python3", "@BOOTSTRAP@/icons/poste-icons.py", "build"]]
 
 # ------------------------------------------------------------ étapes système (sudo, jamais lancées par poste)
 [[system]]
@@ -138,11 +131,6 @@ check = ["sh", "-c", "voxtype setup gpu --status 2>/dev/null | grep -q 'Active b
 commands = ["sudo voxtype setup gpu --enable", "systemctl --user restart voxtype.service"]
 
 # ------------------------------------------------------------ étapes manuelles
-[[manual]]
-id = "poste-icons-shell"
-title = "Icônes Tabler dans le shell (après poste-icons-font) : mkdir -p ~/.config/fontconfig/conf.d && ln -s @BOOTSTRAP@/icons/60-poste-shell-icons.conf ~/.config/fontconfig/conf.d/ && omarchy restart shell"
-check = ["test", "-e", "@HOME@/.config/fontconfig/conf.d/60-poste-shell-icons.conf"]
-
 [[manual]]
 id = "gh-auth"
 title = "GitHub : gh auth login, puis gh auth setup-git"

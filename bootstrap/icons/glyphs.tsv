@@ -1,5 +1,5 @@
 # Glyphes Nerd Font utilisés par Omarchy et ses plugins -> icônes Tabler.
-# Source unique de la police « Poste Nerd Font » du shell et de Glyphs.js de l'île (poste-icons.py).
+# Correspondance de la police « Poste Nerd Font » du shell (config/.local/share/fonts/poste) et de Glyphs.js de l'île.
 # Colonnes (tabulations) : code, tabler, plein, île, nom Nerd, où.
 #   tabler : nom de l'icône Tabler ; « - » = glyphe gardé tel quel (pas d'équivalent correct).
 #   plein  : 1 = variante pleine de Tabler (commandes média, cœur plein…).

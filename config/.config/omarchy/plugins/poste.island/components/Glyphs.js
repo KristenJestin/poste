@@ -1,7 +1,7 @@
 .pragma library
 // Glyphes Nerd Font de l'île -> icônes Tabler (assets/tabler, MIT).
-// GÉNÉRÉ par bootstrap/icons/poste-icons.py glyphs-js depuis bootstrap/icons/glyphs.tsv,
-// la même table que la police « Poste Nerd Font » du shell : ne pas modifier à la main.
+// Même table que la police « Poste Nerd Font » du shell (bootstrap/icons/glyphs.tsv) :
+// changer une icône ici, la changer aussi là-bas.
 // Glyph.qml affiche l'icône quand elle est ici, sinon le glyphe d'origine. Une ligne
 // n'apparaît ici que si son SVG (et sa variante -filled si besoin) est dans assets/tabler.
 var icons = {
