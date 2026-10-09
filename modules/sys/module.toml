@@ -9,5 +9,6 @@ commands = [
   { name = "add", description = "met un fichier de ~ sous gestion (déplacé dans config/, remplacé par un lien)" },
   { name = "forget", description = "remet un fichier ordinaire à la place du lien" },
   { name = "sync", description = "git pull --ff-only puis setup (aperçu compris)" },
+  { name = "done", description = "marque une étape manuelle faite (<id>, --undo ; sans id : liste)" },
   { name = "import-chezmoi", description = "importe la config gérée par chezmoi dans config/" },
 ]

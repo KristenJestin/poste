@@ -5,6 +5,7 @@ mod ignore;
 mod import;
 mod manifest;
 mod plan;
+mod provision;
 mod setup;
 mod status;
 mod util;
@@ -75,6 +76,13 @@ enum Cmd {
         /// Écrit le rapport sur la sortie, rien dans le dépôt
         #[arg(short = 'n', long)]
         dry_run: bool,
+    },
+    /// Marque une étape manuelle (ou système non vérifiable) faite ; sans id, les liste
+    Done {
+        id: Option<String>,
+        /// Remet l'étape à faire
+        #[arg(long)]
+        undo: bool,
     },
     /// État du dépôt, des modules installés et des fichiers posés
     Status,
@@ -172,6 +180,11 @@ fn run(cli: Cli) -> Result<ExitCode> {
         Cmd::ImportChezmoi { source, dry_run } => {
             let repo = util::repo(&env, &cfg)?;
             import::run(&env, &repo, source.as_deref(), dry_run)?;
+            Ok(ExitCode::SUCCESS)
+        }
+        Cmd::Done { id, undo } => {
+            let repo = util::repo(&env, &cfg)?;
+            provision::done(&env, &repo, id.as_deref(), undo)?;
             Ok(ExitCode::SUCCESS)
         }
         Cmd::Status => {

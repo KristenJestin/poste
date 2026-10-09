@@ -9,10 +9,14 @@ Module de gestion du dépôt `poste`. Toujours installé. Le dépôt est repér�
   lance `cargo build --release` dans le dépôt, installe `~/.local/bin/poste` et, pour chaque
   `modules/*/` contenant un `module.toml`, `~/.local/share/poste/modules/<nom>/`
   (`poste-<nom>`, `module.toml`, `island/`, `hypr/`), puis pose la config (voir plus bas).
-  Code de sortie 2 s'il reste des conflits de config.
+  Code de sortie 2 s'il reste des conflits de config. Sauf avec `--no-config`, enchaîne la partie
+  « machine » (voir plus bas).
+- `poste sys done [<id>] [--undo]` : marque une étape manuelle (ou système non vérifiable) faite ;
+  sans id, les liste. État dans `~/.local/state/poste/done/<id>`.
 - `poste sys status` : branche, modifications non commitées, commits non poussés ; modules
   installés (empreinte installée / dépôt) ; fichiers posés manquants ou modifiés à la main ;
-  config (liés, manquants, liens cassés, liens remplacés par un fichier ordinaire, conflits).
+  config (liés, manquants, liens cassés, liens remplacés par un fichier ordinaire, conflits) ;
+  paquets manquants, étapes système, utilisateur et manuelles en attente.
 - `poste sys diff [<chemin>]` : écarts entre `config/` et `~` (diff unifié).
 - `poste sys add <chemin> [--dry-run]` : met un fichier (ou un dossier) de `~` sous gestion :
   copié dans `config/` (après sauvegarde), remplacé par un lien. Refuse ce qui correspond à
@@ -67,6 +71,25 @@ Pour trancher un par un : `--take-repo <chemin>` (le dépôt gagne, l'ancien est
 fichier aux droits restreints, le mode est noté dans `modes`). Un dossier réel remplacé par un lien
 est déplacé tel quel dans `backup/`.
 
+## La machine : paquets et étapes (`bootstrap/`)
+
+Après les binaires et la config, `setup` lit `bootstrap/packages.toml` et `bootstrap/steps.toml`
+(format : [`bootstrap/README.md`](../../bootstrap/README.md)) :
+
+1. Paquets : comparés à `pacman -Qq`. S'il en manque, la commande `yay -S --needed …` est AFFICHÉE.
+2. Étapes système (root) : vérifiées, puis les commandes sont AFFICHÉES dans un bloc copiable.
+   `setup` ne lance jamais `sudo`.
+3. Étapes utilisateur (plugins du shell épinglés + patchs, fichiers, services, thème…) : aperçu des
+   commandes, puis confirmation (sauf `--yes`) ; `--dry-run` n'en lance aucune. Idempotentes : un
+   état déjà bon n'apparaît pas. Ce qui est ambigu ou risqué (plugin à une autre version et modifié,
+   patch qui ne s'applique plus, fichier utilisateur différent) n'est jamais touché, une note le dit.
+   Si une étape a été faite, la config est replanifiée (`omarchy plugin add` peut réécrire
+   `shell.json`) pour remettre les liens du dépôt.
+4. Étapes manuelles non faites, listées en fin de `setup`.
+
+Test : la variable `POSTE_TEST_PACMAN_QQ` (réservée aux tests) remplace `pacman -Qq` par le
+programme indiqué (sans argument).
+
 ## Import depuis chezmoi
 
 `poste sys import-chezmoi` liste les entrées de `chezmoi managed` et copie dans `config/` le
@@ -74,8 +97,8 @@ contenu RÉEL de la machine (pas celui de la source chezmoi), avec bit exécutab
 et liens. Il n'écrit que dans le dépôt poste et dans `~/.local/state/poste/import-chezmoi.md`
 (rapport : écarts avec la source, fichiers absents, entrées `DA`, dossiers candidats au lien de
 dossier, secrets refusés sans recopier leur valeur). `README.md`, `bootstrap.sh` et
-`bootstrap-patches/` de chezmoi vont dans `bootstrap/` (scripts d'installation d'applis, à intégrer
-plus tard à `setup`). Un fichier qui contient un secret évident n'est pas importé. Relançable.
+`bootstrap-patches/` de chezmoi iraient dans `bootstrap/` : l'import est fait une fois pour toutes et ces
+fichiers ont été repris dans `bootstrap/*.toml` ; ne pas relancer l'import (il les recréerait). Un fichier qui contient un secret évident n'est pas importé. Relançable.
 
 ## À venir
 

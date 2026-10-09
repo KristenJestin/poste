@@ -127,5 +127,6 @@ pub fn run(env: &Env, repo: &Path) -> Result<()> {
     if let Some(layout) = config::load(repo, env)? {
         config::print_status(&layout, env, &manifest)?;
     }
+    crate::provision::status(env, repo)?;
     Ok(())
 }

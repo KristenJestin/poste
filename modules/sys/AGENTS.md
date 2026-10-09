@@ -12,3 +12,5 @@
 - `add` refuse tout chemin qui correspond à `config/.poste/ignore` ou aux règles de secrets intégrées (`.ssh`, `.env*`, `.npmrc`, `.claude/.credentials.json`…).
 - Les tests de la config et de l'import travaillent dans un HOME temporaire, jamais dans le vrai `~`.
 
+- Bootstrap : `setup` ne lance JAMAIS `sudo` ; les étapes système sont vérifiées puis affichées. Les étapes utilisateur passent par un aperçu et une confirmation, sont idempotentes, et ne touchent jamais ce qui est ambigu (note affichée). Le contenu des fichiers root vit dans `bootstrap/system/`, pas dans le code.
+- Les tests de `provision` n'exécutent aucune étape réelle (pas de systemctl, voxtype, omarchy) ; le faux `pacman -Qq` passe par `POSTE_TEST_PACMAN_QQ`.

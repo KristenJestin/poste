@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Premier lancement de poste : enregistre l'emplacement du dépôt, construit,
-# puis laisse `poste-sys setup` installer. Options : --yes, --dry-run, --no-config.
+# Premier lancement de poste (Omarchy fraîche) : vérifie cargo, enregistre l'emplacement du
+# dépôt, construit, puis laisse `poste-sys setup` installer (binaires, config, étapes de bootstrap/). Options : --yes, --dry-run, --no-config.
 set -euo pipefail
 
 repo="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
@@ -23,7 +23,8 @@ for arg in "$@"; do
 done
 
 if ! command -v cargo > /dev/null 2>&1; then
-  echo "setup : cargo est introuvable. Installez Rust (pacman -S rust ou rustup)." >&2
+  echo "setup : cargo est introuvable. Installez Rust (poste ne lance jamais sudo), puis relancez ./setup :" >&2
+  echo "  sudo pacman -S --needed rust" >&2
   exit 1
 fi
 

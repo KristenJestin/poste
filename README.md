@@ -1,8 +1,8 @@
 # poste
 
 `poste` est mon environnement de travail (Arch Linux, Hyprland, Omarchy), en Rust.
-À terme il remplacera le dépôt de dotfiles géré par chezmoi. À cette étape (étape 1),
-il ne gère que ses propres fichiers : l'aiguillage et le module `sys`.
+Il a remplacé le dépôt de dotfiles géré par chezmoi : config, paquets et mise en place de la machine
+sont décrits ici.
 
 ## L'aiguillage
 
@@ -54,18 +54,37 @@ Un module est une application à part, dans `modules/<nom>/`, avec son `README.m
 son `AGENTS.md` et sa fiche `module.toml`. Il peut fournir des dossiers facultatifs
 `island/` et `hypr/`, copiés tels quels à l'installation.
 
-## Installation
+## Installer sur un PC neuf
 
-Prérequis : Rust (`cargo`) et `~/.local/bin` dans le `PATH`.
+Point de départ : une Omarchy fraîche, connectée à Internet. `poste` ne lance jamais `sudo` :
+chaque fois qu'il faut un droit root, il affiche la commande exacte à copier.
 
-```bash
-git clone <url> ~/Projects/poste
-cd ~/Projects/poste
-./setup            # ou ./setup --dry-run, ./setup --yes
-```
+1. Rust et git (une seule fois, à la main) :
+   ```bash
+   sudo pacman -S --needed rust git
+   ```
+2. Cloner le dépôt et lancer le premier setup (`~/.local/bin` doit être dans le `PATH`, c'est le cas sous Omarchy) :
+   ```bash
+   git clone https://github.com/KristenJestin/poste.git ~/Projects/poste
+   cd ~/Projects/poste
+   ./setup --dry-run   # aperçu complet, n'écrit rien (hors target/)
+   ./setup             # même chose en vrai, avec confirmations
+   ```
+   `./setup` vérifie `cargo`, enregistre l'emplacement du dépôt (clé `repo`), construit en
+   release puis lance `poste sys setup`, qui :
+   - installe `poste` et ses modules ;
+   - pose la config par liens symboliques (conflits avec des fichiers existants : décidés un par un, voir [`modules/sys/README.md`](modules/sys/README.md)) ;
+   - compare `bootstrap/packages.toml` à `pacman -Qq` et affiche la commande `yay -S --needed …` des paquets manquants ;
+   - affiche en un bloc copiable les étapes système (root) non faites ;
+   - propose les étapes utilisateur (plugins du shell aux versions auditées avec leurs patchs, config de cursor-accent, service et modèle voxtype, Flea par défaut, thème) et les fait après confirmation ;
+   - liste les étapes manuelles restantes.
+3. Lancer vous-même la commande `yay -S --needed …` affichée, puis les commandes `sudo` du bloc « Étapes système ».
+4. Relancer `poste sys setup` : les étapes qui dépendaient des paquets (voxtype, Flea, thème…) se font maintenant. Recommencer jusqu'à « rien à faire ».
+5. Faire les étapes manuelles, en les marquant au fur et à mesure (`poste sys done <id>`, `poste sys done` pour la liste ; `--undo` pour annuler). `poste sys status` résume tout ce qui reste.
+6. Recharger : `omarchy restart shell` et `hyprctl reload`, ou redémarrer la session.
 
-`./setup` enregistre l'emplacement du dépôt (clé `repo`), construit en release et lance
-`poste-sys setup`. Ensuite, `poste sys setup` suffit pour réinstaller après une modification.
+Ensuite, `poste sys setup` (ou `poste sys sync` après un `git pull`) suffit pour réinstaller après une
+modification. `--no-config` ne réinstalle que les binaires et saute toute la partie machine.
 
 Posé par `poste sys setup` :
 
@@ -73,6 +92,7 @@ Posé par `poste sys setup` :
 - `~/.local/share/poste/modules/<nom>/` : `poste-<nom>`, `module.toml`, et `island/`, `hypr/` s'ils existent
 - la liste de ce qui a été posé : `~/.local/state/poste/installed.json`
 - les anciennes versions remplacées : `~/.local/state/poste/backup/`
+- les étapes manuelles marquées faites : `~/.local/state/poste/done/<id>`
 
 ## Organisation du dépôt
 
@@ -81,7 +101,7 @@ config/     la config de ~ (liens posés par poste sys setup)
 core/       poste-core : chemins XDG, config, découverte des modules, notifications
 poste/      l'aiguillage
 modules/    un dossier par module (sys, music, …)
-bootstrap/  scripts d'installation d'applis repris de chezmoi (à intégrer plus tard)
+bootstrap/  paquets, étapes système/utilisateur/manuelles, patchs de plugins (lus par poste sys setup)
 setup       premier lancement
 ```
 
@@ -92,7 +112,7 @@ Vérifications avant commit : `cargo test` et `cargo clippy --all-targets -- -D 
 Le dossier `config/` reflète `~` (vrais noms, sans préfixes) et est posé par liens symboliques
 par `poste sys setup` (aperçu, sauvegardes, conflits tranchés un par un : voir
 [`modules/sys/README.md`](modules/sys/README.md)). `poste sys import-chezmoi` reprend la config
-gérée jusqu'ici par chezmoi. `bootstrap/` garde les scripts d'installation d'applis venus de chezmoi.
+gérée jusqu'ici par chezmoi. `bootstrap/` décrit le reste de la machine (paquets, plugins, étapes) : voir [`bootstrap/README.md`](bootstrap/README.md).
 
 ## À venir
 

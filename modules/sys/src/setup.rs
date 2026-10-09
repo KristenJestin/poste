@@ -40,7 +40,59 @@ fn decisions(env: &Env, o: &Opts) -> Result<HashMap<String, Decision>> {
     Ok(map)
 }
 
+/// Résultat de la phase binaires + config.
+struct Phase {
+    code: ExitCode,
+    /// Faux si on s'arrête là (refus, annulation).
+    proceed: bool,
+    /// Vrai si des éléments de config ont été posés.
+    config_changed: bool,
+}
+
 pub fn run(env: &Env, repo: &Path, o: &Opts) -> Result<ExitCode> {
+    let ph = install_phase(env, repo, o)?;
+    if !ph.proceed || o.no_config {
+        return Ok(ph.code);
+    }
+    println!("\n== Machine (bootstrap/) ==");
+    let applied = crate::provision::setup(env, repo, o.yes, o.dry_run, &confirm)?;
+    let mut code = ph.code;
+    // `omarchy plugin add` peut toucher à des fichiers de config liés (shell.json) :
+    // on replanifie la config et on remet les liens du dépôt.
+    if !applied.done.is_empty() {
+        if let Some(l) = config::load(repo, env)? {
+            let p = config::plan(&l, env, &decisions(env, o)?)?;
+            if p.writes() > 0 || !p.conflicts().is_empty() {
+                println!("\nConfig à remettre après les étapes utilisateur :");
+                config::print_plan(env, &p);
+                let mut manifest = Manifest::load(&env.manifest_file())?;
+                let stamp = time::now_compact();
+                config::apply(&l, env, &p, &stamp, &mut manifest, &env.manifest_file())?;
+                config::record_linked(&p, &mut manifest)?;
+                manifest.save(&env.manifest_file())?;
+                if !p.conflicts().is_empty() {
+                    config::print_conflicts(env, &p);
+                    code = ExitCode::from(2);
+                }
+            }
+        }
+    }
+    if !applied.failed.is_empty() {
+        eprintln!(
+            "\nposte sys : étape(s) en échec : {}",
+            applied.failed.join(", ")
+        );
+        code = ExitCode::from(1);
+    }
+    if ph.config_changed && !o.dry_run {
+        println!(
+            "\nConfig modifiée : pour la recharger, lancez vous-même `omarchy restart shell` et `hyprctl reload`."
+        );
+    }
+    Ok(code)
+}
+
+fn install_phase(env: &Env, repo: &Path, o: &Opts) -> Result<Phase> {
     let (yes, dry_run) = (o.yes, o.dry_run);
     let decisions = decisions(env, o)?;
     if o.no_config && !decisions.is_empty() {
@@ -79,7 +131,11 @@ pub fn run(env: &Env, repo: &Path, o: &Opts) -> Result<ExitCode> {
                 env.display(&it.dest)
             );
         }
-        return Ok(ExitCode::from(1));
+        return Ok(Phase {
+            code: ExitCode::from(1),
+            proceed: false,
+            config_changed: false,
+        });
     }
 
     // La config : un plan à part, dont les conflits n'empêchent pas le reste.
@@ -141,11 +197,19 @@ pub fn run(env: &Env, repo: &Path, o: &Opts) -> Result<ExitCode> {
             }
         }
         end("Tout est à jour");
-        return Ok(code);
+        return Ok(Phase {
+            code,
+            proceed: true,
+            config_changed: false,
+        });
     }
     if dry_run {
         end("Simulation (--dry-run) : rien n'a été écrit");
-        return Ok(code);
+        return Ok(Phase {
+            code,
+            proceed: true,
+            config_changed: false,
+        });
     }
     if !yes
         && !confirm(&format!(
@@ -154,7 +218,11 @@ pub fn run(env: &Env, repo: &Path, o: &Opts) -> Result<ExitCode> {
         ))?
     {
         println!("Annulé.");
-        return Ok(ExitCode::from(1));
+        return Ok(Phase {
+            code: ExitCode::from(1),
+            proceed: false,
+            config_changed: false,
+        });
     }
 
     let stamp = time::now_compact();
@@ -185,7 +253,11 @@ pub fn run(env: &Env, repo: &Path, o: &Opts) -> Result<ExitCode> {
     end(&format!(
         "Terminé : {to_write} fichier(s) posé(s), {done_cfg} élément(s) de config traité(s)"
     ));
-    Ok(code)
+    Ok(Phase {
+        code,
+        proceed: true,
+        config_changed: done_cfg > 0,
+    })
 }
 
 fn build(repo: &Path) -> Result<()> {

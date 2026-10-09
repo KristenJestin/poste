@@ -1,0 +1,30 @@
+# Paquets attendus sur la machine (pacman/AUR). `poste sys setup` les compare à `pacman -Qq`
+# et affiche la commande `yay -S --needed …` pour ceux qui manquent (il ne l'installe pas).
+# Seulement ce qui n'est pas déjà dans l'installation de base d'Omarchy 4
+# (/usr/share/omarchy/install/omarchy-*.packages) et dont cet environnement dépend.
+# Clé = nom du paquet, valeur = à quoi il sert.
+[packages]
+rust = "cargo : construit poste (./setup)"
+mpv = "libmpv : lecture de poste music (rusqlite est compilé avec sa propre sqlite, inutile ici)"
+github-cli = "gh (auth git HTTPS, credential helper dans git/config)"
+direnv = "hook dans .bashrc"
+ttf-fira-code = "police des terminaux (foot / alacritty / ghostty)"
+ttf-firacode-nerd = "glyphes Nerd Font de la police"
+libqalculate = "qalc : calculatrice du lanceur de l'île"
+python = "sources du lanceur (unity-projects), recolor.py de cursor-accent"
+libnotify = "notify-send (sources du lanceur)"
+voxtype-bin = "dictée (config ~/.config/voxtype, île kris.island)"
+zen-browser-bin = "navigateur"
+t3code-nightly-bin = "T3 Code (thème généré par ~/.config/omarchy/themed/t3code.json.tpl)"
+proton-pass-bin = "mots de passe (SUPER+SHIFT+.)"
+unityhub = "Unity Hub"
+unity-cli-bin = "CLI « unity » (source « Projets Unity » du lanceur)"
+proton-vpn-cli = "Proton VPN (piloté par le plugin OmaProton, tuile VPN de l'île)"
+proton-vpn-daemon = "démon de Proton VPN"
+protonmail-bridge = "Proton Mail Bridge (IMAP/SMTP local pour Omamail)"
+flea = "gestionnaire de fichiers par défaut (dépôt Omarchy), Shelf / vue Fichiers de l'île (SUPER+D)"
+fd = "recherche de la vue Fichiers"
+zoxide = "dossiers fréquentés (classement de la recherche)"
+headsetcontrol = "batterie du casque sans fil (île : DevicesState)"
+zip = "LocalSend d'un dossier (zippé d'abord)"
+# Optionnels, installés sur la machine d'origine, non exigés : opencode-bin dotnet-runtime-9.0

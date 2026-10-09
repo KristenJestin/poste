@@ -1,0 +1,172 @@
+# Étapes de mise en place de la machine, lues par `poste sys setup` / `status` / `done`.
+# Substitutions dans les textes et commandes : @HOME@ @USER@ @UID@ @GID@ @REPO@ @BOOTSTRAP@
+# (dossier bootstrap/ du dépôt). Les chemins `source`/`patch` sont relatifs à bootstrap/.
+#
+# Quatre familles :
+#   [[plugin]]  plugin tiers du shell Omarchy, épinglé à un commit, patch local facultatif
+#               (fait par poste, avec aperçu et confirmation)
+#   [[user]]    étape sans sudo : `check` (code 0 = déjà fait), sinon `run` (poste l'exécute)
+#   [[system]]  étape avec sudo : poste vérifie, AFFICHE les commandes, ne les lance jamais
+#   [[manual]]  étape à la main ; `check` facultatif, sinon `poste sys done <id>`
+
+# ------------------------------------------------------------ plugins tiers (versions auditées)
+# kris.island, kris.notifications et kris.workspaces viennent de config/ (liens).
+[[plugin]]
+id = "crmne.mpris"
+url = "https://github.com/crmne/omarchy-mpris"
+commit = "85bb4ff"
+
+[[plugin]]
+id = "jankeesvw.notification-center"
+url = "https://github.com/jankeesvw/omarchy-notification-center"
+commit = "e4c4568"
+
+[[plugin]]
+id = "io.github.honeyspoons.localsend"
+url = "https://github.com/HoneySpoons/omarchy-localsend.git"
+commit = "eef3289"
+
+[[plugin]]
+id = "omamail"
+url = "https://github.com/huacnlee/omamail"
+commit = "a7388fa" # tag v0.10.8
+# Tri des mails (dates texte ou nombre comptaient 0), touche Suppr, IA et agenda masqués,
+# attente au démarrage, style de l'île.
+patch = "patches/omamail-local.patch"
+
+[[plugin]]
+id = "io.github.grichard99.omaproton-vpn"
+url = "https://github.com/grichard99/omaproton-vpn"
+commit = "6d68681"
+
+[[plugin]]
+id = "io.github.smoothpixels.cursor-accent"
+url = "https://github.com/SmoothPixels/cursor-accent"
+commit = "97e001c"
+# recolor.py : option stroke_scale (contour plus fin).
+patch = "patches/cursor-accent-stroke-scale.patch"
+
+# ------------------------------------------------------------ étapes utilisateur (sans sudo)
+[[file]]
+id = "cursor-accent-config"
+title = "config de cursor-accent (accent orange, contour fin)"
+target = "@HOME@/.local/state/cursor-accent/config.json"
+source = "files/cursor-accent-config.json"
+json = true # comparaison du JSON, pas des octets
+
+[[user]]
+id = "cursor-accent-recolor"
+title = "recolorer le curseur avec le thème courant"
+# Pas d'état à vérifier : lancé seulement si le plugin ou sa config viennent d'être posés.
+trigger = ["cursor-accent-config", "io.github.smoothpixels.cursor-accent"]
+run = [["sh", "-c", "python3 \"@HOME@/.config/omarchy/plugins/io.github.smoothpixels.cursor-accent/recolor.py\" \"$(omarchy-theme-current 2>/dev/null || echo unknown)\""]]
+
+[[user]]
+id = "voxtype-service"
+title = "voxtype : service systemd utilisateur"
+requires = "voxtype"
+check = ["test", "-f", "@HOME@/.config/systemd/user/voxtype.service"]
+run = [["voxtype", "setup", "systemd"]]
+
+[[user]]
+id = "voxtype-model"
+title = "voxtype : modèle « small » (téléchargement)"
+requires = "voxtype"
+check = ["test", "-f", "@HOME@/.local/share/voxtype/models/ggml-small.bin"]
+run = [["voxtype", "setup", "--download", "--model", "small", "--quiet"]]
+
+[[user]]
+id = "voxtype-enable"
+title = "voxtype : service activé et démarré"
+requires = "voxtype"
+check = ["systemctl", "--user", "is-enabled", "--quiet", "voxtype.service"]
+run = [["systemctl", "--user", "daemon-reload"], ["systemctl", "--user", "enable", "--now", "voxtype.service"]]
+
+[[user]]
+id = "omarchy-crash-watch-off"
+title = "omarchy-crash-watch.service désactivé"
+check = ["sh", "-c", "! systemctl --user is-enabled --quiet omarchy-crash-watch.service && ! systemctl --user is-active --quiet omarchy-crash-watch.service"]
+run = [["systemctl", "--user", "disable", "--now", "omarchy-crash-watch.service"]]
+
+[[user]]
+id = "flea-default"
+title = "Flea gestionnaire de fichiers par défaut (dossiers, « Afficher dans le dossier », sélecteur)"
+# Idempotent : mimeapps.list, service D-Bus FileManager1, portals.conf. « flea --default off » revient en arrière.
+requires = "flea"
+check = ["sh", "-c", "[ \"$(xdg-mime query default inode/directory)\" = com.thisisgm.flea.desktop ]"]
+run = [["flea", "--default"], ["systemctl", "--user", "restart", "xdg-desktop-portal"]]
+
+[[user]]
+id = "theme-kris"
+title = "thème kris-theme"
+requires = "omarchy"
+check = ["sh", "-c", "[ \"$(omarchy-theme-current | tr 'A-Z ' 'a-z-')\" = kris-theme ]"]
+run = [["omarchy", "theme", "set", "kris-theme"]]
+
+# ------------------------------------------------------------ étapes système (sudo, jamais lancées par poste)
+[[system]]
+id = "polkit-systemd-creds"
+title = "règle polkit systemd-creds (Unity Hub / CLI sans mot de passe)"
+file = "/etc/polkit-1/rules.d/49-systemd-creds-@USER@.rules"
+source = "system/polkit-systemd-creds.rules"
+# rules.d n'est lisible que par root : poste ne peut pas vérifier, l'étape reste affichée
+# jusqu'à `poste sys done polkit-systemd-creds`.
+
+[[system]]
+id = "fstab-ssd"
+title = "SSD NTFS : montage automatique (fstab)"
+file = "/etc/fstab"
+line = "system/fstab-ssd.line"
+contains = "UUID=0123456789ABCDEF"
+when = ["test", "-e", "/dev/disk/by-uuid/0123456789ABCDEF"] # étape ignorée si le disque est absent
+after = ["sudo mkdir -p /run/media/@USER@/SSD", "sudo systemctl daemon-reload", "sudo mount /run/media/@USER@/SSD"]
+
+[[system]]
+id = "voxtype-gpu"
+title = "voxtype : backend GPU"
+requires = "voxtype"
+when = ["sh", "-c", "lspci 2>/dev/null | grep -qiE 'vga.*(nvidia|amd|radeon)'"]
+check = ["sh", "-c", "voxtype setup gpu --status 2>/dev/null | grep -q 'Active backend: GPU'"]
+commands = ["sudo voxtype setup gpu --enable", "systemctl --user restart voxtype.service"]
+
+# ------------------------------------------------------------ étapes manuelles
+[[manual]]
+id = "gh-auth"
+title = "GitHub : gh auth login, puis gh auth setup-git"
+check = ["gh", "auth", "status"]
+
+[[manual]]
+id = "zen-theme"
+title = "Zen : Réglages, Apparence : choisir le thème interne sombre voulu"
+
+[[manual]]
+id = "music-login"
+title = "Musique : poste music login (serveur Navidrome)"
+
+[[manual]]
+id = "unity-login"
+title = "Unity Hub : se connecter (puis unity auth login pour la CLI si besoin)"
+
+[[manual]]
+id = "proton-bridge"
+title = "Proton Mail Bridge : lancer, se connecter ; Réglages : « Open on startup » ON, « Automatic updates » OFF. Noter le mot de passe Bridge (différent de celui de Proton)"
+
+[[manual]]
+id = "omamail-backend"
+title = "Omamail (SUPER+SHIFT+M) : cliquer « Install backend » dans la fenêtre (release GitHub vérifiée par SHA256SUMS), puis ajouter le compte Proton avec le mot de passe Bridge (IMAP 127.0.0.1:1143 / SMTP 1025, STARTTLS : préréglage Proton)"
+
+[[manual]]
+id = "proton-vpn"
+title = "Proton VPN : se connecter depuis le panneau OmaProton (tuile VPN du control center de l'île) ou « protonvpn signin »"
+
+[[manual]]
+id = "ip-fixe"
+title = "(Facultatif) IP fixe : nmcli con mod \"<connexion>\" ipv4.method manual ipv4.addresses 192.0.2.10/24 ipv4.gateway 192.0.2.1 ipv4.dns \"1.1.1.1 1.0.0.1\" ipv4.ignore-auto-dns yes ipv6.dns \"2606:4700:4700::1111 2606:4700:4700::1001\" ipv6.ignore-auto-dns yes && nmcli con up \"<connexion>\""
+
+[[manual]]
+id = "secrets"
+title = "Secrets non versionnés à restaurer : ~/.ssh, fichiers .env, ~/.npmrc, identifiants"
+
+[[manual]]
+id = "reboot-session"
+title = "Redémarrer la session pour tout valider"
