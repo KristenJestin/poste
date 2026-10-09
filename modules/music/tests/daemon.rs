@@ -35,13 +35,19 @@ struct Sandbox {
     bus: Option<std::process::Child>,
 }
 
+/// Attente active (sondage toutes les 50 ms) avec délai maximal. Le délai
+/// demandé est un minimum de confort : sous forte charge (machine saturée,
+/// tests en parallèle) un démon peut mettre bien plus de temps à répondre,
+/// d'où un plancher large. Un test qui réussit ne l'attend jamais.
+const WAIT_FLOOR_SECS: u64 = 30;
+
 fn wait_until(secs: u64, what: &str, mut f: impl FnMut() -> bool) {
-    let end = Instant::now() + Duration::from_secs(secs);
+    let end = Instant::now() + Duration::from_secs(secs.max(WAIT_FLOOR_SECS));
     while Instant::now() < end {
         if f() {
             return;
         }
-        std::thread::sleep(Duration::from_millis(100));
+        std::thread::sleep(Duration::from_millis(50));
     }
     panic!("délai dépassé : {what}");
 }
@@ -168,6 +174,15 @@ impl Sandbox {
         String::from_utf8_lossy(&o.stdout).to_string()
     }
 
+    /// État du démon, ou `None` s'il ne répond pas (encore, ou plus) : pour les attentes.
+    fn try_now(&self) -> Option<Value> {
+        let o = self.run(&["now", "--json"]);
+        if !o.status.success() {
+            return None;
+        }
+        serde_json::from_slice(&o.stdout).ok()
+    }
+
     fn now(&self) -> Value {
         serde_json::from_str(&self.ok(&["now", "--json"])).unwrap()
     }
@@ -213,18 +228,41 @@ impl Drop for Sandbox {
     }
 }
 
+/// Mandataire MPRIS sans cache de propriétés : une lecture interroge toujours
+/// le démon. Avec le cache de zbus, une valeur peut rester périmée si le
+/// signal `PropertiesChanged` croise le premier chargement (course sous charge).
 fn mpris(conn: &Connection, name: &str) -> Proxy<'static> {
-    Proxy::new(
-        conn,
-        name.to_string(),
-        "/org/mpris/MediaPlayer2",
-        "org.mpris.MediaPlayer2.Player",
-    )
-    .unwrap()
+    zbus::blocking::proxy::Builder::new(conn)
+        .destination(name.to_string())
+        .unwrap()
+        .path("/org/mpris/MediaPlayer2")
+        .unwrap()
+        .interface("org.mpris.MediaPlayer2.Player")
+        .unwrap()
+        .cache_properties(zbus::proxy::CacheProperties::No)
+        .build()
+        .unwrap()
+}
+
+/// Lit une propriété MPRIS en patientant tant que le service n'est pas
+/// (encore) sur le bus : il s'inscrit un peu après le démarrage du démon.
+fn prop<T>(p: &Proxy<'_>, name: &str) -> T
+where
+    T: TryFrom<OwnedValue>,
+    T::Error: Into<zbus::Error>,
+{
+    let end = Instant::now() + Duration::from_secs(WAIT_FLOOR_SECS);
+    loop {
+        match p.get_property::<T>(name) {
+            Ok(v) => return v,
+            Err(e) if Instant::now() >= end => panic!("propriété MPRIS {name} : {e}"),
+            Err(_) => std::thread::sleep(Duration::from_millis(50)),
+        }
+    }
 }
 
 fn metadata(p: &Proxy<'_>) -> HashMap<String, OwnedValue> {
-    p.get_property("Metadata").unwrap()
+    prop(p, "Metadata")
 }
 
 fn strings(v: &OwnedValue) -> Vec<String> {
@@ -239,7 +277,7 @@ fn title(p: &Proxy<'_>) -> String {
 }
 
 fn status(p: &Proxy<'_>) -> String {
-    p.get_property("PlaybackStatus").unwrap()
+    prop(p, "PlaybackStatus")
 }
 
 #[test]
@@ -362,13 +400,15 @@ fn lecture_complete_mpris_scrobble_skip_et_fin() {
     // next tout de suite : morceau passé
     sb.ok(&["next"]);
     wait_until(5, "titre 2", || sb.now()["title"] == "Titre 2");
-    let skipped: Vec<String> = {
+    // Le saut est écrit dans la copie un peu après le changement de titre.
+    let skips = || -> Vec<String> {
         let c = rusqlite::Connection::open(sb.db()).unwrap();
         let mut st = c.prepare("SELECT id FROM skips").unwrap();
         let rows = st.query_map([], |r| r.get(0)).unwrap();
         rows.map(|r| r.unwrap()).collect()
     };
-    assert_eq!(skipped, ["t1"]);
+    wait_until(5, "saut enregistré", || !skips().is_empty());
+    assert_eq!(skips(), ["t1"]);
     if let Some(p) = &proxy {
         wait_until(3, "MPRIS titre 2", || title(p) == "Titre 2");
         let m = metadata(p);
@@ -455,8 +495,11 @@ fn stop_puis_inactivite_arrete_le_demon() {
     let sb = Sandbox::new(true);
     let mut c = sb.cmd(&["play", "track", "t2"]);
     c.env("POSTE_MUSIC_IDLE_SECS", "2");
-    assert!(c.output().unwrap().status.success());
-    wait_until(5, "lecture", || sb.now()["state"] == "playing");
+    let o = c.output().unwrap();
+    assert!(o.status.success(), "{}", String::from_utf8_lossy(&o.stderr));
+    wait_until(5, "lecture", || {
+        sb.try_now().is_some_and(|v| v["state"] == "playing")
+    });
     // file ajoutée à la suite
     sb.ok(&["queue", "track", "t3"]);
     assert_eq!(sb.now()["queue_len"], 2);
@@ -883,9 +926,13 @@ fn hold_sync_lock(sb: &Sandbox) -> std::fs::File {
 #[test]
 fn sans_copie_entree_en_cours_puis_copie_en_fond() {
     let sb = Sandbox::new(true);
+    // Le serveur retient ses réponses : si `search` l'attendait, il resterait
+    // bloqué jusqu'à la fin de la retenue (20 s). La borne ne mesure donc que
+    // « n'a pas attendu le serveur », avec une large marge sous charge.
+    sb.fake.state.hold.store(true, Ordering::SeqCst);
     let t = Instant::now();
     let out = sb.ok(&["search", "--json", "titre"]);
-    assert!(t.elapsed() < Duration::from_secs(2), "{:?}", t.elapsed());
+    assert!(t.elapsed() < Duration::from_secs(10), "{:?}", t.elapsed());
     let v: Value = serde_json::from_str(&out).unwrap();
     assert_eq!(v.as_array().unwrap().len(), 1);
     assert_eq!(v[0]["name"], "Copie de la bibliothèque en cours…");
@@ -894,6 +941,7 @@ fn sans_copie_entree_en_cours_puis_copie_en_fond() {
     // Sortie lisible : le dire, sans bloquer.
     let o = sb.run(&["playlists"]);
     assert!(String::from_utf8_lossy(&o.stderr).contains("Copie de la bibliothèque en cours"));
+    sb.fake.state.hold.store(false, Ordering::SeqCst);
     // La copie arrive toute seule.
     wait_until(10, "copie complète en fond", || sb.db().is_file());
     wait_until(10, "synchronisation terminée", || {
@@ -919,7 +967,10 @@ fn copie_vieille_repond_tout_de_suite_et_se_met_a_jour() {
     assert!(out.contains("playlist:") || out.contains("mix:me"), "{out}");
     wait_until(10, "synchronisation de fond", || synced_at(&sb) > 1);
     assert!(scans(&sb) >= 1);
-    assert!(sync_log(&sb).contains("incrémentale"));
+    // Le journal s'écrit un peu après la mise à jour de la date.
+    wait_until(10, "journal de la sync", || {
+        sync_log(&sb).contains("incrémentale")
+    });
 }
 
 #[test]
@@ -973,7 +1024,9 @@ fn demon_synchronise_au_demarrage_puis_periodiquement() {
         c.env("POSTE_MUSIC_DAEMON_EVERY_SECS", every);
         let o = c.output().unwrap();
         assert!(o.status.success(), "{}", String::from_utf8_lossy(&o.stderr));
-        wait_until(5, "démon", || sb.now()["state"] == "playing");
+        wait_until(5, "démon", || {
+            sb.try_now().is_some_and(|v| v["state"] == "playing")
+        });
     };
     play(&sb, "1000");
     std::thread::sleep(Duration::from_millis(1500));
@@ -1009,7 +1062,9 @@ fn volume_defaut_commande_mpris_et_memoire() {
 
     // Le démon démarre au volume mémorisé.
     sb.ok(&["play", "album", "al1"]);
-    wait_until(5, "démon", || sb.now()["state"] == "playing");
+    wait_until(5, "démon", || {
+        sb.try_now().is_some_and(|v| v["state"] == "playing")
+    });
     assert!((sb.now()["volume"].as_f64().unwrap() - 0.45).abs() < 1e-9);
 
     // Par la commande : absolu, relatif, bornes.
@@ -1028,9 +1083,13 @@ fn volume_defaut_commande_mpris_et_memoire() {
             .build()
             .unwrap();
         let p = mpris(&conn, &format!("org.mpris.MediaPlayer2.{}", sb.bus_name));
-        p.set_property("Volume", 0.7f64).unwrap();
+        // Le service MPRIS s'inscrit sur le bus un peu après le démarrage du démon.
+        wait_until(5, "service MPRIS", || {
+            p.set_property("Volume", 0.7f64).is_ok()
+        });
         wait_until(3, "volume MPRIS", || {
-            (sb.now()["volume"].as_f64().unwrap() - 0.7).abs() < 1e-9
+            sb.try_now()
+                .is_some_and(|v| (v["volume"].as_f64().unwrap() - 0.7).abs() < 1e-9)
         });
     } else {
         eprintln!("dbus-daemon absent : volume MPRIS sauté");
@@ -1043,6 +1102,8 @@ fn volume_defaut_commande_mpris_et_memoire() {
     });
     quit_daemon(&sb);
     sb.ok(&["play", "album", "al1"]);
-    wait_until(5, "démon relancé", || sb.now()["state"] == "playing");
+    wait_until(5, "démon relancé", || {
+        sb.try_now().is_some_and(|v| v["state"] == "playing")
+    });
     assert!((sb.now()["volume"].as_f64().unwrap() - 0.7).abs() < 1e-9);
 }

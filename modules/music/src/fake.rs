@@ -27,6 +27,9 @@ pub struct State {
     pub n_requests: AtomicUsize,
     /// Délai en millisecondes avant chaque pochette servie.
     pub cover_delay_ms: AtomicUsize,
+    /// Tant que vrai, le serveur retient ses réponses (20 s au plus) : sert à
+    /// prouver qu'un appel ne dépend pas du réseau sans mesurer de durée.
+    pub hold: AtomicBool,
 }
 
 /// Décode `%XX` et `+` d'une valeur de requête.
@@ -97,6 +100,7 @@ impl Fake {
             stream_secs: AtomicUsize::new(3),
             n_requests: AtomicUsize::new(0),
             cover_delay_ms: AtomicUsize::new(0),
+            hold: AtomicBool::new(false),
         });
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
         let url = format!("http://{}", listener.local_addr().unwrap());
@@ -173,6 +177,10 @@ fn ok(body: Value) -> (u16, String) {
 
 impl State {
     fn respond(&self, method: &str, query: &str) -> (u16, String) {
+        let end = std::time::Instant::now() + std::time::Duration::from_secs(20);
+        while self.hold.load(Ordering::SeqCst) && std::time::Instant::now() < end {
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
         if let Some(r) = self.raw.lock().unwrap().clone() {
             return r;
         }
