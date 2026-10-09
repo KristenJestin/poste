@@ -1,18 +1,28 @@
 #!/usr/bin/env bash
 # Premier lancement de poste (Omarchy fraîche) : vérifie cargo, enregistre l'emplacement du
-# dépôt, construit, puis laisse `poste-sys setup` installer (binaires, config, étapes de bootstrap/). Options : --yes, --dry-run, --no-config.
+# dépôt, construit, puis laisse `poste-sys setup` installer (binaires, config, étapes de bootstrap/). Options : --yes, --dry-run, --no-config, --take-repo, --take-home.
 set -euo pipefail
 
 repo="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 
 pass=()
-for arg in "$@"; do
+while (($#)); do
+  arg="$1"
+  shift
   case "$arg" in
     -y | --yes) pass+=(--yes) ;;
     -n | --dry-run) pass+=(--dry-run) ;;
     --no-config) pass+=(--no-config) ;;
+    --take-repo | --take-home)
+      if (($# == 0)); then
+        echo "setup : $arg attend un chemin" >&2
+        exit 2
+      fi
+      pass+=("$arg" "$1")
+      shift
+      ;;
     -h | --help)
-      echo "Usage : ./setup [--yes] [--dry-run] [--no-config]"
+      echo "Usage : ./setup [--yes] [--dry-run] [--no-config] [--take-repo CHEMIN]... [--take-home CHEMIN]..."
       exit 0
       ;;
     *)
