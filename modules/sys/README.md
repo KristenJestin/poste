@@ -5,26 +5,79 @@ Module de gestion du dépôt `poste`. Toujours installé. Le dépôt est repér�
 
 ## Commandes
 
-- `poste sys setup [--yes] [--dry-run]` : lance `cargo build --release` dans le dépôt, puis
-  installe `~/.local/bin/poste` et, pour chaque `modules/*/` contenant un `module.toml`,
-  `~/.local/share/poste/modules/<nom>/` (`poste-<nom>`, `module.toml`, `island/`, `hypr/`).
+- `poste sys setup [--yes] [--dry-run] [--no-config] [--take-repo <chemin>]… [--take-home <chemin>]…` :
+  lance `cargo build --release` dans le dépôt, installe `~/.local/bin/poste` et, pour chaque
+  `modules/*/` contenant un `module.toml`, `~/.local/share/poste/modules/<nom>/`
+  (`poste-<nom>`, `module.toml`, `island/`, `hypr/`), puis pose la config (voir plus bas).
+  Code de sortie 2 s'il reste des conflits de config.
 - `poste sys status` : branche, modifications non commitées, commits non poussés ; modules
-  installés (empreinte installée / dépôt) ; fichiers posés manquants ou modifiés à la main.
+  installés (empreinte installée / dépôt) ; fichiers posés manquants ou modifiés à la main ;
+  config (liés, manquants, liens cassés, liens remplacés par un fichier ordinaire, conflits).
+- `poste sys diff [<chemin>]` : écarts entre `config/` et `~` (diff unifié).
+- `poste sys add <chemin> [--dry-run]` : met un fichier (ou un dossier) de `~` sous gestion :
+  copié dans `config/` (après sauvegarde), remplacé par un lien. Refuse ce qui correspond à
+  `config/.poste/ignore` (secrets : `.ssh/**`, `.claude/.credentials.json`, `**/.env*`, `.npmrc`…).
+- `poste sys forget <chemin>` : remet un fichier ordinaire à la place du lien ; le fichier reste
+  dans le dépôt jusqu'à votre `git rm` et votre commit.
+- `poste sys sync [--yes] [--dry-run]` : `git pull --ff-only`, puis `setup` (aperçu compris).
+- `poste sys import-chezmoi [--source <dossier>] [--dry-run]` : voir « Import depuis chezmoi ».
 - `poste sys git <args…>` : `git -C <dépôt> <args…>`.
 - `poste sys cd` : affiche le chemin du dépôt (`cd "$(poste sys cd)"`).
 
 ## Règles de `setup`
 
 - Relançable : ne fait que la différence (comparaison sha256), « Tout est à jour » sinon.
-- Affiche le plan (créé / modifié / inchangé) puis demande confirmation, sauf `--yes`.
+- Affiche le plan (créé / modifié / inchangé, puis la config) puis demande confirmation, sauf `--yes`.
 - `--dry-run` n'écrit rien (la construction produit seulement `target/`).
 - Ne remplace jamais un fichier qu'il n'a pas posé : il refuse, sans rien écrire du tout,
   et dit lequel gêne. Un fichier déjà identique à la source est simplement pris en compte.
 - Avant de remplacer un fichier posé, copie l'ancien dans
   `~/.local/state/poste/backup/<chemin aplati>.<AAAAMMJJ-HHMMSS>.bak`.
 - Ne supprime rien : un fichier retiré du dépôt reste en place.
-- Tient `~/.local/state/poste/installed.json` : chemin, sha256, module propriétaire, date.
+- Tient `~/.local/state/poste/installed.json` : chemin, sha256, module propriétaire (`config` pour la config), date.
+
+## La config
+
+Le dossier `config/` du dépôt reflète `~` avec les vrais noms (`config/.config/hypr/bindings.lua`
+pour `~/.config/hypr/bindings.lua`), sans préfixes. `setup` pose chaque entrée en lien
+symbolique vers le dépôt : modifier le fichier de `~` modifie le dépôt.
+
+- Un lien symbolique de `config/` est recréé tel quel (même cible) dans `~`.
+- Le bit exécutable est porté par git. Les droits restreints (0600, 0700) sont listés dans
+  `config/.poste/modes`, une ligne `chemin mode` (par exemple `.config/foot/foot.ini 0600`), et
+  réappliqués à la cible réelle du lien (le fichier du dépôt ; pour un simple dossier, le dossier de `~`).
+- Granularité : un lien par fichier. Un dossier listé dans `config/.poste/link-dirs` (un chemin par
+  ligne) est lié d'un bloc ; à réserver aux dossiers dont tout le contenu appartient au dépôt et où
+  aucun outil n'écrit de fichiers propres. `__pycache__` est ignoré dans les comparaisons et dans git.
+- `config/.poste/ignore` : motifs (relatifs à `~`) que `add` refuse d'ajouter.
+
+État de chaque cible et action de `setup` :
+
+| État de la cible | Action |
+| --- | --- |
+| déjà liée comme prévu | rien |
+| absente | crée le lien |
+| fichier ordinaire identique au dépôt | sauvegarde dans `backup/`, puis lien |
+| fichier ordinaire différent | CONFLIT : rien n'est fait ; `poste sys diff <chemin>` pour voir |
+| lien vers ailleurs, dossier à la place d'un fichier ou l'inverse, parent qui n'est pas un dossier | CONFLIT |
+
+Les conflits n'empêchent pas le reste ; ils sont listés en fin d'aperçu et le code de sortie est 2.
+Pour trancher un par un : `--take-repo <chemin>` (le dépôt gagne, l'ancien est sauvegardé) ou
+`--take-home <chemin>` (le fichier réel est recopié dans le dépôt, sauvegardé, puis lié ; pour un
+fichier aux droits restreints, le mode est noté dans `modes`). Un dossier réel remplacé par un lien
+est déplacé tel quel dans `backup/`.
+
+## Import depuis chezmoi
+
+`poste sys import-chezmoi` liste les entrées de `chezmoi managed` et copie dans `config/` le
+contenu RÉEL de la machine (pas celui de la source chezmoi), avec bit exécutable, droits restreints
+et liens. Il n'écrit que dans le dépôt poste et dans `~/.local/state/poste/import-chezmoi.md`
+(rapport : écarts avec la source, fichiers absents, entrées `DA`, dossiers candidats au lien de
+dossier, secrets refusés sans recopier leur valeur). `README.md`, `bootstrap.sh` et
+`bootstrap-patches/` de chezmoi vont dans `bootstrap/` (scripts d'installation d'applis, à intégrer
+plus tard à `setup`). Un fichier qui contient un secret évident n'est pas importé. Relançable.
 
 ## À venir
 
-`diff`, `add`, `sync`, `install <module>`, liens de config et morceaux de config des modules.
+`install <module>` et les morceaux de config des modules (dossiers `.d`, lignes ajoutées dans des
+fichiers sans inclusion).

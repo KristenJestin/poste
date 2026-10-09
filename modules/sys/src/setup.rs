@@ -1,16 +1,54 @@
 //! `poste sys setup` : construit, montre le plan, demande confirmation, installe.
 
+use crate::config::{self, Decision};
 use crate::manifest::{Entry, Manifest};
 use crate::plan::{self, Action, Item};
 use crate::util::sha256_file;
 use anyhow::{bail, Context, Result};
 use poste_core::{time, Env};
+use std::collections::HashMap;
 use std::io::{BufRead, Write};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::{Command, ExitCode};
 
-pub fn run(env: &Env, repo: &Path, yes: bool, dry_run: bool) -> Result<ExitCode> {
-    build(repo)?;
+/// Options de `poste sys setup`.
+#[derive(Debug, Default)]
+pub struct Opts {
+    pub yes: bool,
+    pub dry_run: bool,
+    /// Ne s'occupe pas de la config (binaires seulement).
+    pub no_config: bool,
+    /// Pour les tests : ne lance pas `cargo build`.
+    pub skip_build: bool,
+    pub take_repo: Vec<String>,
+    pub take_home: Vec<String>,
+}
+
+fn decisions(env: &Env, o: &Opts) -> Result<HashMap<String, Decision>> {
+    let mut map = HashMap::new();
+    for (list, d) in [
+        (&o.take_repo, Decision::Repo),
+        (&o.take_home, Decision::Home),
+    ] {
+        for a in list {
+            let rel = config::rel_of(env, a)?;
+            if map.insert(rel.clone(), d).is_some_and(|prev| prev != d) {
+                bail!("{rel} : --take-repo et --take-home ensemble, choisissez");
+            }
+        }
+    }
+    Ok(map)
+}
+
+pub fn run(env: &Env, repo: &Path, o: &Opts) -> Result<ExitCode> {
+    let (yes, dry_run) = (o.yes, o.dry_run);
+    let decisions = decisions(env, o)?;
+    if o.no_config && !decisions.is_empty() {
+        bail!("--take-repo/--take-home n'ont pas de sens avec --no-config");
+    }
+    if !o.skip_build {
+        build(repo)?;
+    }
 
     let manifest_file = env.manifest_file();
     let mut manifest = Manifest::load(&manifest_file)?;
@@ -28,7 +66,7 @@ pub fn run(env: &Env, repo: &Path, yes: bool, dry_run: bool) -> Result<ExitCode>
 
     print_plan(env, &steps);
 
-    // Refus net : on n'écrit rien du tout si un fichier étranger gêne.
+    // Refus net : on n'écrit rien du tout si un fichier étranger gêne un binaire.
     let conflicts: Vec<_> = steps
         .iter()
         .filter(|(_, a)| *a == Action::Conflict)
@@ -44,26 +82,75 @@ pub fn run(env: &Env, repo: &Path, yes: bool, dry_run: bool) -> Result<ExitCode>
         return Ok(ExitCode::from(1));
     }
 
+    // La config : un plan à part, dont les conflits n'empêchent pas le reste.
+    let layout = if o.no_config {
+        None
+    } else {
+        config::load(repo, env)?
+    };
+    let cfg_plan = match &layout {
+        Some(l) => {
+            let p = config::plan(l, env, &decisions)?;
+            config::print_plan(env, &p);
+            Some(p)
+        }
+        None => None,
+    };
+    let cfg_conflicts = cfg_plan.as_ref().map_or(0, |p| p.conflicts().len());
+    let cfg_writes = cfg_plan.as_ref().map_or(0, |p| p.writes());
+    let code = if cfg_conflicts > 0 {
+        ExitCode::from(2)
+    } else {
+        ExitCode::SUCCESS
+    };
+    let end = |msg: &str| {
+        if let Some(p) = &cfg_plan {
+            config::print_conflicts(env, p);
+        }
+        if cfg_conflicts > 0 {
+            println!(
+                "\n{msg} ({cfg_conflicts} conflit(s) de config à trancher, code de sortie 2)."
+            );
+        } else {
+            println!("\n{msg}");
+        }
+    };
+
     let to_write = steps
         .iter()
         .filter(|(_, a)| matches!(a, Action::Create | Action::Update { .. }))
         .count();
     let to_adopt = steps.iter().filter(|(_, a)| *a == Action::Adopt).count();
 
-    if to_write == 0 {
-        println!("\nTout est à jour.");
-        if to_adopt > 0 && !dry_run {
-            record_adoptions(&steps, &mut manifest, &manifest_file)?;
+    if to_write == 0 && cfg_writes == 0 {
+        let mut changed = false;
+        if !dry_run {
+            if to_adopt > 0 {
+                for (it, a) in &steps {
+                    if *a == Action::Adopt {
+                        record(&mut manifest, it)?;
+                    }
+                }
+                changed = true;
+            }
+            if let Some(p) = &cfg_plan {
+                changed |= config::record_linked(p, &mut manifest)?;
+            }
+            if changed {
+                manifest.save(&manifest_file)?;
+            }
         }
-        return Ok(ExitCode::SUCCESS);
+        end("Tout est à jour");
+        return Ok(code);
     }
     if dry_run {
-        println!("\nSimulation (--dry-run) : rien n'a été écrit.");
-        return Ok(ExitCode::SUCCESS);
+        end("Simulation (--dry-run) : rien n'a été écrit");
+        return Ok(code);
     }
     if !yes
         && !confirm(&format!(
-            "\nAppliquer ces {to_write} changement(s) ? [o/N] "
+            "\nAppliquer ces {} changement(s) ? [o/N] ",
+            to_write + cfg_writes
         ))?
     {
         println!("Annulé.");
@@ -75,7 +162,7 @@ pub fn run(env: &Env, repo: &Path, yes: bool, dry_run: bool) -> Result<ExitCode>
         match action {
             Action::Create | Action::Update { .. } => {
                 if matches!(action, Action::Update { .. }) {
-                    let bak = backup(env, &it.dest, &stamp)?;
+                    let bak = crate::util::backup(env, &it.dest, &stamp)?;
                     println!("  sauvegarde : {}", env.display(&bak));
                 }
                 install(&it.src, &it.dest)?;
@@ -89,8 +176,16 @@ pub fn run(env: &Env, repo: &Path, yes: bool, dry_run: bool) -> Result<ExitCode>
             _ => {}
         }
     }
-    println!("\nTerminé : {to_write} fichier(s) posé(s).");
-    Ok(ExitCode::SUCCESS)
+    let mut done_cfg = 0;
+    if let (Some(l), Some(p)) = (&layout, &cfg_plan) {
+        done_cfg = config::apply(l, env, p, &stamp, &mut manifest, &manifest_file)?;
+        config::record_linked(p, &mut manifest)?;
+        manifest.save(&manifest_file)?;
+    }
+    end(&format!(
+        "Terminé : {to_write} fichier(s) posé(s), {done_cfg} élément(s) de config traité(s)"
+    ));
+    Ok(code)
 }
 
 fn build(repo: &Path) -> Result<()> {
@@ -146,22 +241,6 @@ fn confirm(prompt: &str) -> Result<bool> {
     ))
 }
 
-/// Copie l'ancien fichier dans `backup/` sous un nom horodaté ; renvoie ce chemin.
-fn backup(env: &Env, dest: &Path, stamp: &str) -> Result<PathBuf> {
-    let dir = env.backup_dir();
-    std::fs::create_dir_all(&dir)?;
-    let rel = dest.strip_prefix(&env.home).unwrap_or(dest);
-    let flat: String = rel
-        .to_string_lossy()
-        .trim_start_matches('/')
-        .chars()
-        .map(|c| if c == '/' { '_' } else { c })
-        .collect();
-    let bak = dir.join(format!("{flat}.{stamp}.bak"));
-    std::fs::copy(dest, &bak).with_context(|| format!("sauvegarde de {}", dest.display()))?;
-    Ok(bak)
-}
-
 /// Copie atomique : fichier temporaire voisin puis renommage (fonctionne même si
 /// la destination est un binaire en cours d'exécution, y compris poste-sys lui-même).
 fn install(src: &Path, dest: &Path) -> Result<()> {
@@ -186,11 +265,100 @@ fn record(manifest: &mut Manifest, it: &Item) -> Result<()> {
     Ok(())
 }
 
-fn record_adoptions(steps: &[(Item, Action)], manifest: &mut Manifest, file: &Path) -> Result<()> {
-    for (it, a) in steps {
-        if *a == Action::Adopt {
-            record(manifest, it)?;
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use std::path::PathBuf;
+
+    /// Faux dépôt (avec un « binaire » déjà construit) et HOME temporaire.
+    fn fixture() -> (tempfile::TempDir, PathBuf, Env) {
+        let d = tempfile::tempdir().unwrap();
+        let repo = d.path().join("repo");
+        fs::create_dir_all(repo.join("target/release")).unwrap();
+        fs::write(repo.join("target/release/poste"), "bin").unwrap();
+        fs::create_dir_all(repo.join("config/.config/a")).unwrap();
+        fs::write(repo.join("config/.config/a/neuf"), "n").unwrap();
+        fs::write(repo.join("config/.config/a/conflit"), "dépôt").unwrap();
+        let home = d.path().join("home");
+        fs::create_dir_all(home.join(".config/a")).unwrap();
+        fs::write(home.join(".config/a/conflit"), "maison").unwrap();
+        let env = Env::with_home(&home);
+        (d, repo, env)
+    }
+
+    fn opts(yes: bool, dry_run: bool) -> Opts {
+        Opts {
+            yes,
+            dry_run,
+            skip_build: true,
+            ..Default::default()
         }
     }
-    manifest.save(file)
+
+    fn code(c: ExitCode) -> String {
+        format!("{c:?}")
+    }
+
+    #[test]
+    fn dry_run_n_ecrit_rien() {
+        let (_d, repo, env) = fixture();
+        let c = run(&env, &repo, &opts(true, true)).unwrap();
+        assert_eq!(code(c), code(ExitCode::from(2)), "conflit : code non nul");
+        assert!(!env.home.join(".local").exists(), "rien dans .local");
+        assert!(!env.home.join(".config/a/neuf").exists());
+        assert_eq!(
+            fs::read_to_string(env.home.join(".config/a/conflit")).unwrap(),
+            "maison"
+        );
+    }
+
+    #[test]
+    fn application_conflit_non_bloquant_puis_relance() {
+        let (_d, repo, env) = fixture();
+        let c = run(&env, &repo, &opts(true, false)).unwrap();
+        assert_eq!(code(c), code(ExitCode::from(2)));
+        assert!(env.home.join(".config/a/neuf").is_symlink());
+        assert!(env.bin_dir().join("poste").is_file());
+        assert!(!env.home.join(".config/a/conflit").is_symlink());
+        let m = Manifest::load(&env.manifest_file()).unwrap();
+        assert!(m
+            .files
+            .iter()
+            .any(|e| e.module == "config" && e.path.ends_with(".config/a/neuf")));
+        assert!(m.files.iter().any(|e| e.module == "poste"));
+        // Trancher le conflit puis relancer : à jour, code 0, manifeste inchangé.
+        let o = Opts {
+            take_repo: vec![".config/a/conflit".into()],
+            ..opts(true, false)
+        };
+        assert_eq!(code(run(&env, &repo, &o).unwrap()), code(ExitCode::SUCCESS));
+        assert!(env.home.join(".config/a/conflit").is_symlink());
+        let before = fs::read_to_string(env.manifest_file()).unwrap();
+        assert_eq!(
+            code(run(&env, &repo, &opts(true, false)).unwrap()),
+            code(ExitCode::SUCCESS)
+        );
+        assert_eq!(fs::read_to_string(env.manifest_file()).unwrap(), before);
+        // L'ancienne version du conflit est sauvegardée.
+        let b: Vec<_> = fs::read_dir(env.backup_dir()).unwrap().flatten().collect();
+        assert_eq!(b.len(), 1);
+    }
+
+    #[test]
+    fn sans_config_et_decisions_incoherentes() {
+        let (_d, repo, env) = fixture();
+        let o = Opts {
+            no_config: true,
+            ..opts(true, false)
+        };
+        assert_eq!(code(run(&env, &repo, &o).unwrap()), code(ExitCode::SUCCESS));
+        assert!(!env.home.join(".config/a/neuf").exists());
+        let o = Opts {
+            take_repo: vec!["x".into()],
+            take_home: vec!["x".into()],
+            ..opts(true, true)
+        };
+        assert!(run(&env, &repo, &o).is_err());
+    }
 }

@@ -4,6 +4,7 @@ use anyhow::{bail, Context, Result};
 use poste_core::{Config, Env};
 use sha2::{Digest, Sha256};
 use std::io::Read;
+use std::os::unix::fs::symlink;
 use std::path::{Path, PathBuf};
 
 /// Emplacement du dépôt, lu dans config.toml (clé `repo`, écrite par `./setup`).
@@ -42,6 +43,74 @@ pub fn sha256_file(path: &Path) -> Result<String> {
 /// Début d'une empreinte, pour l'affichage.
 pub fn short(hash: &str) -> &str {
     &hash[..hash.len().min(8)]
+}
+
+/// Sauvegarde ce qui se trouve à `dest` dans `backup/` sous un nom horodaté et renvoie
+/// ce chemin. Un fichier est copié, un lien est recréé tel quel, un dossier est déplacé
+/// (jamais supprimé sans copie complète). Ne touche pas à `dest` sauf pour un dossier.
+pub fn backup(env: &Env, dest: &Path, stamp: &str) -> Result<PathBuf> {
+    let dir = env.backup_dir();
+    std::fs::create_dir_all(&dir)?;
+    let rel = dest.strip_prefix(&env.home).unwrap_or(dest);
+    let flat: String = rel
+        .to_string_lossy()
+        .trim_start_matches('/')
+        .chars()
+        .map(|c| if c == '/' { '_' } else { c })
+        .collect();
+    let mut bak = dir.join(format!("{flat}.{stamp}.bak"));
+    let mut n = 1;
+    while std::fs::symlink_metadata(&bak).is_ok() {
+        bak = dir.join(format!("{flat}.{stamp}.{n}.bak"));
+        n += 1;
+    }
+    let md = std::fs::symlink_metadata(dest)
+        .with_context(|| format!("sauvegarde de {}", dest.display()))?;
+    if md.file_type().is_symlink() {
+        symlink(std::fs::read_link(dest)?, &bak)?;
+    } else if md.is_dir() {
+        if std::fs::rename(dest, &bak).is_err() {
+            // Autre système de fichiers : copie complète, puis seulement ensuite retrait.
+            copy_tree(dest, &bak)?;
+            std::fs::remove_dir_all(dest)?;
+        }
+    } else {
+        std::fs::copy(dest, &bak).with_context(|| format!("sauvegarde de {}", dest.display()))?;
+    }
+    Ok(bak)
+}
+
+/// Copie récursive qui garde les liens tels quels.
+pub fn copy_tree(src: &Path, dst: &Path) -> Result<()> {
+    std::fs::create_dir_all(dst)?;
+    for e in std::fs::read_dir(src)? {
+        let e = e?;
+        let (s, d) = (e.path(), dst.join(e.file_name()));
+        let ft = e.file_type()?;
+        if ft.is_symlink() {
+            symlink(std::fs::read_link(&s)?, &d)?;
+        } else if ft.is_dir() {
+            copy_tree(&s, &d)?;
+        } else {
+            std::fs::copy(&s, &d).with_context(|| format!("copie de {}", s.display()))?;
+        }
+    }
+    Ok(())
+}
+
+/// Pose un lien symbolique en remplaçant atomiquement ce qui est à `dest`
+/// (fichier ou lien ; un dossier doit avoir été écarté avant).
+pub fn replace_with_symlink(dest: &Path, target: &Path) -> Result<()> {
+    let parent = dest.parent().context("destination sans dossier parent")?;
+    std::fs::create_dir_all(parent)?;
+    let tmp = parent.join(format!(".poste-tmp-{}-lien", std::process::id()));
+    let _ = std::fs::remove_file(&tmp);
+    symlink(target, &tmp).with_context(|| format!("création du lien {}", tmp.display()))?;
+    if let Err(e) = std::fs::rename(&tmp, dest) {
+        let _ = std::fs::remove_file(&tmp);
+        return Err(e).with_context(|| format!("pose du lien {}", dest.display()));
+    }
+    Ok(())
 }
 
 #[cfg(test)]

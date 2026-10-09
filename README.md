@@ -77,16 +77,24 @@ Posé par `poste sys setup` :
 ## Organisation du dépôt
 
 ```
+config/     la config de ~ (liens posés par poste sys setup)
 core/       poste-core : chemins XDG, config, découverte des modules, notifications
 poste/      l'aiguillage
 modules/    un dossier par module (sys, music, …)
+bootstrap/  scripts d'installation d'applis repris de chezmoi (à intégrer plus tard)
 setup       premier lancement
 ```
 
 Vérifications avant commit : `cargo test` et `cargo clippy --all-targets -- -D warnings`.
 
+## La config
+
+Le dossier `config/` reflète `~` (vrais noms, sans préfixes) et est posé par liens symboliques
+par `poste sys setup` (aperçu, sauvegardes, conflits tranchés un par un : voir
+[`modules/sys/README.md`](modules/sys/README.md)). `poste sys import-chezmoi` reprend la config
+gérée jusqu'ici par chezmoi. `bootstrap/` garde les scripts d'installation d'applis venus de chezmoi.
+
 ## À venir
 
-Commandes de `poste sys` prévues, pas encore là : `diff`, `add`, `sync`,
-`install <module>`, gestion des liens de config et des morceaux de config des modules
-(dossiers `.d`, lignes ajoutées dans des fichiers sans inclusion).
+Commandes de `poste sys` prévues, pas encore là : `install <module>` et les morceaux de config
+des modules (dossiers `.d`, lignes ajoutées dans des fichiers sans inclusion).

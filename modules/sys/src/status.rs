@@ -1,5 +1,6 @@
 //! `poste sys status` : dépôt, modules installés, fichiers posés.
 
+use crate::config;
 use crate::manifest::Manifest;
 use crate::plan::{self, Item};
 use crate::util::{sha256_file, short};
@@ -99,7 +100,7 @@ pub fn run(env: &Env, repo: &Path) -> Result<()> {
 
     println!("\nFichiers posés");
     let mut problems = 0;
-    for e in &manifest.files {
+    for e in manifest.files.iter().filter(|e| e.module != config::MODULE) {
         let p = Path::new(&e.path);
         match sha256_file(p) {
             Err(_) => {
@@ -116,8 +117,15 @@ pub fn run(env: &Env, repo: &Path) -> Result<()> {
     if problems == 0 {
         println!(
             "  {} fichier(s) suivi(s), tous conformes",
-            manifest.files.len()
+            manifest
+                .files
+                .iter()
+                .filter(|e| e.module != config::MODULE)
+                .count()
         );
+    }
+    if let Some(layout) = config::load(repo, env)? {
+        config::print_status(&layout, env, &manifest)?;
     }
     Ok(())
 }

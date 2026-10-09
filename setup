@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Premier lancement de poste : enregistre l'emplacement du dépôt, construit,
-# puis laisse `poste-sys setup` installer. Options : --yes, --dry-run.
+# puis laisse `poste-sys setup` installer. Options : --yes, --dry-run, --no-config.
 set -euo pipefail
 
 repo="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
@@ -10,8 +10,9 @@ for arg in "$@"; do
   case "$arg" in
     -y | --yes) pass+=(--yes) ;;
     -n | --dry-run) pass+=(--dry-run) ;;
+    --no-config) pass+=(--no-config) ;;
     -h | --help)
-      echo "Usage : ./setup [--yes] [--dry-run]"
+      echo "Usage : ./setup [--yes] [--dry-run] [--no-config]"
       exit 0
       ;;
     *)

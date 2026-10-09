@@ -8,3 +8,7 @@
 - Le nom du dossier d'un module du dépôt doit être égal à son `name` dans `module.toml`.
 - Pas de `sudo`, pas de push, pas de secret dans les sorties.
 - Tests unitaires pour toute logique de plan, de classement ou de manifeste.
+- Config : `setup` ne remplace jamais un fichier ordinaire de `~` qui diffère du dépôt sans décision explicite (`--take-repo`, `--take-home`) ; un fichier identique n'est remplacé qu'après sauvegarde. Un conflit n'arrête pas le reste mais donne le code de sortie 2.
+- `add` refuse tout chemin qui correspond à `config/.poste/ignore` ou aux règles de secrets intégrées (`.ssh`, `.env*`, `.npmrc`, `.claude/.credentials.json`…).
+- Les tests de la config et de l'import travaillent dans un HOME temporaire, jamais dans le vrai `~`.
+

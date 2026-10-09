@@ -5,4 +5,9 @@ commands = [
   { name = "status", description = "état du dépôt, des modules installés et des fichiers posés" },
   { name = "git", description = "lance git -C <dépôt> <args…>" },
   { name = "cd", description = "affiche le chemin du dépôt" },
+  { name = "diff", description = "compare la config du dépôt à celle de ~ ([chemin])" },
+  { name = "add", description = "met un fichier de ~ sous gestion (déplacé dans config/, remplacé par un lien)" },
+  { name = "forget", description = "remet un fichier ordinaire à la place du lien" },
+  { name = "sync", description = "git pull --ff-only puis setup (aperçu compris)" },
+  { name = "import-chezmoi", description = "importe la config gérée par chezmoi dans config/" },
 ]
