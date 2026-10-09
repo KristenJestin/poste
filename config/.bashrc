@@ -29,3 +29,6 @@ command -v direnv >/dev/null && eval "$(direnv hook bash)"
 
 # bunx de Vite+ ne passe pas en mode "x" (bun lancé via un wrapper npm) : utiliser bun x.
 alias bunx='bun x'
+
+# Réglages propres à la machine (non versionnés).
+[ -f "$HOME/.bashrc.local" ] && . "$HOME/.bashrc.local"
