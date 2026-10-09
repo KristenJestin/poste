@@ -4,6 +4,7 @@ use crate::config::{self, Decision};
 use crate::manifest::{Entry, Manifest};
 use crate::plan::{self, Action, Item};
 use crate::util::sha256_file;
+use crate::{lines, orphans};
 use anyhow::{bail, Context, Result};
 use poste_core::{time, Env};
 use std::collections::HashMap;
@@ -54,9 +55,13 @@ pub fn run(env: &Env, repo: &Path, o: &Opts) -> Result<ExitCode> {
     if !ph.proceed || o.no_config {
         return Ok(ph.code);
     }
+    let extras = extras_phase(env, repo, o)?;
     println!("\n== Machine (bootstrap/) ==");
     let applied = crate::provision::setup(env, repo, o.yes, o.dry_run, &confirm)?;
     let mut code = ph.code;
+    if extras.conflicts > 0 {
+        code = ExitCode::from(2);
+    }
     // `omarchy plugin add` peut toucher à des fichiers de config liés (shell.json) :
     // on replanifie la config et on remet les liens du dépôt.
     if !applied.done.is_empty() {
@@ -84,12 +89,72 @@ pub fn run(env: &Env, repo: &Path, o: &Opts) -> Result<ExitCode> {
         );
         code = ExitCode::from(1);
     }
-    if ph.config_changed && !o.dry_run {
+    if (ph.config_changed || extras.changed) && !o.dry_run {
         println!(
             "\nConfig modifiée : pour la recharger, lancez vous-même `omarchy restart shell` et `hyprctl reload`."
         );
     }
     Ok(code)
+}
+
+/// Résultat de la phase « lignes de module et orphelins ».
+struct Extras {
+    conflicts: usize,
+    changed: bool,
+}
+
+/// Lignes posées dans des fichiers sans inclusion (`[[line]]` des modules) et retrait des
+/// orphelins (liens dont la source a disparu, fichiers de modules disparus). Un aperçu,
+/// puis une seule confirmation (sauf `--yes`) ; `--dry-run` n'écrit rien.
+fn extras_phase(env: &Env, repo: &Path, o: &Opts) -> Result<Extras> {
+    let manifest_file = env.manifest_file();
+    let mut manifest = Manifest::load(&manifest_file)?;
+    let layout = config::load(repo, env)?;
+    let items = plan::desired(repo, env)?;
+    let orphan_list = orphans::find(repo, env, layout.as_ref(), &manifest, &items)?;
+    let vanishing: std::collections::HashSet<std::path::PathBuf> =
+        orphan_list.iter().map(|x| x.path.clone()).collect();
+    let specs = lines::desired(repo, env)?;
+    let steps = lines::plan(&specs, &manifest, &vanishing);
+    orphans::print(env, &orphan_list);
+    lines::print_plan(env, &steps);
+    let conflicts = lines::conflicts(&steps);
+    let writes = orphan_list.len() + steps.iter().filter(|s| s.writes()).count();
+    if writes == 0 {
+        return Ok(Extras {
+            conflicts,
+            changed: false,
+        });
+    }
+    if o.dry_run {
+        println!("\nSimulation (--dry-run) : orphelins et lignes non touchés.");
+        return Ok(Extras {
+            conflicts,
+            changed: false,
+        });
+    }
+    if !o.yes && !confirm(&format!("\nAppliquer ces {writes} changement(s) ? [o/N] "))? {
+        println!("Annulé.");
+        return Ok(Extras {
+            conflicts,
+            changed: false,
+        });
+    }
+    let stamp = time::now_compact();
+    orphans::apply(env, repo, &orphan_list, &stamp, &mut manifest)?;
+    manifest.save(&manifest_file)?;
+    // Les liens retirés, on replanifie les lignes (un fichier lié disparu se recrée).
+    let steps = lines::plan(&specs, &manifest, &std::collections::HashSet::new());
+    let n = lines::apply(env, &steps, &stamp, &mut manifest)?;
+    manifest.save(&manifest_file)?;
+    println!(
+        "Terminé : {} orphelin(s) retiré(s), {n} ligne(s) traitée(s).",
+        orphan_list.len()
+    );
+    Ok(Extras {
+        conflicts: lines::conflicts(&steps),
+        changed: true,
+    })
 }
 
 fn install_phase(env: &Env, repo: &Path, o: &Opts) -> Result<Phase> {
@@ -432,5 +497,43 @@ mod tests {
             ..opts(true, true)
         };
         assert!(run(&env, &repo, &o).is_err());
+    }
+
+    #[test]
+    fn module_script_lignes_et_disparition() {
+        let (_d, repo, env) = fixture();
+        let m = repo.join("modules/rec");
+        fs::create_dir_all(m.join("hypr")).unwrap();
+        fs::write(m.join("poste-rec"), "#!/bin/sh\n").unwrap();
+        fs::write(m.join("hypr/rec.lua"), "-- rec\n").unwrap();
+        fs::write(
+            m.join("module.toml"),
+            "name = \"rec\"\n[[line]]\nfile = \"~/.config/x.conf\"\nline = \"k:p = {home}/rec\"\n",
+        )
+        .unwrap();
+        let home = env.home.clone();
+        fs::write(home.join(".config/x.conf"), "perso = 1\n").unwrap();
+        let o = Opts {
+            take_repo: vec![".config/a/conflit".into()],
+            ..opts(true, false)
+        };
+        assert_eq!(code(run(&env, &repo, &o).unwrap()), code(ExitCode::SUCCESS));
+        let prog = env.modules_dir().join("rec/poste-rec");
+        assert!(prog.is_file() && env.modules_dir().join("rec/hypr/rec.lua").is_file());
+        let conf = fs::read_to_string(home.join(".config/x.conf")).unwrap();
+        assert!(conf.starts_with("perso = 1\n") && conf.contains("k:p = "));
+        let before = fs::read_to_string(env.manifest_file()).unwrap();
+        run(&env, &repo, &opts(true, false)).unwrap();
+        assert_eq!(fs::read_to_string(env.manifest_file()).unwrap(), before);
+        // Le module disparaît du dépôt : ses fichiers et sa ligne partent, le reste est intact.
+        fs::remove_dir_all(&m).unwrap();
+        run(&env, &repo, &opts(true, false)).unwrap();
+        assert!(!env.modules_dir().join("rec").exists());
+        assert_eq!(
+            fs::read_to_string(home.join(".config/x.conf")).unwrap(),
+            "perso = 1\n"
+        );
+        let man = Manifest::load(&env.manifest_file()).unwrap();
+        assert!(man.lines.is_empty() && man.files.iter().all(|e| e.module != "rec"));
     }
 }

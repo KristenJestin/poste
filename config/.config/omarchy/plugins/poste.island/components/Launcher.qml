@@ -262,7 +262,7 @@ Item {
   }
 
   // ---------------------------------------------------------------- user items & extensions
-  // ~/.config/poste-island/launcher/launcher.json (hot-reloaded):
+  // ~/.config/poste-island/launcher/launcher.json (hot-reloaded), plus celui de chaque module :
   //   items:      [{ name, subtitle, icon, keywords, type: url|command|terminal|app|copy,
   //                  url | command | id (+args) | text, cwd, enabled }]
   //   extensions: [{ id, name, subtitle, icon, keywords, ttl, enabled,
@@ -281,6 +281,32 @@ Item {
   property var userItems: []
   property var extensions: []
   property var engines: []
+  // Les extensions et entrées des modules (~/.local/share/poste/modules/*/island/launcher.json,
+  // même format) s'ajoutent à celles de la config de l'utilisateur, qui gagne en cas d'id identique.
+  property var userDoc: ({})
+  readonly property var moduleDocs: host && host.modules ? host.modules.launcherDocs : []
+  onModuleDocsChanged: applyConfig()
+  function applyConfig() {
+    var docs = [userDoc]
+    for (var m = 0; m < moduleDocs.length; m++) docs.push(moduleDocs[m].data || {})
+    var items = [], exts = [], engs = [], ids = {}
+    for (var d = 0; d < docs.length; d++) {
+      var doc = docs[d] || {}
+      items = items.concat((doc.items || []).filter(function(i) { return i && i.enabled !== false && i.name }))
+      exts = exts.concat((doc.extensions || []).filter(function(e) {
+        if (!e || e.enabled === false || !e.id || !e.source || ids[e.id]) return false
+        ids[e.id] = true
+        return true
+      }))
+      engs = engs.concat((doc.engines || []).filter(function(e) { return e && e.enabled !== false && e.keyword && e.name && String(e.url || "").indexOf("%s") !== -1 }))
+    }
+    launcher.userItems = items
+    launcher.extensions = exts
+    launcher.engines = engs
+    launcher.extCache = ({})
+    launcher.refreshExtensions(false)
+    launcher.rebuild()
+  }
   FileView {
     path: launcher.configPath
     watchChanges: true
@@ -289,14 +315,10 @@ Item {
     onLoaded: {
       var data = {}
       try { data = JSON.parse(text()) } catch (e) { data = {} }
-      launcher.userItems = (data.items || []).filter(function(i) { return i && i.enabled !== false && i.name })
-      launcher.extensions = (data.extensions || []).filter(function(e) { return e && e.enabled !== false && e.id && e.source })
-      launcher.engines = (data.engines || []).filter(function(e) { return e && e.enabled !== false && e.keyword && e.name && String(e.url || "").indexOf("%s") !== -1 })
-      launcher.extCache = ({})
-      launcher.refreshExtensions(false)
-      launcher.rebuild()
+      launcher.userDoc = data
+      launcher.applyConfig()
     }
-    onLoadFailed: { launcher.userItems = []; launcher.extensions = []; launcher.engines = []; launcher.rebuild() }
+    onLoadFailed: { launcher.userDoc = ({}); launcher.applyConfig() }
   }
 
   function expandHome(path) { path = String(path || ""); return path.indexOf("~") === 0 ? Quickshell.env("HOME") + path.slice(1) : path }
@@ -812,13 +834,14 @@ Item {
     updateHighlight()
   }
 
-  // Extension « Record » : la cible de la ligne sélectionnée (fenêtre, écran,
-  // préréglage) est encadrée à l'écran par l'île (host.recordHighlight).
+  // Extension avec « highlight »: true (par exemple « Record ») : la cible de la ligne
+  // sélectionnée (fenêtre, écran, préréglage) est encadrée à l'écran par l'île (host.recordHighlight).
   property bool ownsHighlight: false
   function updateHighlight() {
     if (!active) return
     var hl = null
-    if (currentExt === "record" && selected >= 0 && selected < results.count) {
+    var cur = currentExt ? extensionById(currentExt) : null
+    if (cur && cur.highlight === true && selected >= 0 && selected < results.count) {
       var row = results.get(selected)
       if (row && row.kind === "item") {
         try { hl = JSON.parse(row.ref).item.highlight || null } catch (e) { hl = null }

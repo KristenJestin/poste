@@ -95,13 +95,8 @@ o.bind("SUPER + L", "Lock screen", "omarchy-shell poste.island lock || omarchy-s
 -- PRINT : capture Omarchy + son « snap » quand un fichier est créé.
 hl.unbind("PRINT")
 o.bind("PRINT", "Screenshot", os.getenv("HOME") .. "/.config/omarchy/plugins/poste.island/bin/poste-screenshot")
--- Enregistrement d'écran : le lanceur de l'île ouvert sur « Record » (préréglages
--- comme Unity, fenêtres, écrans, zone). Pendant un enregistrement,
--- SHIFT+PRINT l'arrête directement.
--- gpu-screen-recorder via bin/poste-record, à la place d'OBS.
-o.bind("SHIFT + PRINT", "Screen recording", "omarchy-shell poste.island record")
--- ALT+PRINT : menu d'enregistrement d'écran d'Omarchy retiré, OBS (SHIFT+PRINT) fait le travail.
-hl.unbind("ALT + PRINT")
+-- Enregistrement d'écran (SHIFT+PRINT, ALT+PRINT retiré) : fourni par le module record
+-- (~/.local/share/poste/modules/record/hypr/record.lua, chargé par hyprland.lua).
 
 
 

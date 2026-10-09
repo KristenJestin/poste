@@ -3,7 +3,9 @@
 mod config;
 mod ignore;
 mod import;
+mod lines;
 mod manifest;
+mod orphans;
 mod plan;
 mod provision;
 mod setup;

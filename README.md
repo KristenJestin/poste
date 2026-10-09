@@ -49,10 +49,37 @@ commands = [{ name = "status", description = "état du dépôt" }]   # facultati
 | --- | --- |
 | [`sys`](modules/sys/README.md) | gère le dépôt : construction, installation, état, git. Toujours installé. |
 | [`music`](modules/music/README.md) | client Navidrome : connexion, copie locale, recherche, lecture, favoris, playlists, mixes. |
+| [`record`](modules/record/README.md) | enregistrement d'écran (gpu-screen-recorder) piloté par l'île : préréglages, fenêtres, écrans, zone. Module-script (Python). |
 
 Un module est une application à part, dans `modules/<nom>/`, avec son `README.md`,
-son `AGENTS.md` et sa fiche `module.toml`. Il peut fournir des dossiers facultatifs
-`island/` et `hypr/`, copiés tels quels à l'installation.
+son `AGENTS.md` et sa fiche `module.toml`. Son programme est soit une caisse Rust
+(`Cargo.toml`, listée dans `members` du `Cargo.toml` racine, binaire `poste-<nom>` construit en
+release), soit un script (`poste-<nom>` exécutable à la racine du module, en Python ou en shell,
+copié tel quel : pas de `Cargo.toml`, pas dans `members`). `poste` ne fait pas la différence : il
+exécute `~/.local/share/poste/modules/<nom>/poste-<nom>`.
+
+### Ce que les modules apportent à la machine
+
+Un module peut fournir, à côté de son programme, des dossiers facultatifs copiés tels quels par
+`poste sys setup` dans `~/.local/share/poste/modules/<nom>/` (l'île et Hyprland les chargent sans
+connaître aucun module ; module absent, aucune trace) :
+
+- `island/` : pour l'île Quickshell (`config/.config/omarchy/plugins/poste.island`, composant `ModuleRegistry.qml`).
+  - `launcher.json` : entrées, extensions et moteurs du lanceur, même format que
+    `~/.config/poste-island/launcher/launcher.json` (fusionné avec lui ; la config de l'utilisateur
+    gagne en cas d'id identique). Une extension peut avoir `"highlight": true` : l'île encadre à
+    l'écran la cible (`highlight: {x,y,w,h,window}`) de la ligne sélectionnée.
+  - `island.json` : `{"slots": [{"slot": "<nom>", "file": "Fichier.qml"}]}`. Slots chargés par l'île :
+    `player-extra` (ajouts à la carte du lecteur : `detail`, `actionGlyph`/`actionOn`/`action()`,
+    `launcherExt`, voir le commentaire dans `Island.qml`) et `capture` (source d'enregistrement
+    de même interface qu'`ObsState.qml`, pour la pastille de capture).
+  - Découverte au démarrage, puis rechargée à chaud (inotifywait sur le dossier des modules).
+- `hypr/*.lua` : morceaux de config Hyprland. `hyprland.lua` charge chaque
+  `modules/*/hypr/*.lua` (`loadfile` + `pcall` : une erreur est isolée et notifiée, le reste de la
+  config se charge).
+- `bin/` : programmes annexes du module.
+- `[[line]]` dans `module.toml` : une ligne à poser dans un fichier sans inclusion (voir
+  [`modules/sys/README.md`](modules/sys/README.md), « Lignes de module »).
 
 ## Installer sur un PC neuf
 
@@ -89,7 +116,8 @@ modification. `--no-config` ne réinstalle que les binaires et saute toute la pa
 Posé par `poste sys setup` :
 
 - `~/.local/bin/poste`
-- `~/.local/share/poste/modules/<nom>/` : `poste-<nom>`, `module.toml`, et `island/`, `hypr/` s'ils existent
+- `~/.local/share/poste/modules/<nom>/` : `poste-<nom>`, `module.toml`, et `island/`, `hypr/`, `bin/` s'ils existent
+- les lignes que les modules ajoutent dans des fichiers sans inclusion (par exemple `~/.config/hypr/xdph.conf`)
 - la liste de ce qui a été posé : `~/.local/state/poste/installed.json`
 - les anciennes versions remplacées : `~/.local/state/poste/backup/`
 - les étapes manuelles marquées faites : `~/.local/state/poste/done/<id>`
@@ -100,7 +128,7 @@ Posé par `poste sys setup` :
 config/     la config de ~ (liens posés par poste sys setup)
 core/       poste-core : chemins XDG, config, découverte des modules, notifications
 poste/      l'aiguillage
-modules/    un dossier par module (sys, music, …)
+modules/    un dossier par module (sys, music, record, …)
 bootstrap/  paquets, étapes système/utilisateur/manuelles, patchs de plugins (lus par poste sys setup)
 setup       premier lancement
 ```
@@ -116,5 +144,4 @@ gérée jusqu'ici par chezmoi. `bootstrap/` décrit le reste de la machine (paqu
 
 ## À venir
 
-Commandes de `poste sys` prévues, pas encore là : `install <module>` et les morceaux de config
-des modules (dossiers `.d`, lignes ajoutées dans des fichiers sans inclusion).
+Commande de `poste sys` prévue, pas encore là : `install <module>`.

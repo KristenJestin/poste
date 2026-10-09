@@ -1,0 +1,10 @@
+# Lignes de base posées par `poste sys setup` dans des fichiers sans inclusion (propriétaire
+# « config » dans installed.json). Même format que les [[line]] d'un module.toml ;
+# `{home}` = dossier personnel, `{modules}` = ~/.local/share/poste/modules.
+#
+# xdph.conf n'est plus un lien vers le dépôt : c'est un fichier ordinaire dont poste ne gère que
+# les lignes ci-dessous et celles des modules (ex. custom_picker_binary du module record).
+
+[[line]]
+file = "~/.config/hypr/xdph.conf"
+line = "screencopy:allow_token_by_default = true"

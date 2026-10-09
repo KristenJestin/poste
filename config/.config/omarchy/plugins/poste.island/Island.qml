@@ -53,6 +53,11 @@ Item {
     showHidden: true
   }
 
+  // ---------------------------------------------------------------- modules poste
+  // Morceaux d'île fournis par les modules (lanceur, éléments QML) : voir ModuleRegistry.qml.
+  ModuleRegistry { id: moduleRegistry }
+  readonly property var modules: moduleRegistry
+
   // ---------------------------------------------------------------- style
   readonly property color colorIsland: Qt.darker(Color.background, 1.9)
   readonly property color colorText: Qt.lighter(Color.foreground, 1.08)
@@ -107,14 +112,47 @@ Item {
   }
   function mediaAction(name) { if (media) media.runAction(name, false, "") }
 
-  // Notre lecteur (poste music) : nom de bus MPRIS, ou identité « Musique » faute de nom.
-  // Lui seul affiche la qualité et le cœur ; les autres lecteurs ne changent pas.
-  readonly property bool playerIsPoste: !!player && (String(player.dbusName || "") === "org.mpris.MediaPlayer2.poste_music"
-    || (String(player.dbusName || "") === "" && String(player.identity || "") === "Musique"))
-  readonly property string posteQuality: playerIsPoste ? String((player.metadata || {})["poste:quality"] || "") : ""
-  readonly property bool posteStarred: playerIsPoste && !!(player.metadata || {})["poste:starred"]
-  // Le démon met à jour `poste:starred` après le serveur : le cœur suit tout seul.
-  function posteLikeToggle() { Quickshell.execDetached(["poste", "music", "like", "--toggle"]) }
+  // Slot « player-extra » : un module peut ajouter à la carte du lecteur ce qui est propre à
+  // son lecteur (qualité du flux, cœur…) par un QML déclaré dans son island/island.json.
+  // Contrat de l'élément chargé : propriété injectée `player` (lecteur MPRIS courant) ;
+  // propriétés lues `active` (bool, ce module prend en charge ce lecteur), `detail` (ligne
+  // discrète sous l'artiste), `actionGlyph` / `actionOn` (bouton en haut à droite) avec la
+  // fonction `action()`, et `launcherExt` (extension du lanceur ouverte par la pastille de la
+  // source du son). Sans module (ou lecteur non pris en charge), rien de tout cela ne s'affiche.
+  property var playerExtraItems: []
+  function collectPlayerExtras() {
+    var list = []
+    for (var i = 0; i < playerExtraLoaders.count; i++) {
+      var ld = playerExtraLoaders.itemAt(i)
+      if (ld && ld.item) list.push(ld.item)
+    }
+    playerExtraItems = list
+  }
+  Repeater {
+    id: playerExtraLoaders
+    model: moduleRegistry.slots["player-extra"] || []
+    delegate: Loader {
+      required property string modelData
+      source: modelData
+      onLoaded: {
+        if (item && "player" in item) item.player = Qt.binding(function() { return root.player })
+        root.collectPlayerExtras()
+      }
+    }
+    onItemAdded: Qt.callLater(root.collectPlayerExtras)
+    onItemRemoved: Qt.callLater(root.collectPlayerExtras)
+  }
+  readonly property var playerExtra: {
+    var list = playerExtraItems
+    for (var i = 0; i < list.length; i++) if (list[i].active) return list[i]
+    return null
+  }
+  readonly property string playerDetail: playerExtra ? String(playerExtra.detail || "") : ""
+  readonly property bool playerHasAction: !!playerExtra && String(playerExtra.actionGlyph || "") !== ""
+  readonly property string playerActionGlyph: playerHasAction ? String(playerExtra.actionGlyph) : ""
+  readonly property bool playerActionOn: playerHasAction && !!playerExtra.actionOn
+  readonly property string playerSourceExt: playerExtra ? String(playerExtra.launcherExt || "") : ""
+  function playerAction() { if (playerExtra && playerExtra.action) playerExtra.action() }
 
   // ---------------------------------------------------------------- volume du lecteur
   // Volume de l'application du lecteur courant : son ou ses flux PipeWire
@@ -620,13 +658,38 @@ Item {
   // control center opens. A run in progress absorbs further requests.
   // OBS : enregistrement / diffusion (ObsState.qml, bin/poste-obs).
   ObsState { id: obsState }
-  // Enregistrement d'écran par gpu-screen-recorder (RecordState.qml,
-  // bin/poste-record), même interface : la pastille suit celui qui enregistre.
-  RecordState { id: recordState }
-  // Cible encadrée pendant le choix dans l'extension « Record » du lanceur :
-  // { x, y, w, h, window } en coordonnées globales Hyprland, ou null.
+  // Slot « capture » : un module peut fournir sa propre source d'enregistrement (élément
+  // de même interface qu'ObsState : active, recording, paused, recordElapsed, request…).
+  // La pastille de capture et sa carte suivent celle qui enregistre, OBS sinon.
+  property var captureItems: []
+  function collectCaptures() {
+    var list = []
+    for (var i = 0; i < captureLoaders.count; i++) {
+      var ld = captureLoaders.itemAt(i)
+      if (ld && ld.item) list.push(ld.item)
+    }
+    captureItems = list
+  }
+  Repeater {
+    id: captureLoaders
+    model: moduleRegistry.slots["capture"] || []
+    delegate: Loader {
+      required property string modelData
+      source: modelData
+      onLoaded: root.collectCaptures()
+    }
+    onItemAdded: Qt.callLater(root.collectCaptures)
+    onItemRemoved: Qt.callLater(root.collectCaptures)
+  }
+  // Cible encadrée pendant le choix dans une extension du lanceur qui le demande
+  // (« highlight »: true) : { x, y, w, h, window } en coordonnées globales Hyprland, ou null.
   property var recordHighlight: null
-  readonly property var obs: recordState.active || !obsState.active ? recordState : obsState
+  readonly property var obs: {
+    var list = captureItems
+    for (var i = 0; i < list.length; i++) if (list[i].active) return list[i]
+    if (obsState.active) return obsState
+    return list.length > 0 ? list[0] : obsState
+  }
 
   // Batteries des périphériques sans fil (clavier, souris, casque) : DevicesState.qml.
   DevicesState { id: devicesState }
@@ -929,13 +992,6 @@ Item {
     function launcher(): string { root.toggleLauncherOn(root.focusedScreen); return "ok" }
     // Le lanceur ouvert directement dans une extension (« record », « ssh »…).
     function launcherIn(ext: string): string { root.openLauncherExtOn(root.focusedScreen, ext); return "ok" }
-    // SHIFT+PRINT : le lanceur sur « Record » (préréglages, fenêtres, écrans) ;
-    // pendant un enregistrement, l'arrête directement.
-    function record(): string {
-      if (recordState.active) { recordState.request("StopRecord"); return "stopped" }
-      root.openLauncherExtOn(root.focusedScreen, "record")
-      return "ok"
-    }
     // omarchy-shell poste.island ask "question" (vide = ouvre la vue)
     function ask(question: string): string { root.openAsk(question, question !== ""); return "ok" }
     // omarchy-shell poste.island timer "10m pâtes"

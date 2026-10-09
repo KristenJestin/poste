@@ -2,14 +2,14 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 
-// Enregistrement d'écran (gpu-screen-recorder) via bin/poste-record watch.
-// Même interface qu'ObsState (recording, paused, recordElapsed, request…),
+// Enregistrement d'écran (gpu-screen-recorder) via « poste record watch » (module record).
+// Fourni au slot « capture » de l'île (island/island.json). Même interface qu'ObsState (recording, paused, recordElapsed, request…),
 // pour que la pastille de capture et sa carte servent aux deux. Le temps est
 // relu chaque seconde et interpolé ici ; la notification « Recording saved »
 // vient de poste-record lui-même.
 Item {
   id: rec
-  readonly property string bin: Quickshell.env("HOME") + "/.config/omarchy/plugins/poste.island/bin/poste-record"
+  readonly property var bin: ["poste", "record"]
 
   readonly property bool connected: true
   property bool recording: false
@@ -30,7 +30,7 @@ Item {
   Process {
     id: watcher
     running: true
-    command: [rec.bin, "watch"]
+    command: rec.bin.concat(["watch"])
     stdout: SplitParser {
       onRead: function(line) {
         var d
@@ -52,6 +52,6 @@ Item {
   function request(kind) {
     var map = { StopRecord: "stop", ToggleRecord: "stop", PauseRecord: "pause", ResumeRecord: "resume", ToggleRecordPause: "toggle" }
     var cmd = map[kind]
-    if (cmd) Quickshell.execDetached([bin, cmd])
+    if (cmd) Quickshell.execDetached(bin.concat([cmd]))
   }
 }

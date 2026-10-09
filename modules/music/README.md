@@ -239,3 +239,16 @@ affichée : un marqueur `.none` évite de la retélécharger.
 
 Le jeton ne figure dans aucun message, journal ou sortie : les erreurs `ureq` (qui contiennent
 l'URL) ne sont jamais affichées, seules la méthode et la nature de l'erreur le sont.
+
+## Partie île du module
+
+`modules/music/island/` est installé dans `~/.local/share/poste/modules/music/island/` ; l'île le
+découvre sans connaître le module (voir `README.md` à la racine, « Ce que les modules apportent ») :
+
+- `launcher.json` : l'extension `poste-music` du lanceur (mots-clés `play`, `music`).
+- `island.json` + `PlayerExtra.qml` : slot `player-extra` de la carte du lecteur. Pour notre lecteur
+  seulement (bus MPRIS `poste_music`) : qualité du flux (`poste:quality`), cœur des favoris
+  (`poste:starred`, `poste music like --toggle`) et pastille de la source du son qui ouvre
+  l'extension du lanceur. La mise en page (où se placent la ligne de détail et le bouton) reste dans
+  `PlayerView.qml` / `ActivityCard.qml` de l'île, qui ne savent rien de la musique : ils lisent le
+  contrat du slot.

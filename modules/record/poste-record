@@ -1,27 +1,30 @@
 #!/usr/bin/env python3
-"""Enregistrement d'écran avec gpu-screen-recorder, piloté par l'île.
+"""Module record de poste : enregistrement d'écran avec gpu-screen-recorder, piloté par l'île.
+Se lance par `poste record <commande>`.
 
-  poste-record start --preset ID            un préréglage de record.json
-  poste-record start --window ADDR [--audio A]   une fenêtre (adresse Hyprland)
-  poste-record start --monitor NAME [--audio A]  un écran entier
-  poste-record start --region [--audio A]        une zone choisie à la souris
-  poste-record stop | pause | toggle            arrêter, pause / reprise, l'un ou l'autre
-  poste-record status                           l'état en JSON
-  poste-record watch                            une ligne JSON par changement d'état
-  poste-record items                            la liste du lanceur (extension « Record »)
-  poste-record open-dir | open-last [--preset ID]   le dossier, ou le dernier enregistrement
+  poste record start --preset ID            un préréglage de record.json
+  poste record start --window ADDR [--audio A]   une fenêtre (adresse Hyprland)
+  poste record start --monitor NAME [--audio A]  un écran entier
+  poste record start --region [--audio A]        une zone choisie à la souris
+  poste record stop | pause | toggle            arrêter, pause / reprise, l'un ou l'autre
+  poste record status                           l'état en JSON
+  poste record watch                            une ligne JSON par changement d'état
+  poste record items                            la liste du lanceur (extension « Record »)
+  poste record open-dir | open-last [--preset ID]   le dossier, ou le dernier enregistrement
+  poste record hotkey                           SHIFT+PRINT : arrête l'enregistrement en cours,
+                                                sinon ouvre le lanceur de l'île sur « Record »
 
 Son (--audio) : none, app (le son de l'appli de la fenêtre), desktop, mic,
 desktop+mic, app+mic ; ou des sources gpu-screen-recorder brutes séparées
 par « | » (app:Unity|default_input).
 
-Préréglages : ~/.config/poste-island/record/presets.json (voir DEFAULT_CONFIG). Un
+Préréglages : ~/.config/poste/record/presets.json (voir DEFAULT_CONFIG). Un
 préréglage choisit son son avec « audioSource » (mêmes valeurs que --audio) et,
 avec « app », peut donner « audioAppName » : le nom de l'appli dans PipeWire
 quand il diffère de sa classe de fenêtre (Unity s'annonce « FMOD Ex App »).
 « cursor » (true / false) montre ou cache la souris dans la vidéo.
 Une fenêtre passe par le portail de capture : le choix de la fenêtre est
-transmis au sélecteur par bin/poste-share-picker (fichier « pick » dans
+transmis au sélecteur par bin/poste-share-picker du module (fichier « pick » dans
 $XDG_RUNTIME_DIR/poste-record), donc sans clic. Un écran ou une zone passent
 directement par KMS, sans portail.
 
@@ -36,7 +39,7 @@ RUN = os.path.join(os.environ.get("XDG_RUNTIME_DIR", "/tmp"), "poste-record")
 STATE = os.path.join(RUN, "state.json")
 PICK = os.path.join(RUN, "pick.json")
 LOG = os.path.join(RUN, "last.log")
-CONFIG = os.path.join(HOME, ".config/poste-island/record/presets.json")
+CONFIG = os.path.join(os.environ.get("XDG_CONFIG_HOME") or os.path.join(HOME, ".config"), "poste/record/presets.json")
 VIDEOS = os.environ.get("XDG_VIDEOS_DIR") or os.path.join(HOME, "Videos")
 
 DEFAULT_CONFIG = {
@@ -370,7 +373,7 @@ def watch():
 
 # ---------------------------------------------------------------- lanceur
 def cmd_of(*args):
-    return " ".join(["~/.config/omarchy/plugins/poste.island/bin/poste-record"] + ["'%s'" % a.replace("'", "'\\''") for a in args])
+    return " ".join(["poste", "record"] + ["'%s'" % a.replace("'", "'\\''") for a in args])
 
 
 def item(id_, name, subtitle, icon, command, verb="Record", keywords=(), actions=(), highlight=None):
@@ -490,6 +493,13 @@ def items():
     print(json.dumps(out))
 
 
+def hotkey():
+    """SHIFT+PRINT : arrête l'enregistrement en cours, sinon ouvre le lanceur sur « Record »."""
+    if read_state():
+        return stop()
+    return subprocess.call(["omarchy-shell", "poste.island", "launcherIn", "record"])
+
+
 def main(argv):
     if not argv:
         print(__doc__)
@@ -520,6 +530,8 @@ def main(argv):
     if cmd == "items":
         items()
         return 0
+    if cmd == "hotkey":
+        return hotkey()
     print(__doc__)
     return 2
 

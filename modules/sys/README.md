@@ -8,7 +8,9 @@ Module de gestion du dépôt `poste`. Toujours installé. Le dépôt est repér�
 - `poste sys setup [--yes] [--dry-run] [--no-config] [--take-repo <chemin>]… [--take-home <chemin>]…` :
   lance `cargo build --release` dans le dépôt, installe `~/.local/bin/poste` et, pour chaque
   `modules/*/` contenant un `module.toml`, `~/.local/share/poste/modules/<nom>/`
-  (`poste-<nom>`, `module.toml`, `island/`, `hypr/`), puis pose la config (voir plus bas).
+  (`poste-<nom>`, `module.toml`, `island/`, `hypr/`, `bin/`), puis pose la config, les lignes de
+  module et retire les orphelins (voir plus bas). Le programme d'un module est le binaire construit
+  s'il a un `Cargo.toml`, sinon le script `poste-<nom>` du dossier du module.
   Code de sortie 2 s'il reste des conflits de config. Sauf avec `--no-config`, enchaîne la partie
   « machine » (voir plus bas).
 - `poste sys done [<id>] [--undo]` : marque une étape manuelle (ou système non vérifiable) faite ;
@@ -16,6 +18,7 @@ Module de gestion du dépôt `poste`. Toujours installé. Le dépôt est repér�
 - `poste sys status` : branche, modifications non commitées, commits non poussés ; modules
   installés (empreinte installée / dépôt) ; fichiers posés manquants ou modifiés à la main ;
   config (liés, manquants, liens cassés, liens remplacés par un fichier ordinaire, conflits) ;
+  lignes de module (en place, conflits) ; orphelins ;
   paquets manquants, étapes système, utilisateur et manuelles en attente.
 - `poste sys diff [<chemin>]` : écarts entre `config/` et `~` (diff unifié).
 - `poste sys add <chemin> [--dry-run]` : met un fichier (ou un dossier) de `~` sous gestion :
@@ -37,8 +40,45 @@ Module de gestion du dépôt `poste`. Toujours installé. Le dépôt est repér�
   et dit lequel gêne. Un fichier déjà identique à la source est simplement pris en compte.
 - Avant de remplacer un fichier posé, copie l'ancien dans
   `~/.local/state/poste/backup/<chemin aplati>.<AAAAMMJJ-HHMMSS>.bak`.
-- Ne supprime rien : un fichier retiré du dépôt reste en place.
+- Ne supprime que les orphelins (voir plus bas), après aperçu et confirmation : un fichier retiré du dépôt reste en place tant que ce n'est pas un lien ou un fichier de module posé par nous et intact.
 - Tient `~/.local/state/poste/installed.json` : chemin, sha256, module propriétaire (`config` pour la config), date.
+
+## Lignes de module (fichiers sans inclusion)
+
+Certains fichiers n'ont pas de mécanisme d'inclusion (cas réel : `~/.config/hypr/xdph.conf`,
+où le module `record` pose `screencopy:custom_picker_binary = …`). Un module déclare dans son
+`module.toml` :
+
+```toml
+[[line]]
+file = "~/.config/hypr/xdph.conf"            # sous ~ seulement
+line = "screencopy:custom_picker_binary = {modules}/record/bin/poste-share-picker"
+```
+
+`{home}` (dossier personnel) et `{modules}` (`~/.local/share/poste/modules`) sont remplacés.
+`config/.poste/lines.toml` (même format, propriétaire `config`) porte les lignes de base du dépôt.
+
+- `setup` ajoute la ligne à la fin du fichier si elle manque (fichier créé s'il n'existe pas) et
+  note `{file, line, module}` dans `installed.json` (`lines`). Le fichier existant est d'abord sauvegardé.
+- Si le module ne la déclare plus ou disparaît, la ligne est retirée ; si elle avait déjà disparu du fichier,
+  l'entrée est seulement oubliée. Si la valeur change, la ligne qu'on avait posée est remplacée.
+- Jamais touchée : une ligne qu'on n'a pas posée (la même ligne déjà présente est laissée, non suivie).
+- Conflit (rien n'est écrit, code de sortie 2) : la clé (ce qui précède le premier `=`) est demandée par
+  deux modules, ou existe déjà dans le fichier avec une autre valeur non posée par nous.
+- Un fichier qui est un lien symbolique n'est jamais modifié (on écrirait dans sa cible).
+
+## Orphelins
+
+`setup` et `status` repèrent ce que poste avait posé et dont la source a disparu :
+
+- un lien de `~` qui pointe vers `<dépôt>/config/…` dont la cible n'existe plus (fichier renommé ou
+  retiré du dépôt) : seuls les liens, jamais un fichier ordinaire, jamais un lien étranger ;
+- un fichier de module noté dans `installed.json` que le dépôt ne produit plus (module supprimé, fichier
+  renommé) et resté tel qu'installé (un fichier modifié à la main est gardé). Il est sauvegardé avant
+  retrait, et les dossiers de module devenus vides sont retirés.
+
+`setup` montre l'aperçu (avec les lignes de module) et demande une confirmation (sauf `--yes`) ;
+`--dry-run` ne retire rien.
 
 ## La config
 
@@ -102,5 +142,4 @@ fichiers ont été repris dans `bootstrap/*.toml` ; ne pas relancer l'import (il
 
 ## À venir
 
-`install <module>` et les morceaux de config des modules (dossiers `.d`, lignes ajoutées dans des
-fichiers sans inclusion).
+`install <module>`.

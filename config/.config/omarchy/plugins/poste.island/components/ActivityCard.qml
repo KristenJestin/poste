@@ -370,7 +370,7 @@ Rectangle {
       y: 22
       spacing: 2
       Text {
-        width: parent.width - (card.host.playerIsPoste ? 28 : 0)
+        width: parent.width - (card.host.playerHasAction ? 28 : 0)
         elide: Text.ElideRight
         text: musicCard.mpris ? String(musicCard.mpris.trackTitle || "Unknown track") : ""
         color: card.host.colorText
@@ -386,30 +386,30 @@ Rectangle {
         font.family: card.host.uiFont
         font.pixelSize: 13
       }
-      // Qualité (poste music seulement), sur la largeur laissée par les commandes.
+      // Ligne de détail d'un module (slot « player-extra »), sur la largeur laissée par les commandes.
       Text {
         width: parent.width - 104
-        visible: card.host.playerIsPoste && text !== ""
+        visible: text !== ""
         elide: Text.ElideRight
-        text: card.host.posteQuality
+        text: card.host.playerDetail
         textFormat: Text.PlainText
         color: card.host.withAlpha(card.host.colorText, 0.4)
         font.family: card.host.uiFont
         font.pixelSize: 11
       }
     }
-    // Cœur (poste music seulement), en haut à droite : le titre lui laisse la place.
+    // Bouton d'action d'un module (cœur des favoris), en haut à droite : le titre lui laisse la place.
     Glyph {
       id: cardHeart
-      visible: card.host.playerIsPoste
+      visible: card.host.playerHasAction
       x: parent.width - 18 - width
       y: 20
-      glyph: card.host.posteStarred ? "󰋑" : "󰋕"
-      color: card.host.posteStarred ? card.host.colorAccent : card.host.withAlpha(card.host.colorText, 0.6)
+      glyph: card.host.playerActionGlyph
+      color: card.host.playerActionOn ? card.host.colorAccent : card.host.withAlpha(card.host.colorText, 0.6)
       fontFamily: card.host.fontFamily
       pixelSize: 18
       stroke: 1.75
-      MouseArea { anchors.fill: parent; anchors.margins: -8; cursorShape: Qt.PointingHandCursor; onClicked: card.host.posteLikeToggle() }
+      MouseArea { anchors.fill: parent; anchors.margins: -8; cursorShape: Qt.PointingHandCursor; onClicked: card.host.playerAction() }
     }
     // Commandes, à droite sous le titre.
     Row {
