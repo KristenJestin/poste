@@ -1157,6 +1157,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "poste-display"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "poste-core",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "toml",
+]
+
+[[package]]
 name = "poste-music"
 version = "0.1.0"
 dependencies = [
@@ -1176,6 +1188,19 @@ dependencies = [
  "toml",
  "ureq",
  "zbus",
+]
+
+[[package]]
+name = "poste-power"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "libc",
+ "poste-core",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "toml",
 ]
 
 [[package]]
@@ -1201,6 +1226,7 @@ dependencies = [
  "sha2 0.10.9",
  "tempfile",
  "toml",
+ "toml_edit 0.22.27",
 ]
 
 [[package]]

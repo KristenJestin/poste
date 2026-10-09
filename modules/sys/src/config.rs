@@ -32,6 +32,9 @@ pub enum Kind {
     Link(PathBuf),
     /// Dossier lié d'un bloc (`link-dirs`).
     Dir,
+    /// Fichier JSON généré : contenu du dépôt plus les surcharges de la machine (texte voulu).
+    /// Pas un lien : un fichier ordinaire écrit par `setup`.
+    Generated(String),
 }
 
 #[derive(Debug, Clone)]
@@ -49,7 +52,15 @@ pub struct Entry {
 pub struct Layout {
     /// `<dépôt>/config`.
     pub root: PathBuf,
+    /// Entrées que `setup` pose (hors fichiers locaux).
     pub entries: Vec<Entry>,
+    /// Entrées que cette machine garde à elle (`local` de `~/.config/poste/config.toml`) :
+    /// jamais liées, jamais signalées en conflit, jamais touchées.
+    pub local: Vec<Entry>,
+    /// Chemins déclarés dans `local`, normalisés (y compris ceux que le dépôt ne connaît pas).
+    pub local_paths: Vec<String>,
+    /// Surcharges JSON de la machine, par chemin relatif (fichiers générés).
+    pub overrides: BTreeMap<String, crate::overrides::Sets>,
     pub modes: BTreeMap<String, u32>,
     pub link_dirs: Vec<String>,
 }
@@ -106,8 +117,51 @@ fn read_meta(root: &Path, name: &str) -> Result<String> {
     }
 }
 
-/// Lit `config/` ; `None` si le dépôt n'a pas de dossier `config/`.
+/// `rel` est-il l'un des chemins locaux, ou sous l'un d'eux ?
+pub fn is_local(rel: &str, local: &[String]) -> bool {
+    local
+        .iter()
+        .any(|l| rel == l || rel.starts_with(&format!("{l}/")))
+}
+
+/// Chemins `local` de la config de la machine, normalisés (erreur claire si l'un est invalide).
+pub fn local_paths(env: &Env) -> Result<Vec<String>> {
+    let cfg = poste_core::Config::load(env)?;
+    cfg.local
+        .iter()
+        .map(|l| normalize_rel(l).with_context(|| format!("config.toml, local : « {l} »")))
+        .collect()
+}
+
+/// Lit `config/` ; `None` si le dépôt n'a pas de dossier `config/`. Les chemins `local` de la
+/// config de la machine sont mis à part (`Layout::local`).
 pub fn load(repo: &Path, env: &Env) -> Result<Option<Layout>> {
+    load_with(repo, env, &local_paths(env)?, &override_sets(env)?)
+}
+
+/// Surcharges JSON de la config de la machine : (chemin relatif normalisé, clés pointées).
+pub fn override_sets(env: &Env) -> Result<Vec<(String, crate::overrides::Sets)>> {
+    let cfg = poste_core::Config::load(env)?;
+    let mut out: Vec<(String, crate::overrides::Sets)> = Vec::new();
+    for o in &cfg.overrides {
+        let rel = normalize_rel(&o.path)
+            .with_context(|| format!("config.toml, override : « {} »", o.path))?;
+        let sets = crate::overrides::sets_of(o)?;
+        match out.iter_mut().find(|(r, _)| *r == rel) {
+            Some((_, s)) => s.extend(sets),
+            None => out.push((rel, sets)),
+        }
+    }
+    Ok(out)
+}
+
+/// Comme `load`, avec une liste de chemins locaux donnée (vide : tout est géré).
+pub fn load_with(
+    repo: &Path,
+    env: &Env,
+    local: &[String],
+    overrides: &[(String, crate::overrides::Sets)],
+) -> Result<Option<Layout>> {
     let root = repo.join("config");
     if !root.is_dir() {
         return Ok(None);
@@ -128,9 +182,32 @@ pub fn load(repo: &Path, env: &Env) -> Result<Option<Layout>> {
     }
     let mut entries = Vec::new();
     scan("", &link_dirs, env, &root, &mut entries)?;
+    let (local_entries, mut entries): (Vec<Entry>, Vec<Entry>) =
+        entries.into_iter().partition(|e| is_local(&e.rel, local));
+    let mut applied = BTreeMap::new();
+    for (rel, sets) in overrides {
+        if is_local(rel, local) {
+            continue; // le fichier local gagne : la machine le gère seule
+        }
+        let Some(e) = entries.iter_mut().find(|e| e.rel == *rel) else {
+            bail!("override : « {rel} » n'est pas un fichier de config/ du dépôt");
+        };
+        if e.kind != Kind::File {
+            bail!("override : « {rel} » n'est pas un fichier ordinaire de config/");
+        }
+        let text = std::fs::read_to_string(&e.src)
+            .with_context(|| format!("override {rel} : lecture de {}", e.src.display()))?;
+        let gen =
+            crate::overrides::generate(&text, sets).with_context(|| format!("override {rel}"))?;
+        e.kind = Kind::Generated(gen);
+        applied.insert(rel.clone(), sets.clone());
+    }
     Ok(Some(Layout {
         root,
         entries,
+        local: local_entries,
+        local_paths: local.to_vec(),
+        overrides: applied,
         modes,
         link_dirs,
     }))
@@ -200,6 +277,11 @@ pub enum State {
     WrongType(&'static str),
     /// Un dossier parent n'est pas un dossier.
     ParentBlocked(PathBuf),
+    /// Fichier généré à jour (dépôt plus surcharges).
+    Generated,
+    /// Fichier généré non modifié depuis notre écriture, mais le dépôt ou les surcharges ont
+    /// changé : à régénérer.
+    Stale,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -239,6 +321,31 @@ fn same_target(a: &Path, b: &Path) -> bool {
         || matches!((std::fs::canonicalize(a), std::fs::canonicalize(b)), (Ok(x), Ok(y)) if x == y)
 }
 
+/// État d'un fichier ordinaire face au contenu généré voulu.
+fn generated_state(e: &Entry, text: &str, env: &Env) -> Result<State> {
+    let bytes = std::fs::read(&e.dest)?;
+    if bytes == text.as_bytes() {
+        return Ok(State::Generated);
+    }
+    let cur = String::from_utf8_lossy(&bytes);
+    // Même JSON, autre mise en forme : on peut réécrire sans perdre quoi que ce soit.
+    if let (Ok(a), Ok(b)) = (crate::ojson::parse(&cur), crate::ojson::parse(text)) {
+        if a.same(&b) {
+            return Ok(State::Identical);
+        }
+    }
+    // Écrit par nous et pas touché depuis : le dépôt ou les surcharges ont changé.
+    let ours = Manifest::load(&env.manifest_file())
+        .ok()
+        .and_then(|m| m.get(&e.dest).map(|x| x.sha256.clone()));
+    let mine = format!("{:x}", Sha256::digest(&bytes));
+    Ok(if ours.as_deref() == Some(mine.as_str()) {
+        State::Stale
+    } else {
+        State::Differs
+    })
+}
+
 pub fn state_of(e: &Entry, env: &Env) -> Result<State> {
     let md = match std::fs::symlink_metadata(&e.dest) {
         Ok(m) => m,
@@ -267,6 +374,13 @@ pub fn state_of(e: &Entry, env: &Env) -> Result<State> {
         let ok = match &e.kind {
             Kind::Link(t) => *t == target,
             Kind::File | Kind::Dir => same_target(&target, &e.src),
+            // L'ancien lien vers le dépôt : poste l'avait posé, on peut le remplacer sans risque.
+            Kind::Generated(_) => {
+                if same_target(&target, &e.src) {
+                    return Ok(State::Identical);
+                }
+                false
+            }
         };
         return Ok(if ok {
             State::Linked
@@ -278,6 +392,8 @@ pub fn state_of(e: &Entry, env: &Env) -> Result<State> {
         });
     }
     Ok(match (&e.kind, md.is_dir(), md.is_file()) {
+        (Kind::Generated(text), false, true) => generated_state(e, text, env)?,
+        (Kind::Generated(_), true, _) => State::WrongType("dossier à la place d'un fichier"),
         (Kind::File, false, true) => {
             if sha256_file(&e.src)? == sha256_file(&e.dest)? {
                 State::Identical
@@ -315,6 +431,9 @@ pub struct ModeFix {
 pub fn mode_fixes(layout: &Layout, env: &Env) -> Vec<ModeFix> {
     let mut out = Vec::new();
     for (rel, want) in &layout.modes {
+        if is_local(rel, &layout.local_paths) {
+            continue;
+        }
         let in_repo = layout.root.join(rel);
         let Ok(repo_md) = std::fs::symlink_metadata(&in_repo) else {
             continue;
@@ -407,6 +526,19 @@ impl Plan {
     }
 }
 
+/// Reprise d'un fichier généré : le texte du dépôt à écrire (erreur si ambigu).
+fn generated_take_home_text(layout: &Layout, e: &Entry) -> Result<String> {
+    let sets = layout.overrides.get(&e.rel).cloned().unwrap_or_default();
+    let home = std::fs::read_to_string(&e.dest)?;
+    let repo = std::fs::read_to_string(&e.src)?;
+    crate::overrides::take_home_text(&home, &repo, &sets)
+        .with_context(|| format!("--take-home {}", e.rel))
+}
+
+fn check_generated_take_home(layout: &Layout, e: &Entry) -> Result<()> {
+    generated_take_home_text(layout, e).map(|_| ())
+}
+
 /// Vérifie qu'un `--take-home` est réalisable pour cet état.
 fn check_take_home(e: &Entry, st: &State) -> Result<()> {
     let ok = match (&e.kind, st) {
@@ -423,6 +555,7 @@ fn check_take_home(e: &Entry, st: &State) -> Result<()> {
                 .unwrap_or(false)
         }
         (Kind::Dir, State::Differs) => true,
+        (Kind::Generated(_), State::Differs) => true,
         (Kind::Link(_), State::OtherLink { .. }) => true,
         _ => false,
     };
@@ -455,7 +588,7 @@ pub fn plan(layout: &Layout, env: &Env, decisions: &HashMap<String, Decision>) -
         let state = state_of(e, env)?;
         let decision = decisions.get(&e.rel).copied();
         let op = match (&state, decision) {
-            (State::Linked, d) => {
+            (State::Linked | State::Generated, d) => {
                 if d.is_some() {
                     p.warnings
                         .push(format!("{} : déjà lié, rien à trancher", e.rel));
@@ -469,7 +602,7 @@ pub fn plan(layout: &Layout, env: &Env, decisions: &HashMap<String, Decision>) -
                 }
                 Op::Create
             }
-            (State::Identical, d) => {
+            (State::Identical | State::Stale, d) => {
                 if d.is_some() {
                     p.warnings
                         .push(format!("{} : identique au dépôt, rien à trancher", e.rel));
@@ -483,6 +616,10 @@ pub fn plan(layout: &Layout, env: &Env, decisions: &HashMap<String, Decision>) -
             (_, Some(Decision::Repo)) => Op::TakeRepo,
             (st, Some(Decision::Home)) => {
                 check_take_home(e, st)?;
+                if let Kind::Generated(_) = e.kind {
+                    // Refus net, avant d'écrire quoi que ce soit, si la reprise est ambiguë.
+                    check_generated_take_home(layout, e)?;
+                }
                 Op::TakeHome
             }
             (_, None) => Op::Conflict,
@@ -508,6 +645,8 @@ pub fn describe(st: &State) -> String {
             target.display(),
             if *broken { " (cassé)" } else { "" }
         ),
+        State::Generated => "généré, à jour".into(),
+        State::Stale => "généré, à régénérer".into(),
         State::WrongType(s) => (*s).to_string(),
         State::ParentBlocked(p) => format!("{} n'est pas un dossier", p.display()),
     }
@@ -527,6 +666,12 @@ pub fn print_plan(env: &Env, plan: &Plan) {
         };
         match s.op {
             Op::Done | Op::Conflict => {}
+            Op::Create if matches!(s.entry.kind, Kind::Generated(_)) => {
+                println!("  généré      {d}  (dépôt + surcharges de la machine)")
+            }
+            Op::Replace if matches!(s.entry.kind, Kind::Generated(_)) => {
+                println!("  régénéré    {d}  (dépôt + surcharges de la machine, ancien sauvegardé)")
+            }
             Op::Create => println!("  lien créé   {d}{kind}"),
             Op::Replace => {
                 println!("  remplacé    {d}{kind}  (identique au dépôt, ancien sauvegardé)")
@@ -568,6 +713,9 @@ pub fn print_conflicts(env: &Env, plan: &Plan) {
         println!("  {}  [{}]", env.display(&s.entry.dest), describe(&s.state));
         let rel = &s.entry.rel;
         match s.state {
+            State::Differs if matches!(s.entry.kind, Kind::Generated(_)) => println!(
+                "      fichier généré (dépôt + surcharges) modifié à la main : poste sys diff {rel}\n      régénérer : poste sys setup --take-repo {rel}  ou reprendre dans le dépôt : --take-home {rel} (remet les valeurs surchargées comme dans le dépôt ; refusé si ambigu)"
+            ),
             State::Differs => println!(
                 "      voir : poste sys diff {rel}\n      trancher : poste sys setup --take-repo {rel}  ou  --take-home {rel}"
             ),
@@ -612,6 +760,7 @@ fn take_home(layout: &Layout, e: &Entry, from: &Path) -> Result<()> {
             replace_with_symlink(&e.src, &t)?;
         }
         Kind::Dir => merge_tree(from, &e.src)?,
+        Kind::Generated(_) => unreachable!("traité par apply_generated"),
     }
     Ok(())
 }
@@ -682,8 +831,9 @@ pub fn upsert_mode_line(root: &Path, rel: &str, mode: u32) -> Result<()> {
 
 /// Empreinte à noter dans `installed.json` : contenu d'un fichier, sinon la cible du lien.
 fn record_hash(e: &Entry) -> Result<String> {
-    Ok(match e.kind {
+    Ok(match &e.kind {
         Kind::File => sha256_file(&e.src)?,
+        Kind::Generated(text) => format!("{:x}", Sha256::digest(text.as_bytes())),
         _ => format!(
             "{:x}",
             Sha256::digest(link_target(e).to_string_lossy().as_bytes())
@@ -725,6 +875,15 @@ pub fn apply(
         let e = &s.entry;
         match s.op {
             Op::Done | Op::Conflict => continue,
+            Op::Create | Op::Replace | Op::TakeRepo | Op::TakeHome
+                if matches!(e.kind, Kind::Generated(_)) =>
+            {
+                let text = apply_generated(layout, env, e, &s.op, stamp)?;
+                record_text(manifest, e, &text);
+                manifest.save(manifest_file)?;
+                n += 1;
+                continue;
+            }
             Op::Create => {
                 if let Some(parent) = e.dest.parent() {
                     std::fs::create_dir_all(parent)?;
@@ -769,6 +928,51 @@ pub fn apply(
         n += 1;
     }
     Ok(n)
+}
+
+/// Écrit un fichier ordinaire de façon atomique (le lien éventuel est remplacé, pas suivi).
+fn write_text(dest: &Path, text: &str) -> Result<()> {
+    let parent = dest.parent().context("destination sans dossier parent")?;
+    std::fs::create_dir_all(parent)?;
+    let tmp = parent.join(format!(".poste-tmp-{}-gen", std::process::id()));
+    std::fs::write(&tmp, text)?;
+    std::fs::rename(&tmp, dest).with_context(|| format!("écriture de {}", dest.display()))
+}
+
+/// Pose un fichier généré (sauvegarde de l'ancien, reprise éventuelle dans le dépôt). Renvoie
+/// le texte écrit.
+fn apply_generated(layout: &Layout, env: &Env, e: &Entry, op: &Op, stamp: &str) -> Result<String> {
+    let Kind::Generated(text) = &e.kind else {
+        unreachable!("fichier généré");
+    };
+    let mut text = text.clone();
+    if *op == Op::TakeHome {
+        // Le dépôt reçoit le fichier de ~ sans les valeurs surchargées ; le fichier généré en dérive.
+        let new_repo = generated_take_home_text(layout, e)?;
+        let sets = layout.overrides.get(&e.rel).cloned().unwrap_or_default();
+        text = crate::overrides::generate(&new_repo, &sets)?;
+        write_text(&e.src, &new_repo)?;
+        println!(
+            "  repris dans le dépôt (valeurs surchargées remises) : config/{}",
+            e.rel
+        );
+    }
+    if std::fs::symlink_metadata(&e.dest).is_ok() {
+        let bak = backup(env, &e.dest, stamp)?;
+        println!("  sauvegarde : {}", env.display(&bak));
+    }
+    write_text(&e.dest, &text)?;
+    Ok(text)
+}
+
+/// Note un fichier généré dans le manifeste (empreinte du texte écrit).
+fn record_text(manifest: &mut Manifest, e: &Entry, text: &str) {
+    manifest.upsert(ManifestEntry {
+        path: e.dest.to_string_lossy().into_owned(),
+        sha256: format!("{:x}", Sha256::digest(text.as_bytes())),
+        module: MODULE.into(),
+        installed_at: time::now_rfc3339(),
+    });
 }
 
 /// Pose le lien final (la cible a été sauvegardée ; un dossier a déjà été déplacé).
@@ -832,7 +1036,12 @@ pub fn rel_of(env: &Env, arg: &str) -> Result<String> {
 }
 
 fn entry_for<'a>(layout: &'a Layout, rel: &str) -> Result<&'a Entry> {
-    if let Some(e) = layout.entries.iter().find(|e| e.rel == rel) {
+    if let Some(e) = layout
+        .entries
+        .iter()
+        .chain(layout.local.iter())
+        .find(|e| e.rel == rel)
+    {
         return Ok(e);
     }
     if let Some(d) = layout
@@ -851,14 +1060,18 @@ fn entry_for<'a>(layout: &'a Layout, rel: &str) -> Result<&'a Entry> {
 pub fn diff(layout: &Layout, env: &Env, arg: Option<&str>) -> Result<bool> {
     let entries: Vec<&Entry> = match arg {
         Some(a) => vec![entry_for(layout, &rel_of(env, a)?)?],
+        // Sans argument : seulement ce que `setup` gère (les fichiers locaux sont voulus différents).
         None => layout.entries.iter().collect(),
     };
     let mut any = false;
     let mut others: Vec<(String, String)> = Vec::new();
     for e in entries {
         let st = state_of(e, env)?;
+        if arg.is_some() && is_local(&e.rel, &layout.local_paths) {
+            println!("(fichier local à cette machine : setup n'y touche pas, l'écart est normal)");
+        }
         match st {
-            State::Linked | State::Identical => {
+            State::Linked | State::Identical | State::Generated => {
                 if arg.is_some() {
                     println!("{} : {}, aucune différence.", e.rel, describe(&st));
                 }
@@ -868,15 +1081,27 @@ pub fn diff(layout: &Layout, env: &Env, arg: Option<&str>) -> Result<bool> {
                     println!("{} : absent de ~ (setup créera le lien).", e.rel);
                 }
             }
-            State::Differs => {
+            State::Differs | State::Stale => {
                 any = true;
                 println!("=== {} (dépôt : -, ~ : +)", e.rel);
+                // Fichier généré : on compare à ce que setup écrirait (dépôt + surcharges).
+                let gen_tmp = if let Kind::Generated(text) = &e.kind {
+                    let t =
+                        std::env::temp_dir().join(format!(".poste-diff-{}", std::process::id()));
+                    std::fs::write(&t, text)?;
+                    Some(t)
+                } else {
+                    None
+                };
                 let _ = std::io::Write::flush(&mut std::io::stdout());
                 let mut cmd = std::process::Command::new("diff");
                 cmd.args(["-ru", "-x", PYCACHE, "--label", &format!("depot/{}", e.rel)]);
                 cmd.arg("--label").arg(format!("maison/{}", e.rel));
-                cmd.arg(&e.src).arg(&e.dest);
+                cmd.arg(gen_tmp.as_deref().unwrap_or(&e.src)).arg(&e.dest);
                 let status = cmd.status().context("impossible de lancer diff")?;
+                if let Some(t) = &gen_tmp {
+                    let _ = std::fs::remove_file(t);
+                }
                 if status.code().is_some_and(|c| c > 1) {
                     bail!("diff a échoué pour {}", e.rel);
                 }
@@ -1059,7 +1284,7 @@ pub fn forget(layout: &Layout, env: &Env, arg: &str, manifest_file: &Path) -> Re
             std::fs::remove_file(&e.dest)?;
             std::fs::rename(&tmp, &e.dest)?;
         }
-        Kind::Link(_) => {}
+        Kind::Link(_) | Kind::Generated(_) => {}
     }
     let mut manifest = Manifest::load(manifest_file)?;
     let p = e.dest.to_string_lossy().into_owned();
@@ -1079,18 +1304,67 @@ pub fn forget(layout: &Layout, env: &Env, arg: &str, manifest_file: &Path) -> Re
 
 // ---------------------------------------------------------------- status
 
+/// Fichiers que cette machine garde à elle (`local`), avec leur état par rapport au dépôt.
+pub fn print_local(layout: &Layout, env: &Env) -> Result<()> {
+    if layout.local_paths.is_empty() {
+        return Ok(());
+    }
+    println!(
+        "\nFichiers locaux ({} ; config.toml, clé local : poste ne les lie ni ne les touche)",
+        layout.local.len()
+    );
+    for e in &layout.local {
+        let st = state_of(e, env)?;
+        let d = match &st {
+            State::Linked => {
+                "encore lié au dépôt (poste sys forget pour en faire un fichier ordinaire)"
+                    .to_string()
+            }
+            State::Missing => "absent de ~".to_string(),
+            State::Identical => "identique au dépôt".to_string(),
+            State::Differs => "différent du dépôt (poste sys diff pour voir)".to_string(),
+            other => describe(other),
+        };
+        println!("  local        {}  [{d}]", env.display(&e.dest));
+    }
+    for l in &layout.local_paths {
+        if !layout
+            .local
+            .iter()
+            .any(|e| is_local(&e.rel, std::slice::from_ref(l)))
+        {
+            println!("  inconnu      ~/{l}  (aucune entrée de config/ ne correspond)");
+        }
+    }
+    Ok(())
+}
+
 pub fn print_status(layout: &Layout, env: &Env, manifest: &Manifest) -> Result<()> {
     println!("\nConfig ({} entrée(s) dans config/)", layout.entries.len());
     let plan = plan(layout, env, &HashMap::new())?;
     let mut linked = 0;
     let mut lines: Vec<String> = Vec::new();
     let (mut missing, mut broken, mut replaced, mut conflicts) = (0, 0, 0, 0);
+    let (mut generated, mut stale) = (0, 0);
     let tracked = |e: &Entry| manifest.get(&e.dest).is_some();
     for s in &plan.steps {
         let d = env.display(&s.entry.dest);
         let rel = &s.entry.rel;
         match &s.state {
             State::Linked => linked += 1,
+            State::Generated => generated += 1,
+            State::Stale => {
+                stale += 1;
+                lines.push(format!(
+                    "  à régénérer  {d}  (le dépôt ou les surcharges ont changé : poste sys setup)"
+                ));
+            }
+            State::Differs if matches!(s.entry.kind, Kind::Generated(_)) => {
+                conflicts += 1;
+                lines.push(format!(
+                    "  généré, modifié à la main  {d}  (poste sys diff {rel} ; poste sys setup --take-repo {rel} pour régénérer, --take-home {rel} pour reprendre dans le dépôt)"
+                ));
+            }
             State::Missing => {
                 missing += 1;
                 lines.push(format!(
@@ -1135,6 +1409,9 @@ pub fn print_status(layout: &Layout, env: &Env, manifest: &Manifest) -> Result<(
         }
     }
     println!("  liés            {linked}");
+    if !layout.overrides.is_empty() {
+        println!("  générés         {generated}  (dépôt + surcharges ; {stale} à régénérer)");
+    }
     println!("  manquants       {missing}");
     println!("  liens cassés    {broken}");
     println!("  remplacés       {replaced}  (lien devenu fichier ordinaire)");
@@ -1146,6 +1423,7 @@ pub fn print_status(layout: &Layout, env: &Env, manifest: &Manifest) -> Result<(
     for m in &plan.modes {
         println!("  droits       {}  {:04o} -> {:04o}", m.rel, m.from, m.to);
     }
+    print_local(layout, env)?;
     Ok(())
 }
 

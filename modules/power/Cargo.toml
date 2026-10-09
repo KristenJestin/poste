@@ -1,0 +1,26 @@
+[package]
+name = "poste-power"
+description = "Module power de poste : alertes batterie et disque (démon utilisateur léger)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lib]
+name = "poste_power"
+path = "src/lib.rs"
+
+[[bin]]
+name = "poste-power"
+path = "src/main.rs"
+
+[dependencies]
+anyhow.workspace = true
+libc = "0.2"
+poste-core.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+toml.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

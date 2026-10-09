@@ -17,3 +17,6 @@
 - Lignes de module : jamais modifier ni retirer une ligne absente de `installed.json` (`lines`), jamais écrire à travers un lien symbolique, conflit signalé sans rien écrire.
 - Orphelins : seulement des liens vers `<dépôt>/config/` à cible disparue, ou des fichiers de module de `installed.json` encore intacts ; jamais un fichier ordinaire, toujours aperçu et confirmation.
 - Un module-script n'a pas de `Cargo.toml` et n'est pas dans `members` du `Cargo.toml` racine.
+- Config de la machine (`~/.config/poste/config.toml` : `local`, `disabled`, `[[override]]`) : jamais écrite par `setup`, seulement par `local`/`module`/`override` (toml_edit : le reste du fichier est conservé). Un chemin `local` n'est jamais lié, signalé ni touché (ni comme orphelin).
+- Fichier généré (`[[override]]`) : jamais écrasé s'il a été modifié à la main (conflit) ; `--take-home` refuse sans rien écrire si la reprise est ambiguë. Le JSON passe par `ojson.rs` (ordre des clés conservé) ; ne pas activer `preserve_order` de serde_json dans le workspace (cela changerait les autres modules).
+- Unités systemd : `setup` les active et désactive via `systemctl --user` (jamais `sudo`) ; les tests utilisent un faux `systemctl` (`POSTE_SYS_TEST_SYSTEMCTL` ou `units::Runner::with_program`), jamais le vrai.

@@ -63,6 +63,16 @@ pub fn repo_modules(repo: &Path) -> Result<Vec<RepoModule>> {
     Ok(out)
 }
 
+/// Les modules du dépôt qui doivent être installés sur cette machine : tous, sauf ceux de
+/// `disabled` dans `~/.config/poste/config.toml` (`sys` n'est jamais désactivable).
+pub fn enabled_modules(repo: &Path, env: &Env) -> Result<Vec<RepoModule>> {
+    let cfg = poste_core::Config::load(env)?;
+    Ok(repo_modules(repo)?
+        .into_iter()
+        .filter(|m| m.name == "sys" || !cfg.is_disabled(&m.name))
+        .collect())
+}
+
 /// Tous les fichiers (récursivement) sous `dir`, triés.
 fn files_under(dir: &Path, out: &mut Vec<PathBuf>) -> Result<()> {
     let mut entries: Vec<_> = std::fs::read_dir(dir)
@@ -89,7 +99,7 @@ pub fn desired(repo: &Path, env: &Env) -> Result<Vec<Item>> {
         src: release.join("poste"),
         dest: env.bin_dir().join("poste"),
     }];
-    for m in repo_modules(repo)? {
+    for m in enabled_modules(repo, env)? {
         let base = env.modules_dir().join(&m.name);
         let prog = format!("poste-{}", m.name);
         // Module en Rust (Cargo.toml) : binaire construit. Module-script (python, shell…) :
@@ -110,7 +120,7 @@ pub fn desired(repo: &Path, env: &Env) -> Result<Vec<Item>> {
             dest: base.join("module.toml"),
         });
         // Dossiers facultatifs copiés tels quels (`bin/` : programmes annexes du module).
-        for sub in ["island", "hypr", "bin"] {
+        for sub in ["island", "hypr", "bin", "systemd"] {
             let root = m.dir.join(sub);
             if root.is_dir() {
                 let mut files = Vec::new();

@@ -22,12 +22,23 @@ pub struct LineEntry {
     pub installed_at: String,
 }
 
+/// Une unité systemd utilisateur activée par `poste sys setup`.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct UnitEntry {
+    pub unit: String,
+    /// Module propriétaire.
+    pub module: String,
+    pub installed_at: String,
+}
+
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub struct Manifest {
     #[serde(default)]
     pub files: Vec<Entry>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub lines: Vec<LineEntry>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub units: Vec<UnitEntry>,
 }
 
 impl Manifest {

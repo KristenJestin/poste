@@ -47,6 +47,28 @@ fn print_lines_and_orphans(
             println!("               {why}");
         }
     }
+    let runner = crate::units::Runner::from_env();
+    let unit_steps = crate::units::plan(
+        env,
+        &runner,
+        &crate::units::desired(repo, env)?,
+        manifest,
+        &std::collections::HashSet::new(),
+    );
+    if !unit_steps.is_empty() {
+        println!("\nUnités systemd utilisateur");
+        for s in &unit_steps {
+            println!(
+                "  {:<13} {}  [{}]",
+                crate::units::label(&s.op),
+                s.unit,
+                s.module
+            );
+            if let crate::units::Op::Conflict(why) = &s.op {
+                println!("                {why}");
+            }
+        }
+    }
     println!("\nOrphelins");
     println!("  à retirer       {}", orphan_list.len());
     if !orphan_list.is_empty() {
@@ -105,6 +127,13 @@ pub fn run(env: &Env, repo: &Path) -> Result<()> {
     let manifest = Manifest::load(&env.manifest_file())?;
     let items = plan::desired(repo, env)?;
 
+    let cfg = poste_core::Config::load(env)?;
+    if !cfg.disabled.is_empty() {
+        println!(
+            "\nModules désactivés sur cette machine (config.toml, disabled) : {}",
+            cfg.disabled.join(", ")
+        );
+    }
     println!("\nModules (installé / dépôt)");
     // Regroupe par module en gardant l'ordre : poste d'abord, puis les modules.
     let mut names: Vec<&str> = Vec::new();

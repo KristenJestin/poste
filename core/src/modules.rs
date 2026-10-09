@@ -23,6 +23,10 @@ pub struct Card {
     /// Lignes à poser dans des fichiers sans inclusion (`[[line]]`).
     #[serde(default)]
     pub line: Vec<CardLine>,
+    /// Unités systemd utilisateur du module (fichiers dans `systemd/`), activées par
+    /// `poste sys setup` et désactivées au retrait du module.
+    #[serde(default)]
+    pub units: Vec<String>,
 }
 
 /// `[[line]]` d'une fiche : une ligne qu'un module veut voir dans un fichier de `~`.
@@ -229,6 +233,7 @@ mod tests {
         let cfg = Config {
             repo: None,
             modules: vec![ext.to_string_lossy().into_owned()],
+            ..Default::default()
         };
 
         // Présent aux trois endroits : les données gagnent.

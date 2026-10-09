@@ -63,7 +63,13 @@ pub fn find(
     let mut out: Vec<Orphan> = Vec::new();
     let mut seen: HashSet<PathBuf> = HashSet::new();
     let wanted: HashSet<PathBuf> = layout
-        .map(|l| l.entries.iter().map(|e| e.dest.clone()).collect())
+        .map(|l| {
+            l.entries
+                .iter()
+                .chain(l.local.iter())
+                .map(|e| e.dest.clone())
+                .collect()
+        })
         .unwrap_or_default();
 
     // Liens de config : chemins notés dans le manifeste + enfants des dossiers gérés.
@@ -137,6 +143,9 @@ pub fn print(env: &Env, orphans: &[Orphan]) {
     if orphans.is_empty() {
         return;
     }
+    let off = poste_core::Config::load(env)
+        .map(|c| c.disabled)
+        .unwrap_or_default();
     println!("\nOrphelins (à retirer, poste les avait posés) :");
     for o in orphans {
         match &o.kind {
@@ -146,8 +155,13 @@ pub fn print(env: &Env, orphans: &[Orphan]) {
                 target.display()
             ),
             Kind::ModuleFile { module } => println!(
-                "  fichier orphelin {}  [{module}]  (le dépôt ne le produit plus)",
-                env.display(&o.path)
+                "  fichier orphelin {}  [{module}]  ({})",
+                env.display(&o.path),
+                if off.contains(module) {
+                    "module désactivé sur cette machine"
+                } else {
+                    "le dépôt ne le produit plus"
+                }
             ),
         }
     }

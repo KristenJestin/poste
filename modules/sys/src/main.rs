@@ -4,12 +4,16 @@ mod config;
 mod ignore;
 mod import;
 mod lines;
+mod machine;
 mod manifest;
+mod ojson;
 mod orphans;
+mod overrides;
 mod plan;
 mod provision;
 mod setup;
 mod status;
+mod units;
 mod util;
 
 use anyhow::{bail, Context, Result};
@@ -93,8 +97,58 @@ enum Cmd {
         #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
         args: Vec<String>,
     },
+    /// Fichiers de config que cette machine garde à elle (config.toml, clé local)
+    Local {
+        #[command(subcommand)]
+        action: Option<LocalCmd>,
+    },
+    /// Surcharges JSON de cette machine (config.toml, [[override]]) : fichier généré, pas lié
+    Override {
+        #[command(subcommand)]
+        action: Option<OverrideCmd>,
+    },
+    /// Modules du dépôt non installés sur cette machine (config.toml, clé disabled)
+    Module {
+        #[command(subcommand)]
+        action: Option<ModuleCmd>,
+    },
     /// Affiche le chemin du dépôt (cd "$(poste sys cd)")
     Cd,
+}
+
+#[derive(Subcommand)]
+enum LocalCmd {
+    /// Liste les fichiers locaux
+    List,
+    /// Garde ce chemin de config/ à cette machine : setup ne le lie ni ne le touche
+    Add { path: String },
+    /// Le remet sous la gestion du dépôt
+    Remove { path: String },
+}
+
+#[derive(Subcommand)]
+enum OverrideCmd {
+    /// Liste les surcharges
+    List,
+    /// Fixe une clé pointée (valeur JSON : 3600, true, "texte") dans un fichier JSON de config/
+    Set {
+        path: String,
+        key: String,
+        #[arg(allow_hyphen_values = true)]
+        value: String,
+    },
+    /// Retire une surcharge (la dernière retirée relie le fichier au dépôt)
+    Unset { path: String, key: String },
+}
+
+#[derive(Subcommand)]
+enum ModuleCmd {
+    /// Liste les modules du dépôt et leur état ici
+    List,
+    /// Réactive un module (installé au prochain setup)
+    Enable { name: String },
+    /// Désactive un module (retiré au prochain setup, avec aperçu)
+    Disable { name: String },
 }
 
 fn main() -> ExitCode {
@@ -208,6 +262,35 @@ fn run(cli: Cli) -> Result<ExitCode> {
                 let s = cmd.status()?;
                 Ok(ExitCode::from(s.code().unwrap_or(1) as u8))
             }
+        }
+        Cmd::Local { action } => {
+            let repo = util::repo(&env, &cfg)?;
+            match action.unwrap_or(LocalCmd::List) {
+                LocalCmd::List => machine::local_list(&env, &repo)?,
+                LocalCmd::Add { path } => machine::local_add(&env, &repo, &path)?,
+                LocalCmd::Remove { path } => machine::local_remove(&env, &path)?,
+            }
+            Ok(ExitCode::SUCCESS)
+        }
+        Cmd::Override { action } => {
+            let repo = util::repo(&env, &cfg)?;
+            match action.unwrap_or(OverrideCmd::List) {
+                OverrideCmd::List => machine::override_list(&env, &repo)?,
+                OverrideCmd::Set { path, key, value } => {
+                    machine::override_set(&env, &repo, &path, &key, &value)?
+                }
+                OverrideCmd::Unset { path, key } => machine::override_unset(&env, &path, &key)?,
+            }
+            Ok(ExitCode::SUCCESS)
+        }
+        Cmd::Module { action } => {
+            let repo = util::repo(&env, &cfg)?;
+            match action.unwrap_or(ModuleCmd::List) {
+                ModuleCmd::List => machine::module_list(&env, &repo)?,
+                ModuleCmd::Enable { name } => machine::module_set(&env, &repo, &name, true)?,
+                ModuleCmd::Disable { name } => machine::module_set(&env, &repo, &name, false)?,
+            }
+            Ok(ExitCode::SUCCESS)
         }
         Cmd::Cd => {
             println!("{}", util::repo(&env, &cfg)?.display());

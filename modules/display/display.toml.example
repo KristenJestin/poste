@@ -1,0 +1,145 @@
+# Profils d'écrans de poste display. À copier en ~/.config/poste/display.toml (local à la machine,
+# non versionné) puis à ajuster : `cp display.toml.example ~/.config/poste/display.toml`.
+#
+# Déduit des anciens scripts du portable pro (display-profile, Omarchy 3, profils work / nomad / home)
+# et de sa monitors.conf. CE QUI EST SÛR et CE QUI NE L'EST PAS est dit profil par profil.
+#
+# Choisir quel profil s'applique : un profil correspond quand TOUS ses `detect` et AU MOINS UN de ses
+# `detect_any` sont présents parmi les écrans EXTERNES branchés ; un profil sans `detect` ni
+# `detect_any` ne correspond que lorsqu'aucun écran externe n'est branché. Le plus précis gagne
+# (le plus de critères), à égalité le premier du fichier. Aucun profil ne correspond (écran inconnu,
+# vidéoprojecteur) : rien n'est changé, Hyprland garde sa règle par défaut.
+#
+# Un critère (detect, detect_any, match) est soit un morceau de la description EDID de l'écran
+# (`poste display status` ou `hyprctl monitors all -j`, champ « description », sans tenir compte
+# de la casse), soit `connector:NOM` pour le nom de la prise (HDMI-A-1, DP-1…). L'EDID est préférable :
+# le nom des prises change d'un dock à l'autre.
+
+# Écran interne du portable (taille 2880x1800 sur le pro).
+internal = "eDP-1"
+# Notification discrète quand le démon change de profil tout seul.
+notify = true
+
+# ---------------------------------------------------------------------------------------------
+# NOMADE : écran du portable seul. SÛR (ancien profil « nomad » + monitors.conf : 2880x1800@120,
+# échelle 1.6). Ramène vers les espaces 9 et 10 les fenêtres restées sur les espaces nommés
+# « mid » et « left » des écrans du bureau, et remet 1 à 10 sur le portable.
+# Mettre scale = 2 pour l'échelle d'Omarchy 4 par défaut (l'ancien pro utilisait 1.6).
+[[profile]]
+name = "nomade"
+label = "Nomade"
+
+[profile.internal]
+enabled = true
+mode = "2880x1800@120"
+position = "0x0"
+scale = 1.6
+
+[[profile.rescue]]
+from = "mid"
+to = "9"
+
+[[profile.rescue]]
+from = "left"
+to = "10"
+
+[[profile.workspace]]
+workspace = "1-10"
+monitor = "internal"
+
+# ---------------------------------------------------------------------------------------------
+# BOULOT : le portable plus les deux écrans du bureau. DISPOSITION SÛRE (ancienne monitors.conf :
+# HDMI-A-1 au milieu, au-dessus du portable ; DP-1 à gauche, en portrait ; portable en dessous du
+# milieu). DÉTECTION INCERTAINE : l'ancien script reconnaissait les écrans par leur prise
+# (HDMI-A-1, DP-1) et je n'ai pas leurs descriptions EDID. Remplacer les `connector:` par un morceau
+# de la description EDID quand le portable est au bureau (`poste display list` / `status`).
+# Attention : `connector:DP-1` correspond aussi à n'importe quel écran branché sur une prise DP-1,
+# chez soi comme ailleurs ; les descriptions EDID lèvent l'ambiguïté.
+# Comme avant : au moins un des deux suffit (detect_any) ; une règle pour un écran absent
+# est simplement ignorée.
+[[profile]]
+name = "boulot"
+label = "Boulot"
+detect_any = ["connector:HDMI-A-1", "connector:DP-1"]
+
+[profile.internal]
+enabled = true
+mode = "2880x1800@120"
+position = "0x0"
+scale = 1.6
+
+[[profile.monitor]]
+match = "connector:HDMI-A-1"
+mode = "1920x1080@144"
+position = "0x-1080"
+scale = 1
+
+[[profile.monitor]]
+match = "connector:DP-1"
+mode = "1920x1080@144"
+position = "-1080x-1080"
+scale = 1
+transform = 1            # 90 degrés ; si l'image est à l'envers, mettre 3
+
+# Le portable porte les espaces 1 à 10 ; chaque écran externe a un espace nommé fixe.
+[[profile.workspace]]
+workspace = "1-10"
+monitor = "internal"
+
+[[profile.workspace]]
+workspace = "name:mid"
+monitor = "connector:HDMI-A-1"
+default = true
+persistent = true
+
+[[profile.workspace]]
+workspace = "name:left"
+monitor = "connector:DP-1"
+default = true
+persistent = true
+
+# ---------------------------------------------------------------------------------------------
+# MAISON : TRÈS INCERTAIN. L'ancien « home » était « portable seul » (voir NOMADE). Ce profil-ci
+# est une hypothèse : le portable posé devant les trois écrans Iiyama PL2470H de la maison (ceux du
+# PC fixe, descriptions EDID relevées sur lui), dans la même disposition que sa monitors.lua
+# (gauche en portrait, centre et droite en paysage), portable en dessous du centre.
+# À supprimer ou corriger si ce n'est pas le cas. Pour « maison = portable seul », supprimer ce
+# bloc : NOMADE s'applique alors.
+[[profile]]
+name = "maison"
+label = "Maison"
+detect = [
+  "PL2470H 0x33303433",  # gauche (portrait)
+  "PL2470H 0x33363338",  # centre
+  "PL2470H 0x31303231",  # droite
+]
+
+[profile.internal]
+enabled = true
+mode = "2880x1800@120"
+position = "1140x1500"   # centré sous l'écran du centre (1800 px logiques de large)
+scale = 1.6
+
+[[profile.monitor]]
+match = "PL2470H 0x33303433"
+mode = "1920x1080@165"
+position = "0x0"
+scale = 1
+transform = 1
+
+[[profile.monitor]]
+match = "PL2470H 0x33363338"
+mode = "1920x1080@165"
+position = "1080x420"
+scale = 1
+
+[[profile.monitor]]
+match = "PL2470H 0x31303231"
+mode = "1920x1080@165"
+position = "3000x420"
+scale = 1
+
+# Pour désactiver le portable quand il est branché à des écrans (attention : la bascule « clamshell »
+# d'Omarchy 4, omarchy-hyprland-monitor-clamshell, gère aussi l'écran interne à la fermeture du capot) :
+#   [profile.internal]
+#   enabled = false

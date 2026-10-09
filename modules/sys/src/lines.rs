@@ -117,7 +117,7 @@ fn specs_of(card: &Card, owner: &str, env: &Env, out: &mut Vec<Spec>) -> Result<
 /// Les lignes voulues : celles des modules du dépôt, puis celles de `config/.poste/lines.toml`.
 pub fn desired(repo: &Path, env: &Env) -> Result<Vec<Spec>> {
     let mut out = Vec::new();
-    for m in plan::repo_modules(repo)? {
+    for m in plan::enabled_modules(repo, env)? {
         let card = Card::load(&m.dir.join("module.toml"))?;
         specs_of(&card, &m.name, env, &mut out)?;
     }

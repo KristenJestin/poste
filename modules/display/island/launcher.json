@@ -1,0 +1,35 @@
+{
+  "//": "Extension du lanceur de l'île fournie par ce module (même format que ~/.config/poste-island/launcher/launcher.json). Les entrées (un profil par ligne) viennent de display.toml via `poste display items`.",
+  "extensions": [
+    {
+      "id": "poste-display",
+      "name": "Écrans",
+      "subtitle": "Profils d'écrans · maison, boulot, nomade",
+      "icon": "󰍹",
+      "keyword": [
+        "ecrans",
+        "écrans",
+        "display",
+        "screens"
+      ],
+      "keywords": [
+        "écran",
+        "ecran",
+        "écrans",
+        "ecrans",
+        "moniteur",
+        "display",
+        "monitor",
+        "profil",
+        "maison",
+        "boulot",
+        "nomade"
+      ],
+      "ttl": 1,
+      "source": {
+        "type": "script",
+        "command": "poste display items"
+      }
+    }
+  ]
+}

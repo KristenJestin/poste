@@ -50,6 +50,8 @@ commands = [{ name = "status", description = "état du dépôt" }]   # facultati
 | [`sys`](modules/sys/README.md) | gère le dépôt : construction, installation, état, git. Toujours installé. |
 | [`music`](modules/music/README.md) | client Navidrome : connexion, copie locale, recherche, lecture, favoris, playlists, mixes. |
 | [`record`](modules/record/README.md) | enregistrement d'écran (gpu-screen-recorder) piloté par l'île : préréglages, fenêtres, écrans, zone. |
+| [`power`](modules/power/README.md) | alertes batterie (faible, critique, branché mais ça se vide) et disque presque plein ; démon léger (portable). |
+| [`display`](modules/display/README.md) | profils d'écrans Hyprland (maison, boulot, nomade) choisis selon les écrans branchés ; démon et entrée de lanceur (portable). |
 
 Un module est une application à part, dans `modules/<nom>/`, avec son `README.md`,
 son `AGENTS.md` et sa fiche `module.toml`. Son programme est soit une caisse Rust
@@ -78,6 +80,9 @@ connaître aucun module ; module absent, aucune trace) :
   `modules/*/hypr/*.lua` (`loadfile` + `pcall` : une erreur est isolée et notifiée, le reste de la
   config se charge).
 - `bin/` : programmes annexes du module.
+- `systemd/` et `units = [...]` dans `module.toml` : unités systemd utilisateur, activées par `poste sys setup`
+  (`systemctl --user enable --now`) et désactivées quand le module disparaît ou est désactivé (voir
+  [`modules/sys/README.md`](modules/sys/README.md), « Unités systemd »).
 - `[[line]]` dans `module.toml` : une ligne à poser dans un fichier sans inclusion (voir
   [`modules/sys/README.md`](modules/sys/README.md), « Lignes de module »).
 
@@ -116,11 +121,36 @@ modification. `--no-config` ne réinstalle que les binaires et saute toute la pa
 Posé par `poste sys setup` :
 
 - `~/.local/bin/poste`
-- `~/.local/share/poste/modules/<nom>/` : `poste-<nom>`, `module.toml`, et `island/`, `hypr/`, `bin/` s'ils existent
+- `~/.local/share/poste/modules/<nom>/` : `poste-<nom>`, `module.toml`, et `island/`, `hypr/`, `bin/`, `systemd/` s'ils existent
 - les lignes que les modules ajoutent dans des fichiers sans inclusion (par exemple `~/.config/hypr/xdph.conf`)
 - la liste de ce qui a été posé : `~/.local/state/poste/installed.json`
 - les anciennes versions remplacées : `~/.local/state/poste/backup/`
 - les étapes manuelles marquées faites : `~/.local/state/poste/done/<id>`
+
+## Installer sur un autre PC
+
+Le dépôt est le même partout : pas de profils par machine. Ce qui diffère se règle dans
+`~/.config/poste/config.toml`, local à la machine et jamais versionné (`poste sys setup` ne l'écrit pas) :
+
+```toml
+local = [".config/hypr/monitors.lua"]     # fichiers de config/ que CETTE machine garde à elle
+disabled = ["record"]                      # modules du dépôt à ne pas installer ici
+
+[[override]]                               # JSON : dépôt + quelques valeurs locales
+path = ".config/omarchy/shell.json"
+set = { "idle.lock" = 3600 }
+```
+
+- `local` : `setup` ne lie pas ces fichiers, ne les signale pas en conflit et ne les touche jamais ;
+  `status` les liste, `diff <chemin>` montre quand même l'écart. `poste sys local add|remove <chemin>`.
+- `disabled` : ces modules ne sont pas installés ; s'ils l'étaient, `setup` les retire proprement
+  (fichiers, `hypr/`, `island/`, lignes posées, unités systemd), avec aperçu. `poste sys module enable|disable <nom>`.
+- `[[override]]` : un fichier JSON de `config/` généré (dépôt + valeurs locales) au lieu d'être lié.
+  `poste sys override set <chemin> <clé> <valeur>`.
+
+À faire AVANT le premier `./setup` de la machine (créer le fichier à la main ou lancer
+`poste sys local add` / `module disable` après le premier `./setup --dry-run`), puis suivre « Installer sur un PC neuf ».
+Détail et règles : [`modules/sys/README.md`](modules/sys/README.md), « Réglages propres à la machine ».
 
 ## Organisation du dépôt
 
@@ -128,7 +158,7 @@ Posé par `poste sys setup` :
 config/     la config de ~ (liens posés par poste sys setup)
 core/       poste-core : chemins XDG, config, découverte des modules, notifications
 poste/      l'aiguillage
-modules/    un dossier par module (sys, music, record, …)
+modules/    un dossier par module (sys, music, record, power, display, …)
 bootstrap/  paquets, étapes système/utilisateur/manuelles, patchs de plugins (lus par poste sys setup)
 setup       premier lancement
 ```

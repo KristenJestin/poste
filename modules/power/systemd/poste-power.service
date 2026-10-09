@@ -1,0 +1,19 @@
+[Unit]
+Description=poste power : alertes batterie et disque
+Documentation=file://%h/Projects/poste/modules/power/README.md
+PartOf=graphical-session.target
+After=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=%h/.local/share/poste/modules/power/poste-power watch
+# omarchy-notification-send (Omarchy 4 : /usr/share/omarchy/bin) doit être trouvable dès le début de session.
+Environment=PATH=%h/.local/share/omarchy/bin:/usr/share/omarchy/bin:%h/.local/bin:/usr/local/bin:/usr/bin
+Restart=on-failure
+RestartSec=10
+# Le démon dort presque tout le temps : priorité minimale et mémoire plafonnée.
+Nice=19
+MemoryMax=64M
+
+[Install]
+WantedBy=graphical-session.target
