@@ -142,9 +142,12 @@ fn new_mpv(volume: u32) -> Result<Mpv> {
         init.set_option("network-timeout", "15")?;
         init.set_option("volume", i64::from(volume))?;
         // Normalisation entre morceaux avec les tags ReplayGain des fichiers
-        // (sans tag : aucune correction, et jamais d'écrêtage).
+        // (sans tag : aucune correction). ReplayGain vise -18 LUFS ; +4 dB
+        // ramène à -14 LUFS, le niveau des services de streaming et du reste
+        // du PC. Le gain est réduit si le morceau écrêterait.
         init.set_option("replaygain", "track")?;
-        init.set_option("replaygain-clip", "no")?;
+        init.set_option("replaygain-preamp", "4")?;
+        init.set_option("replaygain-clip", "yes")?;
         init.set_option("replaygain-fallback", "0")?;
         if let Some(ao) = &ao {
             init.set_option("ao", ao.as_str())?;

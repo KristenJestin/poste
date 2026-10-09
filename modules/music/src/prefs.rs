@@ -8,8 +8,9 @@ use poste_core::Env;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
-/// Volume au premier démarrage, en pourcentage (mpv : 100 = sans atténuation).
-pub const DEFAULT_VOLUME: u32 = 50;
+/// Volume au premier démarrage, en pourcentage (mpv : 100 = sans atténuation,
+/// comme les autres applis : le niveau se règle ensuite au volume du système).
+pub const DEFAULT_VOLUME: u32 = 100;
 /// Plafond de mpv (`volume-max`), aussi celui de MPRIS ici (1,3).
 pub const MAX_VOLUME: u32 = 130;
 
