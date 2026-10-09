@@ -1,0 +1,384 @@
+#!/usr/bin/env python3
+"""Détail de la consommation de Claude Code, pour la vue « Usage » de l'île.
+
+  kris-agent-usage [session|week] [claude|codex]     une ligne JSON sur la sortie
+
+Fenêtre : celle de la limite Claude (5 h ou 7 jours), calculée depuis sa
+remise à zéro dans ~/.local/state/omarchy/agents/usage/claude.json (écrit par
+omarchy-agent-usage-update) ; à défaut, les 5 dernières heures ou 7 derniers
+jours. Les chiffres viennent des journaux de Claude Code
+(~/.claude/projects/*/*.jsonl et leurs sous-agents) : chaque réponse y note
+ses tokens. « tokens » additionne entrée, écriture et lecture du cache, et
+sortie ; une relecture du cache coûte moins cher qu'une entrée neuve, mais
+c'est elle qui grossit avec un long contexte. Lecture seule ; rien n'est
+écrit, aucun contenu de conversation n'est sorti à part le titre de session
+et la description des agents."""
+import collections, datetime, glob, json, os, re, sys
+
+HOME = os.path.expanduser("~")
+LIMITS_DIR = os.path.join(HOME, ".local/state/omarchy/agents/usage")
+CODEX = os.path.join(HOME, ".codex")
+ISLAND_AI = os.path.join(HOME, ".config/kris-island/ai")
+PROJECTS = os.path.join(HOME, ".claude/projects")
+SPAN = {"session": datetime.timedelta(hours=5), "week": datetime.timedelta(days=7)}
+UTC = datetime.timezone.utc
+RUNNING = datetime.timedelta(minutes=2)   # actif depuis moins de 2 min : « en cours »
+SLOTS = 48   # frise : la fenêtre découpée en 48 cases (6 min sur 5 h, 3 h 30 sur 7 jours)
+
+
+def parse_time(text):
+    try:
+        return datetime.datetime.fromisoformat(str(text).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+
+
+def window(kind, provider="claude"):
+    now = datetime.datetime.now(UTC)
+    try:
+        with open(os.path.join(LIMITS_DIR, provider + ".json")) as f:
+            limits = json.load(f).get("limits") or []
+    except (OSError, ValueError):
+        limits = []
+    for limit in limits:
+        label = str(limit.get("label", "")).lower()
+        if limit.get("title"):
+            continue
+        if (kind == "week") == ("week" in label or "7-day" in label or "7 day" in label):
+            end = parse_time(limit.get("resetsAt"))
+            if end:
+                return end - SPAN[kind], end, limit.get("percent")
+    return now - SPAN[kind], now, None
+
+
+def model_name(model):
+    """« claude-opus-5-5 » → « Opus », « claude-croute-6-1[1m] » → « Croute » :
+    la famille, sans « claude- » ni numéros de version."""
+    m = str(model or "").lower().split("[")[0]
+    words = [w for w in re.split(r"[-_.]", m) if w and not w.isdigit() and w not in ("claude", "gpt", "latest", "preview")]
+    words = [w for w in words if not re.fullmatch(r"\d{6,}|v\d+", w)]
+    return " ".join(w.capitalize() for w in words) or (m or "?")
+
+
+def tool_summary(block):
+    """« Bash · pnpm test », « Read · src/app.tsx »… pour le dernier outil."""
+    if block.get("name") == "SubagentHandback":
+        return "Handed its result back"
+    inp = block.get("input") or {}
+    for key in ("description", "command", "file_path", "path", "pattern", "url", "query", "prompt"):
+        if inp.get(key):
+            text = " ".join(str(inp[key]).split())
+            if key in ("file_path", "path"):
+                text = "/".join(text.split("/")[-3:])
+            return "%s · %s" % (block.get("name", "tool"), text[:90])
+    return str(block.get("name", "tool"))
+
+
+def text_of(content):
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        return "\n".join(c.get("text", "") for c in content if isinstance(c, dict) and c.get("type") == "text")
+    return ""
+
+
+def read(path, start):
+    """Réponses de ce journal depuis `start` : liste de (heure, modèle, usage),
+    et ce qu'on sait du journal : titres, dossier, première consigne, dernier
+    outil, dernière activité."""
+    out, seen = [], set()
+    meta = {"title": "", "customTitle": "", "lastPrompt": "", "cwd": "", "prompt": "", "lastTool": "",
+            "firstAt": None, "lastAt": None}
+    try:
+        f = open(path, errors="replace")
+    except OSError:
+        return out, meta
+    with f:
+        for line in f:
+            try:
+                d = json.loads(line)
+            except ValueError:
+                continue
+            kind = d.get("type")
+            if kind == "ai-title":
+                meta["title"] = d.get("aiTitle") or meta["title"]
+                continue
+            if kind == "custom-title":
+                meta["customTitle"] = d.get("customTitle") or meta["customTitle"]
+                continue
+            if kind == "last-prompt":
+                meta["lastPrompt"] = " ".join(str(d.get("lastPrompt") or "").split()) or meta["lastPrompt"]
+                continue
+            t = parse_time(d.get("timestamp"))
+            if t:
+                meta["firstAt"] = meta["firstAt"] or t
+                meta["lastAt"] = t
+            m = d.get("message") or {}
+            if kind == "user" and not meta["prompt"]:
+                meta["prompt"] = text_of(m.get("content"))[:2500]
+            if kind != "assistant":
+                continue
+            meta["cwd"] = meta["cwd"] or d.get("cwd") or ""   # dossier de départ de la session
+            for block in m.get("content") or []:
+                if isinstance(block, dict) and block.get("type") == "tool_use":
+                    meta["lastTool"] = tool_summary(block)
+            if not t or t < start or m.get("id") in seen or str(m.get("model", "")).startswith("<"):
+                continue   # « <synthetic> » : message de Claude Code lui-même, sans modèle
+            seen.add(m.get("id"))
+            u = m.get("usage") or {}
+            out.append((t, model_name(m.get("model")), {
+                "input": u.get("input_tokens") or 0,
+                "write": u.get("cache_creation_input_tokens") or 0,
+                "read": u.get("cache_read_input_tokens") or 0,
+                "output": u.get("output_tokens") or 0,
+            }))
+    return out, meta
+
+
+def tree(agents):
+    """Ordre d'affichage : chaque agent suivi des agents qu'il a lancés."""
+    ids = {a["id"] for a in agents}
+    kids = collections.defaultdict(list)
+    for a in agents:
+        kids[a["parentId"] if a["parentId"] in ids else None].append(a)
+    out = []
+    # rails : pour chaque niveau au-dessus, le trait vertical continue-t-il
+    # (un frère plus bas reste à venir) ; lastSibling : dernier de ses frères.
+    def walk(parent, depth, rails):
+        children = sorted(kids.get(parent, []), key=lambda a: -a["tokens"])
+        for i, a in enumerate(children):
+            a["depth"] = depth
+            a["lastSibling"] = i == len(children) - 1
+            a["rails"] = rails
+            a["hasChildren"] = bool(kids.get(a["id"]))
+            out.append(a)
+            walk(a["id"], depth + 1, rails + [not a["lastSibling"]])
+    walk(None, 1, [])
+    return out
+
+
+def total(u):
+    return u["input"] + u["write"] + u["read"] + u["output"]
+
+
+def agent_entry(aid, parent_id, description, rows, meta, now, kind="", background=False, asked=""):
+    return {"id": aid, "parentId": parent_id, "description": description,
+            "type": kind, "background": background, "askedModel": asked,
+            "model": rows[-1][1], "req": len(rows),
+            "tokens": sum(total(r[2]) for r in rows),
+            "avgContext": int(sum(r[2]["input"] + r[2]["write"] + r[2]["read"] for r in rows) / len(rows)),
+            "first": meta["firstAt"].isoformat() if meta.get("firstAt") else "",
+            "last": meta["lastAt"].isoformat() if meta.get("lastAt") else "",
+            "running": bool(meta.get("lastAt") and now - meta["lastAt"] < RUNNING),
+            "lastTool": meta.get("lastTool", ""), "prompt": meta.get("prompt", ""), "_rows": rows}
+
+
+def claude_sessions(start, now):
+    """(id, dossier, titre, réponses de la conversation, infos, agents) par session."""
+    for path in glob.glob(os.path.join(PROJECTS, "*", "*.jsonl")):
+        if os.path.getmtime(path) < start.timestamp():
+            continue
+        sid = os.path.basename(path)[:-6]
+        rows, meta = read(path, start)
+        agents = []
+        for sub in glob.glob(os.path.join(os.path.dirname(path), sid, "subagents", "*.jsonl")):
+            if os.path.getmtime(sub) < start.timestamp():
+                continue
+            arows, _ = read(sub, start)
+            if not arows:
+                continue
+            try:
+                with open(sub[:-6] + ".meta.json") as f:
+                    am = json.load(f)
+            except (OSError, ValueError):
+                am = {}
+            _, ameta = read(sub, datetime.datetime.max.replace(tzinfo=UTC))
+            agents.append(agent_entry(os.path.basename(sub)[6:-6], am.get("parentAgentId"),
+                                      str(am.get("description") or "Agent"), arows, ameta, now,
+                                      str(am.get("agentType") or ""), am.get("requestShape") == "background",
+                                      str(am.get("model") or "")))
+        # Nom donné avec /rename, sinon la dernière demande, sinon le titre automatique.
+        title = meta["customTitle"] or meta["lastPrompt"][:160] or meta["title"]
+        yield sid, meta["cwd"], title, rows, meta, agents
+
+
+def codex_read(path, start):
+    """Réponses d'un fil Codex (rollout) depuis `start`, et ses infos."""
+    out, meta = [], {"firstAt": None, "lastAt": None, "lastTool": "", "prompt": "", "model": ""}
+    try:
+        f = open(path, errors="replace")
+    except OSError:
+        return out, meta
+    with f:
+        for line in f:
+            try:
+                d = json.loads(line)
+            except ValueError:
+                continue
+            t = parse_time(d.get("timestamp"))
+            if t:
+                meta["firstAt"] = meta["firstAt"] or t
+                meta["lastAt"] = t
+            kind, pl = d.get("type"), d.get("payload") or {}
+            if kind == "turn_context" and pl.get("model"):
+                meta["model"] = model_name(pl["model"])
+            elif kind == "response_item" and pl.get("type") in ("custom_tool_call", "function_call"):
+                arg = " ".join(str(pl.get("input") or pl.get("arguments") or "").split())
+                meta["lastTool"] = ("%s · %s" % (pl.get("name", "tool"), arg[:90])).strip(" ·")
+            elif kind == "response_item" and pl.get("type") == "message" and pl.get("role") == "user" and not meta["prompt"]:
+                meta["prompt"] = text_of([{"type": "text", "text": c.get("text", "")} for c in pl.get("content") or []
+                                          if isinstance(c, dict)])[:2500]
+            elif kind == "token_usage_record" and t and t >= start:
+                u = pl.get("usage") or {}
+                cached = u.get("cached_input_tokens") or 0
+                out.append((t, meta["model"] or "?", {
+                    "input": max(0, (u.get("input_tokens") or 0) - cached),   # Codex compte le cache dans l'entrée
+                    "write": u.get("cache_write_input_tokens") or 0,
+                    "read": cached,
+                    "output": u.get("output_tokens") or 0,
+                }))
+    return out, meta
+
+
+def codex_sessions(start, now):
+    """Les fils Codex : un fil lancé par un autre (thread_spawn_edges) est son agent."""
+    import sqlite3
+    try:
+        db = sqlite3.connect("file:%s?mode=ro" % os.path.join(CODEX, "state_5.sqlite"), uri=True, timeout=2)
+        threads = {r[0]: r for r in db.execute(
+            "select id, rollout_path, cwd, title, agent_nickname, agent_role, thread_source, first_user_message "
+            "from threads where updated_at >= ?", (int(start.timestamp()),))}
+        edges = {c: p for p, c in db.execute("select parent_thread_id, child_thread_id from thread_spawn_edges")}
+        db.close()
+    except Exception:
+        return
+    data = {}
+    for tid, row in threads.items():
+        rows, meta = codex_read(row[1], start) if row[1] else ([], {})
+        data[tid] = (rows, meta)
+    def root(tid):
+        seen = set()
+        while tid in edges and edges[tid] in threads and tid not in seen:
+            seen.add(tid)
+            tid = edges[tid]
+        return tid
+    groups = collections.defaultdict(list)
+    for tid in threads:
+        if root(tid) != tid:
+            groups[root(tid)].append(tid)
+    for tid, row in threads.items():
+        if root(tid) != tid:
+            continue
+        rows, meta = data[tid]
+        agents = []
+        for cid in groups.get(tid, []):
+            crows, cmeta = data[cid]
+            if not crows:
+                continue
+            c = threads[cid]
+            parent = edges.get(cid)
+            agents.append(agent_entry(cid, parent if parent != tid else None,
+                                      str(c[4] or c[3] or c[5] or "Agent"), crows, cmeta, now, str(c[5] or c[6] or "")))
+        yield tid, row[2] or "", str(row[3] or row[7] or "")[:160], rows, meta, agents
+
+
+def merged_timeline(group):
+    """La frise de plusieurs sessions additionnées (modèle de la plus grosse part)."""
+    cells = collections.defaultdict(collections.Counter)
+    for x in group:
+        for i, n, m in x.get("timeline", []):
+            cells[i][m] += n
+    return [[i, sum(c.values()), c.most_common(1)[0][0]] for i, c in sorted(cells.items())]
+
+
+def main():
+    kind = sys.argv[1] if len(sys.argv) > 1 and sys.argv[1] in SPAN else "session"
+    provider = sys.argv[2] if len(sys.argv) > 2 and sys.argv[2] in ("claude", "codex") else "claude"
+    now = datetime.datetime.now(UTC)
+    start, end, percent = window(kind, provider)
+    sessions, models, hours = [], collections.Counter(), collections.Counter()
+    grand = collections.Counter()
+    source = codex_sessions(start, now) if provider == "codex" else claude_sessions(start, now)
+    for sid, cwd, title, rows, meta, agents in source:
+        ctx = [r[2]["input"] + r[2]["write"] + r[2]["read"] for r in rows]   # conversation principale
+        main_rows = list(rows)
+        for a in agents:
+            rows = rows + a.pop("_rows")
+        if not rows:
+            continue
+        for t, m, u in rows:
+            n = total(u)
+            models[m] += n
+            hours[t.astimezone().strftime("%Y-%m-%dT%H")] += n
+            grand.update(u)
+            grand["req"] += 1
+        # Qui a lancé qui : sans parent, c'est la conversation principale.
+        names = {a["id"]: a["description"] for a in agents}
+        for a in agents:
+            a["parent"] = names.get(a["parentId"], "Main conversation" if not a["parentId"] else "an agent outside this window")
+        agents = tree(agents)
+        if main_rows:   # la conversation elle-même, en tête de ses agents
+            agents.insert(0, {"description": "Main conversation", "model": main_rows[-1][1], "req": len(main_rows),
+                              "tokens": sum(total(r[2]) for r in main_rows),
+                              "avgContext": int(sum(ctx) / len(ctx)), "main": True, "depth": 0,
+                              "hasChildren": len(agents) > 0, "rails": [], "lastSibling": True,
+                              "running": bool(meta.get("lastAt") and now - meta["lastAt"] < RUNNING),
+                              "lastTool": meta.get("lastTool", ""), "first": "",
+                              "last": meta["lastAt"].isoformat() if meta.get("lastAt") else ""})
+        # Frise : tokens par case de la fenêtre, avec le modèle qui domine la case.
+        slot_len = (end - start).total_seconds() / SLOTS
+        cells = collections.defaultdict(collections.Counter)
+        for t, m, u in rows:
+            i = int((t - start).total_seconds() // slot_len) if slot_len > 0 else 0
+            if 0 <= i < SLOTS:
+                cells[i][m] += total(u)
+        timeline = [[i, sum(c.values()), c.most_common(1)[0][0]] for i, c in sorted(cells.items())]
+        sessions.append({
+            "id": sid, "_cwd": cwd or "", "timeline": timeline, "project": os.path.basename((cwd or "").rstrip("/")) or "?", "title": title,
+            "req": len(rows), "tokens": sum(total(r[2]) for r in rows),
+            "mainContext": int(sum(ctx) / len(ctx)) if ctx else 0, "maxContext": max(ctx) if ctx else 0,
+            "agentCount": sum(1 for a in agents if not a.get("main")), "agents": agents[:40],
+            "models": dict(collections.Counter(r[1] for r in rows)),
+            "last": max(r[0] for r in rows).isoformat(),
+        })
+    # Les conversations de l'IA de l'île (une session chacune, lancées depuis
+    # ~/.config/kris-island/ai) : une seule ligne « Island AI », chaque
+    # conversation dessous comme un agent.
+    island = [x for x in sessions if x.get("_cwd", "").rstrip("/") == ISLAND_AI]
+    if len(island) > 1:
+        sessions = [x for x in sessions if x not in island]
+        island.sort(key=lambda x: x["last"], reverse=True)
+        kids = []
+        for i, x in enumerate(island):
+            main = x["agents"][0] if x["agents"] else {}
+            kids.append({"id": x["id"], "parentId": None, "description": x["title"] or "Conversation",
+                         "type": "", "background": False, "askedModel": "", "model": main.get("model", "?"),
+                         "req": x["req"], "tokens": x["tokens"], "avgContext": x["mainContext"],
+                         "first": "", "last": x["last"], "running": main.get("running", False),
+                         "lastTool": main.get("lastTool", ""), "prompt": "", "parent": "Island AI",
+                         "depth": 1, "rails": [], "lastSibling": i == len(island) - 1, "hasChildren": False})
+        sessions.append({
+            "id": "island-ai", "project": "Island AI", "title": "%d conversations" % len(island),
+            "timeline": merged_timeline(island),
+            "req": sum(x["req"] for x in island), "tokens": sum(x["tokens"] for x in island),
+            "mainContext": int(sum(x["mainContext"] for x in island) / len(island)),
+            "maxContext": max(x["maxContext"] for x in island), "agentCount": len(island),
+            "agents": kids[:40], "models": {}, "last": max(x["last"] for x in island),
+        })
+    for x in sessions:
+        x.pop("_cwd", None)
+    sessions.sort(key=lambda s: -s["tokens"])
+    grand_total = grand["input"] + grand["write"] + grand["read"] + grand["output"]
+    print(json.dumps({
+        "provider": provider, "kind": kind, "start": start.isoformat(), "end": end.isoformat(), "percent": percent,
+        "total": grand_total, "req": grand["req"], "read": grand["read"], "write": grand["write"],
+        "input": grand["input"], "output": grand["output"],
+        "models": [{"name": k, "tokens": v} for k, v in models.most_common()],
+        "hours": [{"hour": k, "tokens": v} for k, v in sorted(hours.items())],
+        "slots": SLOTS, "now": now.isoformat(),
+        "sessions": sessions[:20],
+    }, ensure_ascii=False))
+
+
+if __name__ == "__main__":
+    main()

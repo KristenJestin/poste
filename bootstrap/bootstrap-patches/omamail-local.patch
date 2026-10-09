@@ -1,0 +1,492 @@
+diff --git i/ui/App.qml w/ui/App.qml
+index 7e105ae..332c8c0 100644
+--- i/ui/App.qml
++++ w/ui/App.qml
+@@ -107,14 +107,15 @@ Item {
+   }
+ 
+   readonly property color foreground: Color.foreground
+-  readonly property color background: Color.background
++  // patch local (kris) : fond, bordures et police de l'île kris.island.
++  readonly property color background: Qt.darker(Color.background, 1.9)
+   readonly property color accent: Color.accent
+   readonly property color urgent: Color.urgent
+   readonly property color danger: Color.urgent
+   readonly property color popupBackground: Color.popups.background
+   readonly property color popupBorder: Color.popups.border
+   // Shared themed border for mail and standalone window chrome.
+-  readonly property color borderColor: Style.normalBorderColor
++  readonly property color borderColor: Qt.alpha(Color.foreground, 0.08)
+   readonly property int borderWidth: Style.normalBorderWidth
+   readonly property color calendarBorder: Style.normalBorderColor
+   readonly property color calendarTodayBackground: Qt.alpha(root.accent, 0.035)
+@@ -131,7 +132,7 @@ Item {
+     Math.min(accent.hslSaturation, 0.55),
+     accent.hslLightness, 1.0)
+ 
+-  readonly property string fontFamily: Style.font.family
++  readonly property string fontFamily: "Adwaita Sans"
+ 
+   function copyText(text) {
+     return service && typeof service.copyText === "function"
+@@ -607,6 +608,7 @@ Item {
+   }
+ 
+   function showCalendar() {
++    return // patch local (kris) : agenda masqué (Proton Calendar non pris en charge)
+     navUntouched = false
+     nav = Nav.replaceRoot(nav, "calendar")
+   }
+diff --git i/ui/Service.qml w/ui/Service.qml
+index ed659c0..0133811 100644
+--- i/ui/Service.qml
++++ w/ui/Service.qml
+@@ -163,7 +163,7 @@ Item {
+     settings ? settings.heavyMessageRendering : null)
+   readonly property bool notifyNewMail: String(settings ? settings.notifyNewMail : "On") !== "Off"
+   // Capability controls visibility; resolved provider controls availability.
+-  readonly property bool hasAgent: capabilities.agent === true
++  readonly property bool hasAgent: false // patch local (kris) : IA désactivée ; upstream : capabilities.agent === true
+   readonly property bool agentAvailable: hasAgent && agentRunner.providerAvailable === true
+   readonly property string agentUnavailableReason: agentRunner.availabilityError || "AI is unavailable."
+   readonly property bool hasTray: capabilities.tray === true
+diff --git i/ui/account/KrisBridgeSettle.qml w/ui/account/KrisBridgeSettle.qml
+new file mode 100644
+index 0000000..73f27f0
+--- /dev/null
++++ w/ui/account/KrisBridgeSettle.qml
+@@ -0,0 +1,34 @@
++import QtQuick
++import Quickshell.Io
++
++// Patch local (kris), fichier ajouté (pas dans Omamail) : MailAccount attend
++// `settled` avant de se connecter.
++Item {
++  id: root
++  // Patch local (kris) : Proton Bridge met un moment à connecter le compte
++  // après son démarrage ; une connexion IMAP trop tôt est refusée (« Connection
++  // in progress »). On attend que Bridge tourne depuis au moins 60 s (pas de
++  // Bridge : pas d'attente ; Bridge pas encore lancé : on revérifie).
++  property bool settled: false
++  Process {
++    id: bridgeAge
++    running: true
++    command: ["sh", "-c", "ps -o etimes= -C bridge 2>/dev/null | sort -n | head -1"]
++    stdout: StdioCollector {
++      waitForEnd: true
++      onStreamFinished: {
++        var age = parseInt(String(text).trim(), 10)
++        if (isNaN(age)) {
++          // Bridge pas (encore) lancé : à l'ouverture de session il démarre
++          // juste après le shell, on revérifie quelques fois avant d'abandonner.
++          if (root.bridgeChecks++ < 6) recheckTimer.start()
++          else root.settled = true
++        } else if (age >= 60) root.settled = true
++        else { settleTimer.interval = (60 - age) * 1000; settleTimer.start() }
++      }
++    }
++  }
++  property int bridgeChecks: 0
++  Timer { id: recheckTimer; interval: 5000; onTriggered: bridgeAge.running = true }
++  Timer { id: settleTimer; onTriggered: root.settled = true }
++}
+diff --git i/ui/account/KrisSort.js w/ui/account/KrisSort.js
+new file mode 100644
+index 0000000..2b281b4
+--- /dev/null
++++ w/ui/account/KrisSort.js
+@@ -0,0 +1,22 @@
++.pragma library
++// Patch local (kris), fichier ajouté (pas dans Omamail) : Proton Bridge
++// numérote les UID IMAP sans suivre la date, la liste arrivait donc dans le
++// désordre. Tri stable, plus récent d'abord.
++
++function byDate(rows) {
++  function time(row) {
++    var value = row ? row.date : null
++    if (value && typeof value.getTime === "function") return Number(value.getTime()) || 0
++    var numeric = Number(value)
++    if (isFinite(numeric) && numeric > 0) return numeric < 1e12 ? numeric * 1000 : numeric
++    var parsed = Date.parse(String(value || ""))
++    if (isFinite(parsed) && parsed > 0) return parsed
++    return Number(row && row.internalDate) || 0
++  }
++  var keyed = []
++  for (var i = 0; i < rows.length; i++) keyed.push({ at: time(rows[i]), index: i, row: rows[i] })
++  keyed.sort(function(a, b) { return b.at - a.at || a.index - b.index })
++  var out = []
++  for (var j = 0; j < keyed.length; j++) out.push(keyed[j].row)
++  return out
++}
+diff --git i/ui/account/MailAccount.qml w/ui/account/MailAccount.qml
+index 6137c71..4e5cec2 100644
+--- i/ui/account/MailAccount.qml
++++ w/ui/account/MailAccount.qml
+@@ -11,6 +11,7 @@ import "../message/Calendar.js" as Calendar
+ import "../message/Unsubscribe.js" as Unsub
+ import "../message/Outbox.js" as Outbox
+ import "Model.js" as Model
++import "KrisSort.js" as KrisSort
+ import "Accounts.js" as Accounts
+ import "../providers/Registry.js" as Provider
+ import "../providers/ImapProtocol.js" as Imap
+@@ -474,7 +475,9 @@ Item {
+   // handshake lands. Waiting here makes that later transition run the same
+   // metadata and active-list initialization as a restored sign-in.
+   readonly property bool ready: setupState === "ready" && !!api
+-    && (!backend || !backend.executable || backend.ready === true)
++    && (!backend || !backend.executable || backend.ready === true) && bridgeSettle.settled
++  // Patch local (kris) : attendre que Proton Bridge soit prêt (KrisBridgeSettle.qml).
++  KrisBridgeSettle { id: bridgeSettle }
+   readonly property bool nativePolling: Provider.nativeSync(providerId) && !!backend
+     && !!backend.protocolInfo && Array.isArray(backend.protocolInfo.methods)
+     && backend.protocolInfo.methods.indexOf("mail.watch") >= 0
+@@ -1214,6 +1217,8 @@ Item {
+     var account = accountId
+     var list = listSerial
+     var merged = append ? root.messages.concat(summaries) : summaries
++    // Patch local (kris) : liste triée par date (KrisSort.js).
++    merged = KrisSort.byDate(merged)
+     // A manual search may uncover an old unread row the current mailbox page
+     // never held. That is a result, not newly arrived mail, so it must not turn
+     // into a desktop notification.
+diff --git i/ui/components/AppMenu.qml w/ui/components/AppMenu.qml
+index ad00bc8..e8995ca 100644
+--- i/ui/components/AppMenu.qml
++++ w/ui/components/AppMenu.qml
+@@ -147,6 +147,7 @@ Item {
+       MenuRow {
+         id: calendarRow
+         text: "Calendar"
++        visible: false // patch local (kris) : agenda masqué
+         onActivated: { menu.close(); root.calendarRequested() }
+       }
+       MenuSeparatorLine {
+diff --git i/ui/components/KrisAvatar.qml w/ui/components/KrisAvatar.qml
+new file mode 100644
+index 0000000..494454f
+--- /dev/null
++++ w/ui/components/KrisAvatar.qml
+@@ -0,0 +1,97 @@
++import QtQuick
++import QtQuick.Effects
++import Quickshell.Io
++import qs.Commons
++
++// Patch local (kris), fichier ajouté (pas dans Omamail) : la pastille d'un
++// mail dans la liste. Initiale de l'expéditeur sur un rond coloré (couleur
++// tirée de son nom), ou son logo s'il en a un. MessageRow ne fait que
++// l'appeler, pour que les mises à jour d'Omamail touchent le moins possible.
++Rectangle {
++  id: avatar
++  required property var summary
++  property string fontFamily: ""
++  readonly property string who: String(avatar.summary.from ? avatar.summary.from.display || "" : "")
++  readonly property real hue: {
++    var h = 0
++    for (var i = 0; i < who.length; i++) h = (h * 31 + who.charCodeAt(i)) % 360
++    return h / 360
++  }
++  width: Style.space(30)
++  height: width
++  radius: width / 2
++  readonly property bool hasLogo: logo.status === Image.Ready
++  gradient: Gradient {
++    GradientStop { position: 0; color: avatar.hasLogo ? "transparent" : Qt.hsla(avatar.hue, 0.75, 0.62, 1) }
++    GradientStop { position: 1; color: avatar.hasLogo ? "transparent" : Qt.hsla(avatar.hue, 0.7, 0.45, 1) }
++  }
++  // Logo de l'expéditeur, trouvé par kris-sender-logo (île kris.island) :
++  // BIMI, puis icônes déclarées par le site, en cache local. Rien trouvé
++  // (ou script absent) : l'initiale reste.
++  readonly property string domain: {
++    // Jamais pour les spams : on ne contacte pas leurs sites.
++    if (avatar.summary.inSpam) return ""
++    var email = String(avatar.summary.from ? avatar.summary.from.email || "" : "").toLowerCase()
++    var d = email.split("@")[1] || ""
++    // Alias Proton (hello_at_example_com_xxxx@passmail.net) : le vrai domaine
++    // de l'expéditeur est écrit dans l'alias.
++    if (d === "passmail.net" || d === "passinbox.com" || d === "passfwd.com") {
++      var m = email.split("@")[0].match(/_at_([a-z0-9_-]+)_[a-z0-9]+$/)
++      d = m ? m[1].replace(/_/g, ".") : ""
++    }
++    return /^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(d) ? d : ""
++  }
++  property string logoPath: ""
++  onDomainChanged: { logoPath = ""; if (domain !== "") logoProc.running = true }
++  Component.onCompleted: if (domain !== "") logoProc.running = true
++  Process {
++    id: logoProc
++    command: ["sh", "-c", 'exec "$HOME/.config/omarchy/plugins/kris.island/bin/kris-sender-logo" "$1" "$2" 2>/dev/null', "kris-sender-logo", avatar.domain, avatar.who]
++    stdout: StdioCollector { onStreamFinished: avatar.logoPath = String(this.text).trim() }
++  }
++  // Logo tel quel, sans fond, arrondi aux coins (forme prévue pour ces
++  // icônes) ; la pastille colorée disparaît dessous.
++  Item {
++    id: logoMask
++    anchors.fill: parent
++    visible: false
++    layer.enabled: true
++    Rectangle { anchors.fill: parent; radius: width * 0.26; color: "black" }
++  }
++  Item {
++    anchors.fill: parent
++    visible: logo.status === Image.Ready
++    z: 1
++    layer.enabled: true
++    layer.effect: MultiEffect {
++      maskEnabled: true
++      maskSource: logoMask
++      maskThresholdMin: 0.5
++      maskSpreadAtMin: 1.0
++    }
++    Image {
++      id: logo
++      anchors.fill: parent
++      sourceSize.width: 96
++      sourceSize.height: 96
++      fillMode: Image.PreserveAspectFit
++      smooth: true
++      asynchronous: true
++      cache: false
++      source: avatar.logoPath !== "" ? "file://" + avatar.logoPath : ""
++    }
++  }
++  TextMetrics { id: avatarMetrics; text: avatarLetter.text; font: avatarLetter.font }
++  Text {
++    id: avatarLetter
++    visible: !avatar.hasLogo
++    // Centré sur le dessin de la lettre, pas sur la boîte du texte.
++    anchors.horizontalCenter: parent.horizontalCenter
++    y: parent.height / 2 - baselineOffset - (avatarMetrics.tightBoundingRect.y + avatarMetrics.tightBoundingRect.height / 2)
++    text: (avatar.who.replace(/^[^A-Za-zÀ-ÿ0-9]+/, "").charAt(0) || "?").toUpperCase()
++    color: "white"
++    font.family: avatar.fontFamily
++    font.pixelSize: Style.font.body
++    font.weight: Font.Bold
++  }
++}
+diff --git i/ui/components/MailboxSidebar.qml w/ui/components/MailboxSidebar.qml
+index 608ca17..2d6108e 100644
+--- i/ui/components/MailboxSidebar.qml
++++ w/ui/components/MailboxSidebar.qml
+@@ -166,6 +166,7 @@ Item {
+       x: Style.space(6)
+       label: "Calendar"
+       icon: "calendar"
++      visible: false // patch local (kris) : agenda masqué
+       selected: root.calendarSelected
+       onActivated: root.calendarRequested()
+     }
+@@ -206,12 +207,15 @@ Item {
+     readonly property bool showsNumber: root.numbersVisible && slotNumber > 0
+     readonly property string numberText: String(slotNumber)
+ 
++    // patch local (kris) : rangées plus hautes, arrondies, sélection avec contour (style de l'île).
+     width: column.width
+-    implicitHeight: Style.space(28)
+-    radius: Style.cornerRadius
++    implicitHeight: Style.space(34)
++    radius: 8
+     color: entry.selected
+-      ? Style.selectedFillFor(root.textColor, root.accentColor)
+-      : (hover.hovered ? Style.hoverFillFor(root.textColor, root.accentColor) : "transparent")
++      ? Qt.alpha(root.textColor, 0.08)
++      : (hover.hovered ? Qt.alpha(root.textColor, 0.04) : "transparent")
++    border.width: entry.selected ? 1 : 0
++    border.color: Qt.alpha(root.textColor, 0.1)
+ 
+     ActionIcon {
+       id: glyph
+@@ -292,8 +296,8 @@ Item {
+         : (entry.selectable ? root.dimColor
+           : Qt.rgba(root.dimColor.r, root.dimColor.g, root.dimColor.b, root.dimColor.a * 0.6))
+       font.family: root.panelFontFamily
+-      font.pixelSize: Style.font.bodySmall
+-      font.bold: entry.selected
++      font.pixelSize: Style.font.body + 1
++      font.weight: entry.selected ? Font.DemiBold : Font.Normal
+       elide: Text.ElideRight
+     }
+ 
+diff --git i/ui/components/MessageList.qml w/ui/components/MessageList.qml
+index d729038..41d45f4 100644
+--- i/ui/components/MessageList.qml
++++ w/ui/components/MessageList.qml
+@@ -40,7 +40,7 @@ Column {
+   signal menuRequested(string id, real sceneX, real sceneY)
+ 
+   width: parent ? parent.width : 0
+-  spacing: Style.space(2)
++  spacing: Style.space(6) // patch local (kris) : était 2
+ 
+   // Where a row sits in this column's own coordinates, so the panel's scroller
+   // can bring it into view. Found by index rather than by asking the rows which
+diff --git i/ui/components/MessageRow.qml w/ui/components/MessageRow.qml
+index 41dd05a..1a4bbf6 100644
+--- i/ui/components/MessageRow.qml
++++ w/ui/components/MessageRow.qml
+@@ -92,13 +92,31 @@ Rectangle {
+     return Direction.isRightToLeft(direction) ? Text.AlignRight : Text.AlignLeft
+   }
+ 
+-  width: parent ? parent.width : 0
+-  implicitHeight: body.implicitHeight + Style.space(14)
+-  radius: Style.cornerRadius
++  // patch local (kris) : marge sur les côtés et bordure d'accent sur le mail ouvert.
++  x: Style.space(8)
++  width: parent ? parent.width - Style.space(16) : 0
++  implicitHeight: body.implicitHeight + Style.space(24)
++  radius: 10
++  readonly property bool current: selected || hasCursor
++  border.width: current ? 1.5 : 1
++  border.color: current ? accentColor : Qt.alpha(textColor, 0.06)
+   // The checkbox identifies bulk selection independently of the reader fill.
+-  color: selected || hasCursor || checked
+-    ? Style.selectedFillFor(textColor, accentColor)
+-    : (hot ? Style.hoverFillFor(textColor, accentColor) : "transparent")
++  color: current ? Qt.alpha(textColor, 0.06)
++    : (checked ? Style.selectedFillFor(textColor, accentColor)
++    : (hot ? Style.hoverFillFor(textColor, accentColor) : Qt.alpha(textColor, 0.025)))
++
++  // Barre d'accent à gauche, entre les deux arrondis, collée au contour.
++  Rectangle {
++    visible: root.current
++    anchors.left: parent.left
++    anchors.top: parent.top
++    anchors.bottom: parent.bottom
++    anchors.topMargin: root.radius / 2
++    anchors.bottomMargin: root.radius / 2
++    width: 4
++    radius: 2
++    color: root.accentColor
++  }
+ 
+   MouseArea {
+     id: mouse
+@@ -137,20 +155,32 @@ Rectangle {
+     width: Style.space(5)
+     height: width
+     radius: width / 2
+-    visible: root.summary.unread
++    visible: false // patch local (kris) : remplacé par le point près de la date
+     color: root.accentColor
+   }
+ 
++  // patch local (kris) : pastille ou logo de l'expéditeur (KrisAvatar.qml).
++  KrisAvatar {
++    id: avatar
++    summary: root.summary
++    fontFamily: root.panelFontFamily
++    anchors.left: parent.left
++    anchors.leftMargin: Style.space(14)
++    anchors.top: parent.top
++    anchors.topMargin: Style.space(12)
++  }
++
+   Column {
+     id: body
+     anchors.left: parent.left
+     anchors.right: parent.right
+     // Align message text with the reader and header content.
+-    anchors.leftMargin: Style.space(14)
++    anchors.leftMargin: Style.space(14) + avatar.width + Style.space(12)
+     // Align text with the action glyph, rather than its padded hit target.
+     anchors.rightMargin: Style.space(6) + (Style.space(24) - Style.font.iconSmall) / 2
+-    anchors.verticalCenter: parent.verticalCenter
+-    spacing: Style.space(2)
++    anchors.top: parent.top
++    anchors.topMargin: Style.space(12)
++    spacing: Style.space(3)
+ 
+     // The sender, the mailbox it arrived in where the list is made of several,
+     // and how long the conversation is. Both of the last two are optional and
+@@ -170,9 +200,10 @@ Rectangle {
+         anchors.rightMargin: (source.visible || count.visible) ? Style.space(4) : Style.space(8)
+         textFormat: Text.PlainText
+         text: root.summary.from.display
+-        color: root.dimColor
++        color: root.summary.unread ? root.textColor : Qt.alpha(root.textColor, 0.62)
+         font.family: root.panelFontFamily
+-        font.pixelSize: Style.font.bodySmall
++        font.pixelSize: Style.font.body + 2
++        font.weight: root.summary.unread ? Font.Bold : Font.Medium
+         elide: Text.ElideRight
+         horizontalAlignment: root.textAlignment
+       }
+@@ -229,26 +260,43 @@ Rectangle {
+         id: time
+         objectName: "message-time"
+         anchors.right: parent.right
++        anchors.rightMargin: root.summary.unread ? Style.space(14) : 0
+         anchors.baseline: sender.baseline
+         textFormat: Text.PlainText
+         text: root.summary.time
+-        color: root.dimColor
++        color: root.summary.unread ? root.accentColor : root.dimColor
+         font.family: root.panelFontFamily
+         font.pixelSize: Style.font.caption
++        font.weight: root.summary.unread ? Font.DemiBold : Font.Normal
++      }
++      // patch local (kris) : non lu = point d'accent à droite de la date.
++      Rectangle {
++        visible: root.summary.unread
++        anchors.right: parent.right
++        anchors.verticalCenter: time.verticalCenter
++        width: Style.space(8)
++        height: width
++        radius: width / 2
++        color: root.accentColor
+       }
+     }
+ 
+     Text {
+       id: subject
+       objectName: "message-subject"
+-      width: parent.width - (actions.visible ? actions.width + Style.space(4) : 0)
++      // patch local (kris) : place des trois boutons du survol (étoile,
++      // archive, corbeille) toujours réservée, pour que le texte ne se remette
++      // pas en page au survol (ils n'existent pas hors survol).
++      width: parent.width - Style.space(24) * 3 - Style.space(4)
+       // Sender-controlled text must never activate Qt's rich-text loader.
+       textFormat: Text.PlainText
+       text: root.summary.subject
+-      color: root.textColor
++      color: root.summary.unread ? root.textColor : root.dimColor
+       font.family: root.panelFontFamily
+-      font.pixelSize: Style.font.body
+-      font.bold: root.summary.unread
++      font.pixelSize: Style.font.body + 1
++      lineHeight: 1.15
++      wrapMode: Text.Wrap
++      maximumLineCount: 2
+       elide: Text.ElideRight
+       horizontalAlignment: root.subjectAlignment
+     }
+diff --git i/ui/keys/Keymap.js w/ui/keys/Keymap.js
+index b178ba8..c873c5a 100644
+--- i/ui/keys/Keymap.js
++++ w/ui/keys/Keymap.js
+@@ -72,7 +72,7 @@ var BINDINGS = [
+   { id: "archive", keys: ["e"], contexts: MAIL,
+     group: "Acting", label: "Archive",
+     hint: { list: "archive", reader: "archive" } },
+-  { id: "trash", keys: ["d"], contexts: MAIL,
++  { id: "trash", keys: ["d", "Delete"], contexts: MAIL, // Delete : patch local (kris)
+     group: "Acting", label: "Move to trash",
+     hint: { list: "trash", reader: "trash" } },
+   { id: "star", keys: ["s"], contexts: MAIL,
+@@ -202,12 +202,10 @@ var BINDINGS = [
+   { id: "assistantChooseCommand", keys: ["Return", "Enter"], contexts: ["assistantCommands"],
+     group: "AI", label: "Complete or run the selected AI command" },
+ 
+-  { id: "calendar", keys: ["Alt+C"], contexts: ["list", "reader", "calendar"],
+-    group: "Going", label: "Switch between mail and calendar" },
++  // patch local (kris) : raccourci agenda retiré
+   { id: "mailView", keys: ["Ctrl+Shift+M"], contexts: ["list", "reader", "calendar"],
+     group: "Going", label: "Go to mail" },
+-  { id: "calendarView", keys: ["Ctrl+Shift+C"], contexts: ["list", "reader", "calendar"],
+-    group: "Going", label: "Go to calendar" },
++  // patch local (kris) : raccourci agenda retiré
+   { id: "toggleSidebar", keys: ["["], contexts: ["list", "reader", "calendar"],
+     group: "Going", label: "Show or hide the sidebar" },
+ 

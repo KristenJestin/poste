@@ -1,0 +1,21 @@
+#!/bin/bash
+# Ids des entrées .desktop dont le programme n'existe plus (TryExec ou Exec
+# introuvable) : le lanceur de l'île les masque. Ex. Alacritty désinstallé
+# dont Omarchy a laissé une copie dans ~/.local/share/applications.
+IFS=: read -ra dirs <<< "${XDG_DATA_HOME:-$HOME/.local/share}:${XDG_DATA_DIRS:-/usr/local/share:/usr/share}"
+found() {
+  local cmd=$1
+  cmd=${cmd#\"}; cmd=${cmd%\"}
+  [[ -z $cmd || $cmd == env || $cmd == flatpak ]] && return 0
+  if [[ $cmd == /* ]]; then [[ -x $cmd ]]; else command -v "$cmd" >/dev/null 2>&1; fi
+}
+for d in "${dirs[@]}"; do
+  for f in "$d"/applications/*.desktop; do
+    [[ -f $f ]] || continue
+    try=$(grep -m1 '^TryExec=' "$f" | cut -d= -f2-)
+    exe=$(grep -m1 '^Exec=' "$f" | cut -d= -f2- | awk '{print $1}')
+    if { [[ -n $try ]] && ! found "$try"; } || { [[ -n $exe ]] && ! found "$exe"; }; then
+      basename "$f" .desktop
+    fi
+  done
+done | sort -u

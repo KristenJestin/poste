@@ -1,0 +1,111 @@
+{
+  "bar": {
+    "centerAnchor": "omarchy.clock",
+    "layout": {
+      "center": [
+        {
+          "id": "omarchy.indicators"
+        },
+        {
+          "format": "dddd HH:mm",
+          "formatAlt": "d MMMM 'W'ww yyyy",
+          "id": "omarchy.clock",
+          "verticalFormat": "HH\n—\nmm"
+        },
+        {
+          "id": "omarchy.keyboard-layout"
+        },
+        {
+          "id": "omarchy.weather"
+        },
+        {
+          "id": "omarchy.system-update"
+        }
+      ],
+      "left": [
+        {
+          "id": "omarchy.menu"
+        },
+        {
+          "id": "kris.workspaces"
+        }
+      ],
+      "right": [
+        {
+          "id": "crmne.mpris"
+        },
+        {
+          "id": "io.github.honeyspoons.localsend"
+        },
+        {
+          "id": "omarchy.tray"
+        },
+        {
+          "id": "io.github.thisisgm.flea-shelf"
+        },
+        {
+          "id": "io.github.grichard99.omaproton-vpn"
+        },
+        {
+          "id": "omamail",
+          "refreshIntervalSec": 120,
+          "maxMessages": 50,
+          "heavyMessageRendering": "Always render",
+          "contentDirection": "Auto",
+          "appearance": "System",
+          "defaultQuery": "in:inbox",
+          "notifyNewMail": "On",
+          "oauthPort": 9481,
+          "undoSendSeconds": 10,
+          "unifiedCalendarView": false,
+          "showBarIcon": false,
+          "unifiedMailboxes": false,
+          "suggestEvents": false
+        },
+        {
+          "id": "jankeesvw.notification-center"
+        },
+        {
+          "id": "omarchy.agents"
+        },
+        {
+          "id": "omarchy.bluetooth"
+        },
+        {
+          "id": "omarchy.network"
+        },
+        {
+          "id": "omarchy.audio"
+        },
+        {
+          "id": "omarchy.power"
+        },
+        {
+          "id": "omarchy.monitor"
+        }
+      ]
+    },
+    "position": "top",
+    "transparent": true,
+    "id": "kris.island"
+  },
+  "idle": {
+    "lock": 5400,
+    "screensaver": 2700
+  },
+  "plugins": [
+    {
+      "id": "kris.notifications"
+    },
+    {
+      "id": "io.github.smoothpixels.cursor-accent"
+    }
+  ],
+  "version": 1,
+  "disabledPlugins": [
+    "omarchy.notifications"
+  ],
+  "cloneSourceRestores": [
+    "kris.notifications"
+  ]
+}

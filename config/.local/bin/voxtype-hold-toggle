@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+# Dictée voxtype hybride sur une seule touche :
+#   - tap bref      -> toggle (démarre et reste en écoute ; re-tap pour arrêter)
+#   - maintien      -> push-to-talk (enregistre tant que c'est tenu, stop au relâché)
+#
+# Branché depuis Hyprland avec une paire bind (press) / bindr (release) :
+#   bindd = SUPER, A, Dictée, exec, voxtype-hold-toggle press
+#   bindr = SUPER, A,         exec, voxtype-hold-toggle release
+#
+# Nécessite le daemon voxtype (service systemd --user voxtype.service).
+
+TS="${XDG_RUNTIME_DIR:-/tmp}/voxtype-press-ts"
+# Marque "SUPER encore enfoncé" : effacé par Hyprland au relâchement de SUPER
+# (bindings.lua) et attendu par voxtype-focus restore avant de coller.
+SUPER_HELD="${XDG_RUNTIME_DIR:-/tmp}/voxtype-super-held"
+THRESH_MS=250                      # au-delà = considéré comme un "maintien"
+
+nowms() { echo $(( $(date +%s%N) / 1000000 )); }
+state() { voxtype status 2>/dev/null | head -1 | tr -d '[:space:]'; }
+
+case "$1" in
+  press)
+    : # marque "SUPER tenu" posée par Hyprland (bindings.lua)
+    if [ "$(state)" = "recording" ]; then
+      # déjà en écoute (tap précédent) -> ce nouvel appui l'arrête
+      rm -f "$TS"
+      voxtype record stop
+    else
+      nowms > "$TS"
+      voxtype record start
+    fi
+    ;;
+  release)
+    [ -f "$TS" ] || exit 0
+    held=$(( $(nowms) - $(cat "$TS" 2>/dev/null || echo 0) ))
+    rm -f "$TS"
+    if [ "$held" -ge "$THRESH_MS" ] && [ "$(state)" = "recording" ]; then
+      # maintien -> push-to-talk : on arrête au relâchement
+      voxtype record stop
+    fi
+    # sinon : tap bref -> on laisse l'enregistrement tourner (mode toggle)
+    ;;
+  *)
+    echo "usage: voxtype-hold-toggle press|release" >&2
+    exit 2
+    ;;
+esac

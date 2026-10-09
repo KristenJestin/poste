@@ -1,0 +1,10 @@
+#!/bin/bash
+# Capture d'écran d'Omarchy + son « snap » (kris-sfx) si un fichier a bien
+# été créé (pas de son quand on annule la sélection).
+dir="${OMARCHY_SCREENSHOT_DIR:-${XDG_PICTURES_DIR:-$HOME/Pictures}}"
+mark=$(mktemp)
+omarchy-capture-screenshot "$@"
+if [[ -n $(find "$dir" -maxdepth 1 -type f -newer "$mark" -print -quit 2>/dev/null) ]]; then
+  "$(dirname "$(readlink -f "$0")")/kris-sfx" screenshot
+fi
+rm -f "$mark"

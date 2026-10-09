@@ -1,0 +1,57 @@
+#!/usr/bin/env python3
+"""kris-island launcher source: SSH hosts from ~/.ssh/config (and its Include
+files). Enter opens a terminal connected to the host. Wildcard hosts (*, ?)
+are skipped. Nothing secret is read: only Host / HostName / User / Port."""
+import glob, json, os
+
+HOME = os.path.expanduser("~")
+
+
+def parse(path, seen, hosts):
+    path = os.path.realpath(path)
+    if path in seen or not os.path.isfile(path):
+        return
+    seen.add(path)
+    current = []
+    with open(path, errors="replace") as f:
+        for raw in f:
+            line = raw.strip()
+            if not line or line.startswith("#"):
+                continue
+            key, _, value = line.replace("=", " ", 1).partition(" ")
+            key, value = key.lower(), value.strip()
+            if key == "include":
+                for pattern in value.split():
+                    pattern = os.path.expanduser(pattern)
+                    if not os.path.isabs(pattern):
+                        pattern = os.path.join(HOME, ".ssh", pattern)
+                    for inc in sorted(glob.glob(pattern)):
+                        parse(inc, seen, hosts)
+            elif key == "host":
+                current = [h for h in value.split() if not any(c in h for c in "*?!")]
+                for h in current:
+                    hosts.setdefault(h, {})
+            elif key == "match":
+                current = []
+            elif current and key in ("hostname", "user", "port"):
+                for h in current:
+                    hosts[h].setdefault(key, value)
+
+
+hosts = {}
+parse(os.path.join(HOME, ".ssh", "config"), set(), hosts)
+items = []
+for name, opts in hosts.items():
+    target = opts.get("hostname", name)
+    sub = (opts["user"] + "@" if "user" in opts else "") + target + (":" + opts["port"] if "port" in opts else "")
+    items.append({
+        "id": name,
+        "name": name,
+        "subtitle": sub,
+        "icon": "󰣀",
+        "keywords": ["ssh", target],
+        "verb": "Connect",
+        "action": {"type": "terminal", "command": "ssh " + name, "title": "ssh " + name},
+        "actions": [{"label": "Copy ssh command", "icon": "󰆏", "action": {"type": "copy", "text": "ssh " + name}}]
+    })
+print(json.dumps(items))

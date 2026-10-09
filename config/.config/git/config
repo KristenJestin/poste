@@ -1,0 +1,79 @@
+# See https://git-scm.com/docs/git-config
+
+[alias]
+	aco = !git add -A && git commit -m
+	acoa = commit --amend -am
+	acop = "!f() { git aco \"$@\" && git p; }; f"
+
+	graph1 = log --graph --abbrev-commit --decorate --format=format:'%C(bold blue)%h%C(reset) - %C(bold green)(%ar)%C(reset) %C(white)%s%C(reset) %C(dim white)- %C(bold magenta)%an%C(reset)%C(bold yellow)%d%C(reset)' --all
+	graph2 = log --graph --abbrev-commit --decorate --format=format:'%C(bold blue)%h%C(reset) - %C(bold cyan)%aD%C(reset) %C(bold green)(%ar)%C(reset)%C(bold yellow)%d%C(reset)%n''          %C(white)%s%C(reset) %C(dim white)- %an%C(reset)' --all
+	graph = !"git graph1"
+	p = push
+	upstream = !git push -u origin HEAD
+	up = upstream
+	s = status -sb
+	l = log --pretty=format:"%C(yellow)%h\\ %ad%Cred%d\\ %Creset%s%Cblue\\ [%cn]" --decorate --date=short
+	last = log -1 HEAD --stat
+	search = !git rev-list --all | xargs git grep -F
+
+	co = checkout
+	cob = checkout -b
+	# list branches sorted by last modified
+	b = "!git for-each-ref --sort='-authordate' --format='%(authordate)%09%(objectname:short)%09%(refname)' refs/heads | sed -e 's-refs/heads/--'"
+	# list aliases
+	la = "!git config -l | grep alias | cut -c 7-"
+
+	# diff
+	compare = difftool -d
+	compare-last = compare @~..@
+
+	# remove
+	undo = reset --soft HEAD^
+	unstage = reset --
+	clear = !git reset --hard && git clean -df
+	cleanup = "!git branch --merged | grep  -v '\\*\\|master\\|main\\|develop\\|developpement' | xargs -n 1 -r git branch -d"
+
+	# stash
+	save = stash -u
+
+[init]
+	defaultBranch = main
+[fetch]
+	prune = true             # Drop remote-tracking refs deleted on the remote
+[pull]
+	rebase = true 			 # Rebase (instead of merge) on pull
+[push]
+	autoSetupRemote = true   # Automatically set upstream branch on push
+[diff]
+	algorithm = histogram    # Clearer diffs on moved/edited lines
+	colorMoved = plain       # Highlight moved blocks in diffs
+	mnemonicPrefix = true    # More intuitive refs in diff output
+[commit]
+	verbose = true           # Include diff comment in commit message template
+	gpgsign = true
+[column]
+	ui = auto 			     # Output in columns when possible
+[branch]
+	sort = -committerdate    # Sort branches by most recent commit first
+[tag]
+	sort = -version:refname  # Sort version numbers as you would expect
+	gpgsign = true
+[rerere]
+	enabled = true           # Record and reuse conflict resolutions
+	autoupdate = true        # Apply stored conflict resolutions automatically
+[user]
+	name = Kristen
+	email = 48407004+KristenJestin@users.noreply.github.com
+	signingkey = ~/.ssh/id_ed25519.pub
+[gpg]
+	format = ssh
+[gpg "ssh"]
+	allowedSignersFile = /home/kris/.config/git/allowed_signers
+[credential]
+	helper = /usr/lib/git-core/git-credential-libsecret
+[credential "https://github.com"]
+	helper = 
+	helper = !/usr/bin/gh auth git-credential
+[credential "https://gist.github.com"]
+	helper = 
+	helper = !/usr/bin/gh auth git-credential

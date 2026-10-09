@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "id": "kris.island",
+  "name": "Kris Island",
+  "version": "0.1.0",
+  "author": "kris",
+  "description": "Floating per-monitor island replacing the bar: workspaces, clock, now playing, player, notifications and volume",
+  "kinds": [
+    "bar"
+  ],
+  "entryPoints": {
+    "bar": "Island.qml"
+  }
+}

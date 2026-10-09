@@ -1,0 +1,32 @@
+{
+  "//": "Préréglages d'enregistrement (bin/kris-record, extension « Record » du lanceur, SHIFT+PRINT). window.class / window.title : expressions régulières Hyprland. audioSource : none, app (le son de l'appli de la fenêtre), desktop, mic, desktop+mic, app+mic, ou sources gpu-screen-recorder brutes (app:Unity|default_input). audioAppName (facultatif, avec audioSource app) : nom de l'appli dans le son du PC (PipeWire) quand il diffère de sa classe, voir pw-dump | jq '.[].info.props[\"application.name\"]'. cursor : true / false, souris visible ou cachée dans la vidéo. dir : dossier de sortie ; s'il est sur un disque absent, ~/Videos.",
+  "defaults": {
+    "dir": "/run/media/kris/SSD/Records/Linux",
+    "fps": 60,
+    "quality": "very_high",
+    "codec": "auto",
+    "container": "mp4",
+    "cursor": true
+  },
+  "presets": [
+    {
+      "id": "unity",
+      "name": "Unity",
+      "subtitle": "Unity editor window · Unity's own sound (FMOD) · 1080p60 · no cursor",
+      "icon": "unityhub",
+      "keywords": [
+        "unity",
+        "jeu",
+        "game"
+      ],
+      "window": {
+        "class": "^Unity$"
+      },
+      "audioSource": "app",
+      "audioAppName": "FMOD Ex App",
+      "resolution": "1920x1080",
+      "cursor": false,
+      "dir": "/run/media/kris/SSD/Records/Linux/Unity"
+    }
+  ]
+}

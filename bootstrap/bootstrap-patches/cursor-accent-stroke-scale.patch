@@ -1,0 +1,33 @@
+diff --git a/recolor.py b/recolor.py
+index 027c0bf..4b7c924 100755
+--- a/recolor.py
++++ b/recolor.py
+@@ -26,6 +26,7 @@ lives outside that directory, in ~/.local/state, so `omarchy plugin update`
+ """
+ import fcntl
+ import json
++import re
+ import os
+ import shutil
+ import subprocess
+@@ -113,7 +114,19 @@ def main():
+         shutil.rmtree(build_dir, ignore_errors=True)
+         build_dir.mkdir(parents=True)
+         (build_dir / "src").symlink_to(PLUGIN_DIR / "src")
+-        (build_dir / "svg").symlink_to(PLUGIN_DIR / "svg")
++        # Patch local (kris) : contour plus fin. config.json "stroke_scale"
++        # (ex. 0.7) multiplie tous les stroke-width des SVG avant le rendu.
++        stroke_scale = float(config.get("stroke_scale", 1.0) or 1.0)
++        if stroke_scale == 1.0:
++            (build_dir / "svg").symlink_to(PLUGIN_DIR / "svg")
++        else:
++            shutil.copytree(PLUGIN_DIR / "svg", build_dir / "svg", symlinks=True)
++            for svg in (build_dir / "svg").rglob("*.svg"):
++                text = svg.read_text()
++                scaled = re.sub(r'stroke-width="([0-9.]+)"',
++                                lambda m: f'stroke-width="{float(m.group(1)) * stroke_scale:g}"', text)
++                if scaled != text:
++                    svg.write_text(scaled)
+         (build_dir / "config").mkdir()
+         (build_dir / "config/render.json").symlink_to(render_path)
+         (build_dir / "config/build.toml").symlink_to(PLUGIN_DIR / "config/build.toml")

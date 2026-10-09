@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+# Mémorise la fenêtre focalisée au démarrage de la dictée et la restaure
+# juste avant que voxtype ne tape le texte.
+#
+# Sans ça, voxtype tape dans la fenêtre focalisée à la FIN du traitement
+# (plusieurs secondes après), donc pas là où on visait en lançant la dictée.
+#
+# Branché depuis ~/.config/voxtype/config.toml, section [output] :
+#   pre_recording_command = "/home/kris/.local/bin/voxtype-focus save"
+#   pre_output_command    = "/home/kris/.local/bin/voxtype-focus restore"
+
+F="${XDG_RUNTIME_DIR:-/tmp}/voxtype-focus-addr"
+SUPER_HELD="${XDG_RUNTIME_DIR:-/tmp}/voxtype-super-held"
+
+addr_now() { hyprctl activewindow -j 2>/dev/null | jq -r '.address // empty'; }
+
+case "$1" in
+  save)
+    addr_now > "$F"
+    ;;
+  restore)
+    # Dictée lancée avec SUPER+A : attendre que SUPER soit relâché (10 s max),
+    # sinon le Ctrl+V de voxtype part en SUPER+Ctrl+V et ne colle rien.
+    for _ in $(seq 100); do [ -e "$SUPER_HELD" ] || break; sleep 0.1; done
+    rm -f "$SUPER_HELD"
+    addr=$(cat "$F" 2>/dev/null)
+    rm -f "$F"
+    [ -n "$addr" ] || exit 0
+    # déjà au bon endroit : ne pas voler le focus pour rien
+    [ "$(addr_now)" = "$addr" ] && exit 0
+    hyprctl dispatch "hl.dsp.focus({ window = \"address:$addr\" })" >/dev/null
+    ;;
+  *)
+    echo "usage: voxtype-focus save|restore" >&2
+    exit 2
+    ;;
+esac

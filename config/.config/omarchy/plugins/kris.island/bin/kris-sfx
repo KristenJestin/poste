@@ -1,0 +1,96 @@
+#!/usr/bin/env python3
+"""Joue le son d'un événement de l'île : kris-sfx EVENT [--app NAME --urgency U]
+
+Réglages dans ~/.config/kris-island/sounds/sounds.json :
+  enabled   : false coupe tous les sons
+  volume    : multiplicateur global (1.0 = volumes du site uisfx)
+  gains     : multiplicateur par jeu de sons, ex. { "zen": 1.6 }
+  events    : { "timer-done": "cinematic/complete", ... } (chemin sans .ogg,
+              relatif à ~/.config/kris-island/sounds ; "" = muet), ou
+              { "sound": "...", "volume": 0.2 } pour régler un son à part
+  notifications : { "apps": [...], "urgency": ["critical"], "appSounds": {...} }
+              — une notification ne sonne que si son appli est listée
+              (insensible à la casse, "*" = toutes) ou si son urgence est
+              listée ; "appSounds" donne à une appli son propre son (elle
+              sonne alors toujours).
+Sons : uisfx (CC0), voir sounds/SOURCE.txt. Bloque le temps du son."""
+import json, os, subprocess, sys
+
+HOME = os.path.expanduser("~")
+DIR = os.path.join(HOME, ".config/kris-island/sounds")
+# Volume propre à chaque son, repris d'uisfx (defaultVolume), sinon trop fort.
+LEVELS = {"complete": .24, "recording": .09, "stop": .19, "paste": .17, "snap": .2,
+          "lock": .2, "unlock": .2, "queued": .14, "notification": .2}
+DEFAULT = {
+    "enabled": True,
+    "volume": 1.0,
+    "gains": {"zen": 1.6},
+    "events": {
+        "timer-done": "cinematic/complete",
+        "dictation-start": "minimal/recording",
+        "dictation-stop": "minimal/stop",
+        "dictation-paste": "minimal/paste",
+        "screenshot": "zen/snap",
+        "lock": "zen/lock",
+        "unlock": "zen/unlock",
+        "ai-done": "zen/queued",
+        "notification": "minimal/notification",
+    },
+    "notifications": {"apps": [], "urgency": ["critical"]},
+}
+
+
+def config():
+    cfg = json.loads(json.dumps(DEFAULT))
+    try:
+        with open(os.path.join(HOME, ".config/kris-island/sounds/sounds.json")) as f:
+            user = json.load(f)
+        for k, v in user.items():
+            if isinstance(v, dict) and isinstance(cfg.get(k), dict):
+                cfg[k].update(v)
+            else:
+                cfg[k] = v
+    except (OSError, ValueError):
+        pass
+    return cfg
+
+
+def main():
+    args = sys.argv[1:]
+    if not args:
+        sys.exit(2)
+    event, app, urgency = args[0], "", ""
+    if "--app" in args:
+        app = args[args.index("--app") + 1] if args.index("--app") + 1 < len(args) else ""
+    if "--urgency" in args:
+        urgency = args[args.index("--urgency") + 1] if args.index("--urgency") + 1 < len(args) else ""
+    cfg = config()
+    if not cfg.get("enabled", True):
+        return
+    spec = (cfg.get("events") or {}).get(event, "")
+    if event == "notification":
+        rule = cfg.get("notifications") or {}
+        own = {str(k).lower(): v for k, v in (rule.get("appSounds") or {}).items()}
+        apps = [str(a).lower() for a in rule.get("apps", [])]
+        if app.lower() in own:
+            spec = own[app.lower()]
+        elif not ("*" in apps or app.lower() in apps or urgency.lower() in [str(u).lower() for u in rule.get("urgency", [])]):
+            return
+    if isinstance(spec, dict):
+        name, level = spec.get("sound", ""), spec.get("volume")
+    else:
+        name, level = spec, None
+    if not name:
+        return
+    if level is None:
+        level = LEVELS.get(os.path.basename(name), 0.2)
+    path = os.path.join(DIR, name + ".ogg")
+    if os.path.isfile(path):
+        gain = float((cfg.get("gains") or {}).get(name.split("/")[0], 1.0))
+        volume = max(0.0, min(1.0, float(level) * gain * float(cfg.get("volume", 1.0))))
+        subprocess.run(["pw-play", "--volume", f"{volume:.3f}", path],
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+
+if __name__ == "__main__":
+    main()

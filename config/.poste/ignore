@@ -1,0 +1,28 @@
+# Chemins (relatifs à ~) que `poste sys add` refuse d'ajouter.
+# Repris des règles utiles de l'ancien .chezmoiignore. `*` et `?` ne franchissent pas un `/`,
+# `**` couvre zéro dossier ou plus ; un motif qui correspond à un dossier couvre son contenu.
+
+# Secrets : ne jamais versionner
+.ssh/**
+.gnupg/**
+.npmrc
+.netrc
+.docker/.token_seed
+.claude/.credentials.json
+**/.env
+**/.env.*
+.config/configstore/**
+
+# Caches et fichiers régénérables
+.cache/**
+.npm/**
+.dotnet/**
+.nuget/**
+**/__pycache__/**
+**/*.bak.*
+**/*.bak
+
+# Géré ou régénéré par Omarchy et des outils tiers
+.config/omarchy/current
+.claude/skills/omarchy
+.claude/plugins
