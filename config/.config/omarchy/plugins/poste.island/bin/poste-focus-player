@@ -1,0 +1,47 @@
+#!/usr/bin/env python3
+"""Met au premier plan la fenêtre d'où vient le son (lecteur de l'île).
+
+  poste-focus-player APPLI TITRE [URL]
+
+APPLI : desktopEntry ou identity du lecteur MPRIS (« zen », « spotify »…).
+Parmi les fenêtres de cette appli, on préfère celle dont le titre contient
+TITRE (un navigateur met l'onglet qui joue dans son titre), puis celle dont
+le titre contient le nom du site de URL (« YouTube »), sinon la plus
+récemment utilisée. Hyprland 0.56 : dispatch en Lua, adresse vérifiée.
+Code de sortie 3 : l'appli n'a aucune fenêtre (réduite dans la barre des
+tâches) ; le lecteur de l'île la fait alors réapparaître (MPRIS Raise, ou en
+relançant l'appli)."""
+import json, re, subprocess, sys
+
+
+def norm(s):
+    return re.sub(r"[^a-z0-9]", "", str(s).lower())
+
+
+def main():
+    if len(sys.argv) not in (3, 4):
+        sys.exit("usage: poste-focus-player APPLI TITRE [URL]")
+    app, title = norm(sys.argv[1]), sys.argv[2].strip().lower()
+    host = re.sub(r"^https?://([^/:]+).*$", r"\1", sys.argv[3].lower()) if len(sys.argv) == 4 else ""
+    labels = [l for l in host.split(".") if l not in ("www", "m", "music", "open")]
+    site = labels[-2] if len(labels) >= 2 else ""
+    if not app:
+        return
+    clients = json.loads(subprocess.run(["hyprctl", "clients", "-j"], capture_output=True, text=True).stdout or "[]")
+    mine = [c for c in clients if c.get("mapped") and app and
+            (app in norm(c.get("class")) or norm(c.get("class")) in app or app in norm(c.get("initialClass")))
+            and norm(c.get("class"))]
+    if not mine:
+        sys.exit(3)   # aucune fenêtre (appli réduite dans la barre des tâches)
+    def rank(c):
+        t = str(c.get("title", "")).lower()
+        return (0 if title and title in t else 1 if site and site in t else 2, c.get("focusHistoryID", 999))
+    mine.sort(key=rank)
+    address = str(mine[0].get("address", ""))
+    if re.fullmatch(r"0x[0-9a-f]{1,16}", address):
+        subprocess.run(["hyprctl", "dispatch", 'hl.dsp.focus({ window = "address:%s" })' % address],
+                       stdout=subprocess.DEVNULL)
+
+
+if __name__ == "__main__":
+    main()

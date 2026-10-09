@@ -82,7 +82,7 @@ hl.config({ decoration = { dim_around = 0.55 } })
 -- quasi opaque, le flou Acrylic ne se voyait plus). Actif / inactif.
 o.window({ tag = "default-opacity" }, { opacity = "0.97 0.9" })
 
--- Notifications flottantes (kris.notifications) en verre dépoli : flou des
+-- Notifications flottantes (poste.notifications) en verre dépoli : flou des
 -- fenêtres réellement derrière (xray off), seulement sous les cartes
 -- (ignore_alpha > alpha de l'ombre, < alpha du verre 0.76).
 hl.layer_rule({ match = { namespace = "^omarchy-notifications$" }, blur = true, ignore_alpha = 0.45, xray = false })
@@ -90,9 +90,9 @@ hl.layer_rule({ match = { namespace = "^omarchy-notifications$" }, blur = true, 
 -- Menu Omarchy (SUPER+ALT+ESPACE) : voile sombre derrière.
 hl.layer_rule({ match = { namespace = "^omarchy-menu$" }, dim_around = true })
 
--- Bandeau de dictée (kris.island, kris-island-dictation) : même verre dépoli
+-- Bandeau de dictée (poste.island, poste-island-dictation) : même verre dépoli
 -- que les toasts.
-hl.layer_rule({ match = { namespace = "^kris-island-dictation$" }, blur = true, ignore_alpha = 0.45, xray = false })
+hl.layer_rule({ match = { namespace = "^poste-island-dictation$" }, blur = true, ignore_alpha = 0.45, xray = false })
 
 -- Panneaux natifs (Réseau, Bluetooth, Audio, VPN…) ouverts depuis l'île :
 -- même voile que l'île dépliée et une petite apparition. La surface couvre

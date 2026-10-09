@@ -7,7 +7,7 @@ index 7e105ae..332c8c0 100644
  
    readonly property color foreground: Color.foreground
 -  readonly property color background: Color.background
-+  // patch local (kris) : fond, bordures et police de l'île kris.island.
++  // patch local (kris) : fond, bordures et police de l'île poste.island.
 +  readonly property color background: Qt.darker(Color.background, 1.9)
    readonly property color accent: Color.accent
    readonly property color urgent: Color.urgent
@@ -195,7 +195,7 @@ index 0000000..494454f
 +    GradientStop { position: 0; color: avatar.hasLogo ? "transparent" : Qt.hsla(avatar.hue, 0.75, 0.62, 1) }
 +    GradientStop { position: 1; color: avatar.hasLogo ? "transparent" : Qt.hsla(avatar.hue, 0.7, 0.45, 1) }
 +  }
-+  // Logo de l'expéditeur, trouvé par kris-sender-logo (île kris.island) :
++  // Logo de l'expéditeur, trouvé par poste-sender-logo (île poste.island) :
 +  // BIMI, puis icônes déclarées par le site, en cache local. Rien trouvé
 +  // (ou script absent) : l'initiale reste.
 +  readonly property string domain: {
@@ -216,7 +216,7 @@ index 0000000..494454f
 +  Component.onCompleted: if (domain !== "") logoProc.running = true
 +  Process {
 +    id: logoProc
-+    command: ["sh", "-c", 'exec "$HOME/.config/omarchy/plugins/kris.island/bin/kris-sender-logo" "$1" "$2" 2>/dev/null', "kris-sender-logo", avatar.domain, avatar.who]
++    command: ["sh", "-c", 'exec "$HOME/.config/omarchy/plugins/poste.island/bin/poste-sender-logo" "$1" "$2" 2>/dev/null', "poste-sender-logo", avatar.domain, avatar.who]
 +    stdout: StdioCollector { onStreamFinished: avatar.logoPath = String(this.text).trim() }
 +  }
 +  // Logo tel quel, sans fond, arrondi aux coins (forme prévue pour ces

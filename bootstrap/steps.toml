@@ -10,7 +10,7 @@
 #   [[manual]]  étape à la main ; `check` facultatif, sinon `poste sys done <id>`
 
 # ------------------------------------------------------------ plugins tiers (versions auditées)
-# kris.island, kris.notifications et kris.workspaces viennent de config/ (liens).
+# poste.island, poste.notifications et poste.workspaces viennent de config/ (liens).
 [[plugin]]
 id = "crmne.mpris"
 url = "https://github.com/crmne/omarchy-mpris"
@@ -97,11 +97,11 @@ check = ["sh", "-c", "[ \"$(xdg-mime query default inode/directory)\" = com.this
 run = [["flea", "--default"], ["systemctl", "--user", "restart", "xdg-desktop-portal"]]
 
 [[user]]
-id = "theme-kris"
-title = "thème kris-theme"
+id = "theme-poste"
+title = "thème poste-theme"
 requires = "omarchy"
-check = ["sh", "-c", "[ \"$(omarchy-theme-current | tr 'A-Z ' 'a-z-')\" = kris-theme ]"]
-run = [["omarchy", "theme", "set", "kris-theme"]]
+check = ["sh", "-c", "[ \"$(omarchy-theme-current | tr 'A-Z ' 'a-z-')\" = poste-theme ]"]
+run = [["omarchy", "theme", "set", "poste-theme"]]
 
 # ------------------------------------------------------------ étapes système (sudo, jamais lancées par poste)
 [[system]]

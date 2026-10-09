@@ -10,7 +10,10 @@
   "includeCoAuthoredBy": false,
   "includeGitInstructions": false,
   "permissions": {
-    "defaultMode": "auto"
+    "defaultMode": "auto",
+    "allow": [
+      "mcp__pencil"
+    ]
   },
   "statusLine": {
     "type": "command",

@@ -1,0 +1,221 @@
+#!/usr/bin/env python3
+"""Pont entre OBS (son serveur WebSocket, protocole v5) et l'île.
+
+  poste-obs watch            une ligne JSON par changement, reconnexion seule
+  poste-obs <Requête>        envoie une requête OBS (StartRecord, StopRecord,
+                            ToggleRecord, ToggleRecordPause, SaveReplayBuffer…)
+
+Lignes de `watch` :
+  {"t": "status", "connected": true, "recording": true, "paused": false,
+   "recordMs": 75000, "streaming": false, "streamMs": 0, "replay": false,
+   "scene": "Écran"}
+  {"t": "saved", "path": "/home/…/2026-10-05 10-00-00.mkv"}
+  {"t": "status", "connected": false, "error": "…"}
+
+Connexion et mot de passe : lus dans la config d'OBS
+(~/.config/obs-studio/plugin_config/obs-websocket/config.json), jamais
+affichés. Il faut activer le serveur dans OBS (Outils → Paramètres du
+serveur WebSocket). Aucune dépendance : le client WebSocket minimal est
+écrit ici (OBS est local, sans chiffrement)."""
+import base64, hashlib, json, os, socket, struct, sys, time, uuid
+
+CONFIG = os.path.expanduser("~/.config/obs-studio/plugin_config/obs-websocket/config.json")
+OUTPUTS, SCENES = 1 << 6, 1 << 2
+
+
+class Timeout(Exception):
+    pass
+
+
+class MiniWS:
+    """Client WebSocket minimal (RFC 6455) : texte seulement, en local."""
+    def __init__(self, port, timeout=3):
+        self.sock = socket.create_connection(("127.0.0.1", port), timeout=timeout)
+        key = base64.b64encode(os.urandom(16)).decode()
+        self.sock.sendall(("GET / HTTP/1.1\r\nHost: 127.0.0.1:%d\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n"
+                           "Sec-WebSocket-Key: %s\r\nSec-WebSocket-Version: 13\r\n"
+                           "Sec-WebSocket-Protocol: obswebsocket.json\r\n\r\n" % (port, key)).encode())
+        head = b""
+        while b"\r\n\r\n" not in head:
+            chunk = self.sock.recv(1024)
+            if not chunk:
+                raise ConnectionError("handshake")
+            head += chunk
+        if b" 101 " not in head.split(b"\r\n", 1)[0]:
+            raise ConnectionError("handshake refused")
+        self.buf = head.split(b"\r\n\r\n", 1)[1]
+
+    def settimeout(self, t):
+        self.sock.settimeout(t)
+
+    def _read(self, n):
+        while len(self.buf) < n:
+            try:
+                chunk = self.sock.recv(65536)
+            except socket.timeout:
+                raise Timeout()
+            if not chunk:
+                raise ConnectionError("closed")
+            self.buf += chunk
+        out, self.buf = self.buf[:n], self.buf[n:]
+        return out
+
+    def _frame(self, opcode, payload):
+        head = bytes([0x80 | opcode])
+        n = len(payload)
+        head += bytes([0x80 | n]) if n < 126 else bytes([0x80 | 126]) + struct.pack(">H", n) if n < 65536 \
+            else bytes([0x80 | 127]) + struct.pack(">Q", n)
+        mask = os.urandom(4)
+        self.sock.sendall(head + mask + bytes(b ^ mask[i % 4] for i, b in enumerate(payload)))
+
+    def send(self, text):
+        self._frame(0x1, text.encode())
+
+    def recv(self):
+        message = b""
+        while True:
+            b0, b1 = self._read(2)
+            opcode, n = b0 & 0x0F, b1 & 0x7F
+            if n == 126:
+                n = struct.unpack(">H", self._read(2))[0]
+            elif n == 127:
+                n = struct.unpack(">Q", self._read(8))[0]
+            data = self._read(n)
+            if opcode == 0x8:
+                raise ConnectionError("closed")
+            if opcode == 0x9:
+                self._frame(0xA, data)
+                continue
+            if opcode in (0x1, 0x0):
+                message += data
+                if b0 & 0x80:
+                    return message.decode("utf-8", "replace")
+
+
+def emit(**event):
+    sys.stdout.write(json.dumps(event, ensure_ascii=False) + "\n")
+    sys.stdout.flush()
+
+
+def settings():
+    try:
+        with open(CONFIG) as f:
+            c = json.load(f)
+    except (OSError, ValueError):
+        return None
+    if not c.get("server_enabled", False):
+        return None
+    return {"port": int(c.get("server_port", 4455)),
+            "password": c.get("server_password", "") if c.get("auth_required", True) else ""}
+
+
+class Obs:
+    def __init__(self, ws):
+        self.ws = ws
+        self.events = []
+
+    @classmethod
+    def connect(cls, s):
+        ws = MiniWS(s["port"])
+        hello = json.loads(ws.recv())["d"]
+        ident = {"rpcVersion": 1, "eventSubscriptions": OUTPUTS | SCENES}
+        auth = hello.get("authentication")
+        if auth:
+            secret = base64.b64encode(hashlib.sha256((s["password"] + auth["salt"]).encode()).digest()).decode()
+            ident["authentication"] = base64.b64encode(
+                hashlib.sha256((secret + auth["challenge"]).encode()).digest()).decode()
+        ws.send(json.dumps({"op": 1, "d": ident}))
+        while True:
+            msg = json.loads(ws.recv())
+            if msg.get("op") == 2:
+                return cls(ws)
+
+    def request(self, kind, data=None):
+        rid = uuid.uuid4().hex
+        self.ws.send(json.dumps({"op": 6, "d": {"requestType": kind, "requestId": rid, "requestData": data or {}}}))
+        while True:
+            msg = json.loads(self.ws.recv())
+            if msg.get("op") == 7 and msg["d"].get("requestId") == rid:
+                st = msg["d"].get("requestStatus", {})
+                return msg["d"].get("responseData") or {} if st.get("result") else None
+            if msg.get("op") == 5:
+                self.events.append(msg["d"])
+
+    def status(self):
+        rec = self.request("GetRecordStatus") or {}
+        stream = self.request("GetStreamStatus") or {}
+        replay = self.request("GetReplayBufferStatus") or {}
+        scene = self.request("GetCurrentProgramScene") or {}
+        return {"connected": True, "recording": bool(rec.get("outputActive")), "paused": bool(rec.get("outputPaused")),
+                "recordMs": int(rec.get("outputDuration") or 0), "streaming": bool(stream.get("outputActive")),
+                "streamMs": int(stream.get("outputDuration") or 0), "replay": bool(replay.get("outputActive")),
+                "scene": str(scene.get("sceneName") or scene.get("currentProgramSceneName") or "")}
+
+
+def watch():
+    last = None
+    while True:
+        s = settings()
+        if not s:
+            if last != "off":
+                emit(t="status", connected=False, error="websocket server disabled")
+                last = "off"
+            time.sleep(5)
+            continue
+        try:
+            obs = Obs.connect(s)
+        except Exception:
+            if last != "down":
+                emit(t="status", connected=False, error="OBS not running")
+                last = "down"
+            time.sleep(3)
+            continue
+        last = "up"
+        try:
+            st = obs.status()
+            emit(t="status", **st)
+            obs.ws.settimeout(1)
+            while True:
+                try:
+                    msg = json.loads(obs.ws.recv())
+                    if msg.get("op") == 5:
+                        obs.events.append(msg["d"])
+                except Timeout:
+                    pass
+                changed = False
+                while obs.events:
+                    ev = obs.events.pop(0)
+                    kind, data = ev.get("eventType"), ev.get("eventData") or {}
+                    if kind == "RecordStateChanged" and data.get("outputState") == "OBS_WEBSOCKET_OUTPUT_STOPPED" and data.get("outputPath"):
+                        emit(t="saved", path=data["outputPath"])
+                    if kind in ("RecordStateChanged", "StreamStateChanged", "ReplayBufferStateChanged",
+                                "CurrentProgramSceneChanged"):
+                        changed = True
+                # Pendant un enregistrement ou une diffusion : le temps, chaque seconde.
+                if changed or st["recording"] or st["streaming"]:
+                    obs.ws.settimeout(3)
+                    st = obs.status()
+                    obs.ws.settimeout(1)
+                    emit(t="status", **st)
+        except Exception:
+            emit(t="status", connected=False, error="OBS closed")
+            last = "down"
+            time.sleep(2)
+
+
+def main():
+    if len(sys.argv) < 2:
+        sys.exit("usage: poste-obs watch | <Requête>")
+    if sys.argv[1] == "watch":
+        watch()
+        return
+    s = settings()
+    if not s:
+        sys.exit("serveur WebSocket d'OBS désactivé")
+    obs = Obs.connect(s)
+    res = obs.request(sys.argv[1])
+    print(json.dumps({"ok": res is not None}))
+
+
+if __name__ == "__main__":
+    main()

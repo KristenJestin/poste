@@ -15,10 +15,10 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 /// Dossiers que l'on voudrait lier d'un bloc, s'ils sont propres.
-const PROPOSED_LINK_DIRS: &[&str] = &[".config/omarchy/plugins/kris.island"];
+const PROPOSED_LINK_DIRS: &[&str] = &[".config/omarchy/plugins/poste.island"];
 /// Dossiers dont on contrôle la propreté et que l'on signale (en plus des proposés).
 const CANDIDATE_PARENTS: &[&str] = &[".config/omarchy/plugins"];
-const CANDIDATE_DIRS: &[&str] = &[".config/kris-island"];
+const CANDIDATE_DIRS: &[&str] = &[".config/poste-island"];
 
 const IGNORE_TEMPLATE: &str = "# Chemins (relatifs à ~) que `poste sys add` refuse d'ajouter.\n\
 # Repris des règles utiles de l'ancien .chezmoiignore. `*` et `?` ne franchissent pas un `/`,\n\

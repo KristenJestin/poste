@@ -27,7 +27,7 @@
           "id": "omarchy.menu"
         },
         {
-          "id": "kris.workspaces"
+          "id": "poste.workspaces"
         }
       ],
       "right": [
@@ -87,7 +87,7 @@
     },
     "position": "top",
     "transparent": true,
-    "id": "kris.island"
+    "id": "poste.island"
   },
   "idle": {
     "lock": 5400,
@@ -95,7 +95,7 @@
   },
   "plugins": [
     {
-      "id": "kris.notifications"
+      "id": "poste.notifications"
     },
     {
       "id": "io.github.smoothpixels.cursor-accent"
@@ -106,6 +106,6 @@
     "omarchy.notifications"
   ],
   "cloneSourceRestores": [
-    "kris.notifications"
+    "poste.notifications"
   ]
 }

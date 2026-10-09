@@ -1,4 +1,4 @@
-/* Omarchy, au style de l'île (kris.island) : fonds noirs profonds, Adwaita
+/* Omarchy, au style de l'île (poste.island) : fonds noirs profonds, Adwaita
  * Sans, accent seulement pour ce qui est actif ou cliquable, titres blancs
  * hiérarchisés par la taille, éléments arrondis en cartes, liserés discrets.
  * Modèle perso (~/.config/omarchy/themed), remplace celui d'Omarchy ; rendu

@@ -1,0 +1,245 @@
+#!/usr/bin/env python3
+"""Logo d'un expéditeur de mail, pour Omamail (patch local de Kris).
+
+  poste-sender-logo DOMAINE [NOM]   affiche le chemin d'un PNG, ou rien
+
+Ordre de recherche, du plus fiable au moins fiable :
+  1. BIMI : le logo officiel publié dans les DNS (default._bimi.<domaine>)
+  2. les icônes que la page d'accueil déclare (<link rel="icon">,
+     apple-touch-icon), comme le ferait un navigateur
+  3. /favicon.ico, seulement si la page n'en déclare aucune
+On ne devine jamais /apple-touch-icon.png : ce sont souvent de vieux fichiers
+oubliés (l'ancien logo de Steam, celui de Pôle emploi…).
+
+On remonte les sous-domaines (email.francetravail.fr → francetravail.fr),
+sans aller jusqu'aux suffixes publics (gouv.fr, co.uk…). Rien pour les
+messageries personnelles (Gmail, Proton…), sauf si le NOM affiché est celui du
+service lui-même (« Proton », « Google »). Omamail ne le lance jamais pour
+les spams. HTTPS uniquement,
+redirections HTTPS uniquement, tailles et délais bornés. Les sites contactés
+voient l'adresse IP, jamais le mail. Cache : ~/.cache/poste-island/sender-logos/
+(<domaine>.png, ou <domaine>.none pendant 7 jours si rien n'a été trouvé ;
+un logo trouvé est gardé 30 jours)."""
+import html.parser, os, re, subprocess, sys, tempfile, time, urllib.parse, urllib.request
+
+CACHE = os.path.expanduser("~/.cache/poste-island/sender-logos")
+KEEP_FOUND, KEEP_NONE = 30 * 86400, 7 * 86400
+UA = "Mozilla/5.0 (X11; Linux x86_64; rv:140.0) Gecko/20100101 Firefox/140.0"
+PUBLIC_SECOND = {"gouv", "gov", "co", "com", "org", "net", "ac", "edu", "ne", "or"}
+# Messageries personnelles : le logo serait celui de Gmail, pas de la personne.
+PERSONAL = {"gmail.com", "googlemail.com", "outlook.com", "outlook.fr", "hotmail.com", "hotmail.fr",
+            "live.com", "live.fr", "msn.com", "yahoo.com", "yahoo.fr", "icloud.com", "me.com", "mac.com",
+            "proton.me", "pm.me", "protonmail.com", "protonmail.ch", "gmx.com", "gmx.fr", "aol.com",
+            "free.fr", "orange.fr", "wanadoo.fr", "sfr.fr", "laposte.net", "bbox.fr", "neuf.fr", "tutanota.com"}
+# Le service lui-même, reconnu à son nom affiché.
+BRANDS = {"gmail.com": "google gmail", "googlemail.com": "google gmail", "outlook.com": "microsoft outlook",
+          "outlook.fr": "microsoft outlook", "hotmail.com": "microsoft outlook", "hotmail.fr": "microsoft outlook",
+          "live.com": "microsoft", "live.fr": "microsoft", "msn.com": "microsoft", "yahoo.com": "yahoo",
+          "yahoo.fr": "yahoo", "icloud.com": "apple icloud", "me.com": "apple", "mac.com": "apple",
+          "proton.me": "proton", "pm.me": "proton", "protonmail.com": "proton", "protonmail.ch": "proton",
+          "gmx.com": "gmx", "gmx.fr": "gmx", "aol.com": "aol", "free.fr": "free", "orange.fr": "orange",
+          "wanadoo.fr": "orange", "sfr.fr": "sfr", "laposte.net": "poste", "bbox.fr": "bouygues bbox",
+          "neuf.fr": "sfr", "tutanota.com": "tuta"}
+DOMAIN_RE = re.compile(r"^[a-z0-9-]+(\.[a-z0-9-]+)+$")
+
+
+class HttpsOnly(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        if not newurl.lower().startswith("https://"):
+            return None
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
+OPENER = urllib.request.build_opener(HttpsOnly)
+
+
+def fetch(url, limit, truncate=False):
+    """truncate : une page trop longue est lue jusqu'à la limite (les icônes
+    sont déclarées dans <head>, au début) au lieu d'être refusée."""
+    if url.startswith("data:"):
+        with urllib.request.urlopen(url) as r:   # icône écrite dans la page
+            data = r.read(limit + 1)
+            if len(data) > limit:
+                raise ValueError("too big")
+            return url, r.headers.get_content_type(), data
+    req = urllib.request.Request(url, headers={"User-Agent": UA, "Accept": "*/*"})
+    with OPENER.open(req, timeout=5) as r:
+        data = r.read(limit + 1)
+        if len(data) > limit and not truncate:
+            raise ValueError("too big")
+        return r.geturl(), r.headers.get_content_type(), data[:limit]
+
+
+class Links(html.parser.HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.icons = []
+
+    def handle_starttag(self, tag, attrs):
+        if tag != "link":
+            return
+        a = dict((k, v or "") for k, v in attrs)
+        rel = a.get("rel", "").lower().split()
+        if "icon" in rel or "apple-touch-icon" in rel or "apple-touch-icon-precomposed" in rel:
+            if a.get("href"):
+                self.icons.append(a)
+
+
+def icon_rank(a):
+    rel, href = a.get("rel", "").lower(), a.get("href", "").lower()
+    if "mask-icon" in rel:
+        return -1
+    size = 0
+    for m in re.finditer(r"(\d+)x\d+", a.get("sizes", "")):
+        size = max(size, int(m.group(1)))
+    if "apple-touch-icon" in rel:
+        size = max(size, 180)
+    if href.endswith(".svg") or "svg" in a.get("type", ""):
+        size = max(size, 150)
+    return size or 16
+
+
+def to_png(data, out):
+    """Écrit un PNG carré de 128 px (la plus grande image d'un .ico)."""
+    with tempfile.TemporaryDirectory() as tmp:
+        # ImageMagick reconnaît l'ICO à son extension, pas à son contenu.
+        head = data[:16].lstrip()
+        ext = (".ico" if data[:4] == b"\x00\x00\x01\x00" else ".png" if data[:8] == b"\x89PNG\r\n\x1a\n"
+               else ".svg" if head[:5] in (b"<?xml", b"<svg ") else ".img")
+        src = os.path.join(tmp, "src" + ext)
+        with open(src, "wb") as f:
+            f.write(data)
+        kind = subprocess.run(["magick", "identify", "-format", "%m %w\n", src],
+                              capture_output=True, text=True, timeout=10)
+        if kind.returncode != 0 or not kind.stdout.strip():
+            return False
+        frames = [l.split() for l in kind.stdout.strip().splitlines()]
+        if frames[0][0] in ("SVG", "MSVG") or ext == ".svg":
+            png = os.path.join(tmp, "svg.png")
+            if subprocess.run(["rsvg-convert", "-w", "128", "-h", "128", "-a", "-o", png, src],
+                              capture_output=True, timeout=10).returncode != 0:
+                return False
+            src = png
+            frame = ""
+        else:
+            best = max(range(len(frames)), key=lambda i: int(frames[i][1]) if frames[i][1].isdigit() else 0)
+            if int(frames[best][1] or 0) < 32:
+                return False   # trop petit pour être lisible : l'initiale fera mieux
+            frame = "[%d]" % best
+        tmp_out = out + ".tmp"
+        ok = subprocess.run(["magick", src + frame, "-background", "none", "-resize", "128x128",
+                             "-gravity", "center", "-extent", "128x128", "PNG32:" + tmp_out],
+                            capture_output=True, timeout=10).returncode == 0
+        if ok:
+            lighten_if_dark(tmp_out)
+            os.replace(tmp_out, out)
+        return ok
+
+
+def lighten_if_dark(path):
+    """Logo détouré, sombre et sans couleur (GitHub, Unity…) : passé en blanc,
+    sinon il disparaît sur le fond sombre d'Omamail."""
+    r = subprocess.run(["magick", path, "-resize", "24x24!", "txt:-"], capture_output=True, text=True, timeout=10)
+    clear, lum, sat, n = 0, 0.0, 0.0, 0
+    for line in r.stdout.splitlines()[1:]:
+        m = re.search(r"srgba?\(([\d.]+)%?,([\d.]+)%?,([\d.]+)%?(?:,([\d.]+))?\)", line)
+        if not m:
+            continue
+        rgb = [float(v) for v in m.groups()[:3]]
+        if "%" in line.split("srgb")[1].split(")")[0]:
+            rgb = [v * 2.55 for v in rgb]
+        a = float(m.group(4)) if m.group(4) is not None else 1.0
+        if a < 0.5:
+            clear += 1
+            continue
+        hi, lo = max(rgb) / 255, min(rgb) / 255
+        lum += (0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2]) / 255
+        sat += (hi - lo) / hi if hi > 0 else 0
+        n += 1
+    if n and clear > 0.15 * (clear + n) and lum / n < 0.35 and sat / n < 0.25:
+        subprocess.run(["magick", path, "-channel", "RGB", "-negate", "+channel", "PNG32:" + path],
+                       capture_output=True, timeout=10)
+
+
+def bimi(domain):
+    try:
+        r = subprocess.run(["resolvectl", "query", "-t", "TXT", "--legend=no", "default._bimi." + domain],
+                           capture_output=True, text=True, timeout=5)
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    m = re.search(r"v=BIMI1;.*?\bl=(https://[^;\"\s]+)", r.stdout)
+    return m.group(1) if m else None
+
+
+def candidates(domain):
+    url = bimi(domain)
+    if url:
+        yield url
+    for home in ("https://" + domain + "/", "https://www." + domain + "/"):
+        try:
+            final, ctype, body = fetch(home, 1_500_000, truncate=True)
+        except Exception:
+            continue
+        declared = []
+        if ctype == "text/html":
+            p = Links()
+            try:
+                p.feed(body.decode("utf-8", "replace"))
+            except Exception:
+                pass
+            declared = sorted((a for a in p.icons if icon_rank(a) >= 0), key=icon_rank, reverse=True)
+        for a in declared:
+            yield urllib.parse.urljoin(final, a["href"])
+        if not declared:
+            yield urllib.parse.urljoin(final, "/favicon.ico")
+        return
+
+
+def find(domain, out):
+    for url in candidates(domain):
+        if not (url.lower().startswith("https://") or url.startswith("data:image/")):
+            continue
+        try:
+            _, _, data = fetch(url, 600_000)
+        except Exception:
+            continue
+        if to_png(data, out):
+            return True
+    return False
+
+
+def domains_for(domain):
+    parts = domain.split(".")
+    for i in range(len(parts) - 1):
+        rest = parts[i:]
+        if len(rest) == 2 and rest[0] in PUBLIC_SECOND:
+            break
+        yield ".".join(rest)
+
+
+def main():
+    if len(sys.argv) not in (2, 3):
+        sys.exit("usage: poste-sender-logo DOMAINE [NOM]")
+    domain = sys.argv[1].strip().lower().rstrip(".")
+    name = sys.argv[2].lower() if len(sys.argv) == 3 else ""
+    if not DOMAIN_RE.match(domain) or len(domain) > 253:
+        return
+    if domain in PERSONAL and not any(w in name for w in BRANDS.get(domain, "").split()):
+        return
+    os.makedirs(CACHE, exist_ok=True)
+    now = time.time()
+    for d in domains_for(domain):
+        png, none = os.path.join(CACHE, d + ".png"), os.path.join(CACHE, d + ".none")
+        if os.path.exists(png) and now - os.path.getmtime(png) < KEEP_FOUND:
+            print(png)
+            return
+        if os.path.exists(none) and now - os.path.getmtime(none) < KEEP_NONE:
+            continue
+        if find(d, png):
+            print(png)
+            return
+        open(none, "w").close()
+
+
+if __name__ == "__main__":
+    main()

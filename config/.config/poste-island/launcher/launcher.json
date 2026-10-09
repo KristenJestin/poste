@@ -1,0 +1,266 @@
+{
+  "//": "poste.island launcher — hot-reloaded. Action types: url, command, terminal, app, copy. Set \"enabled\": false to disable an entry.",
+  "items": [
+    {
+      "enabled": false,
+      "name": "GitHub",
+      "subtitle": "Open github.com",
+      "icon": "🐙",
+      "keywords": [
+        "git",
+        "repo"
+      ],
+      "type": "url",
+      "url": "https://github.com"
+    },
+    {
+      "enabled": false,
+      "name": "System monitor",
+      "subtitle": "btop in a terminal",
+      "icon": "utilities-system-monitor",
+      "keywords": [
+        "top",
+        "cpu",
+        "ram",
+        "moniteur",
+        "système"
+      ],
+      "type": "terminal",
+      "command": "btop",
+      "cwd": "~"
+    },
+    {
+      "name": "Jellyfin",
+      "subtitle": "media.example.org",
+      "icon": "~/.config/poste-island/launcher/icons/jellyfin.png",
+      "keywords": [
+        "media",
+        "films",
+        "séries",
+        "streaming",
+        "movies",
+        "series",
+        "tv"
+      ],
+      "type": "url",
+      "url": "https://media.example.org"
+    },
+    {
+      "name": "Proton VPN",
+      "subtitle": "Open the VPN panel",
+      "icon": "network-vpn",
+      "keywords": [
+        "vpn",
+        "proton",
+        "protonvpn",
+        "connexion",
+        "connection"
+      ],
+      "type": "command",
+      "command": "omarchy-shell shell summon io.github.grichard99.omaproton-vpn '{}'"
+    }
+  ],
+  "extensions": [
+    {
+      "id": "record",
+      "name": "Record",
+      "subtitle": "Screen recording · presets, windows, screens · SHIFT+PRINT",
+      "icon": "󰑋",
+      "keyword": [
+        "rec",
+        "record"
+      ],
+      "keywords": [
+        "record",
+        "enregistrer",
+        "enregistrement",
+        "capture",
+        "vidéo",
+        "video",
+        "screen",
+        "écran",
+        "unity"
+      ],
+      "ttl": 1,
+      "source": {
+        "type": "script",
+        "command": "~/.config/omarchy/plugins/poste.island/bin/poste-record items"
+      }
+    },
+    {
+      "id": "unity",
+      "name": "Unity Projects",
+      "subtitle": "Open a project in the editor",
+      "icon": "unityhub",
+      "keywords": [
+        "editor",
+        "jeu",
+        "projet",
+        "projets",
+        "unity",
+        "game",
+        "project",
+        "projects"
+      ],
+      "ttl": 300,
+      "source": {
+        "type": "script",
+        "command": "~/.config/poste-island/launcher/extensions/unity-projects"
+      },
+      "keyword": [
+        "open",
+        "proj"
+      ]
+    },
+    {
+      "id": "poste-music",
+      "name": "Musique",
+      "subtitle": "Navidrome · recherche, playlists, mixes",
+      "icon": "󰝚",
+      "keywords": [
+        "musique",
+        "navidrome",
+        "playlist",
+        "music",
+        "playlists",
+        "artist",
+        "album",
+        "artiste",
+        "morceau"
+      ],
+      "ttl": 30,
+      "source": {
+        "type": "script",
+        "command": "poste music home --json",
+        "search": "poste music search --json"
+      },
+      "keyword": [
+        "play",
+        "music"
+      ],
+      "rootItems": false
+    },
+    {
+      "id": "ssh",
+      "name": "SSH",
+      "subtitle": "Connect to a server",
+      "icon": "󰣀",
+      "keyword": "ssh",
+      "keywords": [
+        "ssh",
+        "server",
+        "serveur",
+        "remote",
+        "connexion"
+      ],
+      "ttl": 60,
+      "source": {
+        "type": "script",
+        "command": "~/.config/poste-island/launcher/extensions/ssh-hosts"
+      }
+    }
+  ],
+  "engines": [
+    {
+      "keyword": "yt",
+      "name": "YouTube",
+      "url": "https://www.youtube.com/results?search_query=%s",
+      "icon": "~/.config/poste-island/launcher/icons/youtube.png",
+      "keywords": [
+        "youtube",
+        "video",
+        "vidéo"
+      ]
+    },
+    {
+      "keyword": "ytm",
+      "name": "YouTube Music",
+      "url": "https://music.youtube.com/search?q=%s",
+      "icon": "~/.config/poste-island/launcher/icons/ytmusic.png",
+      "keywords": [
+        "youtube music",
+        "musique",
+        "music",
+        "ytmusic"
+      ]
+    },
+    {
+      "keyword": [
+        "jf",
+        "media"
+      ],
+      "name": "Jellyfin",
+      "url": "https://media.example.org/web/#/search?query=%s",
+      "icon": "~/.config/poste-island/launcher/icons/jellyfin.png",
+      "keywords": [
+        "jellyfin",
+        "film",
+        "films",
+        "série",
+        "séries",
+        "movie",
+        "tv"
+      ]
+    },
+    {
+      "keyword": "gh",
+      "name": "GitHub",
+      "url": "https://github.com/search?q=%s&type=repositories",
+      "icon": "~/.config/poste-island/launcher/icons/github.png",
+      "keywords": [
+        "github",
+        "git",
+        "repo"
+      ]
+    },
+    {
+      "keyword": "aur",
+      "name": "AUR",
+      "url": "https://aur.archlinux.org/packages?K=%s",
+      "icon": "~/.config/poste-island/launcher/icons/aur.svg",
+      "keywords": [
+        "arch",
+        "package",
+        "paquet"
+      ]
+    },
+    {
+      "keyword": "maps",
+      "name": "Maps",
+      "url": "https://www.google.com/maps/search/%s",
+      "icon": "~/.config/poste-island/launcher/icons/maps.png",
+      "keywords": [
+        "carte",
+        "map",
+        "adresse",
+        "itinéraire"
+      ]
+    }
+  ],
+  "ai": {
+    "//": "Question rapide à l'IA (« ai » + espace). default = fournisseur ; providers = réglages en plus de ceux de bin/poste-ask (claude, codex) ; Tab change de fournisseur. Claude : permissionMode (auto = le classifieur décide, comme le mode auto du terminal), allow = acceptés d'office, deny = refusés d'office. Ex. allow \"Bash(git status*)\", deny \"Bash(curl *)\".",
+    "default": "claude",
+    "providers": {},
+    "permissionMode": "auto",
+    "allow": [
+      "Read",
+      "Glob",
+      "Grep",
+      "WebSearch",
+      "WebFetch"
+    ],
+    "deny": [
+      "Bash(sudo *)",
+      "Bash(rm -r*)",
+      "Bash(rm -fr*)",
+      "Bash(git push*)",
+      "Bash(dd *)",
+      "Bash(mkfs*)",
+      "Bash(shutdown*)",
+      "Bash(reboot*)",
+      "Bash(poweroff*)",
+      "Bash(systemctl poweroff*)",
+      "Bash(systemctl reboot*)"
+    ]
+  }
+}

@@ -75,14 +75,14 @@ o.bind("SUPER + mouse_up", "Scroll active workspace backward", hl.dsp.focus({ wo
 -- Les autres anciens raccourcis perso (terminal, tmux, navigateur, éditeur,
 -- docker, obsidian, musique...) sont désormais des défauts Omarchy.
 
--- SUPER+SPACE : lanceur de l'île kris.island (était : Vicinae — supprimé —, avant ça le menu Omarchy).
+-- SUPER+SPACE : lanceur de l'île poste.island (était : Vicinae — supprimé —, avant ça le menu Omarchy).
 hl.unbind("SUPER + SPACE")
-o.bind("SUPER + SPACE", "Launcher", "omarchy-shell kris.island launcher")
+o.bind("SUPER + SPACE", "Launcher", "omarchy-shell poste.island launcher")
 
 
--- SUPER+ALT+SPACE : menu Omarchy dans l'île kris.island (était : menu Omarchy natif).
+-- SUPER+ALT+SPACE : menu Omarchy dans l'île poste.island (était : menu Omarchy natif).
 hl.unbind("SUPER + ALT + SPACE")
-o.bind("SUPER + ALT + SPACE", "Omarchy menu", "omarchy-shell kris.island menu")
+o.bind("SUPER + ALT + SPACE", "Omarchy menu", "omarchy-shell poste.island menu")
 
 -- SUPER+CTRL+ALT+SPACE : menu Omarchy natif (repli).
 o.bind("SUPER + CTRL + ALT + SPACE", "Omarchy menu (native)", "omarchy-menu toggle")
@@ -91,15 +91,15 @@ o.bind("SUPER + CTRL + ALT + SPACE", "Omarchy menu (native)", "omarchy-menu togg
 -- SUPER+L passe par l'île : son « lock » immédiat, puis omarchy-system-lock.
 -- (Verrouillage auto et déverrouillage : sons joués par l'île.)
 hl.unbind("SUPER + L")
-o.bind("SUPER + L", "Lock screen", "omarchy-shell kris.island lock || omarchy-system-lock")
+o.bind("SUPER + L", "Lock screen", "omarchy-shell poste.island lock || omarchy-system-lock")
 -- PRINT : capture Omarchy + son « snap » quand un fichier est créé.
 hl.unbind("PRINT")
-o.bind("PRINT", "Screenshot", os.getenv("HOME") .. "/.config/omarchy/plugins/kris.island/bin/kris-screenshot")
+o.bind("PRINT", "Screenshot", os.getenv("HOME") .. "/.config/omarchy/plugins/poste.island/bin/poste-screenshot")
 -- Enregistrement d'écran : le lanceur de l'île ouvert sur « Record » (préréglages
 -- comme Unity, fenêtres, écrans, zone). Pendant un enregistrement,
 -- SHIFT+PRINT l'arrête directement.
--- gpu-screen-recorder via bin/kris-record, à la place d'OBS.
-o.bind("SHIFT + PRINT", "Screen recording", "omarchy-shell kris.island record")
+-- gpu-screen-recorder via bin/poste-record, à la place d'OBS.
+o.bind("SHIFT + PRINT", "Screen recording", "omarchy-shell poste.island record")
 -- ALT+PRINT : menu d'enregistrement d'écran d'Omarchy retiré, OBS (SHIFT+PRINT) fait le travail.
 hl.unbind("ALT + PRINT")
 
@@ -141,10 +141,10 @@ o.bind("SUPER + CTRL + ALT + LEFT", "Send window to left screen", hl.dsp.window.
 o.bind("SUPER + CTRL + ALT + UP", "Send window to center screen", hl.dsp.window.move({ monitor = "DP-1" }))
 o.bind("SUPER + CTRL + ALT + RIGHT", "Send window to right screen", hl.dsp.window.move({ monitor = "DP-2" }))
 
--- Touches de volume : même commande qu'Omarchy, mais via le shim de kris.island
+-- Touches de volume : même commande qu'Omarchy, mais via le shim de poste.island
 -- qui saute l'OSD de volume quand l'île est la barre active (l'île affiche le
 -- volume elle-même). Sans l'île, l'OSD natif s'affiche comme avant.
-local island_volume = 'PATH="$HOME/.config/omarchy/plugins/kris.island/bin:$PATH" omarchy-audio-output-volume '
+local island_volume = 'PATH="$HOME/.config/omarchy/plugins/poste.island/bin:$PATH" omarchy-audio-output-volume '
 for key, spec in pairs({
   ["XF86AudioRaiseVolume"] = { "Volume up", "raise", true },
   ["XF86AudioLowerVolume"] = { "Volume down", "lower", true },
@@ -194,7 +194,7 @@ for key, spec in pairs({
   ["SUPER + CTRL + B"] = { "Bluetooth (island)", "bluetooth" },
 }) do
   hl.unbind(key)
-  o.bind(key, spec[1], "omarchy-shell kris.island " .. spec[2])
+  o.bind(key, spec[1], "omarchy-shell poste.island " .. spec[2])
 end
 
 -- SUPER+D : bac de fichiers de Flea (Shelf), ouvert sous l'île.

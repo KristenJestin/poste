@@ -100,7 +100,7 @@ type_delay_ms = 0
 # visée au lancement de la dictée. Le script mémorise puis restaure l'adresse.
 pre_recording_command = "/home/kris/.local/bin/voxtype-focus save"
 pre_output_command = "/home/kris/.local/bin/voxtype-focus restore"
-post_output_command = "/home/kris/.config/omarchy/plugins/kris.island/bin/kris-sfx dictation-paste"
+post_output_command = "/home/kris/.config/omarchy/plugins/poste.island/bin/poste-sfx dictation-paste"
 
 # Laisse au compositeur le temps de basculer le focus avant la frappe
 pre_type_delay_ms = 150
