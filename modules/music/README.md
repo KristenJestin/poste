@@ -64,7 +64,7 @@ journalisés ni exposés), et garde la file en phase avec la playlist de mpv.
   « MP3 · 320 kbps »). Pas de `xesam:url`. `PropertiesChanged` à chaque changement de
   morceau, d'état ou de volume ; `Seeked` sur déplacement.
 - Volume : démarre au volume mémorisé (100 % la première fois, comme les autres applis). mpv applique ReplayGain par morceau
-  (`replaygain=track`, `replaygain-clip=no`, `replaygain-fallback=0`) : les fichiers sans tags ne sont pas corrigés.
+  (`replaygain=track`, `replaygain-preamp=4`, `replaygain-clip=yes`, `replaygain-fallback=0`) : les fichiers sans tags ne sont pas corrigés.
 - Pochettes : `getCoverArt` (512) dans `~/.cache/poste/music/covers/<id>.img`, une fois, en arrière-plan.
 - Écoutes : `scrobble` `submission=false` au début de chaque morceau, `submission=true` à
   50 % de la durée ou 4 minutes réellement jouées (pauses exclues). Échec ignoré.

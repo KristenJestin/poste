@@ -390,7 +390,7 @@ fn lecture_complete_mpris_scrobble_skip_et_fin() {
         .unwrap();
         assert_eq!(ident, "Musique");
         let vol: f64 = p.get_property("Volume").unwrap();
-        assert!((vol - 0.5).abs() < 1e-9, "volume par défaut : {vol}");
+        assert!((vol - 1.0).abs() < 1e-9, "volume par défaut : {vol}");
         p.set_property("Volume", 0.8f64).unwrap();
         wait_until(3, "volume", || {
             (p.get_property::<f64>("Volume").unwrap() - 0.8).abs() < 1e-9
@@ -1055,9 +1055,9 @@ fn volume_defaut_commande_mpris_et_memoire() {
     let sb = Sandbox::new(true);
     sb.ok(&["sync", "--full"]);
     // Sans démon : valeur par défaut, et un réglage est mémorisé pour le prochain démarrage.
-    assert_eq!(sb.ok(&["volume"]), "Volume : 50 %\n");
-    assert_eq!(sb.ok(&["volume", "-5"]), "Volume : 45 %\n");
-    assert!(volume_file(&sb).contains("volume = 45"));
+    assert_eq!(sb.ok(&["volume"]), "Volume : 100 %\n");
+    assert_eq!(sb.ok(&["volume", "-5"]), "Volume : 95 %\n");
+    assert!(volume_file(&sb).contains("volume = 95"));
     assert!(!sb.run(&["volume", "fort"]).status.success());
 
     // Le démon démarre au volume mémorisé.
@@ -1065,7 +1065,7 @@ fn volume_defaut_commande_mpris_et_memoire() {
     wait_until(5, "démon", || {
         sb.try_now().is_some_and(|v| v["state"] == "playing")
     });
-    assert!((sb.now()["volume"].as_f64().unwrap() - 0.45).abs() < 1e-9);
+    assert!((sb.now()["volume"].as_f64().unwrap() - 0.95).abs() < 1e-9);
 
     // Par la commande : absolu, relatif, bornes.
     assert_eq!(sb.ok(&["volume", "30"]), "Volume : 30 %\n");
