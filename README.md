@@ -49,7 +49,7 @@ commands = [{ name = "status", description = "état du dépôt" }]   # facultati
 | --- | --- |
 | [`sys`](modules/sys/README.md) | gère le dépôt : construction, installation, état, git. Toujours installé. |
 | [`music`](modules/music/README.md) | client Navidrome : connexion, copie locale, recherche, lecture, favoris, playlists, mixes. |
-| [`record`](modules/record/README.md) | enregistrement d'écran (gpu-screen-recorder) piloté par l'île : préréglages, fenêtres, écrans, zone. Module-script (Python). |
+| [`record`](modules/record/README.md) | enregistrement d'écran (gpu-screen-recorder) piloté par l'île : préréglages, fenêtres, écrans, zone. |
 
 Un module est une application à part, dans `modules/<nom>/`, avec son `README.md`,
 son `AGENTS.md` et sa fiche `module.toml`. Son programme est soit une caisse Rust

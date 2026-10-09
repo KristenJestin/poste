@@ -16,6 +16,7 @@ commands = [
 
 # Ligne posée par `poste sys setup` dans un fichier sans inclusion : le sélecteur de partage
 # d'écran de xdg-desktop-portal-hyprland choisit seul la fenêtre demandée par `poste record`.
+# bin/poste-share-picker est un script court qui lance `poste-record share-picker` (chemin stable).
 [[line]]
 file = "~/.config/hypr/xdph.conf"
 line = "screencopy:custom_picker_binary = {modules}/record/bin/poste-share-picker"

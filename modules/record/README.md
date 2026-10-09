@@ -1,8 +1,10 @@
 # poste record
 
-Enregistrement d'écran avec `gpu-screen-recorder`, piloté par l'île. C'est un module-script
-(Python, `poste-record`) : pas de Rust ici, `poste sys setup` copie le script tel quel dans
-`~/.local/share/poste/modules/record/poste-record`, et `poste record …` l'exécute.
+Enregistrement d'écran avec `gpu-screen-recorder`, piloté par l'île. C'est une caisse Rust
+(`poste-record`, listée dans les `members` du `Cargo.toml` racine) : `poste sys setup` construit le
+binaire en release et l'installe dans `~/.local/share/poste/modules/record/poste-record`, et
+`poste record …` l'exécute. Le script Python d'origine reste dans le dépôt (`poste-record.py`,
+`poste-share-picker.py`) le temps de la validation en vrai ; il n'est pas installé.
 
 ## Commandes
 
@@ -38,7 +40,7 @@ est repéré comme orphelin et retiré par `poste sys setup`. Le format est déc
 | Lanceur de l'île | `island/launcher.json` | extension `record` (mots-clés `rec`, `record`), avec `"highlight": true` : l'île encadre à l'écran la cible sélectionnée |
 | Île (slot `capture`) | `island/island.json`, `island/RecordState.qml` | état de l'enregistrement pour la pastille de capture et sa carte (partagées avec OBS, qui restent dans l'île) |
 | `xdph.conf` | ligne de `module.toml` (`[[line]]`) | `screencopy:custom_picker_binary` vers `bin/poste-share-picker` |
-| Programme annexe | `bin/poste-share-picker` | sélecteur de partage d'écran de xdg-desktop-portal-hyprland : répond seul avec la fenêtre demandée par `poste record` (fichier `pick.json` de moins de 20 s dans `$XDG_RUNTIME_DIR/poste-record`), sinon passe la main à `hyprland-preview-share-picker` |
+| Programme annexe | `bin/poste-share-picker` | sélecteur de partage d'écran de xdg-desktop-portal-hyprland : script court (chemin stable pour la ligne `xdph.conf`) qui lance `poste-record share-picker`. Celui-ci répond seul avec la fenêtre demandée par `poste record` (fichier `pick.json` de moins de 20 s dans `$XDG_RUNTIME_DIR/poste-record`), sinon passe la main à `hyprland-preview-share-picker` (`exec`, mêmes arguments) |
 
 Sans le module, aucune de ces traces n'existe (ni raccourci, ni entrée de lanceur, ni ligne `xdph.conf`).
 `xdg-desktop-portal-hyprland` ne relit sa config qu'au démarrage : après avoir posé ou retiré la
@@ -48,3 +50,27 @@ ligne, redémarrer le portail (`systemctl --user restart xdg-desktop-portal-hypr
 
 - `$XDG_RUNTIME_DIR/poste-record/` : `state.json` (enregistrement en cours), `pick.json`, `last.log`.
 - Notifications : « Recording saved » (un clic ouvre le dossier) ou l'erreur.
+
+## Développement
+
+- `poste-record share-picker` est une sous-commande cachée (appelée par `bin/poste-share-picker`),
+  comme `poste-record --supervise '<json>'`, le superviseur détaché lancé par `start`
+  (`setsid`, il garde gpu-screen-recorder, écrit `state.json`, nettoie et notifie à la fin).
+- Variables d'environnement RÉSERVÉES AUX TESTS : `POSTE_RECORD_GSR` (remplace `gpu-screen-recorder`),
+  `POSTE_RECORD_HYPRCTL` (remplace `hyprctl`), `POSTE_RECORD_NOTIFY` (remplace
+  `omarchy-notification-send`), `POSTE_RECORD_SLURP` (remplace `slurp`).
+- Tests (`cargo test -p poste-record`) :
+  - `tests/parity.rs` et `tests/calc.rs` jouent les mêmes scénarios avec `poste-record.py` et avec le
+    binaire, sur les mêmes faux programmes (`tests/fakes/fake.sh`), et comparent sorties JSON (à
+    l'octet près), arguments de gpu-screen-recorder, notifications et fichiers créés. Sans `python3`,
+    ils sont ignorés.
+  - `tests/cycle.rs` : start, pause, resume, toggle, stop, notification, open-last, hotkey, échec de
+    gpu-screen-recorder, sélecteur de partage, avec un faux gpu-screen-recorder (jamais le vrai).
+- Écarts voulus avec le script Python (tous sans effet sur ses usages) : un pid absent ou nul dans
+  `state.json` n'est jamais signalé (le Python aurait visé son groupe de processus) ; un échec de
+  lancement de gpu-screen-recorder notifie « Recording failed » (le Python s'arrêtait en silence) ;
+  une expression régulière de préréglage invalide ne correspond à aucune fenêtre (le Python
+  plantait) ; une entrée mal formée de `presets.json` (préréglage sans `id`, élément qui n'est pas un
+  objet) est ignorée au lieu de faire échouer `items` ; un drapeau sans valeur (`--preset` en
+  dernier) donne un message et le code 1. Les expressions régulières sont celles de la caisse `regex`
+  (pas de retour arrière ni d'assertions avant/arrière, contrairement à `re`).
