@@ -38,4 +38,4 @@ Lecteur de fond (démon, MPRIS « Musique »), lu aussi par l'île. Les commande
 ## Règles
 - Jamais de sudo : donner la commande à Kris.
 - Ne rien supprimer, écraser ni pousser sans demande claire.
-- Réglages du lanceur : `~/.config/kris-island/launcher/launcher.json`. Code de l'île : `~/.config/omarchy/plugins/kris.island/` (suivi par chezmoi : `chezmoi re-add` après modif).
+- Réglages du lanceur : `~/.config/kris-island/launcher/launcher.json`. Code de l'île : `~/.config/omarchy/plugins/kris.island/` (lien vers le dépôt `~/Projects/poste` : une modif est déjà dans le dépôt, il reste `poste sys git commit` puis `push`).
