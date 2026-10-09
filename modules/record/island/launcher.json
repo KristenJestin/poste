@@ -1,0 +1,32 @@
+{
+  "//": "Extensions du lanceur de l'île fournies par ce module (même format que ~/.config/poste-island/launcher/launcher.json : items, extensions, engines). Fusionné par l'île depuis ~/.local/share/poste/modules/<nom>/island/launcher.json.",
+  "extensions": [
+    {
+      "id": "record",
+      "name": "Record",
+      "subtitle": "Screen recording · presets, windows, screens · SHIFT+PRINT",
+      "icon": "󰑋",
+      "keyword": [
+        "rec",
+        "record"
+      ],
+      "keywords": [
+        "record",
+        "enregistrer",
+        "enregistrement",
+        "capture",
+        "vidéo",
+        "video",
+        "screen",
+        "écran",
+        "unity"
+      ],
+      "ttl": 1,
+      "source": {
+        "type": "script",
+        "command": "poste record items"
+      },
+      "highlight": true
+    }
+  ]
+}

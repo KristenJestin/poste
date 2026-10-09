@@ -1,13 +1,60 @@
 //! `poste sys status` : dépôt, modules installés, fichiers posés.
 
-use crate::config;
 use crate::manifest::Manifest;
 use crate::plan::{self, Item};
 use crate::util::{sha256_file, short};
+use crate::{config, lines, orphans};
 use anyhow::Result;
 use poste_core::Env;
 use std::path::Path;
 use std::process::Command;
+
+/// Lignes posées par les modules dans des fichiers sans inclusion, et orphelins.
+fn print_lines_and_orphans(
+    env: &Env,
+    repo: &Path,
+    layout: Option<&config::Layout>,
+    manifest: &Manifest,
+    items: &[Item],
+) -> Result<()> {
+    let orphan_list = orphans::find(repo, env, layout, manifest, items)?;
+    let vanishing = orphan_list.iter().map(|o| o.path.clone()).collect();
+    let specs = lines::desired(repo, env)?;
+    let steps = lines::plan(&specs, manifest, &vanishing);
+    let ok = steps
+        .iter()
+        .filter(|s| matches!(s.op, lines::Op::Unchanged))
+        .count();
+    println!("\nLignes de module");
+    println!("  en place        {ok}");
+    println!("  conflits        {}", lines::conflicts(&steps));
+    println!(
+        "  à poser/retirer {}",
+        steps.iter().filter(|s| s.writes()).count()
+    );
+    for s in steps
+        .iter()
+        .filter(|s| !matches!(s.op, lines::Op::Unchanged))
+    {
+        println!(
+            "  {:<12} {}  {}  [{}]",
+            lines::label(&s.op),
+            env.display(&s.file),
+            s.line,
+            s.module
+        );
+        if let lines::Op::Conflict(why) | lines::Op::Blocked(why) = &s.op {
+            println!("               {why}");
+        }
+    }
+    println!("\nOrphelins");
+    println!("  à retirer       {}", orphan_list.len());
+    if !orphan_list.is_empty() {
+        orphans::print(env, &orphan_list);
+        println!("  (poste sys setup propose de les retirer)");
+    }
+    Ok(())
+}
 
 /// Sortie texte d'une commande git, `None` si elle échoue.
 fn git(repo: &Path, args: &[&str]) -> Option<String> {
@@ -124,9 +171,11 @@ pub fn run(env: &Env, repo: &Path) -> Result<()> {
                 .count()
         );
     }
-    if let Some(layout) = config::load(repo, env)? {
-        config::print_status(&layout, env, &manifest)?;
+    let layout = config::load(repo, env)?;
+    if let Some(layout) = &layout {
+        config::print_status(layout, env, &manifest)?;
     }
+    print_lines_and_orphans(env, repo, layout.as_ref(), &manifest, &items)?;
     crate::provision::status(env, repo)?;
     Ok(())
 }

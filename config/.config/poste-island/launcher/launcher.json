@@ -62,32 +62,6 @@
   ],
   "extensions": [
     {
-      "id": "record",
-      "name": "Record",
-      "subtitle": "Screen recording · presets, windows, screens · SHIFT+PRINT",
-      "icon": "󰑋",
-      "keyword": [
-        "rec",
-        "record"
-      ],
-      "keywords": [
-        "record",
-        "enregistrer",
-        "enregistrement",
-        "capture",
-        "vidéo",
-        "video",
-        "screen",
-        "écran",
-        "unity"
-      ],
-      "ttl": 1,
-      "source": {
-        "type": "script",
-        "command": "~/.config/omarchy/plugins/poste.island/bin/poste-record items"
-      }
-    },
-    {
       "id": "unity",
       "name": "Unity Projects",
       "subtitle": "Open a project in the editor",
@@ -111,34 +85,6 @@
         "open",
         "proj"
       ]
-    },
-    {
-      "id": "poste-music",
-      "name": "Musique",
-      "subtitle": "Navidrome · recherche, playlists, mixes",
-      "icon": "󰝚",
-      "keywords": [
-        "musique",
-        "navidrome",
-        "playlist",
-        "music",
-        "playlists",
-        "artist",
-        "album",
-        "artiste",
-        "morceau"
-      ],
-      "ttl": 30,
-      "source": {
-        "type": "script",
-        "command": "poste music home --json",
-        "search": "poste music search --json"
-      },
-      "keyword": [
-        "play",
-        "music"
-      ],
-      "rootItems": false
     },
     {
       "id": "ssh",

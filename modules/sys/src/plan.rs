@@ -92,9 +92,16 @@ pub fn desired(repo: &Path, env: &Env) -> Result<Vec<Item>> {
     for m in repo_modules(repo)? {
         let base = env.modules_dir().join(&m.name);
         let prog = format!("poste-{}", m.name);
+        // Module en Rust (Cargo.toml) : binaire construit. Module-script (python, shell…) :
+        // le programme `poste-<nom>` du dossier du module, copié tel quel.
+        let src = if m.dir.join("Cargo.toml").is_file() {
+            release.join(&prog)
+        } else {
+            m.dir.join(&prog)
+        };
         items.push(Item {
             module: m.name.clone(),
-            src: release.join(&prog),
+            src,
             dest: base.join(&prog),
         });
         items.push(Item {
@@ -102,8 +109,8 @@ pub fn desired(repo: &Path, env: &Env) -> Result<Vec<Item>> {
             src: m.dir.join("module.toml"),
             dest: base.join("module.toml"),
         });
-        // Dossiers facultatifs copiés tels quels.
-        for sub in ["island", "hypr"] {
+        // Dossiers facultatifs copiés tels quels (`bin/` : programmes annexes du module).
+        for sub in ["island", "hypr", "bin"] {
             let root = m.dir.join(sub);
             if root.is_dir() {
                 let mut files = Vec::new();

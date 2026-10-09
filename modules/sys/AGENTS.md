@@ -14,3 +14,6 @@
 
 - Bootstrap : `setup` ne lance JAMAIS `sudo` ; les étapes système sont vérifiées puis affichées. Les étapes utilisateur passent par un aperçu et une confirmation, sont idempotentes, et ne touchent jamais ce qui est ambigu (note affichée). Le contenu des fichiers root vit dans `bootstrap/system/`, pas dans le code.
 - Les tests de `provision` n'exécutent aucune étape réelle (pas de systemctl, voxtype, omarchy) ; le faux `pacman -Qq` passe par `POSTE_TEST_PACMAN_QQ`.
+- Lignes de module : jamais modifier ni retirer une ligne absente de `installed.json` (`lines`), jamais écrire à travers un lien symbolique, conflit signalé sans rien écrire.
+- Orphelins : seulement des liens vers `<dépôt>/config/` à cible disparue, ou des fichiers de module de `installed.json` encore intacts ; jamais un fichier ordinaire, toujours aperçu et confirmation.
+- Un module-script n'a pas de `Cargo.toml` et n'est pas dans `members` du `Cargo.toml` racine.

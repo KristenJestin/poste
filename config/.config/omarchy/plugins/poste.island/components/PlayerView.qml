@@ -129,11 +129,11 @@ Item {
           font.family: player.host.uiFont
           font.pixelSize: 15
         }
-        // Qualité du flux (poste music seulement), petite et discrète.
+        // Ligne de détail fournie par un module (slot « player-extra »), petite et discrète.
         Text {
           Layout.fillWidth: true
-          visible: player.host.playerIsPoste && text !== ""
-          text: player.host.posteQuality
+          visible: text !== ""
+          text: player.host.playerDetail
           textFormat: Text.PlainText
           elide: Text.ElideRight
           color: player.host.withAlpha(player.host.colorText, 0.4)
@@ -143,8 +143,8 @@ Item {
         }
         // D'où vient le son : l'appli (icône et nom). Clic : sa fenêtre passe
         // au premier plan (celle de l'onglet qui joue pour un navigateur).
-        // Notre lecteur (poste music) n'a pas de fenêtre : le clic ouvre le
-        // lanceur sur l'extension « poste-music » (ce qui ferme cette vue).
+        // Un lecteur sans fenêtre pris en charge par un module (slot « player-extra ») : le clic
+        // ouvre le lanceur sur l'extension qu'il indique (ce qui ferme cette vue).
         Item {
           id: sourceChip
           readonly property var entry: player.mpris && player.mpris.desktopEntry
@@ -185,8 +185,8 @@ Item {
             hoverEnabled: true
             cursorShape: Qt.PointingHandCursor
             onClicked: {
-              if (player.host.playerIsPoste) {
-                player.host.openLauncherExtOn(player.host.focusedScreen, "poste-music")
+              if (player.host.playerSourceExt !== "") {
+                player.host.openLauncherExtOn(player.host.focusedScreen, player.host.playerSourceExt)
                 return
               }
               var m = player.mpris
@@ -210,14 +210,14 @@ Item {
           }
         }
       }
-      // Cœur (poste music seulement) : ajoute ou retire le morceau des favoris.
+      // Bouton d'action fourni par un module (cœur des favoris, slot « player-extra »).
       Glyph {
         id: heart
-        visible: player.host.playerIsPoste
+        visible: player.host.playerHasAction
         Layout.alignment: Qt.AlignTop
         Layout.topMargin: 6
-        glyph: player.host.posteStarred ? "󰋑" : "󰋕"
-        color: player.host.posteStarred ? player.host.colorAccent : player.host.withAlpha(player.host.colorText, 0.6)
+        glyph: player.host.playerActionGlyph
+        color: player.host.playerActionOn ? player.host.colorAccent : player.host.withAlpha(player.host.colorText, 0.6)
         opacity: heartMouse.pressed ? 0.6 : 1
         fontFamily: player.host.fontFamily
         pixelSize: 22
@@ -229,7 +229,7 @@ Item {
           anchors.fill: parent
           anchors.margins: -8
           cursorShape: Qt.PointingHandCursor
-          onClicked: player.host.posteLikeToggle()
+          onClicked: player.host.playerAction()
         }
       }
       SoundWave {

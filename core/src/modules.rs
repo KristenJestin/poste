@@ -20,6 +20,17 @@ pub struct Card {
     pub description: String,
     #[serde(default)]
     pub commands: Vec<CardCommand>,
+    /// Lignes à poser dans des fichiers sans inclusion (`[[line]]`).
+    #[serde(default)]
+    pub line: Vec<CardLine>,
+}
+
+/// `[[line]]` d'une fiche : une ligne qu'un module veut voir dans un fichier de `~`.
+/// `file` accepte `~/…` ; `line` accepte `{home}` (dossier personnel) et `{modules}` (dossier des modules installés).
+#[derive(Debug, Default, Clone, Deserialize, PartialEq, Eq)]
+pub struct CardLine {
+    pub file: String,
+    pub line: String,
 }
 
 #[derive(Debug, Default, Clone, Deserialize, PartialEq, Eq)]

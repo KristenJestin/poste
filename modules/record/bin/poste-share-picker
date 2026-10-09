@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Sélecteur de partage d'écran pour xdg-desktop-portal-hyprland
-(screencopy:custom_picker_binary dans ~/.config/hypr/xdph.conf).
+(screencopy:custom_picker_binary dans ~/.config/hypr/xdph.conf, ligne posée par poste sys setup d'après le module.toml du module record).
 
-Si bin/poste-record vient de demander une fenêtre (fichier pick.json de moins
+Si `poste record` vient de demander une fenêtre (fichier pick.json de moins
 de 20 s dans $XDG_RUNTIME_DIR/poste-record), répond directement avec cette
 fenêtre, sans rien afficher. Sinon (partage d'écran d'un navigateur, d'OBS…),
 passe la main au sélecteur habituel, hyprland-preview-share-picker.

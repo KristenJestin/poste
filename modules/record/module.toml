@@ -1,0 +1,21 @@
+name = "record"
+description = "Enregistrement d'écran (gpu-screen-recorder) piloté par l'île : préréglages, fenêtres, écrans, zone"
+commands = [
+  { name = "start", description = "démarre : start --preset ID | --window ADDR | --monitor NOM | --region [--audio A]" },
+  { name = "stop", description = "arrête l'enregistrement en cours (le fichier est terminé proprement)" },
+  { name = "pause", description = "met en pause" },
+  { name = "resume", description = "reprend" },
+  { name = "toggle", description = "pause ou reprise" },
+  { name = "status", description = "état en JSON (recording, paused, label, file…)" },
+  { name = "watch", description = "une ligne JSON par changement d'état (pour l'île)" },
+  { name = "items", description = "liste de l'extension « Record » du lanceur (JSON)" },
+  { name = "hotkey", description = "SHIFT+PRINT : arrête l'enregistrement en cours, sinon ouvre le lanceur sur Record" },
+  { name = "open-dir", description = "ouvre le dossier des enregistrements (--preset ID)" },
+  { name = "open-last", description = "ouvre le dernier enregistrement (--preset ID)" },
+]
+
+# Ligne posée par `poste sys setup` dans un fichier sans inclusion : le sélecteur de partage
+# d'écran de xdg-desktop-portal-hyprland choisit seul la fenêtre demandée par `poste record`.
+[[line]]
+file = "~/.config/hypr/xdph.conf"
+line = "screencopy:custom_picker_binary = {modules}/record/bin/poste-share-picker"

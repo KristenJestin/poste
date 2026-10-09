@@ -12,10 +12,22 @@ pub struct Entry {
     pub installed_at: String,
 }
 
+/// Une ligne posée par `poste sys setup` dans un fichier sans inclusion.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct LineEntry {
+    pub file: String,
+    pub line: String,
+    /// Module propriétaire (`config` pour `config/.poste/lines.toml`).
+    pub module: String,
+    pub installed_at: String,
+}
+
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub struct Manifest {
     #[serde(default)]
     pub files: Vec<Entry>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub lines: Vec<LineEntry>,
 }
 
 impl Manifest {
