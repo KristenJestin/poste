@@ -22,6 +22,10 @@ pub struct Config {
     /// Modules du dépôt à ne pas installer sur cette machine (retirés s'ils l'étaient).
     #[serde(default)]
     pub disabled: Vec<String>,
+    /// Paquets (`bootstrap/packages.toml`) et étapes (`bootstrap/steps.toml`, par `id`) que cette
+    /// machine n'installe pas : ni exigés, ni proposés, ni comptés manquants. Rien n'est désinstallé.
+    #[serde(default)]
+    pub skip: Vec<String>,
     /// Surcharges JSON propres à cette machine (`[[override]]`).
     #[serde(default, rename = "override")]
     pub overrides: Vec<Override>,
@@ -65,6 +69,11 @@ impl Config {
         self.disabled.iter().any(|d| d == name)
     }
 
+    /// Cet identifiant (paquet ou étape du bootstrap) est-il ignoré sur cette machine ?
+    pub fn is_skipped(&self, id: &str) -> bool {
+        self.skip.iter().any(|d| d == id)
+    }
+
     /// Dossiers de modules déclarés, `~` développé.
     pub fn module_dirs(&self, env: &Env) -> Vec<PathBuf> {
         self.modules.iter().map(|m| env.expand(m)).collect()
@@ -95,6 +104,13 @@ mod tests {
         assert_eq!(c.local, [".config/hypr/monitors.lua"]);
         assert!(c.is_disabled("record"));
         assert!(!c.is_disabled("music"));
+    }
+
+    #[test]
+    fn skip() {
+        let c = Config::parse("skip = [\"gimp\", \"voxtype-model\"]\n").unwrap();
+        assert!(c.is_skipped("gimp") && !c.is_skipped("autre"));
+        assert!(Config::parse("").unwrap().skip.is_empty());
     }
 
     #[test]

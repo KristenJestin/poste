@@ -135,6 +135,7 @@ Le dépôt est le même partout : pas de profils par machine. Ce qui diffère se
 ```toml
 local = [".config/hypr/monitors.lua"]     # fichiers de config/ que CETTE machine garde à elle
 disabled = ["record"]                      # modules du dépôt à ne pas installer ici
+skip = ["gimp", "omamail"]                 # paquets / étapes du bootstrap ignorés ici
 
 [[override]]                               # JSON : dépôt + quelques valeurs locales
 path = ".config/omarchy/shell.json"
@@ -145,11 +146,16 @@ set = { "idle.lock" = 3600 }
   `status` les liste, `diff <chemin>` montre quand même l'écart. `poste sys local add|remove <chemin>`.
 - `disabled` : ces modules ne sont pas installés ; s'ils l'étaient, `setup` les retire proprement
   (fichiers, `hypr/`, `island/`, lignes posées, unités systemd), avec aperçu. `poste sys module enable|disable <nom>`.
+- `skip` : noms de paquets de `bootstrap/packages.toml` ou `id` d'étapes de `bootstrap/steps.toml` à
+  sauter sur cette machine : ni exigés, ni proposés, ni comptés manquants dans `setup` et `status`
+  (une ligne « ignorés sur cette machine » le rappelle). Une étape qui se déclenche après une étape
+  ignorée l'est aussi. Un identifiant inconnu donne un avertissement. Rien n'est désinstallé.
+  `poste sys skip list|add <id>…|remove <id>…`.
 - `[[override]]` : un fichier JSON de `config/` généré (dépôt + valeurs locales) au lieu d'être lié.
   `poste sys override set <chemin> <clé> <valeur>`.
 
 À faire AVANT le premier `./setup` de la machine (créer le fichier à la main ou lancer
-`poste sys local add` / `module disable` après le premier `./setup --dry-run`), puis suivre « Installer sur un PC neuf ».
+`poste sys local add` / `module disable` / `skip add` après le premier `./setup --dry-run`), puis suivre « Installer sur un PC neuf ».
 Détail et règles : [`modules/sys/README.md`](modules/sys/README.md), « Réglages propres à la machine ».
 
 ## Organisation du dépôt

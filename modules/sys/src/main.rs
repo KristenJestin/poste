@@ -112,6 +112,11 @@ enum Cmd {
         #[command(subcommand)]
         action: Option<ModuleCmd>,
     },
+    /// Paquets et étapes du bootstrap ignorés sur cette machine (config.toml, clé skip)
+    Skip {
+        #[command(subcommand)]
+        action: Option<SkipCmd>,
+    },
     /// Affiche le chemin du dépôt (cd "$(poste sys cd)")
     Cd,
 }
@@ -149,6 +154,22 @@ enum ModuleCmd {
     Enable { name: String },
     /// Désactive un module (retiré au prochain setup, avec aperçu)
     Disable { name: String },
+}
+
+#[derive(Subcommand)]
+enum SkipCmd {
+    /// Liste les identifiants ignorés
+    List,
+    /// Ignore des paquets (packages.toml) ou des étapes (steps.toml) ici ; rien n'est désinstallé
+    Add {
+        #[arg(required = true)]
+        ids: Vec<String>,
+    },
+    /// Cesse d'ignorer ces identifiants
+    Remove {
+        #[arg(required = true)]
+        ids: Vec<String>,
+    },
 }
 
 fn main() -> ExitCode {
@@ -289,6 +310,15 @@ fn run(cli: Cli) -> Result<ExitCode> {
                 ModuleCmd::List => machine::module_list(&env, &repo)?,
                 ModuleCmd::Enable { name } => machine::module_set(&env, &repo, &name, true)?,
                 ModuleCmd::Disable { name } => machine::module_set(&env, &repo, &name, false)?,
+            }
+            Ok(ExitCode::SUCCESS)
+        }
+        Cmd::Skip { action } => {
+            let repo = util::repo(&env, &cfg)?;
+            match action.unwrap_or(SkipCmd::List) {
+                SkipCmd::List => machine::skip_list(&env, &repo)?,
+                SkipCmd::Add { ids } => machine::skip_add(&env, &repo, &ids)?,
+                SkipCmd::Remove { ids } => machine::skip_remove(&env, &ids)?,
             }
             Ok(ExitCode::SUCCESS)
         }

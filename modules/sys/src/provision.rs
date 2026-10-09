@@ -5,7 +5,7 @@
 //! `bootstrap/steps.toml` ; les contenus de fichiers root dans `bootstrap/system/`.
 
 use anyhow::{bail, Context, Result};
-use poste_core::{time, Env};
+use poste_core::{time, Config, Env};
 use serde::Deserialize;
 use std::collections::{BTreeMap, HashSet};
 use std::io::ErrorKind;
@@ -164,6 +164,145 @@ fn load_packages(ctx: &Ctx) -> Result<BTreeMap<String, String>> {
     let f: PackagesFile =
         toml::from_str(&s).with_context(|| format!("lecture de {}", p.display()))?;
     Ok(f.packages)
+}
+
+// ------------------------------------------------------------------ skip
+
+/// Ce que `skip` (config.toml) a retiré du bootstrap de cette machine.
+#[derive(Debug, Default, PartialEq)]
+pub struct Skipped {
+    /// Identifiants retirés (ceux de `skip` qui existent, puis les étapes qui en dépendent).
+    pub ignored: Vec<String>,
+    /// Identifiants de `skip` qui ne sont ni un paquet ni une étape (faute de frappe ?).
+    pub unknown: Vec<String>,
+}
+
+/// Retire des paquets et des étapes ce que `skip` désigne. Une étape utilisateur dont un
+/// `trigger` est sauté est sautée à son tour (elle suppose cette étape : recolorer un plugin
+/// absent échouerait), et ainsi de suite.
+fn apply_skip(
+    skip: &[String],
+    wanted: &mut BTreeMap<String, String>,
+    steps: &mut Steps,
+) -> Skipped {
+    let mut out = Skipped::default();
+    let mut gone: HashSet<String> = HashSet::new();
+    for id in skip {
+        if gone.contains(id) {
+            continue; // doublon
+        }
+        let known = wanted.remove(id).is_some() | step_ids(steps).contains(id.as_str());
+        if known {
+            if gone.insert(id.clone()) {
+                out.ignored.push(id.clone());
+            }
+        } else if !out.unknown.contains(id) {
+            out.unknown.push(id.clone());
+        }
+    }
+    steps.plugin.retain(|s| !gone.contains(&s.id));
+    steps.file.retain(|s| !gone.contains(&s.id));
+    steps.system.retain(|s| !gone.contains(&s.id));
+    steps.manual.retain(|s| !gone.contains(&s.id));
+    steps.user.retain(|s| !gone.contains(&s.id));
+    loop {
+        let dependent: Vec<String> = steps
+            .user
+            .iter()
+            .filter(|u| u.trigger.iter().any(|t| gone.contains(t)))
+            .map(|u| u.id.clone())
+            .collect();
+        if dependent.is_empty() {
+            break;
+        }
+        steps.user.retain(|u| !dependent.contains(&u.id));
+        for d in dependent {
+            gone.insert(d.clone());
+            out.ignored.push(d);
+        }
+    }
+    out
+}
+
+fn step_ids(steps: &Steps) -> HashSet<&str> {
+    steps
+        .plugin
+        .iter()
+        .map(|s| s.id.as_str())
+        .chain(steps.file.iter().map(|s| s.id.as_str()))
+        .chain(steps.user.iter().map(|s| s.id.as_str()))
+        .chain(steps.system.iter().map(|s| s.id.as_str()))
+        .chain(steps.manual.iter().map(|s| s.id.as_str()))
+        .collect()
+}
+
+/// Paquets voulus et étapes, `skip` de la machine appliqué ; avertit des identifiants inconnus.
+fn load_wanted(ctx: &Ctx) -> Result<(BTreeMap<String, String>, Steps, Skipped)> {
+    let cfg = Config::load(ctx.env)?;
+    let mut wanted = load_packages(ctx)?;
+    let mut steps = load_steps(ctx)?;
+    let sk = apply_skip(&cfg.skip, &mut wanted, &mut steps);
+    for u in &sk.unknown {
+        eprintln!(
+            "avertissement : « {u} » (config.toml, skip) n'est ni un paquet de packages.toml ni l'id d'une étape de steps.toml (faute de frappe ?)"
+        );
+    }
+    Ok((wanted, steps, sk))
+}
+
+/// Nature de chaque identifiant que `skip` peut désigner (paquets et étapes du bootstrap).
+pub fn skip_catalog(env: &Env, repo: &Path) -> Result<BTreeMap<String, &'static str>> {
+    let ctx = Ctx::new(env, repo);
+    let steps = load_steps(&ctx)?;
+    let mut out: BTreeMap<String, &'static str> = BTreeMap::new();
+    for k in load_packages(&ctx)?.into_keys() {
+        out.insert(k, "paquet");
+    }
+    let kinds: [(Vec<&str>, &'static str); 5] = [
+        (
+            steps.plugin.iter().map(|s| s.id.as_str()).collect(),
+            "plugin",
+        ),
+        (
+            steps.file.iter().map(|s| s.id.as_str()).collect(),
+            "fichier",
+        ),
+        (
+            steps.user.iter().map(|s| s.id.as_str()).collect(),
+            "étape utilisateur",
+        ),
+        (
+            steps.system.iter().map(|s| s.id.as_str()).collect(),
+            "étape système",
+        ),
+        (
+            steps.manual.iter().map(|s| s.id.as_str()).collect(),
+            "étape manuelle",
+        ),
+    ];
+    for (ids, kind) in kinds {
+        for id in ids {
+            out.entry(id.to_string()).or_insert(kind);
+        }
+    }
+    Ok(out)
+}
+
+/// Effet de `skip` sur ce dépôt, sans avertissement (pour `poste sys skip`).
+pub fn skip_effect(env: &Env, repo: &Path, skip: &[String]) -> Result<Skipped> {
+    let ctx = Ctx::new(env, repo);
+    let mut wanted = load_packages(&ctx)?;
+    let mut steps = load_steps(&ctx)?;
+    Ok(apply_skip(skip, &mut wanted, &mut steps))
+}
+
+fn print_skipped(sk: &Skipped) {
+    if !sk.ignored.is_empty() {
+        println!(
+            "\nignorés sur cette machine (config.toml, skip) : {}",
+            sk.ignored.join(", ")
+        );
+    }
 }
 
 // ------------------------------------------------------------------ utilitaires
@@ -645,21 +784,20 @@ struct Packages {
     total: usize,
 }
 
-fn packages_report(ctx: &Ctx) -> Result<Option<Packages>> {
-    let wanted = load_packages(ctx)?;
+fn packages_report(wanted: &BTreeMap<String, String>) -> Result<Option<Packages>> {
     if wanted.is_empty() {
         return Ok(None);
     }
     let installed = installed_packages()?;
     Ok(Some(Packages {
-        missing: missing_of(&wanted, &installed),
+        missing: missing_of(wanted, &installed),
         total: wanted.len(),
     }))
 }
 
-fn print_packages(ctx: &Ctx) {
+fn print_packages(wanted: &BTreeMap<String, String>) {
     println!("\nPaquets");
-    match packages_report(ctx) {
+    match packages_report(wanted) {
         Err(e) => println!("  vérification impossible : {e:#}"),
         Ok(None) => println!("  aucun paquet déclaré"),
         Ok(Some(p)) if p.missing.is_empty() => println!("  tous présents ({})", p.total),
@@ -757,8 +895,8 @@ pub fn setup(
     confirm: &dyn Fn(&str) -> Result<bool>,
 ) -> Result<Applied> {
     let ctx = Ctx::new(env, repo);
-    let steps = load_steps(&ctx)?;
-    print_packages(&ctx);
+    let (wanted, steps, skipped) = load_wanted(&ctx)?;
+    print_packages(&wanted);
     print_system(&ctx, &steps)?;
     let plan = user_plan(&ctx, &steps)?;
     print_user_plan(&plan);
@@ -774,15 +912,16 @@ pub fn setup(
         }
     }
     print_manual(&ctx, &steps);
+    print_skipped(&skipped);
     Ok(applied)
 }
 
 /// Lignes de `poste sys status` pour paquets, étapes système, utilisateur et manuelles.
 pub fn status(env: &Env, repo: &Path) -> Result<()> {
     let ctx = Ctx::new(env, repo);
-    let steps = load_steps(&ctx)?;
+    let (wanted, steps, skipped) = load_wanted(&ctx)?;
     println!("\nPaquets");
-    match packages_report(&ctx) {
+    match packages_report(&wanted) {
         Err(e) => println!("  vérification impossible : {e:#}"),
         Ok(None) => println!("  aucun paquet déclaré"),
         Ok(Some(p)) if p.missing.is_empty() => println!("  tous présents ({})", p.total),
@@ -830,6 +969,7 @@ pub fn status(env: &Env, repo: &Path) -> Result<()> {
     for m in manual {
         println!("  à faire  [{}] {}", m.id, ctx.sub(&m.title));
     }
+    print_skipped(&skipped);
     Ok(())
 }
 
@@ -1070,5 +1210,86 @@ run = [["false"]]
         let r = apply_user(&plan);
         assert_eq!(r.done, vec!["a", "apres"]);
         assert!(r.failed.is_empty() && marker.is_file());
+    }
+
+    #[test]
+    fn skip_retire_paquets_etapes_et_dependantes() {
+        let mut steps: Steps = toml::from_str(
+            r#"
+[[plugin]]
+id = "pl"
+url = "u"
+commit = "c"
+[[file]]
+id = "cfg"
+title = "t"
+target = "/x"
+source = "s"
+[[user]]
+id = "recolor"
+title = "t"
+trigger = ["cfg", "pl"]
+[[user]]
+id = "apres-recolor"
+title = "t"
+trigger = ["recolor"]
+[[user]]
+id = "autre"
+title = "t"
+trigger = ["cfg"]
+[[user]]
+id = "libre"
+title = "t"
+[[system]]
+id = "sy"
+title = "t"
+[[manual]]
+id = "ma"
+title = "t"
+"#,
+        )
+        .unwrap();
+        let mut wanted: BTreeMap<String, String> = [("gimp", ""), ("vlc", "")]
+            .iter()
+            .map(|(k, v)| (k.to_string(), v.to_string()))
+            .collect();
+        let skip: Vec<String> = ["gimp", "pl", "sy", "ma", "gimp", "faute", "faute"]
+            .iter()
+            .map(|s| s.to_string())
+            .collect();
+        let sk = apply_skip(&skip, &mut wanted, &mut steps);
+        assert_eq!(wanted.keys().collect::<Vec<_>>(), ["vlc"]);
+        assert!(steps.plugin.is_empty() && steps.system.is_empty() && steps.manual.is_empty());
+        let users: Vec<&str> = steps.user.iter().map(|u| u.id.as_str()).collect();
+        assert_eq!(users, ["autre", "libre"], "autre dépend de cfg, non sauté");
+        assert_eq!(steps.file.len(), 1, "cfg n'est pas sauté");
+        assert_eq!(
+            sk.ignored,
+            ["gimp", "pl", "sy", "ma", "recolor", "apres-recolor",]
+        );
+        assert_eq!(sk.unknown, ["faute"]);
+    }
+
+    #[test]
+    fn skip_de_config_toml_pris_en_compte() {
+        let (_d, repo, env) = fixture();
+        write(
+            &repo,
+            "packages.toml",
+            "[packages]\ngimp = \"x\"\nvlc = \"y\"\n",
+        );
+        write(
+            &repo,
+            "steps.toml",
+            "[[manual]]\nid = \"m1\"\ntitle = \"m1\"\n[[manual]]\nid = \"m2\"\ntitle = \"m2\"\n",
+        );
+        fs::create_dir_all(env.config_file().parent().unwrap()).unwrap();
+        fs::write(env.config_file(), "skip = [\"gimp\", \"m1\", \"zzz\"]\n").unwrap();
+        let ctx = Ctx::new(&env, &repo);
+        let (wanted, steps, sk) = load_wanted(&ctx).unwrap();
+        assert_eq!(wanted.keys().collect::<Vec<_>>(), ["vlc"]);
+        assert_eq!(manual_pending(&ctx, &steps).len(), 1);
+        assert_eq!(sk.ignored, ["gimp", "m1"]);
+        assert_eq!(sk.unknown, ["zzz"]);
     }
 }

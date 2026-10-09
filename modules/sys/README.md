@@ -31,6 +31,7 @@ Module de gestion du dépôt `poste`. Toujours installé. Le dépôt est repér�
 - `poste sys local [list|add <chemin>|remove <chemin>]` : fichiers de `config/` que CETTE machine garde
   à elle (voir « Réglages propres à la machine »).
 - `poste sys module [list|enable <nom>|disable <nom>]` : modules du dépôt non installés ici.
+- `poste sys skip [list|add <id>…|remove <id>…]` : paquets et étapes du bootstrap ignorés ici.
 - `poste sys override [list|set <chemin> <clé> <valeur>|unset <chemin> <clé>]` : surcharges JSON par machine.
 - `poste sys git <args…>` : `git -C <dépôt> <args…>`.
 - `poste sys cd` : affiche le chemin du dépôt (`cd "$(poste sys cd)"`).
@@ -50,18 +51,19 @@ Module de gestion du dépôt `poste`. Toujours installé. Le dépôt est repér�
 ## Réglages propres à la machine
 
 Le dépôt est le même sur tous les PC (pas de profils par machine). Ce qui diffère d'une machine à
-l'autre vit dans `~/.config/poste/config.toml`, LOCAL à la machine et jamais dans le dépôt. Trois clés :
+l'autre vit dans `~/.config/poste/config.toml`, LOCAL à la machine et jamais dans le dépôt. Quatre clés :
 
 ```toml
 local = [".config/hypr/monitors.lua", ".config/hypr/input.lua"]   # fichiers à cette machine
 disabled = ["record", "power"]                                      # modules non installés ici
+skip = ["gimp", "io.github.grichard99.omaproton-vpn"]               # paquets / étapes du bootstrap ignorés ici
 
 [[override]]                                                        # JSON : dépôt + valeurs locales
 path = ".config/omarchy/shell.json"
 set = { "idle.lock" = 3600 }
 ```
 
-Les trois s'éditent sans ouvrir le fichier (commentaires et autres clés conservés).
+Les quatre s'éditent sans ouvrir le fichier (commentaires et autres clés conservés).
 
 ### `local` : fichiers à la machine
 
@@ -74,6 +76,21 @@ Les trois s'éditent sans ouvrir le fichier (commentaires et autres clés conser
 - `local add <chemin>` refuse un chemin que `config/` ne connaît pas. S'il est encore un lien vers le
   dépôt, il est laissé tel quel (l'éditer modifierait le dépôt) : `poste sys forget <chemin>` en fait
   un fichier ordinaire. `local remove` remet le chemin sous gestion (conflit à trancher s'il diffère).
+
+### `skip` : paquets et étapes du bootstrap ignorés
+
+- Un identifiant est un nom de paquet de `bootstrap/packages.toml` ou l'`id` d'une étape de
+  `bootstrap/steps.toml` (`[[plugin]]`, `[[file]]`, `[[user]]`, `[[system]]`, `[[manual]]`).
+- Ce qui est ignoré n'est ni exigé, ni proposé, ni compté comme manquant dans `setup`,
+  `setup --dry-run` et `status`, qui ajoutent une ligne
+  `ignorés sur cette machine (config.toml, skip) : …`.
+- Dépendances : une étape utilisateur dont un `trigger` est ignoré l'est aussi (par ex.
+  `cursor-accent-recolor` quand `io.github.smoothpixels.cursor-accent` ou `cursor-accent-config`
+  est dans `skip`), en cascade. `requires` désigne un binaire, pas une étape : non concerné.
+- Un identifiant inconnu (faute de frappe) donne un avertissement, pas une erreur ; `skip add` l'ajoute
+  quand même. `skip remove` échoue si un identifiant n'y est pas (les autres sont retirés).
+- Rien n'est désinstallé : poste n'a jamais lancé pacman, et un plugin ou un fichier déjà posé reste.
+  `poste sys done` reste utilisable sur une étape ignorée.
 
 ### `disabled` : modules non installés
 

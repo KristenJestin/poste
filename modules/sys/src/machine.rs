@@ -6,6 +6,7 @@
 use crate::config;
 use crate::ojson::{self, J};
 use crate::plan;
+use crate::provision;
 use anyhow::{bail, Context, Result};
 use poste_core::{Config, Env};
 use std::path::Path;
@@ -379,6 +380,88 @@ pub fn module_set(env: &Env, repo: &Path, name: &str, enable: bool) -> Result<()
     Ok(())
 }
 
+// ---------------------------------------------------------------- skip
+
+/// `poste sys skip` : identifiants ignorés et ce qu'ils font sauter.
+pub fn skip_list(env: &Env, repo: &Path) -> Result<()> {
+    let cfg = Config::load(env)?;
+    if cfg.skip.is_empty() {
+        println!("Rien d'ignoré : tout le bootstrap s'applique (poste sys skip add <paquet ou id d'étape>…).");
+        return Ok(());
+    }
+    let catalog = provision::skip_catalog(env, repo)?;
+    println!("Ignorés sur cette machine (config.toml, clé skip)");
+    for id in &cfg.skip {
+        match catalog.get(id) {
+            Some(kind) => println!("  {id:<40} {kind}"),
+            None => println!("  {id:<40} inconnu du bootstrap (faute de frappe ?)"),
+        }
+    }
+    let eff = provision::skip_effect(env, repo, &cfg.skip)?;
+    let deps: Vec<&String> = eff
+        .ignored
+        .iter()
+        .filter(|i| !cfg.skip.contains(i))
+        .collect();
+    if !deps.is_empty() {
+        println!(
+            "  sautées avec eux (elles en dépendent) : {}",
+            deps.iter()
+                .map(|d| d.as_str())
+                .collect::<Vec<_>>()
+                .join(", ")
+        );
+    }
+    Ok(())
+}
+
+/// `poste sys skip add <id>…` : un identifiant inconnu est ajouté quand même, avec un avertissement.
+pub fn skip_add(env: &Env, repo: &Path, ids: &[String]) -> Result<()> {
+    let file = env.config_file();
+    let catalog = provision::skip_catalog(env, repo)?;
+    for id in ids {
+        let known = catalog.get(id);
+        if known.is_none() {
+            eprintln!("avertissement : « {id} » n'est ni un paquet de packages.toml ni l'id d'une étape de steps.toml (faute de frappe ?)");
+        }
+        let changed = edit_list(&file, "skip", id, true)?;
+        let tag = if changed {
+            "ignoré ici"
+        } else {
+            "déjà ignoré"
+        };
+        match known {
+            Some(kind) => println!("{id} : {tag} ({kind}, {}).", env.display(&file)),
+            None => println!("{id} : {tag} ({}).", env.display(&file)),
+        }
+    }
+    println!("  setup et status ne l'exigent, ne le proposent ni ne le comptent plus manquant. Rien n'est désinstallé.");
+    Ok(())
+}
+
+/// `poste sys skip remove <id>…` : les identifiants absents de `skip` font échouer la commande,
+/// après avoir retiré les autres.
+pub fn skip_remove(env: &Env, ids: &[String]) -> Result<()> {
+    let file = env.config_file();
+    let mut absent = Vec::new();
+    for id in ids {
+        if edit_list(&file, "skip", id, false)? {
+            println!("{id} : n'est plus ignoré.");
+        } else {
+            absent.push(id.as_str());
+        }
+    }
+    if !absent.is_empty() {
+        bail!(
+            "pas dans skip ({}) : {}",
+            env.display(&file),
+            absent.join(", ")
+        );
+    }
+    println!("  Le prochain setup le remet au bootstrap.");
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -457,6 +540,34 @@ mod tests {
         assert_eq!(Config::load(&env).unwrap().disabled, ["record"]);
         module_set(&env, &repo, "record", true).unwrap();
         assert!(Config::load(&env).unwrap().disabled.is_empty());
+    }
+
+    #[test]
+    fn skip_add_remove_list() {
+        let (_d, repo, env) = repo_et_home();
+        fs::create_dir_all(repo.join("bootstrap")).unwrap();
+        fs::write(
+            repo.join("bootstrap/packages.toml"),
+            "[packages]\ngimp = \"x\"\n",
+        )
+        .unwrap();
+        fs::write(
+            repo.join("bootstrap/steps.toml"),
+            "[[manual]]\nid = \"m1\"\ntitle = \"t\"\n",
+        )
+        .unwrap();
+        fs::create_dir_all(env.config_file().parent().unwrap()).unwrap();
+        fs::write(env.config_file(), "# perso\nrepo = \"/r\"\n").unwrap();
+        skip_add(&env, &repo, &["gimp".into(), "m1".into(), "typo".into()]).unwrap();
+        skip_add(&env, &repo, &["gimp".into()]).unwrap(); // idempotent
+        let t = fs::read_to_string(env.config_file()).unwrap();
+        assert!(t.contains("# perso") && t.contains("repo = \"/r\""));
+        assert_eq!(Config::parse(&t).unwrap().skip, ["gimp", "m1", "typo"]);
+        skip_list(&env, &repo).unwrap();
+        assert!(skip_remove(&env, &["gimp".into(), "absent".into()]).is_err());
+        assert_eq!(Config::load(&env).unwrap().skip, ["m1", "typo"]);
+        skip_remove(&env, &["m1".into(), "typo".into()]).unwrap();
+        assert!(Config::load(&env).unwrap().skip.is_empty());
     }
 
     #[test]
