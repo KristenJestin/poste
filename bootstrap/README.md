@@ -1,6 +1,7 @@
 # bootstrap : la machine décrite en données
 
-Lu par `poste sys setup` (aperçu), `poste sys status` et `poste sys done`. Rien ici n'est un script.
+Lu par `poste sys setup` (aperçu), `poste sys status` et `poste sys done`. Rien ici n'est un script,
+sauf `icons/poste-icons.py`, lancé par une étape utilisateur.
 
 | Fichier | Contenu |
 | --- | --- |
@@ -9,6 +10,7 @@ Lu par `poste sys setup` (aperçu), `poste sys status` et `poste sys done`. Rien
 | `system/` | contenus des fichiers root (`@USER@`, `@UID@`, `@GID@`, `@HOME@` y sont remplacés) |
 | `files/` | contenus de fichiers utilisateur posés par poste (config de cursor-accent) |
 | `patches/` | patchs locaux de plugins tiers, appliqués par `git apply` |
+| `icons/` | icônes Tabler à la place des glyphes Nerd Font dans le shell : table, police générée, règle fontconfig (voir [`icons/README.md`](icons/README.md)) |
 
 Familles d'étapes (détail et commentaires dans `steps.toml`) :
 

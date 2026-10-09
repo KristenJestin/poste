@@ -1,0 +1,332 @@
+# Glyphes Nerd Font utilisés par Omarchy et ses plugins -> icônes Tabler.
+# Source unique de la police « Poste Nerd Font » du shell et de Glyphs.js de l'île (poste-icons.py).
+# Colonnes (tabulations) : code, tabler, plein, île, nom Nerd, où.
+#   tabler : nom de l'icône Tabler ; « - » = glyphe gardé tel quel (pas d'équivalent correct).
+#   plein  : 1 = variante pleine de Tabler (commandes média, cœur plein…).
+#   île    : vide = même icône dans l'île ; sinon le nom que l'île garde (sens propre à l'île).
+#   où     : fichiers qui l'utilisent (menu = omarchy-menu.jsonc), pour mémoire.
+E302	-	0		weather-day_cloudy	panels/weather
+E308	cloud-rain	0		weather-day_rain	panels/weather
+E30A	cloud-snow	0		weather-day_snow	panels/weather
+E30D	sun	0		weather-day_sunny	panels/weather
+E313	cloud-fog	0		weather-fog	panels/weather
+E318	cloud-rain	0		weather-rain	panels/weather
+E31A	snowflake	0		weather-snow	panels/weather
+E31D	cloud-storm	0		weather-thunderstorm	panels/weather
+E327	cloud-snow	0		weather-night_alt_snow	panels/weather
+E32B	moon-stars	0		weather-night_clear	panels/weather
+E32E	-	0		weather-night_cloudy	panels/weather
+E333	cloud-rain	0		weather-night_rain	panels/weather
+E33D	cloud	0		weather-cloud	panels/weather
+E346	haze-moon	0		weather-night_fog	panels/weather
+E383	clock	0		weather-time_2	menu
+E3AD	cloud-snow	0		weather-sleet	panels/weather
+E615	settings	0		seti-config	menu
+E627	brand-golang	0		seti-go	menu
+E62A	layout-grid	0		custom-windows	menu
+E62B	-	0		custom-vim	menu
+E62D	-	0		seti-elixir	menu
+E638	volume	0		seti-audio	menu
+E659	typography	0		seti-font	menu
+E6AE	-	0		custom-neovim	menu
+E707	brand-dropbox	0		dev-dropbox	menu,panels/dropbox
+E737	-	0		dev-scala	menu
+E738	-	0		dev-java	menu
+E73C	brand-python	0		dev-python	menu
+E73D	brand-php	0		dev-php	menu
+E73F	brand-laravel	0		dev-laravel	menu
+E757	brand-symfony	0		dev-symfony_badge	menu
+E768	-	0		dev-clojure	menu
+E76F	-	0		dev-bun	menu
+E77F	-	0		dev-dotnet	menu
+E781	brand-javascript	0		dev-javascript_badge	menu
+E795	terminal-2	0		dev-terminal	menu
+E7A8	brand-rust	0		dev-rust	menu
+E7C0	brand-deno	0		dev-denojs	menu
+E7F0	brand-google	0		dev-google	menu
+E84E	-	0		dev-ocaml	menu
+E860	-	0		dev-phoenix	menu
+E8DA	brand-vscode	0		dev-vscode	menu
+E8EF	-	0		dev-zig	menu
+E900	-	0		dev-cobol	menu (police omarchy, iconFont)
+E901	-	0		dev-cpanel	menu (police omarchy, iconFont)
+E902	-	0		dev-datadog	menu (police omarchy, iconFont)
+E903	-	0		dev-datatables	menu (police omarchy, iconFont)
+E904	-	0		dev-delphi	menu (police omarchy, iconFont)
+E905	-	0		dev-detaspace	menu (police omarchy, iconFont)
+E906	-	0		dev-discloud	menu (police omarchy, iconFont)
+E907	-	0		dev-dovecot	menu (police omarchy, iconFont)
+E908	-	0		dev-duckdb	menu (police omarchy, iconFont)
+E90A	-	0		dev-dynatrace	menu (police omarchy, iconFont)
+E90B	-	0		dev-entityframeworkcore	menu (police omarchy, iconFont)
+E90C	-	0		dev-expo	menu (police omarchy, iconFont)
+E90D	-	0		dev-fiber	menu (police omarchy, iconFont)
+EA74	info-circle	0		cod-info	menu
+EA78	device-desktop-down	0		cod-desktop_download	menu
+EA7B	file	0		cod-file	io.github.honeyspoons.localsend,menu
+EB01	world	0		cod-globe	menu,panels/tailscale
+EB11	key	0		cod-key	menu
+EBA2	server-cog	0		cod-server_process	menu
+EBCF	wand	0		cod-wand	menu
+EC12	microphone	0		cod-mic	menu
+EC19	cpu	0		cod-chip	menu
+EC81	-	0		cod-openai	poste.island,poste.notifications
+EC82	-	0		cod-claude	poste.island,poste.notifications
+ED0D	brand-nodejs	0		fa-node_js	menu
+ED3E	brand-xbox	0		fa-xbox	menu
+EEE8	volume-3	0		fa-volume_xmark	osd,panels/audio
+EF70	tools	0		fa-screwdriver_wrench	menu
+EF94	-	0		fa-battle_net	menu
+EFBA	mouse	0		fa-computer_mouse	menu
+F004	heart	0		fa-heart	menu
+F005	star	0		fa-star	menu
+F00C	check	0		fa-check	bar
+F011	power	0		fa-power_off	menu
+F021	refresh	0		fa-refresh	bar,menu
+F023	lock	0		fa-lock	extensions,menu,polkit
+F026	volume-4	0		fa-volume_off	osd,panels/audio
+F027	volume-2	0		fa-volume_low	osd,panels/audio
+F028	volume	0		fa-volume_up	osd,panels/audio
+F030	camera	0		fa-camera	menu
+F03A	list	0		fa-list	menu
+F03D	video	0		fa-video_camera	menu
+F03E	photo	0		fa-picture_o	menu
+F040	pencil	0		fa-pencil	menu
+F041	map-pin	0		fa-map_marker	panels/weather
+F043	droplet	0		fa-tint	menu
+F044	edit	0		fa-pencil_square_o	menu
+F047	arrows-move	0		fa-arrows_up_down_left_right	menu
+F053	chevron-left	0		fa-chevron_left	bar
+F06E	eye	0		fa-eye	bar
+F07C	folder-open	0		fa-folder_open	menu
+F07F	clipboard	0		fa-clipboard_alt	io.github.honeyspoons.localsend,menu
+F08D	pin	0		fa-thumbtack	bar
+F0DB	layout-columns	0		fa-table_columns	menu
+F0E2	arrow-back-up	0		fa-undo	menu
+F114	folder	0		fa-folder_o	io.github.honeyspoons.localsend,menu
+F118	mood-smile	0		fa-smile_o	menu
+F11B	device-gamepad	0		fa-gamepad	menu
+F11C	keyboard	0		fa-keyboard_o	menu
+F15C	file-text	0		fa-file_text	menu
+F1B6	brand-steam	0		fa-steam	menu
+F21F	brand-docker	0		fa-docker	menu
+F245	pointer	0		fa-mouse_pointer	menu
+F268	brand-chrome	0		fa-chrome	menu
+F269	brand-firefox	0		fa-firefox	menu
+F2D0	app-window	0		fa-window_maximize	menu
+F359	-	0		linux-hyprland	menu
+F405	book	0		oct-book	menu
+F46A	restore	0		oct-sync	menu
+F487	package	0		oct-package	menu
+F488	browser	0		oct-browser	menu
+F489	terminal-2	0		oct-terminal	menu
+F4B8	brand-github-copilot	0		oct-copilot	menu
+F50E	share	0		oct-share	io.github.honeyspoons.localsend,menu
+F835	-	0		?	menu
+F0032	brand-android	0		md-android	panels/tailscale
+F0035	brand-apple	0		md-apple	panels/tailscale
+F003B	layout-grid	0		md-apps	menu,poste.island
+F0045	arrow-down	0		md-arrow_down	menu
+F004D	arrow-left	0		md-arrow_left	menu,poste.island
+F0054	arrow-right	0		md-arrow_right	menu,poste.island
+F005D	arrow-up	0		md-arrow_up	menu
+F0079	battery-vertical-4	0	battery-4	md-battery	menu,panels/power,poste.island
+F007A	battery-vertical-1	0	battery-1	md-battery_10	panels/power,poste.island
+F007B	battery-vertical-1	0	battery-1	md-battery_20	panels/power,poste.island
+F007C	battery-vertical-2	0	battery-1	md-battery_30	panels/power,poste.island
+F007D	battery-vertical-2	0	battery-2	md-battery_40	panels/power,poste.island
+F007E	battery-vertical-2	0	battery-2	md-battery_50	panels/power,poste.island
+F007F	battery-vertical-3	0	battery-2	md-battery_60	panels/power,poste.island
+F0080	battery-vertical-3	0	battery-4	md-battery_70	panels/power,poste.island
+F0081	battery-vertical-3	0	battery-4	md-battery_80	panels/power,poste.island
+F0082	battery-vertical-4	0	battery-4	md-battery_90	panels/power,poste.island
+F0084	battery-vertical-charging	0	battery-charging	md-battery_charging	panels/power,poste.island
+F0085	battery-vertical-charging	0		md-battery_charging_100	panels/power
+F0086	battery-vertical-charging	0		md-battery_charging_20	panels/power
+F0087	battery-vertical-charging	0		md-battery_charging_30	panels/power
+F0088	battery-vertical-charging	0		md-battery_charging_40	panels/power
+F0089	battery-vertical-charging	0		md-battery_charging_60	panels/power
+F008A	battery-vertical-charging	0		md-battery_charging_80	panels/power
+F008B	battery-vertical-charging	0		md-battery_charging_90	panels/power
+F008E	battery-vertical	0	battery	md-battery_outline	poste.island
+F009A	bell	0		md-bell	notifications,poste.island,poste.notifications
+F009B	bell-off	0		md-bell_off	bar,menu
+F009E	bell-ringing	0	bell	md-bell_ring	poste.island
+F00AF	bluetooth	0		md-bluetooth	menu,panels/audio,panels/bluetooth,poste.island
+F00B1	bluetooth-connected	0		md-bluetooth_connect	panels/bluetooth,poste.island
+F00B2	bluetooth-off	0		md-bluetooth_off	panels/bluetooth,poste.island
+F00B5	blur	0		md-blur	menu
+F00C9	color-picker	0		md-border_color	menu
+F00EC	calculator	0		md-calculator	poste.island
+F00ED	calendar	0		md-calendar	panels/clock
+F0100	camera	0		md-camera	panels/audio
+F012C	check	0		md-check	io.github.grichard99.omaproton-vpn,menu,panels/monitor,panels/network,poste.island
+F0140	chevron-down	0		md-chevron_down	Ui
+F0141	chevron-left	0		md-chevron_left	panels/clock,poste.island
+F0142	chevron-right	0		md-chevron_right	panels/clock,poste.island
+F014C	clipboard	0		md-clipboard_outline	clipboard
+F014D	clipboard-text	0	clipboard	md-clipboard_text	poste.island
+F0156	x	0		md-close	menu,poste.island,poste.notifications
+F0159	circle-x	0		md-close_circle	panels/bluetooth,panels/network
+F015B	network-off	0		md-close_network	poste.island
+F015F	cloud	0		md-cloud	menu
+F0176	coffee	0		md-coffee	bar,menu
+F018D	terminal-2	0		md-console	poste.island
+F018F	copy	0		md-content_copy	io.github.grichard99.omaproton-vpn,menu,panels/tailscale,poste.island
+F0192	clipboard-text	0		md-content_paste	poste.island
+F01B4	trash	0		md-delete	poste.island
+F01BD	hand-click	0		md-cursor_pointer	menu
+F01C5	device-desktop	0		md-desktop_tower	menu
+F01D6	server-2	0		md-dns	menu
+F01DA	download	0		md-download	io.github.grichard99.omaproton-vpn,poste.island
+F01E9	brand-edge	0		md-microsoft_edge	menu
+F01EE	mail	0		md-email	poste.island
+F0200	network	0		md-ethernet	panels/network,poste.island
+F0209	eye-off	0		md-eye_off	emojis,menu,poste.island
+F0211	player-track-next	1		md-fast_forward	poste.island
+F0214	file	0		md-file	io.github.honeyspoons.localsend,panels/dropbox,poste.island
+F0219	file-text	0		md-file_document	io.github.honeyspoons.localsend,panels/dropbox
+F022B	movie	0		md-file_video	io.github.honeyspoons.localsend,panels/dropbox
+F0237	fingerprint	0		md-fingerprint	lock,menu
+F0249	device-floppy	0		md-floppy	menu
+F024B	folder	0		md-folder	poste.island
+F024D	folder-down	0	folder-open	md-folder_download	poste.island
+F0256	folder	0	folder-open	md-folder_outline	poste.island
+F0297	device-gamepad-2	0		md-gamepad_variant	poste.island
+F029A	scale	0		md-gauge	panels/power
+F02AD	brand-google	0		md-google	menu
+F02AF	brand-chrome	0		md-google_chrome	menu
+F02B4	device-gamepad-2	0		md-google_controller	poste.island
+F02CA	database	0		md-harddisk	menu
+F02CB	headphones	0		md-headphones	panels/audio,poste.island
+F02CE	headset	0		md-headset	poste.island
+F02D1	heart	1		md-heart	menu,poste.island
+F02D5	heart	0		md-heart_outline	poste.island
+F02E9	photo	0		md-image	io.github.honeyspoons.localsend,panels/dropbox,poste.island
+F0306	key	0		md-key	bar,io.github.grichard99.omaproton-vpn
+F030B	key	0		md-key_variant	panels/dropbox
+F030C	keyboard	0		md-keyboard	menu,osd,poste.island
+F032A	leaf	0		md-leaf	panels/power
+F033D	-	0		md-linux	panels/tailscale
+F033E	lock	0		md-lock	panels/network,poste.island
+F0342	login	0		md-login	poste.island
+F0343	logout	0		md-logout	io.github.grichard99.omaproton-vpn,menu,osd
+F0349	search	0		md-magnify	poste.island
+F035C	menu-2	0		md-menu	menu
+F036C	microphone	0		md-microphone	bar,osd,panels/audio,poste.island
+F036D	microphone-off	0		md-microphone_off	bar,osd,panels/audio,poste.island
+F0372	brand-windows	0		md-microsoft	menu,panels/tailscale
+F0373	brand-minecraft	0		md-minecraft	menu
+F0379	device-desktop	0		md-monitor	menu,osd,panels/audio,panels/monitor,poste.island
+F037A	devices-pc	0		md-monitor_multiple	panels/monitor
+F037D	mouse	0		md-mouse	poste.island
+F039E	notes	0		md-note_text	menu
+F03CC	external-link	0		md-open_in_new	poste.island
+F03D3	package	0		md-package	menu
+F03D6	box	0		md-package_variant	menu
+F03E4	player-pause	1		md-pause	crmne.mpris,osd,poste.island,services
+F03F2	device-mobile	0		md-phone	poste.island
+F0403	pin	0		md-pin	poste.island
+F040A	player-play	1		md-play	crmne.mpris,osd,poste.island,services
+F0415	plus	0		md-plus	poste.island
+F0425	power	0		md-power	extensions,menu,osd,poste.island
+F0431	puzzle	0		md-puzzle	menu
+F0432	qrcode	0		md-qrcode	menu,panels/network
+F044B	circle-dot	0		md-record_rec	poste.island
+F0450	refresh	0	rotate	md-refresh	Ui,poste.island
+F0453	reload	0		md-reload	menu
+F045F	player-track-prev	1		md-rewind	poste.island
+F0483	shield-half	0	shield-x	md-security	panels/tailscale,poste.island
+F048A	send	0		md-send	panels/tailscale,poste.island
+F0497	share	0		md-share_variant	io.github.grichard99.omaproton-vpn
+F0498	shield	0	shield-check	md-shield	poste.island
+F04AD	player-skip-forward	1		md-skip_next	crmne.mpris,osd,poste.island,services
+F04AE	player-skip-back	1		md-skip_previous	crmne.mpris,osd,poste.island,services
+F04B2	zzz	0	moon	md-sleep	menu,poste.island
+F04C3	device-speaker	0		md-speaker	panels/audio,poste.island
+F04C5	gauge	0		md-speedometer	menu,panels/network,panels/power,poste.island
+F04C7	brand-spotify	0		md-spotify	menu
+F04CE	star	0		md-star	poste.island
+F04DB	player-stop	1		md-stop	poste.island
+F050E	contrast	0		md-theme_light_dark	bar,menu
+F051B	stopwatch	0		md-timer_outline	poste.island
+F051F	hourglass	0		md-timer_sand	bar,poste.island
+F052B	traffic-lights	0		md-traffic_light	menu
+F0567	video	0		md-video	poste.island
+F057E	volume	0		md-volume_high	panels/audio,poste.island
+F057F	volume-4	0		md-volume_low	poste.island
+F0580	volume-2	0		md-volume_medium	poste.island
+F0581	volume-off	0		md-volume_off	poste.island
+F0582	shield-lock	0	plug-connected-x	md-vpn	panels/tailscale,poste.island
+F059F	world	0		md-web	menu,poste.island
+F05AA	wifi-off	0		md-wifi_off	poste.island
+F05AF	app-window	0		md-window_maximize	poste.island
+F05BA	device-gamepad	0		md-microsoft_xbox_controller	menu
+F05C4	file-zip	0		md-zip_box	poste.island
+F0633	command	0		md-apple_keyboard_command	poste.island
+F066F	brand-discord	0		md-discord	menu
+F06A9	robot	0		md-robot	hooks,menu,poste.island
+F06C4	asterisk	0		md-asterisk	menu
+F06E4	infinity	0		md-infinity	menu
+F06E7	device-laptop-off	0		md-laptop_off	menu
+F06F3	network	0		md-network	menu
+F0709	rotate-clockwise	0		md-restart	menu,osd,poste.island
+F0741	hand-finger	0		md-gesture_tap	osd
+F075A	music	0		md-music	crmne.mpris,osd,poste.island,services
+F075F	volume-3	0	volume-off	md-volume_mute	panels/audio,poste.island
+F0785	mood-wink	0		md-sticker_emoji	menu
+F07C0	device-desktop	0		md-desktop_classic	panels/tailscale,poste.island
+F07F5	password	0		md-form_textbox_password	menu
+F07F8	-	0		md-trackpad	menu,osd
+F0868	brand-docker	0		md-docker	menu
+F0881	-	0		md-onepassword	menu
+F088C	alarm	0		md-reminder	bar,menu
+F089C	battery-vertical-charging	0		md-battery_charging_10	panels/power
+F089D	battery-vertical-charging	0		md-battery_charging_50	panels/power
+F089E	battery-vertical-charging	0		md-battery_charging_70	panels/power
+F08B9	screen-share	0		md-remote_desktop	menu
+F08C0	server	0		md-ssh	menu,poste.island
+F08C7	-	0		md-arch	menu
+F0901	moon	0		md-power_cycle	menu
+F091F	wifi-0	0		md-wifi_strength_1	panels/network,poste.island
+F0922	wifi-1	0		md-wifi_strength_2	panels/network,poste.island
+F0925	wifi-2	0		md-wifi_strength_3	panels/network,poste.island
+F0928	wifi	0		md-wifi_strength_4	panels/network,poste.island
+F092E	wifi-off	0		md-wifi_strength_off_outline	panels/network,poste.island
+F092F	wifi-0	0		md-wifi_strength_outline	panels/network,poste.island
+F0930	pinned-off	0		md-pin_off_outline	poste.island
+F0931	pin	0	pinned-off	md-pin_outline	poste.island
+F0966	file-download	0		md-file_download_outline	io.github.honeyspoons.localsend,menu
+F0996	progress	0		md-progress_clock	Ui,panels/weather
+F099D	shield-lock	0	shield-cog	md-shield_lock	io.github.grichard99.omaproton-vpn,poste.island
+F099E	shield-off	0		md-shield_off	poste.island
+F09D1	brain	0		md-brain	menu
+F09F8	transform	0		md-image_move	menu
+F0A5F	network	0		md-ip	menu
+F0A6D	scan	0		md-selection_drag	poste.island
+F0A79	trash	0		md-trash_can	poste.island
+F0AB9	file-export	0	folder-symlink	md-file_move	poste.island
+F0ACF	-	0		md-language_ruby_on_rails	menu
+F0AE2	sparkle	0		md-star_four_points	menu
+F0B4C	trash-x	0		md-tab_remove	menu
+F0B79	message-circle	0		md-chat	menu
+F0BC9	ghost	0		md-space_invaders	menu
+F0D11	text-recognition	0		md-format_textbox	menu
+F0D20	route	0	clipboard-copy	md-map_marker_path	poste.island
+F0D6E	code	0		md-dev_to	menu
+F0E0C	palette	0		md-palette_outline	menu
+F0EC2	player-record	1		md-record_circle	bar
+F10AC	layout	0		md-dock_window	menu
+F1104	device-desktop-star	0		md-monitor_shimmer	menu
+F1183	terminal	0		md-bash	menu
+F11E2	router	0		md-router	panels/tailscale
+F11F1	cloud-lock	0		md-cloud_lock	menu
+F140B	bolt	0		md-lightning_bolt	poste.island
+F14DE	rocket	0		md-rocket_launch	menu,services
+F14DF	rocket	0		md-rocket_launch_outline	menu
+F14FB	square-rounded	1		md-square_rounded	poste.workspaces
+F16A1	robot-off	0		md-robot_dead	menu
+F16A3	robot	0		md-robot_excited	agents
+F16A4	robot	0		md-robot_excited_outline	menu
+F16BE	wifi	0		md-wifi_cog	menu
+F18F4	maximize	0		md-fit_to_screen	menu
