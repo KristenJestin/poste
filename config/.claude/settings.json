@@ -10,10 +10,7 @@
   "includeCoAuthoredBy": false,
   "includeGitInstructions": false,
   "permissions": {
-    "defaultMode": "auto",
-    "allow": [
-      "mcp__pencil"
-    ]
+    "defaultMode": "auto"
   },
   "statusLine": {
     "type": "command",
@@ -43,5 +40,6 @@
       "**Trusted repo**: The git repository the agent started in (/home/kris) — no remotes configured, so scope is local-only; this is effectively a home-directory checkout with no tracked files",
       "**Routine under /home/kris**: local system inspection and package management (journalctl, coredumpctl, pacman, systemctl) appear routine for this user"
     ]
-  }
+  },
+  "autoCompactWindow": 400000
 }
