@@ -14,7 +14,25 @@ BarWidget {
   id: root
   moduleName: "poste.workspaces"
 
-  readonly property var workspaceMonitors: ["DP-3", "DP-1", "DP-2"]
+  // Lu dans workspace_monitors de monitors.lua : chaque machine garde sa liste.
+  property var workspaceMonitors: []
+  function parseWorkspaceMonitors(text) {
+    var m = /^\s*workspace_monitors\s*=\s*\{([^}]*)\}/m.exec(text || "")
+    if (!m) return []
+    var out = []
+    var re = /["']([^"']+)["']/g
+    var s
+    while ((s = re.exec(m[1])) !== null) out.push(s[1])
+    return out
+  }
+  FileView {
+    path: Quickshell.env("HOME") + "/.config/hypr/monitors.lua"
+    watchChanges: true
+    printErrors: false
+    onFileChanged: reload()
+    onLoaded: root.workspaceMonitors = root.parseWorkspaceMonitors(text())
+    onLoadFailed: root.workspaceMonitors = []
+  }
 
   // Écran de cette barre. Lu après installation du widget dans sa barre : un
   // binding direct gardait l'écran du premier rendu pour toutes les barres.

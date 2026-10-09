@@ -287,7 +287,25 @@ Item {
   // Per-monitor workspaces (see ~/.config/hypr/monitors.lua): left 1-10,
   // center 11-20, right 21-30, any other screen 31-40. State comes straight
   // from hyprctl on every workspace/window event.
-  readonly property var workspaceMonitors: ["DP-3", "DP-1", "DP-2"]
+  // Read from workspace_monitors in monitors.lua, so each machine keeps its own list.
+  property var workspaceMonitors: []
+  function parseWorkspaceMonitors(text) {
+    var m = /^\s*workspace_monitors\s*=\s*\{([^}]*)\}/m.exec(text || "")
+    if (!m) return []
+    var out = []
+    var re = /["']([^"']+)["']/g
+    var s
+    while ((s = re.exec(m[1])) !== null) out.push(s[1])
+    return out
+  }
+  FileView {
+    path: Quickshell.env("HOME") + "/.config/hypr/monitors.lua"
+    watchChanges: true
+    printErrors: false
+    onFileChanged: reload()
+    onLoaded: root.workspaceMonitors = root.parseWorkspaceMonitors(text())
+    onLoadFailed: root.workspaceMonitors = []
+  }
   function workspaceOffset(screenName) {
     var slot = workspaceMonitors.indexOf(screenName)
     return (slot === -1 ? workspaceMonitors.length : slot) * 10
