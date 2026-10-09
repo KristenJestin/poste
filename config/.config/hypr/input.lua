@@ -67,3 +67,17 @@ hl.config({
 
 -- Pas de collage au clic molette (sélection primaire).
 hl.config({ misc = { middle_click_paste = false } })
+
+-- Pavé tactile (portable ; sans effet sur le fixe) : défilement naturel, clic
+-- droit à deux doigts, défilement plus lent, et réglé par terminal.
+hl.config({
+  input = {
+    touchpad = {
+      natural_scroll = true,
+      clickfinger_behavior = true,
+      scroll_factor = 0.4,
+    },
+  },
+})
+o.window("(Alacritty|kitty|foot)", { scroll_touchpad = 1.5 })
+o.window("com.mitchellh.ghostty", { scroll_touchpad = 0.2 })
