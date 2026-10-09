@@ -286,19 +286,89 @@ Item {
   property var userDoc: ({})
   readonly property var moduleDocs: host && host.modules ? host.modules.launcherDocs : []
   onModuleDocsChanged: applyConfig()
+  // Propre à chaque machine (pas versionné) : ~/.config/poste-island/launcher/hidden.json,
+  // ["Jellyfin", "unity", …] : noms d'entrées et de moteurs, id d'extensions, mots-clés de moteurs.
+  // Et « requires » sur une entrée, extension ou moteur : "unityhub" (commande dans le PATH)
+  // ou "plugin:<id>" (plugin Omarchy installé), une valeur ou une liste ; sinon l'entrée est masquée.
+  property var localHidden: []
+  FileView {
+    path: Quickshell.env("HOME") + "/.config/poste-island/launcher/hidden.json"
+    watchChanges: true
+    printErrors: false
+    onFileChanged: reload()
+    onLoaded: {
+      var list = []
+      try { list = JSON.parse(text()) } catch (e) { list = [] }
+      launcher.localHidden = Array.isArray(list) ? list.map(function(s) { return String(s).toLowerCase() }) : []
+      launcher.applyConfig()
+    }
+    onLoadFailed: { launcher.localHidden = []; launcher.applyConfig() }
+  }
+  // Exigences absentes de cette machine (null tant que la vérification n'a pas répondu).
+  property var missingRequires: null
+  property string requiresKey: ""
+  Process {
+    id: requiresScan
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: {
+        var map = {}
+        var lines = String(text || "").split("\n")
+        for (var i = 0; i < lines.length; i++) if (lines[i].trim()) map[lines[i].trim()] = true
+        launcher.missingRequires = map
+        launcher.applyConfig()
+      }
+    }
+  }
+  function requiresOf(e) {
+    var r = e && e.requires
+    if (!r) return []
+    return (Array.isArray(r) ? r : [r]).map(String).filter(function(s) { return s.length > 0 })
+  }
+  function shownHere(e) {
+    var names = [e.name, e.id].concat(Array.isArray(e.keyword) ? e.keyword : [e.keyword])
+    for (var n = 0; n < names.length; n++)
+      if (names[n] && localHidden.indexOf(String(names[n]).toLowerCase()) !== -1) return false
+    var req = requiresOf(e)
+    if (req.length === 0) return true
+    if (missingRequires === null) return false
+    for (var i = 0; i < req.length; i++) if (missingRequires[req[i]]) return false
+    return true
+  }
+  function scanRequires(docs) {
+    var all = {}
+    for (var d = 0; d < docs.length; d++) {
+      var doc = docs[d] || {}
+      var entries = (doc.items || []).concat(doc.extensions || [], doc.engines || [])
+      for (var i = 0; i < entries.length; i++) {
+        var req = requiresOf(entries[i])
+        for (var j = 0; j < req.length; j++) all[req[j]] = true
+      }
+    }
+    var list = Object.keys(all).sort()
+    var key = list.join("\n")
+    if (key === requiresKey && missingRequires !== null) return
+    requiresKey = key
+    if (list.length === 0) { missingRequires = ({}); return }
+    requiresScan.command = ["sh", "-c",
+      "for r; do case $r in plugin:*) [ -d \"$HOME/.config/omarchy/plugins/${r#plugin:}\" ] || echo \"$r\" ;; *) command -v \"$r\" >/dev/null 2>&1 || echo \"$r\" ;; esac; done",
+      "requires"].concat(list)
+    requiresScan.running = true
+  }
   function applyConfig() {
     var docs = [userDoc]
     for (var m = 0; m < moduleDocs.length; m++) docs.push(moduleDocs[m].data || {})
+    scanRequires(docs)
     var items = [], exts = [], engs = [], ids = {}
     for (var d = 0; d < docs.length; d++) {
       var doc = docs[d] || {}
-      items = items.concat((doc.items || []).filter(function(i) { return i && i.enabled !== false && i.name }))
+      items = items.concat((doc.items || []).filter(function(i) { return i && i.enabled !== false && i.name && launcher.shownHere(i) }))
       exts = exts.concat((doc.extensions || []).filter(function(e) {
-        if (!e || e.enabled === false || !e.id || !e.source || ids[e.id]) return false
+        if (!e || e.enabled === false || !e.id || !e.source || ids[e.id] || !launcher.shownHere(e)) return false
         ids[e.id] = true
         return true
       }))
-      engs = engs.concat((doc.engines || []).filter(function(e) { return e && e.enabled !== false && e.keyword && e.name && String(e.url || "").indexOf("%s") !== -1 }))
+      engs = engs.concat((doc.engines || []).filter(function(e) { return e && e.enabled !== false && e.keyword && e.name && String(e.url || "").indexOf("%s") !== -1 && launcher.shownHere(e) }))
     }
     launcher.userItems = items
     launcher.extensions = exts

@@ -57,7 +57,8 @@
         "connection"
       ],
       "type": "command",
-      "command": "omarchy-shell shell summon io.github.grichard99.omaproton-vpn '{}'"
+      "command": "omarchy-shell shell summon io.github.grichard99.omaproton-vpn '{}'",
+      "requires": "plugin:io.github.grichard99.omaproton-vpn"
     }
   ],
   "extensions": [
@@ -84,7 +85,8 @@
       "keyword": [
         "open",
         "proj"
-      ]
+      ],
+      "requires": "unity"
     },
     {
       "id": "ssh",
