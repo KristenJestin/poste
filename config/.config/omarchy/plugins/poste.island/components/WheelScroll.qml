@@ -10,7 +10,7 @@ WheelHandler {
   id: wheel
 
   // Pixels par cran (angleDelta de 120).
-  property real step: 60
+  property real step: 50
 
   // La ListView ou la Flickable : posé dedans, le gestionnaire se retrouve sur
   // son contentItem.
