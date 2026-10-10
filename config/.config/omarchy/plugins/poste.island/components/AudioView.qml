@@ -159,6 +159,7 @@ Item {
     }
 
     Flickable {
+      WheelScroll {}
       id: flick
       width: parent.width
       height: Math.min(audio.maxListHeight, body.implicitHeight)

@@ -355,6 +355,7 @@ Item {
 
     // ------------------------------------------------ sessions
     ListView {
+      WheelScroll {}
       id: list
       width: parent.width
       height: Math.min(contentHeight, view.maxHeight - y - 30)

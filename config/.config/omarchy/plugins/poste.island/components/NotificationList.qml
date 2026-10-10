@@ -110,6 +110,7 @@ Item {
   }
 
   ListView {
+    WheelScroll {}
     id: view
     anchors.top: header.bottom
     anchors.topMargin: 10

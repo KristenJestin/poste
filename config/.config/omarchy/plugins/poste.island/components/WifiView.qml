@@ -309,6 +309,7 @@ Item {
     }
 
     ListView {
+      WheelScroll {}
       id: list
       visible: wifi.radio
       width: parent.width

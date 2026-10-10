@@ -242,6 +242,7 @@ Item {
     }
 
     ListView {
+      WheelScroll {}
       id: list
       visible: bt.powered && rows.count > 0
       width: parent.width

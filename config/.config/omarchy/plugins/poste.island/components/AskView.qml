@@ -171,6 +171,7 @@ Item {
   readonly property string questionText: c.question
 
   Flickable {
+    WheelScroll {}
     id: flick
     anchors.top: header.bottom
     anchors.topMargin: 12

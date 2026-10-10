@@ -211,6 +211,7 @@ Item {
     }
 
     ListView {
+      WheelScroll {}
       id: list
       visible: vpn.ready && vpn.countries.length > 0
       width: parent.width

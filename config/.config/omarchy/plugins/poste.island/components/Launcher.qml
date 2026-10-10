@@ -1333,6 +1333,7 @@ Item {
   }
 
   ListView {
+    WheelScroll {}
     id: list
     anchors.top: header.bottom
     anchors.topMargin: 12

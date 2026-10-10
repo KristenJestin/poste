@@ -162,6 +162,7 @@ Item {
       font.pixelSize: 12
     }
     ListView {
+      WheelScroll {}
       id: list
       visible: ts.peers.length > 0
       width: parent.width

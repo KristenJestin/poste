@@ -838,6 +838,7 @@ Item {
 
   // ---------------------------------------------------------------- list
   Flickable {
+    WheelScroll {}
     id: flick
     anchors.top: header.bottom
     anchors.topMargin: 8
