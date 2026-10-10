@@ -18,7 +18,11 @@ const ICON_LIKE: &str = "\u{f02d1}";
 const ICON_UNLIKE: &str = "\u{f02d5}";
 const ICON_TO_PLAYLIST: &str = "\u{f0cb8}";
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// Candidats lus dans l'index pour chaque type, avant le tri par pertinence.
+const CANDIDATES: usize = 200;
+
+/// Dans l'ordre d'affichage à pertinence égale.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Kind {
     Playlist,
     Artist,
@@ -27,6 +31,16 @@ pub enum Kind {
 }
 
 impl Kind {
+    /// Résultats gardés pour ce type.
+    fn limit(self) -> usize {
+        match self {
+            Kind::Playlist => LIMIT_PLAYLISTS,
+            Kind::Artist => LIMIT_ARTISTS,
+            Kind::Album => LIMIT_ALBUMS,
+            Kind::Track => LIMIT_TRACKS,
+        }
+    }
+
     pub fn word(self) -> &'static str {
         match self {
             Kind::Playlist => "playlist",
@@ -85,7 +99,8 @@ fn hits(
     Ok(rows.collect::<rusqlite::Result<_>>()?)
 }
 
-/// Résultats dans l'ordre : playlists, artistes, albums, morceaux.
+/// Résultats du plus pertinent au moins pertinent (voir `relevance`) ; à
+/// pertinence égale : playlists, artistes, albums, morceaux.
 pub fn search(conn: &Connection, input: &str) -> Result<Vec<Hit>> {
     let Some(q) = fts_query(input) else {
         return Ok(Vec::new());
@@ -108,7 +123,7 @@ pub fn search(conn: &Connection, input: &str) -> Result<Vec<Hit>> {
          FROM fts_playlists f JOIN playlists p ON p.id = f.id
          WHERE fts_playlists MATCH ?1 ORDER BY f.rank LIMIT ?2",
         &q,
-        LIMIT_PLAYLISTS,
+        CANDIDATES,
         |r| {
             Ok(Hit {
                 count: r.get(2)?,
@@ -124,7 +139,7 @@ pub fn search(conn: &Connection, input: &str) -> Result<Vec<Hit>> {
          FROM fts_artists f JOIN artists a ON a.id = f.id
          WHERE fts_artists MATCH ?1 ORDER BY f.rank LIMIT ?2",
         &q,
-        LIMIT_ARTISTS,
+        CANDIDATES,
         |r| {
             Ok(Hit {
                 count: r.get(2)?,
@@ -140,7 +155,7 @@ pub fn search(conn: &Connection, input: &str) -> Result<Vec<Hit>> {
          FROM fts_albums f JOIN albums a ON a.id = f.id
          WHERE fts_albums MATCH ?1 ORDER BY f.rank LIMIT ?2",
         &q,
-        LIMIT_ALBUMS,
+        CANDIDATES,
         |r| {
             Ok(Hit {
                 artist: r.get(2)?,
@@ -157,7 +172,7 @@ pub fn search(conn: &Connection, input: &str) -> Result<Vec<Hit>> {
          FROM fts_tracks f JOIN tracks t ON t.id = f.id
          WHERE fts_tracks MATCH ?1 ORDER BY f.rank, t.playCount DESC LIMIT ?2",
         &q,
-        LIMIT_TRACKS,
+        CANDIDATES,
         |r| {
             Ok(Hit {
                 artist: r.get(2)?,
@@ -168,7 +183,86 @@ pub fn search(conn: &Connection, input: &str) -> Result<Vec<Hit>> {
             })
         },
     )?);
-    Ok(out)
+    let query = words(input);
+    let mut ranked: Vec<(u8, Hit)> = out
+        .into_iter()
+        .map(|h| (relevance(&query, &h), h))
+        .collect();
+    // Les meilleurs de chaque type, puis tous ensemble par pertinence ; à
+    // pertinence égale, l'ordre des types et celui de l'index.
+    ranked.sort_by_key(|(r, h)| (h.kind, *r));
+    let mut seen = [0usize; 4];
+    ranked.retain(|(_, h)| {
+        let n = &mut seen[h.kind as usize];
+        *n += 1;
+        *n <= h.kind.limit()
+    });
+    ranked.sort_by_key(|(r, _)| *r);
+    Ok(ranked.into_iter().map(|(_, h)| h).collect())
+}
+
+/// Minuscules sans accents, comme l'index (`remove_diacritics`).
+fn fold(c: char) -> char {
+    match c {
+        'à' | 'á' | 'â' | 'ã' | 'ä' | 'å' => 'a',
+        'ç' => 'c',
+        'è' | 'é' | 'ê' | 'ë' => 'e',
+        'ì' | 'í' | 'î' | 'ï' => 'i',
+        'ñ' => 'n',
+        'ò' | 'ó' | 'ô' | 'õ' | 'ö' | 'ø' => 'o',
+        'ù' | 'ú' | 'û' | 'ü' => 'u',
+        'ý' | 'ÿ' => 'y',
+        c => c,
+    }
+}
+
+/// Les mots d'un texte, découpés comme la requête FTS, sans casse ni accents.
+fn words(s: &str) -> Vec<String> {
+    s.split(|c: char| !c.is_alphanumeric())
+        .filter(|w| !w.is_empty())
+        .map(|w| w.chars().flat_map(char::to_lowercase).map(fold).collect())
+        .collect()
+}
+
+/// Pertinence d'un résultat pour la requête, de 0 (la meilleure) à 6 : nom
+/// identique, nom qui commence par la requête, mots entiers dans le nom, nom qui
+/// commence par la requête dont le dernier mot est en cours de frappe, débuts de
+/// mots dans le nom, mots entiers dans l'artiste ou l'album, le reste (débuts
+/// de mots dans l'artiste ou l'album).
+fn relevance(query: &[String], hit: &Hit) -> u8 {
+    let name = words(&hit.name);
+    let whole = |ws: &[String]| query.iter().all(|q| ws.contains(q));
+    let starts = match query.split_last() {
+        Some((last, head)) => {
+            name.len() >= query.len()
+                && name.starts_with(head)
+                && name[head.len()].starts_with(last.as_str())
+        }
+        None => false,
+    };
+    if name == query {
+        0
+    } else if name.starts_with(query) {
+        1
+    } else if whole(&name) {
+        2
+    } else if starts {
+        3
+    } else if query
+        .iter()
+        .all(|q| name.iter().any(|w| w.starts_with(q.as_str())))
+    {
+        4
+    } else {
+        let mut all = name;
+        all.extend(words(&hit.artist));
+        all.extend(words(&hit.album));
+        if whole(&all) {
+            5
+        } else {
+            6
+        }
+    }
 }
 
 /// Toutes les playlists, par nom.
@@ -388,6 +482,43 @@ mod tests {
             kinds,
             [Kind::Playlist, Kind::Artist, Kind::Album, Kind::Track]
         );
+    }
+
+    #[test]
+    fn nom_exact_d_abord() {
+        let d = tempfile::tempdir().unwrap();
+        let mut conn = db::create(&d.path().join("l.db")).unwrap();
+        let tx = conn.transaction().unwrap();
+        db::insert_artist(&tx, &json!({"id":"ar1","name":"Reverb Man","albumCount":0})).unwrap();
+        for (id, title, album) in [
+            ("t1", "Wenches & Mead", "Captain Morgan's Revenge"),
+            ("t2", "SLAY! (Slowed + Reverb)", "SLAY!"),
+            ("t3", "Marche ou rêve", "Millénium"),
+            ("t4", "Rêve mieux", "Civilisation"),
+            ("t5", "Rêve", "Plaisir Risque Dépendance"),
+        ] {
+            db::insert_track(&tx, &json!({"id":id,"title":title,"artist":"X","album":album}))
+                .unwrap();
+        }
+        tx.commit().unwrap();
+        let names: Vec<_> = search(&conn, "Rêve")
+            .unwrap()
+            .into_iter()
+            .map(|h| h.name)
+            .collect();
+        assert_eq!(
+            names,
+            [
+                "Rêve",
+                "Rêve mieux",
+                "Marche ou rêve",
+                "Reverb Man",
+                "SLAY! (Slowed + Reverb)",
+                "Wenches & Mead"
+            ]
+        );
+        // Un mot en cours de frappe reste un début de mot.
+        assert_eq!(search(&conn, "rêv").unwrap()[0].name, "Reverb Man");
     }
 
     #[test]
