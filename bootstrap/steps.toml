@@ -122,14 +122,6 @@ contains = "UUID=0123456789ABCDEF"
 when = ["test", "-e", "/dev/disk/by-uuid/0123456789ABCDEF"] # étape ignorée si le disque est absent
 after = ["sudo mkdir -p /run/media/@USER@/SSD", "sudo systemctl daemon-reload", "sudo mount /run/media/@USER@/SSD"]
 
-[[system]]
-id = "voxtype-gpu"
-title = "voxtype : backend GPU"
-requires = "voxtype"
-when = ["sh", "-c", "lspci 2>/dev/null | grep -qiE 'vga.*(nvidia|amd|radeon)'"]
-check = ["sh", "-c", "voxtype setup gpu --status 2>/dev/null | grep -q 'Active backend: GPU'"]
-commands = ["sudo voxtype setup gpu --enable", "systemctl --user restart voxtype.service"]
-
 # ------------------------------------------------------------ étapes manuelles
 [[manual]]
 id = "gh-auth"
