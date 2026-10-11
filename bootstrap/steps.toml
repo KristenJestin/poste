@@ -70,10 +70,10 @@ run = [["voxtype", "setup", "systemd"]]
 
 [[user]]
 id = "voxtype-model"
-title = "voxtype : modèle « small » (téléchargement)"
+title = "voxtype : modèle Parakeet v3 (téléchargement)"
 requires = "voxtype"
-check = ["test", "-f", "@HOME@/.local/share/voxtype/models/ggml-small.bin"]
-run = [["voxtype", "setup", "--download", "--model", "small", "--quiet"]]
+check = ["test", "-d", "@HOME@/.local/share/voxtype/models/parakeet-tdt-0.6b-v3"]
+run = [["voxtype", "setup", "--download", "--model", "parakeet-tdt-0.6b-v3", "--quiet"]]
 
 [[user]]
 id = "voxtype-enable"

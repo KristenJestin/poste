@@ -10,6 +10,10 @@
 # Required for `voxtype record toggle` and `voxtype status` commands.
 state_file = "auto"
 
+# Moteur : Parakeet v3 sur la carte graphique (binaire ONNX CUDA, voir le drop-in
+# ~/.config/systemd/user/voxtype.service.d/parakeet-cuda.conf).
+engine = "parakeet"
+
 [hotkey]
 # Hotkey is configured in Hyprland. Default is Super + Ctrl + X
 enabled = false
@@ -142,3 +146,6 @@ enabled = false
 # « Sous-titres réalisés par la communauté d'Amara.org » sur les pauses.
 enabled = true
 backend = "energy"
+
+[parakeet]
+model = "parakeet-tdt-0.6b-v3"
