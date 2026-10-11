@@ -65,6 +65,16 @@ hl.config({
   },
 })
 
+-- Pointeurs intégrés du portable (sans effet sur le fixe) : plus rapides que la
+-- souris du fixe, toujours sans accélération. Validé par Kris le 2026-10-11.
+for _, name in ipairs({
+  "snsl0035:00-2c2f:0035-touchpad",
+  "snsl0035:00-2c2f:0035-mouse",
+  "tpps/2-synaptics-trackpoint",
+}) do
+  hl.device({ name = name, sensitivity = 0.2, accel_profile = "flat" })
+end
+
 -- Pas de collage au clic molette (sélection primaire).
 hl.config({ misc = { middle_click_paste = false } })
 
