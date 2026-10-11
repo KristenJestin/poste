@@ -20,6 +20,13 @@ hl.monitor({ output = "", mode = "preferred", position = "auto", scale = 1 })
 -- Chaque écran a ses propres workspaces 1 à 10 (voir bindings.lua) :
 -- en interne, gauche = 1-10, centre = 11-20, droite = 21-30.
 -- default_name affiche 1 à 10 sur chaque écran au lieu de 11-30.
+-- SUPER+CTRL+ALT+flèche envoie la fenêtre sur l'écran de cette flèche (bindings.lua).
+screen_keys = {
+  { key = "LEFT", monitor = "DP-3", name = "left screen" },
+  { key = "UP", monitor = "DP-1", name = "center screen" },
+  { key = "RIGHT", monitor = "DP-2", name = "right screen" },
+}
+
 workspace_monitors = { "DP-3", "DP-1", "DP-2" }
 
 for index, output in ipairs(workspace_monitors) do

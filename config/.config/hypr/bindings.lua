@@ -131,10 +131,11 @@ o.bind("SUPER + A", "Dictée (tap=toggle / maintien=PTT)", function()
 end)
 o.bind("SUPER + A", nil, "voxtype-hold-toggle release", { release = true })
 
--- Envoyer la fenêtre sur un écran précis.
-o.bind("SUPER + CTRL + ALT + LEFT", "Send window to left screen", hl.dsp.window.move({ monitor = "DP-3" }))
-o.bind("SUPER + CTRL + ALT + UP", "Send window to center screen", hl.dsp.window.move({ monitor = "DP-1" }))
-o.bind("SUPER + CTRL + ALT + RIGHT", "Send window to right screen", hl.dsp.window.move({ monitor = "DP-2" }))
+-- Envoyer la fenêtre sur un écran précis (SUPER+CTRL+ALT+flèche). Les écrans
+-- de chaque flèche sont propres à la machine : screen_keys, dans monitors.lua.
+for _, screen in ipairs(screen_keys or {}) do
+  o.bind("SUPER + CTRL + ALT + " .. screen.key, "Send window to " .. screen.name, hl.dsp.window.move({ monitor = screen.monitor }))
+end
 
 -- Touches de volume : même commande qu'Omarchy, mais via le shim de poste.island
 -- qui saute l'OSD de volume quand l'île est la barre active (l'île affiche le
