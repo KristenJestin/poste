@@ -167,7 +167,12 @@ end
 
 -- SUPER+SHIFT+C : T3 Code (à la place de Calendar HEY), ramène la fenêtre si elle est ouverte.
 hl.unbind("SUPER + SHIFT + C")
-o.bind("SUPER + SHIFT + C", "T3 Code", o.launch_sole("com.t3tools.T3Code", "/opt/t3code-nightly-bin/t3code"))
+-- Un lanceur ~/.local/bin/t3code (propre à la machine, ex. identifiants du PC
+-- pro) passe avant la commande du paquet.
+local t3code = os.getenv("HOME") .. "/.local/bin/t3code"
+local t3code_wrapper = io.open(t3code)
+if t3code_wrapper then t3code_wrapper:close() else t3code = "t3code-nightly" end
+o.bind("SUPER + SHIFT + C", "T3 Code", o.launch_sole("com.t3tools.T3Code", t3code))
 
 -- Raccourcis Omarchy vers des sites web (webapps) : retirés à la demande.
 for _, key in ipairs({
