@@ -62,23 +62,30 @@ PanelWindow {
     font.pixelSize: win.fontSize
     text: win.plain
   }
+  FontMetrics {
+    id: fm
+    font.family: win.host.fontFamily
+    font.pixelSize: win.fontSize
+  }
+  // Largeur du texte, sans animation : le texte la prend telle quelle, sans repasser sur deux
+  // lignes le temps d'une animation à chaque phrase qui s'allonge.
+  readonly property real textWidth: Math.min(maxTextWidth, Math.ceil(oneLine.advanceWidth) + 2)
 
   Rectangle {
     id: box
-    width: Math.min(win.maxTextWidth, Math.ceil(oneLine.advanceWidth) + 2) + 2 * win.padX
+    width: win.textWidth + 2 * win.padX
     height: clipper.height + 2 * win.padY
     radius: Math.min(height / 2, 22)
     color: win.host.colorIsland
     opacity: win.wanted ? 1 : 0
     Behavior on opacity { NumberAnimation { duration: win.wanted ? 160 : 220 } }
-    Behavior on width { NumberAnimation { duration: 160 * win.host.motionScale; easing.type: Easing.OutQuint } }
 
     Item {
       id: clipper
       x: win.padX
       y: win.padY
-      width: box.width - 2 * win.padX
-      height: Math.min(label.implicitHeight, Math.ceil(oneLine.height) * win.lines)
+      width: win.textWidth
+      height: Math.min(label.implicitHeight, Math.ceil(fm.lineSpacing) * win.lines)
       clip: true
       Text {
         id: label

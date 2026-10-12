@@ -18,7 +18,8 @@ poste : ce module ne fait que le relier à l'île et à Hyprland.
   - en bas de l'écran : les phrases figées (`final`), puis la phrase en cours (`partial`) en gris,
     trois lignes au plus (la fin reste visible) ;
   - `idle` : tout s'efface.
-- Démon absent ou flux coupé : l'île réessaie toutes les 5 secondes, sans rien écrire au journal.
+- Démon absent ou flux coupé : l'île regarde toutes les 5 secondes si le socket est revenu, et ne
+  s'y reconnecte qu'alors (rien au journal tant qu'il est absent).
 - voxtype (SUPER+A) continue de marcher à côté : la pastille montre celui qui dicte.
 
 ## Commandes

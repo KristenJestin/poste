@@ -33,11 +33,13 @@ Item {
     try { ev = JSON.parse(line) } catch (e) { return }
     if (!ev || typeof ev !== "object") return
     if (ev.type === "state") {
-      var s = String(ev.state || "idle")
-      if (s !== "loading" && s !== "listening" && s !== "stopping") s = "idle"
-      // Nouvelle dictée, ou fin (un partial encore ouvert est jeté) : le texte disparaît.
-      if (s === "idle" || (s === "loading" && phase === "idle")) reset()
+      var s = String(ev.state || "")
+      if (["idle", "loading", "listening", "stopping"].indexOf(s) === -1) return   // inconnu : ignoré
+      var was = phase
       phase = s
+      // Fin (un partial encore ouvert est jeté), ou nouvelle dictée : le texte disparaît. La
+      // phase change d'abord, pour que l'île ne recopie pas un texte à moitié effacé.
+      if (s === "idle" || was === "idle") reset()
     } else if (ev.type === "level") {
       if (!listening) return
       var level = Math.min(1, Math.sqrt(Math.max(0, Number(ev.rms) || 0)) * 2.2)
@@ -61,25 +63,42 @@ Item {
   }
 
   // Le flux est lu sur le socket du démon (commande `watch`), sans passer par un processus : rien
-  // ne dépend de la façon dont le programme vide sa sortie dans un tuyau.
-  Socket {
-    id: sock
-    path: voc.socketPath
-    parser: SplitParser { onRead: function(line) { voc.handle(line) } }
-    onConnectionStateChanged: {
-      if (connected) {
-        write("watch\n")
-        flush()
-      } else {
-        voc.phase = "idle"
-        voc.reset()
+  // ne dépend de la façon dont le programme vide sa sortie dans un tuyau. Après un échec, un
+  // Socket de Quickshell garde sa connexion morte et ne réessaie plus : on en recrée un à chaque
+  // essai, et seulement quand le socket existe (chaque échec écrirait un avertissement au journal).
+  property bool linked: !!link.item && link.item.connected
+  Loader {
+    id: link
+    active: false
+    sourceComponent: Socket {
+      path: voc.socketPath
+      connected: true
+      parser: SplitParser { onRead: function(line) { voc.handle(line) } }
+      onConnectionStateChanged: {
+        if (connected) {
+          write("watch\n")
+          flush()
+        } else {
+          voc.phase = "idle"
+          voc.reset()
+        }
       }
     }
   }
-  function reconnect() {
-    sock.connected = false
-    sock.connected = true
+  Process {
+    id: probe
+    command: ["test", "-S", voc.socketPath]
+    onExited: function(code) {
+      if (code !== 0 || voc.linked) return
+      link.active = false
+      link.active = true
+    }
   }
-  Component.onCompleted: reconnect()
-  Timer { interval: 5000; repeat: true; running: !sock.connected; onTriggered: voc.reconnect() }
+  Timer {
+    interval: 5000
+    repeat: true
+    triggeredOnStart: true
+    running: !voc.linked
+    onTriggered: if (!probe.running) probe.running = true
+  }
 }
