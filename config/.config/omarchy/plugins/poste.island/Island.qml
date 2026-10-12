@@ -645,7 +645,6 @@ Item {
       root.voxLevels = next
     }
   }
-  onVoxListeningChanged: if (!voxListening) voxLevels = []
   readonly property string dictationFinals: dictation ? String(dictation.finals || "") : ""
   readonly property string dictationPartial: dictation ? String(dictation.partial || "") : ""
   // Le texte dicté va au bandeau, en bas de l'écran actif.
@@ -710,8 +709,11 @@ Item {
     command: ["sh", "-c", 'while :; do "$1" dictation-start || exit; done', "vox-loop", root.sfx]
   }
   // Le son d'écoute tourne en boucle (voxLoop) ; à l'arrêt, « stop ». Même chose pour
-  // voxtype et pour la source du slot « dictation ».
-  onVoxListeningChanged: if (!voxListening) Quickshell.execDetached([root.sfx, "dictation-stop"])
+  // voxtype et pour la source du slot « dictation ». L'historique de l'onde repart de zéro.
+  onVoxListeningChanged: if (!voxListening) {
+    voxLevels = []
+    Quickshell.execDetached([root.sfx, "dictation-stop"])
+  }
 
   // ---------------------------------------------------------------- AI usage
   // Records written by omarchy-agent-usage-update into
