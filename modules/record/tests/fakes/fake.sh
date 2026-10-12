@@ -8,7 +8,8 @@
 #   app_audio                    réponse de `gpu-screen-recorder --list-application-audio`
 #   slurp                        réponse de `slurp -d` (absent : choix annulé)
 #   gsr_mode                     quick (défaut) : écrit le fichier et sort ; hold : attend SIGINT
-#                                (SIGUSR2 journalisé) ; fail : erreur sans fichier ; nofile : sort sans fichier
+#                                (SIGUSR2 journalisé, « gsr-ready » une fois les signaux pris en charge) ;
+#                                fail : erreur sans fichier ; nofile : sort sans fichier
 # Journal : FAKE_DIR/journal, une ligne « nom<TAB>arg<TAB>arg… » par appel.
 name=$(basename "$0")
 J="$FAKE_DIR/journal"
@@ -61,6 +62,7 @@ case "$name" in
         printf 'video' > "$out"
         trap 'printf "gsr-signal\tUSR2\n" >> "$J"' USR2
         trap 'printf "gsr-signal\tINT\n" >> "$J"; kill "$sp" 2>/dev/null; exit 0' INT
+        printf 'gsr-ready\n' >> "$J"
         sleep 20 &
         sp=$!
         while kill -0 "$sp" 2>/dev/null; do wait "$sp"; done

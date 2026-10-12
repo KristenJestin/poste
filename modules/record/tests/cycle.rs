@@ -27,6 +27,7 @@ fn start_monitor(b: &Bench) {
         .unwrap();
     assert_eq!(o.status.code(), Some(0));
     b.wait_for("l'état d'enregistrement", || b.state_file().exists());
+    b.wait_gsr_ready();
 }
 
 #[test]
@@ -247,6 +248,7 @@ fn fenetre_choisie_ecrit_pick_json_pour_le_selecteur() {
         .unwrap();
     assert_eq!(o.status.code(), Some(0));
     b.wait_for("l'état", || b.state_file().exists());
+    b.wait_gsr_ready();
     let pick: Value = serde_json::from_str(
         &std::fs::read_to_string(b.run.join("poste-record/pick.json")).unwrap(),
     )

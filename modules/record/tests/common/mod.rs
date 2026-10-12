@@ -139,6 +139,14 @@ impl Bench {
         );
     }
 
+    /// Attend que le faux gsr (mode hold) ait journalisé ses arguments et pris en charge ses
+    /// signaux : l'état est écrit dès son lancement, avant.
+    pub fn wait_gsr_ready(&self) {
+        self.wait_for("le faux gsr prêt", || {
+            self.journal().contains("gsr-ready\n")
+        });
+    }
+
     /// Attend la notification finale du superviseur.
     pub fn wait_notification(&self) {
         self.wait_for("la notification", || {
