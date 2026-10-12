@@ -20,9 +20,25 @@ Item {
   readonly property int maxMessageWidth: osd.media ? 440 : 300
   readonly property int fontSize: 14
 
-  // Ce que la pièce prend dans la pile (pour celles du dessus), animé.
-  property real space: active ? height + bandeau.gap : 0
-  Behavior on space { NumberAnimation { duration: 340; easing.type: Easing.OutQuint } }
+  // Ce que la pièce prend dans la pile (pour celles du dessus) : sa hauteur, à la proportion
+  // de sa présence.
+  property real presence: 0
+  Component.onCompleted: presence = active ? 1 : 0
+  function followActive() {
+    presenceAnim.stop()
+    presencePause.duration = active ? 0 : 200
+    presenceMove.to = active ? 1 : 0
+    presenceAnim.start()
+  }
+  SequentialAnimation {
+    id: presenceAnim
+    PauseAnimation { id: presencePause }
+    NumberAnimation { id: presenceMove; target: view; property: "presence"; duration: 340; easing.type: Easing.OutQuint }
+  }
+  readonly property real space: (height + bandeau.gap) * presence
+  // La pièce n'apparaît que lorsque sa place peut la contenir (l'écart absorbe la fin de
+  // l'ouverture) ; en partant, elle s'efface avant que sa place se referme.
+  readonly property bool shownIn: active && space >= height - 0.5
   readonly property bool live: opacity > 0.01
 
   TextMetrics {
@@ -47,21 +63,28 @@ Item {
 
   // Entrée : monte d'un peu plus bas, grandit un peu, apparaît. Sortie : s'efface, rapetisse,
   // descend un peu.
-  opacity: active ? 1 : 0
-  scale: active ? 1 : 0.94
-  property real drop: active ? 0 : 14
+  opacity: shownIn ? 1 : 0
+  scale: shownIn ? 1 : 0.94
+  property real drop: shownIn ? 0 : bandeau.gap
   transform: Translate { y: view.drop }
-  Behavior on opacity { NumberAnimation { duration: view.active ? 260 : 200; easing.type: view.active ? Easing.OutCubic : Easing.InCubic } }
-  Behavior on scale { NumberAnimation { duration: view.active ? 340 : 220; easing.type: view.active ? Easing.OutBack : Easing.InCubic; easing.overshoot: 1.2 } }
-  Behavior on drop { NumberAnimation { duration: view.active ? 340 : 220; easing.type: view.active ? Easing.OutQuint : Easing.InCubic } }
+  Behavior on opacity { NumberAnimation { duration: view.shownIn ? 260 : 200; easing.type: view.shownIn ? Easing.OutCubic : Easing.InCubic } }
+  Behavior on scale { NumberAnimation { duration: view.shownIn ? 340 : 220; easing.type: view.shownIn ? Easing.OutBack : Easing.InCubic; easing.overshoot: 1.2 } }
+  Behavior on drop { NumberAnimation { duration: view.shownIn ? 340 : 220; easing.type: view.shownIn ? Easing.OutQuint : Easing.InCubic } }
   visible: live
 
-  // La largeur ne s'anime que d'un OSD à l'autre, pas à l'ouverture.
+  // Largeur montrée : d'un OSD à l'autre, elle glisse vers la nouvelle largeur (le contenu est
+  // posé tout de suite à sa largeur finale et se découvre avec elle). Un OSD qui apparaît alors
+  // que rien n'était visible prend sa largeur d'emblée.
   property real shownWidth: width
-  Behavior on shownWidth {
-    enabled: view.active && view.opacity > 0.99
-    NumberAnimation { duration: 260; easing.type: Easing.OutQuint }
+  onWidthChanged: {
+    if (live) bandeau.animateTo(widthAnim, shownWidth, width)
+    else { widthAnim.stop(); shownWidth = width }
   }
+  onActiveChanged: {
+    if (active && !live) { widthAnim.stop(); shownWidth = width }
+    followActive()
+  }
+  NumberAnimation { id: widthAnim; target: view; property: "shownWidth"; duration: 260; easing.type: Easing.OutQuint }
 
   BandeauSurface {
     id: surface
@@ -105,7 +128,8 @@ Item {
           height: parent.height
           radius: parent.radius
           width: parent.width * (view.progress && view.osd.maxValue > 0 ? view.osd.value / view.osd.maxValue : 0)
-          color: view.bandeau.colorAccent
+          color: view.osd.dim ? view.bandeau.colorMuted : view.bandeau.colorAccent
+          Behavior on color { ColorAnimation { duration: 160 } }
           Behavior on width {
             enabled: view.active
             NumberAnimation { duration: 160; easing.type: Easing.OutCubic }

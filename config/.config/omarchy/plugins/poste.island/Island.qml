@@ -7,12 +7,8 @@
 //
 // One island per screen shows that screen's workspaces, the clock, and the
 // now-playing cover + wave; clicking the music opens a player on that screen.
-// Volume feedback shows on the focused screen only.
-//
-// Notifications stay with omarchy.notifications (history, DND and the
-// notification center depend on it); third-party plugins only get a narrow
-// proxy of that service, so its toasts can't be taken over from here. They
-// keep showing natively, placed under the island via barSize.
+// Ce qui passe (volume, OSD, notifications, texte dicté) s'affiche dans le bandeau
+// (bandeau/), en bas de l'écran actif : l'île ne se transforme plus pour le montrer.
 import QtQuick
 import Qt.labs.folderlistmodel
 import Quickshell
@@ -239,46 +235,7 @@ Item {
   // ---------------------------------------------------------------- focus
   readonly property string focusedScreen: Hyprland.focusedMonitor ? String(Hyprland.focusedMonitor.name) : ""
 
-  // ---------------------------------------------------------------- feedback
-  // A short-lived takeover of the focused screen's island ("volume").
-  property string feedbackKind: ""
-  function showFeedback(kind, duration) {
-    feedbackKind = kind
-    feedbackTimer.interval = duration
-    feedbackTimer.restart()
-  }
-  Timer {
-    id: feedbackTimer
-    repeat: false
-    onTriggered: root.feedbackKind = ""
-  }
-
-  // ---------------------------------------------------------------- volume
-  readonly property real volume: Pipewire.defaultAudioSink && Pipewire.defaultAudioSink.audio
-    ? Pipewire.defaultAudioSink.audio.volume : -1
-  readonly property bool muted: !!(Pipewire.defaultAudioSink && Pipewire.defaultAudioSink.audio
-    && Pipewire.defaultAudioSink.audio.muted)
-  PwObjectTracker { objects: [Pipewire.defaultAudioSink] }
-  // An output's first reading (startup, output switch) is only remembered.
-  property var hudSink: null
-  property real hudVolume: -1
-  property bool hudMuted: false
-  property bool initialized: false
-  function volumeFeedback() {
-    var sink = Pipewire.defaultAudioSink
-    if (!initialized || !sink || !sink.ready || volume < 0) return
-    var changed = hudSink === sink && (volume !== hudVolume || muted !== hudMuted)
-    hudSink = sink
-    hudVolume = volume
-    hudMuted = muted
-    if (changed) showFeedback("volume", 1600)
-  }
-  readonly property bool sinkReady: !!(Pipewire.defaultAudioSink && Pipewire.defaultAudioSink.ready)
-  onVolumeChanged: volumeFeedback()
-  onMutedChanged: volumeFeedback()
-  onSinkReadyChanged: volumeFeedback()
   Component.onCompleted: {
-    initialized = true
     lockKnown = true
     refreshWorkspaces()
     refreshUnread()

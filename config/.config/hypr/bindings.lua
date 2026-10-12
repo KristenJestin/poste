@@ -151,8 +151,8 @@ for _, screen in ipairs(screen_keys or {}) do
 end
 
 -- Touches de volume : même commande qu'Omarchy, mais via le shim de poste.island
--- qui saute l'OSD de volume quand l'île est la barre active (l'île affiche le
--- volume elle-même). Sans l'île, l'OSD natif s'affiche comme avant.
+-- qui saute l'OSD de volume quand l'île est la barre active (le bandeau de l'île
+-- affiche le volume lu dans PipeWire). Sans l'île, l'OSD natif s'affiche comme avant.
 local island_volume = 'PATH="$HOME/.config/omarchy/plugins/poste.island/bin:$PATH" omarchy-audio-output-volume '
 for key, spec in pairs({
   ["XF86AudioRaiseVolume"] = { "Volume up", "raise", true },

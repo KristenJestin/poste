@@ -1,8 +1,9 @@
 #!/bin/bash
 # Used only by the volume key bindings (~/.config/hypr/bindings.lua put this
 # directory first on PATH for omarchy-audio-output-volume). While poste.island is
-# the active bar it shows the volume itself, so the volume OSD is skipped;
-# everything else goes to the OSD (poste.osd, drawn in the bandeau).
+# the active bar, the bandeau shows the volume itself, read from PipeWire (it
+# catches every change, not only the keys), so the volume OSD of the keys is
+# skipped; everything else goes to the OSD (poste.osd, drawn in the bandeau).
 real="${OMARCHY_PATH:-/usr/share/omarchy}/bin/omarchy-osd"
 config="$HOME/.config/omarchy/shell.json"
 if [[ " $* " == *" -i volume-"* ]] && [[ $(jq -r '.bar.id // ""' "$config" 2>/dev/null) == "poste.island" ]]; then
