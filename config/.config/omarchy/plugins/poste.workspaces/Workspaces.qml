@@ -26,6 +26,7 @@ BarWidget {
     return out
   }
   FileView {
+    id: monitorsFile
     path: Quickshell.env("HOME") + "/.config/hypr/monitors.lua"
     watchChanges: true
     printErrors: false
@@ -83,6 +84,9 @@ BarWidget {
   Connections {
     target: Hyprland
     function onRawEvent(event) {
+      // Un monitors.lua recâblé (lien vers un autre fichier) ne déclenche pas
+      // watchChanges : on le relit quand Hyprland recharge sa config.
+      if (event.name === "configreloaded") monitorsFile.reload()
       if (/workspace|window|monitor|focus|openlayer|closelayer/.test(event.name)) root.refresh()
     }
   }
