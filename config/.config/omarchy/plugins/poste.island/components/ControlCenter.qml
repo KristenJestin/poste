@@ -23,14 +23,60 @@ Item {
     + (host.tsAvailable ? 1 : 0)
   readonly property real tileWidth: Math.min(74, Math.floor((width - 8 * (tileCount - 1)) / tileCount))
   property int monthOffset: 0
+
+  // Tray menu shown in the panel (see trayMenuView). Each submenu level keeps its own
+  // opener: an entry belongs to its parent's model, so the stack is torn down deepest first.
+  property var trayMenuItem: null
+  property var trayMenuStack: []
+  QsMenuOpener {
+    id: trayMenuOpener
+    menu: cc.trayMenuItem ? cc.trayMenuItem.menu : null
+  }
+  Component {
+    id: trayOpenerComponent
+    QsMenuOpener {}
+  }
+  function resetTraySubmenus() {
+    var stack = trayMenuStack
+    trayMenuStack = []
+    for (var i = stack.length - 1; i >= 0; i--) stack[i].opener.destroy()
+  }
+  function openTrayMenu(item) {
+    var same = trayMenuItem === item
+    resetTraySubmenus()
+    trayMenuItem = same ? null : item
+  }
+  function closeTrayMenu() {
+    resetTraySubmenus()
+    trayMenuItem = null
+  }
+  function enterTraySubmenu(entry, title) {
+    var opener = trayOpenerComponent.createObject(cc, { menu: entry })
+    if (!opener) return
+    trayMenuStack = trayMenuStack.concat([{ opener: opener, title: title }])
+  }
+  function leaveTraySubmenu() {
+    if (trayMenuStack.length === 0) return
+    var stack = trayMenuStack.slice()
+    var top = stack.pop()
+    trayMenuStack = stack
+    top.opener.destroy()
+  }
+
   onActiveChanged: {
+    if (!active) closeTrayMenu()
     if (active) host.runAgentUpdate("limits")
     if (!active) return
     monthOffset = 0
     Qt.callLater(function() { cc.forceActiveFocus() })
   }
   Keys.onPressed: function(event) {
-    if (event.key === Qt.Key_Escape) { cc.closeRequested(); event.accepted = true }
+    if (event.key === Qt.Key_Escape) {
+      if (cc.trayMenuStack.length > 0) cc.leaveTraySubmenu()
+      else if (cc.trayMenuItem) cc.closeTrayMenu()
+      else cc.closeRequested()
+      event.accepted = true
+    }
     else if (event.key === Qt.Key_Left) { cc.monthOffset--; event.accepted = true }
     else if (event.key === Qt.Key_Right) { cc.monthOffset++; event.accepted = true }
   }
@@ -546,13 +592,145 @@ Item {
               var item = trayItem.modelData
               if (mouse.button === Qt.MiddleButton) { item.secondaryActivate(); return }
               if (mouse.button === Qt.RightButton || item.onlyMenu) {
-                if (!item.hasMenu) return
-                var window = trayItem.QsWindow.window
-                var point = window.contentItem.mapFromItem(trayItem, 0, trayItem.height + 6)
-                item.display(window, point.x, point.y)
+                if (item.hasMenu) cc.openTrayMenu(item)
                 return
               }
               item.activate()
+            }
+          }
+        }
+      }
+    }
+
+    // Menu of a tray item, drawn here: item.display() needs a platform menu, which
+    // Quickshell refuses because Omarchy's shell root has no `UseQApplication` pragma.
+    // Submenus drill down in place (same approach as Omarchy's bar tray).
+    Column {
+      id: trayMenuView
+      width: parent.width
+      visible: cc.trayMenuItem !== null
+      spacing: 0
+
+      Item {
+        visible: cc.trayMenuStack.length > 0
+        width: parent.width
+        height: visible ? 28 : 0
+        Rectangle {
+          anchors.fill: parent
+          radius: 8
+          color: backMouse.containsMouse ? cc.host.withAlpha(cc.host.colorText, 0.1) : "transparent"
+        }
+        Text {
+          anchors.verticalCenter: parent.verticalCenter
+          x: 8
+          width: parent.width - 16
+          text: "‹  " + (cc.trayMenuStack.length > 0 ? cc.trayMenuStack[cc.trayMenuStack.length - 1].title : "")
+          textFormat: Text.PlainText
+          elide: Text.ElideRight
+          color: cc.host.colorText
+          font.family: cc.host.uiFont
+          font.pixelSize: 12
+        }
+        MouseArea {
+          id: backMouse
+          anchors.fill: parent
+          hoverEnabled: true
+          cursorShape: Qt.PointingHandCursor
+          onClicked: cc.leaveTraySubmenu()
+        }
+      }
+
+      Flickable {
+        width: parent.width
+        height: Math.min(trayMenuRows.implicitHeight, 320)
+        contentHeight: trayMenuRows.implicitHeight
+        clip: true
+        boundsBehavior: Flickable.StopAtBounds
+        interactive: contentHeight > height
+
+        Column {
+          id: trayMenuRows
+          width: parent.width
+          Repeater {
+            model: cc.trayMenuStack.length > 0
+              ? cc.trayMenuStack[cc.trayMenuStack.length - 1].opener.children
+              : trayMenuOpener.children
+            delegate: Item {
+              id: row
+              required property var modelData
+              readonly property bool separator: modelData.isSeparator
+              width: trayMenuRows.width
+              height: separator ? 9 : 28
+              opacity: modelData.enabled ? 1 : 0.45
+
+              Rectangle {
+                visible: row.separator
+                anchors.verticalCenter: parent.verticalCenter
+                x: 8; width: parent.width - 16; height: 1
+                color: cc.host.withAlpha(cc.host.colorText, 0.12)
+              }
+              Rectangle {
+                visible: !row.separator
+                anchors.fill: parent
+                radius: 8
+                color: rowMouse.containsMouse && row.modelData.enabled ? cc.host.withAlpha(cc.host.colorText, 0.1) : "transparent"
+              }
+              Text {
+                id: check
+                visible: !row.separator && row.modelData.buttonType !== QsMenuButtonType.None
+                anchors.verticalCenter: parent.verticalCenter
+                x: 6; width: 14
+                horizontalAlignment: Text.AlignHCenter
+                text: row.modelData.checkState === Qt.Checked ? "✓" : ""
+                color: cc.host.colorText
+                font.family: cc.host.uiFont
+                font.pixelSize: 12
+              }
+              IconImage {
+                id: rowIcon
+                visible: !row.separator && String(row.modelData.icon || "") !== ""
+                anchors.verticalCenter: parent.verticalCenter
+                x: 24
+                implicitSize: 16
+                source: String(row.modelData.icon || "")
+              }
+              Text {
+                visible: !row.separator
+                anchors.verticalCenter: parent.verticalCenter
+                x: rowIcon.visible ? 46 : 24
+                width: parent.width - x - 24
+                text: String(row.modelData.text || "")
+                textFormat: Text.PlainText
+                elide: Text.ElideRight
+                color: cc.host.colorText
+                font.family: cc.host.uiFont
+                font.pixelSize: 12
+              }
+              Text {
+                visible: !row.separator && row.modelData.hasChildren
+                anchors.verticalCenter: parent.verticalCenter
+                anchors.right: parent.right
+                anchors.rightMargin: 10
+                text: "›"
+                color: cc.host.colorMuted
+                font.family: cc.host.uiFont
+                font.pixelSize: 12
+              }
+              MouseArea {
+                id: rowMouse
+                anchors.fill: parent
+                hoverEnabled: true
+                enabled: !row.separator && row.modelData.enabled
+                cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+                onClicked: {
+                  if (row.modelData.hasChildren) {
+                    cc.enterTraySubmenu(row.modelData, String(row.modelData.text || ""))
+                  } else {
+                    row.modelData.triggered()
+                    cc.closeTrayMenu()
+                  }
+                }
+              }
             }
           }
         }
