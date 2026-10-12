@@ -773,8 +773,14 @@ Item {
     return { kind: "app", title: String(app.name), subtitle: String(app.genericName || app.comment || ""),
       icon: app.icon ? Quickshell.iconPath(app.icon, true) : "", glyph: "󰀻", chevron: false, key: key, pinned: isPinned(key), ref: String(app.id) }
   }
-  readonly property bool looksLikeUrl: /^(https?:\/\/)?([a-z0-9-]+\.)+[a-z]{2,}(:[0-9]+)?(\/\S*)?$/i.test(query.trim())
-  function urlFor(text) { text = text.trim(); return /^https?:\/\//i.test(text) ? text : "https://" + text }
+  // Une adresse : un nom de domaine, localhost ou une IPv4, avec port et chemin facultatifs.
+  // Sans protocole : https, sauf localhost et les IP (un service local est rarement en https).
+  readonly property bool looksLikeUrl: /^(https?:\/\/)?(([a-z0-9-]+\.)+[a-z]{2,}|localhost|(\d{1,3}\.){3}\d{1,3})(:[0-9]+)?(\/\S*)?$/i.test(query.trim())
+  function urlFor(text) {
+    text = text.trim()
+    if (/^https?:\/\//i.test(text)) return text
+    return (/^(localhost|(\d{1,3}\.){3}\d{1,3})([:\/]|$)/i.test(text) ? "http://" : "https://") + text
+  }
   function webUrlFor(text) { return searchUrl.replace("%s", encodeURIComponent(text.trim())) }
 
   function rebuild() {
