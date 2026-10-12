@@ -49,7 +49,7 @@ Item {
     // Périphériques sans fil sous 15 % (DevicesState.qml).
     var lows = host.devices ? host.devices.low : []
     for (var d = 0; d < lows.length; d++) out.push({ kind: "device", key: "device:" + lows[d].key, device: lows[d], rank: 0.5, order: d })
-    var ts = host.timers || []
+    var ts = host.allTimers || []
     for (var i = 0; i < ts.length; i++) {
       var t = ts[i]
       out.push({ kind: "timer", key: "timer:" + t.id, timer: t,

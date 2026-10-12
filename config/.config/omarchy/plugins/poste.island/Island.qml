@@ -874,10 +874,15 @@ Item {
   // petite île à droite de l'île principale (TimerPill), dont le fond se vide
   // avec le temps. Fin : son en boucle et pastille qui pulse jusqu'au clic. Survivent à un redémarrage
   // du shell (~/.local/state/poste-island/timers.json).
+  // Les rappels d'Omarchy (omarchy-reminder) s'y ajoutent à l'affichage
+  // (allTimers) sans être stockés : systemd reste leur source de vérité.
   property var timers: []
+  property var omarchyReminders: []
+  readonly property var allTimers: timers.concat(omarchyReminders)
   property double now: Date.now()
   readonly property string timersPath: root.home + "/.local/state/poste-island/timers.json"
   readonly property bool timersTicking: {
+    if (omarchyReminders.length > 0) return true
     for (var i = 0; i < timers.length; i++) if (!timers[i].paused && !timers[i].done) return true
     return false
   }
@@ -933,8 +938,12 @@ Item {
   function updateTimer(id, fn) {
     setTimers(timers.map(function(t) { if (t.id !== id) return t; var c = {}; for (var k in t) c[k] = t[k]; fn(c); return c }))
   }
-  function cancelTimer(id) { setTimers(timers.filter(function(t) { return t.id !== id })) }
+  function cancelTimer(id) {
+    if (isReminder(id)) { cancelReminder(id); return }
+    setTimers(timers.filter(function(t) { return t.id !== id }))
+  }
   function togglePause(id) {
+    if (isReminder(id)) return   // un minuteur systemd ne se met pas en pause
     now = Date.now()
     updateTimer(id, function(t) {
       if (t.done) return
@@ -943,6 +952,7 @@ Item {
     })
   }
   function addToTimer(id, ms) {
+    if (isReminder(id)) return   // ni prolongé : l'unité systemd n'est pas la nôtre
     now = Date.now()
     updateTimer(id, function(t) {
       if (t.done) { t.done = false; t.end = now + ms; t.duration = ms; return }
@@ -961,6 +971,10 @@ Item {
       return c
     })
     if (changed) setTimers(list)
+    // Un rappel dont l'heure est passée disparaît tout de suite, sans attendre
+    // la prochaine lecture : l'unité a sonné, sa notification est l'alerte.
+    var live = omarchyReminders.filter(function(r) { return r.end > now })
+    if (live.length !== omarchyReminders.length) omarchyReminders = live
   }
   function ringTimer(t) { }  // le son part tout seul (ringProc) tant qu'un minuteur est terminé
   // Terminé : « complete » (jeu cinematic, uisfx, CC0) en boucle jusqu'au clic
@@ -973,6 +987,81 @@ Item {
     id: ringProc
     running: root.timerRinging
     command: ["timeout", "120", "sh", "-c", 'while :; do "$1" timer-done; sleep 1.4; done', "ring", root.sfx]
+  }
+
+  // ---------------------------------------------------------------- rappels d'Omarchy
+  // `omarchy-reminder <minutes> [message]` crée une unité systemd transitoire
+  // omarchy-reminder-<N>m-<instant>.timer ; son message, s'il y en a un, est
+  // dans $XDG_RUNTIME_DIR/omarchy-reminders/<unité>.message. Omarchy les
+  // montrait dans sa barre, que l'île remplace : on les lit donc ici et on les
+  // affiche comme des minuteurs (même bulle, même carte). Rien n'est écrit dans
+  // timers.json, systemd reste la source de vérité. Pas de pause ni de +1 min
+  // (un minuteur systemd ne se suspend pas, et recréer l'unité ferait dépendre
+  // l'île de la commande interne d'Omarchy) ; pas de sonnerie à la fin non
+  // plus : l'unité envoie sa propre notification, qui est l'alerte, et la
+  // bulle disparaît à l'heure dite. Sans systemctl ni unité, il n'y a rien.
+  // Lecture toutes les 5 s (un `systemctl list-timers` ; pas de signal à
+  // écouter pour une unité transitoire), et aussitôt après une annulation.
+  property var remindersGone: []   // unités annulées d'ici, ignorées jusqu'à ce que systemd les ait lâchées
+  readonly property string remindersMarker: "--messages--"
+  function isReminder(id) { return String(id).indexOf("omarchy:") === 0 }
+  function pollReminders() { if (!remindersProc.running) remindersProc.running = true }
+  function applyReminders(out) {
+    var cut = out.indexOf(remindersMarker + "\n")
+    var json = cut < 0 ? out : out.substring(0, cut)
+    var msgs = {}
+    if (cut >= 0) out.substring(cut + remindersMarker.length + 1).split("\n").forEach(function(line) {
+      var tab = line.indexOf("\t")
+      if (tab > 0) msgs[line.substring(0, tab)] = line.substring(tab + 1).trim()
+    })
+    var units = []
+    try { units = JSON.parse(json) } catch (e) {}
+    if (!Array.isArray(units)) units = []
+    var at = Date.now(), list = [], seen = []
+    units.forEach(function(u) {
+      var unit = String(u.unit || "").replace(/\.timer$/, "")
+      if (!/^omarchy-reminder-[A-Za-z0-9_.-]+$/.test(unit)) return
+      seen.push(unit)
+      var end = Number(u.next) / 1000      // microsecondes depuis l'epoch
+      if (!(end > at) || remindersGone.indexOf(unit) !== -1) return
+      var m = unit.match(/^omarchy-reminder-(\d+)m-/)
+      list.push({ id: "omarchy:" + unit, unit: unit, label: msgs[unit + ".message"] || "Rappel",
+                  duration: Math.max(m ? Number(m[1]) * 60000 : 0, end - at), end: end,
+                  paused: false, left: 0, done: false, omarchy: true })
+    })
+    remindersGone = remindersGone.filter(function(u) { return seen.indexOf(u) !== -1 })
+    // Pas de nouvelle liste si rien n'a changé : la bande d'activités ne se reconstruit pas pour rien.
+    var sig = function(l) { return l.map(function(r) { return r.id + "|" + r.end + "|" + r.label + "|" + r.duration }).join("\n") }
+    if (sig(list) !== sig(omarchyReminders)) { now = at; omarchyReminders = list }
+  }
+  // Annule un rappel : arrête son minuteur systemd et retire son message, comme
+  // `omarchy-reminder clear` le fait pour tous.
+  function cancelReminder(id) {
+    var unit = String(id).substring(8)
+    if (!/^omarchy-reminder-[A-Za-z0-9_.-]+$/.test(unit)) return
+    remindersGone = remindersGone.concat([unit])
+    omarchyReminders = omarchyReminders.filter(function(r) { return r.id !== id })
+    Quickshell.execDetached(["sh", "-c",
+      'systemctl --user stop "$1.timer" 2>/dev/null; rm -f "${XDG_RUNTIME_DIR:-/tmp}/omarchy-reminders/$1.message"',
+      "reminder-stop", unit])
+    remindersRecheck.restart()
+  }
+  Timer { id: remindersRecheck; interval: 700; onTriggered: root.pollReminders() }
+  Timer { interval: 5000; running: true; repeat: true; triggeredOnStart: true; onTriggered: root.pollReminders() }
+  Process {
+    id: remindersProc
+    command: ["sh", "-c",
+      'command -v systemctl >/dev/null 2>&1 || exit 0\n' +
+      'systemctl --user list-timers --all --no-pager --output=json "omarchy-reminder-*.timer" 2>/dev/null\n' +
+      'printf "\\n%s\\n" "$1"\n' +
+      'for f in "${XDG_RUNTIME_DIR:-/tmp}"/omarchy-reminders/omarchy-reminder-*.message; do\n' +
+      '  [ -f "$f" ] || continue\n' +
+      '  printf "%s\\t" "${f##*/}"; tr "\\n\\t\\r" "   " < "$f"; printf "\\n"\n' +
+      'done', "reminders", root.remindersMarker]
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: root.applyReminders(text)
+    }
   }
 
 
@@ -1075,7 +1164,12 @@ Item {
     function lock(): string { root.lockNow(); return "ok" }
     function timerStop(): string { root.setTimers([]); return "ok" }
     // omarchy-shell poste.island timerCancel <id> : annule un seul minuteur.
-    function timerCancel(id: string): string { root.setTimers(root.timers.filter(function(t) { return String(t.id) !== String(id) })); return "ok" }
+    // Un rappel d'Omarchy se désigne par « omarchy:<unité> ».
+    function timerCancel(id: string): string {
+      if (root.isReminder(id)) root.cancelReminder(id)
+      else root.setTimers(root.timers.filter(function(t) { return String(t.id) !== String(id) }))
+      return "ok"
+    }
     function shelf(): string { root.openModuleOn(root.focusedScreen, "shelf"); return "ok" }
     // omarchy-shell poste.island usage : détail de la consommation de Claude Code.
     // omarchy-shell poste.island batterySim "charging 75" | "low 15" | "critical 6" | "off" :

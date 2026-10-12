@@ -5,7 +5,8 @@ dossier) et par la skill Claude Code `poste-desktop`. Arch + Omarchy 4,
 Hyprland 0.56, shell Quickshell avec l'île perso `poste.island`.
 
 ## Île (`omarchy-shell poste.island <commande>`)
-- `timer "10m pâtes"` : minuteur (formats : `25`, `5m30`, `1h30`, `90s`, `12:30`, libellé après). `timerStop` : arrête tout.
+- `timer "10m pâtes"` : minuteur (formats : `25`, `5m30`, `1h30`, `90s`, `12:30`, libellé après). `timerStop` : arrête tous les minuteurs de poste.
+- Les rappels d'Omarchy (`omarchy-reminder`, SUPER+CTRL+R) s'affichent aussi comme des minuteurs (lus dans systemd toutes les 5 s, jamais écrits dans `timers.json`) : sans pause ni +1 min, ils disparaissent à l'heure (la notification d'Omarchy est l'alerte). `timerCancel "omarchy:<unité>"` en annule un ; `timerStop` ne touche que les minuteurs de poste.
 - `ask "question"` : ouvre la vue IA (vide = rouvre la conversation en cours). `askPin` : range la conversation dans la pastille de droite, ou l en retire.
 - `askBg "question"` (ou `askBgWith "question" codex`) : lance une IA en arrière-plan, dans une pastille épinglée, sans ouvrir la vue. `askUnpinAll` : retire toutes les pastilles IA au repos.
 - `devices` : batteries des périphériques sans fil en JSON (clavier, souris, casque). `deviceSim "mouse 12"` / `batterySim "charging 75"` : simulations (`off` pour arrêter).

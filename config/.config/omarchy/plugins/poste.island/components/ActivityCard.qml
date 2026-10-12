@@ -14,6 +14,7 @@ Rectangle {
   required property var activity
   readonly property string kind: activity ? activity.kind : ""
   readonly property var timer: activity ? activity.timer || null : null
+  readonly property bool isReminder: !!timer && timer.omarchy === true   // rappel d'Omarchy (Island.qml)
   readonly property var conv: activity ? activity.conv || null : null
   readonly property var battery: host.battery
   readonly property var device: activity ? activity.device || null : null
@@ -86,6 +87,7 @@ Rectangle {
       anchors.left: parent.left
       anchors.leftMargin: 22
       anchors.verticalCenter: parent.verticalCenter
+      visible: !card.isReminder   // un rappel d'Omarchy ne se met pas en pause
       glyph: card.timer && card.timer.done ? "󰑐" : card.timer && card.timer.paused ? "󰐊" : "󰏤"
       onActivated: {
         if (card.timer.done) card.host.addToTimer(card.timer.id, 60000)
@@ -146,7 +148,7 @@ Rectangle {
       anchors.leftMargin: 26
       anchors.bottom: parent.bottom
       anchors.bottomMargin: 12
-      visible: card.timer && !card.timer.done
+      visible: card.timer && !card.timer.done && !card.isReminder
       text: "+1 min"
       color: plusMouse.containsMouse ? card.host.colorText : card.host.colorMuted
       font.family: card.host.uiFont
