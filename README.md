@@ -100,6 +100,7 @@ chaque fois qu'il faut un droit root, il affiche la commande exacte à copier.
    cd ~/Projects/poste
    ./setup --dry-run   # aperçu complet, n'écrit rien (hors target/)
    ./setup             # même chose en vrai, avec confirmations
+   ./setup --data <adresse de poste-data>   # idem, avec le dépôt de données de la machine
    ```
    `./setup` vérifie `cargo`, enregistre l'emplacement du dépôt (clé `repo`), construit en
    release puis lance `poste sys setup`, qui :
@@ -128,7 +129,7 @@ Posé par `poste sys setup` :
 
 ## Installer sur un autre PC
 
-Le dépôt est le même partout : pas de profils par machine. Ce qui diffère se règle dans
+Le dépôt est le même partout : pas de profils par machine. Ce qui diffère se règle dans le dépôt de données de la machine (plus bas), ou dans
 `~/.config/poste/config.toml`, local à la machine et jamais versionné (`poste sys setup` ne l'écrit pas) :
 
 ```toml
@@ -156,6 +157,32 @@ set = { "idle.lock" = 3600 }
 À faire AVANT le premier `./setup` de la machine (créer le fichier à la main ou lancer
 `poste sys local add` / `module disable` / `skip add` après le premier `./setup --dry-run`), puis suivre « Installer sur un PC neuf ».
 Détail et règles : [`modules/sys/README.md`](modules/sys/README.md), « Réglages propres à la machine ».
+
+### Dépôt de données de la machine (`poste-data`)
+
+Ce dépôt est public et générique. Ce qui est propre à une machine et doit survivre à une
+réinstallation (écrans, montages, adresses de services privés, étapes système de la machine)
+vit dans un second dépôt git, privé, un par machine : `poste-data`, sur le compte qui va avec la
+machine. Déclaré par `data = "<dossier>"` dans `~/.config/poste/config.toml`
+(`./setup --data <adresse git>` le clone à côté de poste et écrit la clé) :
+
+```text
+poste-data/
+  poste.toml           # mêmes clés que config.toml (disabled, skip, local, modules, [[override]]), ajoutées
+  config/              # comme config/ de poste ; même chemin : ce fichier remplace celui de poste
+    .poste/modes       # droits de ses fichiers (pas de link-dirs)
+  bootstrap/
+    steps.toml         # étapes ajoutées ; même id : remplace celle de poste
+    packages.toml      # paquets ajoutés
+```
+
+- Les chemins relatifs de ses étapes (`line`, `source`, `patch`) partent de son `bootstrap/` ;
+  `@DATA@` vaut son dossier.
+- Un fichier sous un dossier lié d'un bloc par poste (`link-dirs`) est refusé.
+- `poste sys sync` fait `git pull --ff-only` dans les deux dépôts, puis `setup`.
+- Le lanceur de l'île lit en plus `~/.config/poste-island/launcher/machine.json` (même format que
+  `launcher.json`) : les entrées propres à la machine y vont, posées par `poste-data`.
+- `repo` et `data` restent dans `config.toml`, jamais dans `poste.toml`.
 
 ## Organisation du dépôt
 

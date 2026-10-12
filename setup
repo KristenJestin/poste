@@ -1,17 +1,19 @@
 #!/usr/bin/env bash
 # Premier lancement de poste (Omarchy fraîche) : vérifie cargo, enregistre l'emplacement du
-# dépôt, construit, puis laisse `poste-sys setup` installer (binaires, config, étapes de bootstrap/). Options : --yes, --dry-run, --no-config, --take-repo, --take-home.
+# dépôt, construit, puis laisse `poste-sys setup` installer (binaires, config, étapes de bootstrap/). Options : --yes, --dry-run, --no-config, --take-repo, --take-home, --data.
 set -euo pipefail
 
 repo="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 
 pass=()
+data=""
+dry=0
 while (($#)); do
   arg="$1"
   shift
   case "$arg" in
     -y | --yes) pass+=(--yes) ;;
-    -n | --dry-run) pass+=(--dry-run) ;;
+    -n | --dry-run) pass+=(--dry-run); dry=1 ;;
     --no-config) pass+=(--no-config) ;;
     --take-repo | --take-home)
       if (($# == 0)); then
@@ -21,8 +23,16 @@ while (($#)); do
       pass+=("$arg" "$1")
       shift
       ;;
+    --data)
+      if (($# == 0)); then
+        echo "setup : --data attend l'adresse git ou le dossier du dépôt de données" >&2
+        exit 2
+      fi
+      data="$1"
+      shift
+      ;;
     -h | --help)
-      echo "Usage : ./setup [--yes] [--dry-run] [--no-config] [--take-repo CHEMIN]... [--take-home CHEMIN]..."
+      echo "Usage : ./setup [--yes] [--dry-run] [--no-config] [--take-repo CHEMIN]... [--take-home CHEMIN]... [--data ADRESSE|DOSSIER]"
       exit 0
       ;;
     *)
@@ -38,29 +48,58 @@ if ! command -v cargo > /dev/null 2>&1; then
   exit 1
 fi
 
-# Écrit (ou met à jour) la clé `repo` sans toucher au reste de la config.
 config="${XDG_CONFIG_HOME:-$HOME/.config}/poste/config.toml"
 mkdir -p "$(dirname "$config")"
-value="${repo//\\/\\\\}"
-value="${value//\"/\\\"}"
-line="repo = \"$value\""
-tmp="$(mktemp "$config.XXXXXX")"
-if [[ -f $config ]] && grep -Eq '^[[:space:]]*repo[[:space:]]*=' "$config"; then
-  # La clé existe : on remplace seulement cette ligne.
-  NEWLINE="$line" awk '
-    !done && /^[[:space:]]*repo[[:space:]]*=/ { print ENVIRON["NEWLINE"]; done = 1; next }
-    { print }
-  ' "$config" > "$tmp"
-else
-  # Une clé de premier niveau doit précéder toute table : on l'ajoute en tête.
-  { echo "$line"; [[ -f $config ]] && cat "$config"; true; } > "$tmp"
-fi
-if [[ -f $config ]] && cmp -s "$tmp" "$config"; then
-  rm -f "$tmp"
-else
-  chmod 644 "$tmp"
-  mv "$tmp" "$config"
-  echo "Config : repo enregistré dans $config"
+
+# Écrit (ou met à jour) une clé de premier niveau sans toucher au reste de la config.
+set_key() {
+  local key="$1" value="$2" line tmp
+  value="${value//\\/\\\\}"
+  value="${value//\"/\\\"}"
+  line="$key = \"$value\""
+  tmp="$(mktemp "$config.XXXXXX")"
+  if [[ -f $config ]] && grep -Eq "^[[:space:]]*$key[[:space:]]*=" "$config"; then
+    # La clé existe : on remplace seulement cette ligne.
+    NEWLINE="$line" KEY="$key" awk '
+      !done && $0 ~ "^[[:space:]]*" ENVIRON["KEY"] "[[:space:]]*=" { print ENVIRON["NEWLINE"]; done = 1; next }
+      { print }
+    ' "$config" > "$tmp"
+  else
+    # Une clé de premier niveau doit précéder toute table : on l'ajoute en tête.
+    { echo "$line"; [[ -f $config ]] && cat "$config"; true; } > "$tmp"
+  fi
+  if [[ -f $config ]] && cmp -s "$tmp" "$config"; then
+    rm -f "$tmp"
+  else
+    chmod 644 "$tmp"
+    mv "$tmp" "$config"
+    echo "Config : $key enregistré dans $config"
+  fi
+}
+
+set_key repo "$repo"
+
+# Dépôt de données de la machine (privé) : un dossier existant, ou une adresse git clonée
+# à côté du dépôt (poste-data).
+if [[ -n $data ]]; then
+  if [[ -d $data ]]; then
+    data="$(cd "$data" && pwd -P)"
+  else
+    dest="$(dirname "$repo")/poste-data"
+    if [[ -e $dest ]]; then
+      echo "setup : $dest existe déjà ; passez ce dossier à --data, ou déplacez-le" >&2
+      exit 1
+    fi
+    if ((dry)); then
+      echo "Simulation : git clone $data $dest non lancé, data non enregistré."
+      data=""
+    else
+      echo "Clonage du dépôt de données dans $dest…"
+      git clone "$data" "$dest"
+      data="$dest"
+    fi
+  fi
+  if [[ -n $data ]]; then set_key data "$data"; fi
 fi
 
 echo "Construction de l'espace de travail (release)…"

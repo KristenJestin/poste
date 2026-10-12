@@ -26,7 +26,7 @@ Module de gestion du dépôt `poste`. Toujours installé. Le dépôt est repér�
   `config/.poste/ignore` (secrets : `.ssh/**`, `.claude/.credentials.json`, `**/.env*`, `.npmrc`…).
 - `poste sys forget <chemin>` : remet un fichier ordinaire à la place du lien ; le fichier reste
   dans le dépôt jusqu'à votre `git rm` et votre commit.
-- `poste sys sync [--yes] [--dry-run]` : `git pull --ff-only`, puis `setup` (aperçu compris).
+- `poste sys sync [--yes] [--dry-run]` : `git pull --ff-only` dans le dépôt et dans le dépôt de données de la machine (`data`, voir le README racine), puis `setup` (aperçu compris).
 - `poste sys import-chezmoi [--source <dossier>] [--dry-run]` : voir « Import depuis chezmoi ».
 - `poste sys local [list|add <chemin>|remove <chemin>]` : fichiers de `config/` que CETTE machine garde
   à elle (voir « Réglages propres à la machine »).

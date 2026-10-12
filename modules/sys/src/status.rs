@@ -92,7 +92,22 @@ fn git(repo: &Path, args: &[&str]) -> Option<String> {
 }
 
 pub fn run(env: &Env, repo: &Path) -> Result<()> {
-    println!("Dépôt");
+    repo_section("Dépôt", repo);
+    if let Some(d) = poste_core::Config::load(env)?.data_path(env) {
+        println!();
+        if d.is_dir() {
+            repo_section("Dépôt de données de la machine (data)", &d);
+        } else {
+            println!("Dépôt de données de la machine (data)");
+            println!("  chemin        {} (absent)", d.display());
+        }
+    }
+    rest(env, repo)
+}
+
+/// Chemin, branche, modifications et poussée d'un dépôt git.
+fn repo_section(title: &str, repo: &Path) {
+    println!("{title}");
     println!("  chemin        {}", repo.display());
     if git(repo, &["rev-parse", "--git-dir"]).is_none() {
         println!("  git           ce dossier n'est pas un dépôt git");
@@ -123,7 +138,9 @@ pub fn run(env: &Env, repo: &Path) -> Result<()> {
             }
         }
     }
+}
 
+fn rest(env: &Env, repo: &Path) -> Result<()> {
     let manifest = Manifest::load(&env.manifest_file())?;
     let items = plan::desired(repo, env)?;
 

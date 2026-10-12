@@ -8,7 +8,7 @@ commands = [
   { name = "diff", description = "compare la config du dépôt à celle de ~ ([chemin])" },
   { name = "add", description = "met un fichier de ~ sous gestion (déplacé dans config/, remplacé par un lien)" },
   { name = "forget", description = "remet un fichier ordinaire à la place du lien" },
-  { name = "sync", description = "git pull --ff-only puis setup (aperçu compris)" },
+  { name = "sync", description = "git pull --ff-only (dépôt et dépôt de données) puis setup (aperçu compris)" },
   { name = "done", description = "marque une étape manuelle faite (<id>, --undo ; sans id : liste)" },
   { name = "local", description = "fichiers de config gardés à cette machine (list, add <chemin>, remove <chemin>)" },
   { name = "module", description = "modules désactivés sur cette machine (list, enable <nom>, disable <nom>)" },

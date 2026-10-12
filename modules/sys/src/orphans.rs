@@ -59,7 +59,10 @@ pub fn find(
     manifest: &Manifest,
     items: &[Item],
 ) -> Result<Vec<Orphan>> {
-    let config_root = repo.join("config");
+    let mut roots = vec![repo.join("config")];
+    if let Some(d) = layout.and_then(|l| l.data_root.clone()) {
+        roots.push(d);
+    }
     let mut out: Vec<Orphan> = Vec::new();
     let mut seen: HashSet<PathBuf> = HashSet::new();
     let wanted: HashSet<PathBuf> = layout
@@ -110,7 +113,7 @@ pub fn find(
         if wanted.contains(&p) || !seen.insert(p.clone()) {
             continue;
         }
-        if let Some(target) = dangling_config_link(&p, &config_root) {
+        if let Some(target) = roots.iter().find_map(|r| dangling_config_link(&p, r)) {
             out.push(Orphan {
                 path: p,
                 kind: Kind::Link { target },

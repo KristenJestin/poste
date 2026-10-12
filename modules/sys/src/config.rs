@@ -52,6 +52,9 @@ pub struct Entry {
 pub struct Layout {
     /// `<dépôt>/config`.
     pub root: PathBuf,
+    /// `<dépôt de données>/config`, s'il est déclaré (`data`) et existe : ses fichiers
+    /// remplacent ceux du dépôt de même chemin, ou s'y ajoutent.
+    pub data_root: Option<PathBuf>,
     /// Entrées que `setup` pose (hors fichiers locaux).
     pub entries: Vec<Entry>,
     /// Entrées que cette machine garde à elle (`local` de `~/.config/poste/config.toml`) :
@@ -182,6 +185,11 @@ pub fn load_with(
     }
     let mut entries = Vec::new();
     scan("", &link_dirs, env, &root, &mut entries)?;
+    let mut modes = modes;
+    let data_root = data_config_root(env)?;
+    if let Some(droot) = &data_root {
+        overlay(droot, env, &link_dirs, &mut entries, &mut modes)?;
+    }
     let (local_entries, mut entries): (Vec<Entry>, Vec<Entry>) =
         entries.into_iter().partition(|e| is_local(&e.rel, local));
     let mut applied = BTreeMap::new();
@@ -204,6 +212,7 @@ pub fn load_with(
     }
     Ok(Some(Layout {
         root,
+        data_root,
         entries,
         local: local_entries,
         local_paths: local.to_vec(),
@@ -211,6 +220,63 @@ pub fn load_with(
         modes,
         link_dirs,
     }))
+}
+
+/// `config/` du dépôt de données de la machine, s'il est déclaré et existe.
+pub fn data_config_root(env: &Env) -> Result<Option<PathBuf>> {
+    let cfg = poste_core::Config::load(env)?;
+    Ok(cfg
+        .data_path(env)
+        .map(|d| d.join("config"))
+        .filter(|d| d.is_dir()))
+}
+
+/// Pose les fichiers du dépôt de données par-dessus ceux du dépôt : même chemin, il gagne ;
+/// sinon il s'ajoute. Pas de `link-dirs` côté données, et rien sous un dossier lié d'un bloc
+/// du dépôt (on ne peut pas y mettre un fichier sans toucher au dépôt).
+fn overlay(
+    droot: &Path,
+    env: &Env,
+    link_dirs: &[String],
+    entries: &mut Vec<Entry>,
+    modes: &mut BTreeMap<String, u32>,
+) -> Result<()> {
+    if !parse_link_dirs(&read_meta(droot, "link-dirs")?)?.is_empty() {
+        bail!(
+            "{} : link-dirs n'est pas pris en charge dans le dépôt de données",
+            droot.join(META).join("link-dirs").display()
+        );
+    }
+    modes.extend(parse_modes(&read_meta(droot, "modes")?)?);
+    let mut extra = Vec::new();
+    scan("", &[], env, droot, &mut extra)?;
+    for e in extra {
+        if let Some(d) = link_dirs
+            .iter()
+            .find(|d| e.rel == **d || e.rel.starts_with(&format!("{d}/")))
+        {
+            bail!(
+                "dépôt de données : « {} » est dans « {d} », lié d'un bloc par le dépôt",
+                e.rel
+            );
+        }
+        match entries.iter_mut().find(|x| x.rel == e.rel) {
+            Some(x) => *x = e,
+            None => entries.push(e),
+        }
+    }
+    entries.sort_by(|a, b| a.rel.cmp(&b.rel));
+    Ok(())
+}
+
+impl Layout {
+    /// Racine (`config/` du dépôt ou du dépôt de données) d'où vient cette entrée.
+    pub fn root_of(&self, e: &Entry) -> &Path {
+        match &self.data_root {
+            Some(d) if e.src.starts_with(d) => d,
+            _ => &self.root,
+        }
+    }
 }
 
 fn scan(
@@ -434,7 +500,10 @@ pub fn mode_fixes(layout: &Layout, env: &Env) -> Vec<ModeFix> {
         if is_local(rel, &layout.local_paths) {
             continue;
         }
-        let in_repo = layout.root.join(rel);
+        let in_repo = match layout.entries.iter().find(|e| e.rel == *rel) {
+            Some(e) => e.src.clone(),
+            None => layout.root.join(rel),
+        };
         let Ok(repo_md) = std::fs::symlink_metadata(&in_repo) else {
             continue;
         };
@@ -790,7 +859,7 @@ fn merge_tree(src: &Path, dst: &Path) -> Result<()> {
 /// Un fichier repris avec des droits restreints : ajoute son mode à `config/.poste/modes`.
 fn note_restricted_mode(layout: &Layout, e: &Entry, mode: u32) -> Result<()> {
     if mode & 0o077 == 0 && !layout.modes.contains_key(&e.rel) {
-        upsert_mode_line(&layout.root, &e.rel, mode)?;
+        upsert_mode_line(layout.root_of(e), &e.rel, mode)?;
         std::fs::set_permissions(&e.src, std::fs::Permissions::from_mode(mode))?;
         println!(
             "  droits {:04o} notés dans config/.poste/modes pour {}",
@@ -1543,6 +1612,53 @@ mod tests {
             Kind::Link(PathBuf::from("../../.agents/s"))
         );
         assert!(load(&fx().repo.join("nope"), &f.env).unwrap().is_none());
+    }
+
+    #[test]
+    fn depot_de_donnees_par_dessus_le_depot() {
+        let f = fx();
+        f.cfg(".config/a", "dépôt a");
+        f.cfg(".config/b", "exemple");
+        f.cfg(".config/bloc/x", "x");
+        f.meta("link-dirs", ".config/bloc\n");
+        let data = f.repo.parent().unwrap().join("data");
+        let dcfg = |rel: &str, s: &str| {
+            let p = data.join("config").join(rel);
+            fs::create_dir_all(p.parent().unwrap()).unwrap();
+            fs::write(p, s).unwrap();
+        };
+        dcfg(".config/b", "vrai b");
+        dcfg(".config/c", "propre à la machine");
+        dcfg(".poste/modes", ".config/c 0600\n");
+        fs::create_dir_all(f.env.config_file().parent().unwrap()).unwrap();
+        fs::write(
+            f.env.config_file(),
+            format!("data = \"{}\"\n", data.display()),
+        )
+        .unwrap();
+
+        let l = f.layout();
+        assert_eq!(l.data_root.as_deref(), Some(data.join("config").as_path()));
+        let src = |rel: &str| l.entries.iter().find(|e| e.rel == rel).unwrap().src.clone();
+        assert_eq!(src(".config/a"), f.repo.join("config/.config/a"));
+        assert_eq!(src(".config/b"), data.join("config/.config/b"));
+        assert_eq!(src(".config/c"), data.join("config/.config/c"));
+        assert_eq!(l.modes[".config/c"], 0o600);
+        let e = l.entries.iter().find(|e| e.rel == ".config/c").unwrap();
+        assert_eq!(l.root_of(e), data.join("config"));
+
+        let p = f.plan(&[]);
+        f.apply(&p);
+        assert_eq!(fs::read_to_string(f.home(".config/b")).unwrap(), "vrai b");
+        assert_eq!(f.state(".config/c"), State::Linked);
+        assert_eq!(
+            fs::metadata(data.join("config/.config/c")).unwrap().mode() & 0o777,
+            0o600
+        );
+
+        // Rien sous un dossier lié d'un bloc par le dépôt.
+        dcfg(".config/bloc/y", "y");
+        assert!(load(&f.repo, &f.env).is_err());
     }
 
     #[test]

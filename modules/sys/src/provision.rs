@@ -95,16 +95,26 @@ struct ManualStep {
     check: Vec<String>,
 }
 
-/// Contexte : chemins et substitutions (`@HOME@`, `@USER@`, `@UID@`, `@GID@`, `@REPO@`, `@BOOTSTRAP@`).
+/// Contexte : chemins et substitutions (`@HOME@`, `@USER@`, `@UID@`, `@GID@`, `@REPO@`,
+/// `@BOOTSTRAP@`, et `@DATA@` : le dépôt de données de la machine, vide sans lui).
 pub struct Ctx<'a> {
     env: &'a Env,
     dir: PathBuf,
+    /// `bootstrap/` du dépôt de données, s'il est déclaré et existe.
+    data_dir: Option<PathBuf>,
     vars: Vec<(&'static str, String)>,
 }
 
 impl<'a> Ctx<'a> {
     pub fn new(env: &'a Env, repo: &Path) -> Self {
         let dir = repo.join("bootstrap");
+        let data = poste_core::Config::load(env)
+            .ok()
+            .and_then(|c| c.data_path(env));
+        let data_dir = data
+            .as_ref()
+            .map(|d| d.join("bootstrap"))
+            .filter(|d| d.is_dir());
         let id = |flag: &str| {
             Command::new("id")
                 .arg(flag)
@@ -120,8 +130,18 @@ impl<'a> Ctx<'a> {
             ("@GID@", id("-g")),
             ("@REPO@", repo.to_string_lossy().into_owned()),
             ("@BOOTSTRAP@", dir.to_string_lossy().into_owned()),
+            (
+                "@DATA@",
+                data.map(|d| d.to_string_lossy().into_owned())
+                    .unwrap_or_default(),
+            ),
         ];
-        Self { env, dir, vars }
+        Self {
+            env,
+            dir,
+            data_dir,
+            vars,
+        }
     }
 
     fn sub(&self, s: &str) -> String {
@@ -146,8 +166,8 @@ impl<'a> Ctx<'a> {
     }
 }
 
-fn load_steps(ctx: &Ctx) -> Result<Steps> {
-    let p = ctx.dir.join("steps.toml");
+fn read_steps(dir: &Path) -> Result<Steps> {
+    let p = dir.join("steps.toml");
     if !p.is_file() {
         return Ok(Steps::default());
     }
@@ -155,8 +175,45 @@ fn load_steps(ctx: &Ctx) -> Result<Steps> {
     toml::from_str(&s).with_context(|| format!("lecture de {}", p.display()))
 }
 
-fn load_packages(ctx: &Ctx) -> Result<BTreeMap<String, String>> {
-    let p = ctx.dir.join("packages.toml");
+/// Les étapes du dépôt, puis celles du dépôt de données : leurs chemins relatifs (patch, source,
+/// line) partent de son `bootstrap/`, et une étape de même `id` remplace celle du dépôt.
+fn load_steps(ctx: &Ctx) -> Result<Steps> {
+    let mut steps = read_steps(&ctx.dir)?;
+    let Some(dd) = &ctx.data_dir else {
+        return Ok(steps);
+    };
+    let more = read_steps(dd)?;
+    let abs = |r: &mut String| *r = dd.join(&*r).to_string_lossy().into_owned();
+    fn put<T>(list: &mut Vec<T>, item: T, id: impl Fn(&T) -> &str) {
+        match list.iter().position(|x| id(x) == id(&item)) {
+            Some(i) => list[i] = item,
+            None => list.push(item),
+        }
+    }
+    for mut p in more.plugin {
+        p.patch.as_mut().map(abs);
+        put(&mut steps.plugin, p, |x| &x.id);
+    }
+    for mut f in more.file {
+        abs(&mut f.source);
+        put(&mut steps.file, f, |x| &x.id);
+    }
+    for u in more.user {
+        put(&mut steps.user, u, |x| &x.id);
+    }
+    for mut s in more.system {
+        s.source.as_mut().map(abs);
+        s.line.as_mut().map(abs);
+        put(&mut steps.system, s, |x| &x.id);
+    }
+    for m in more.manual {
+        put(&mut steps.manual, m, |x| &x.id);
+    }
+    Ok(steps)
+}
+
+fn read_packages(dir: &Path) -> Result<BTreeMap<String, String>> {
+    let p = dir.join("packages.toml");
     if !p.is_file() {
         return Ok(BTreeMap::new());
     }
@@ -164,6 +221,15 @@ fn load_packages(ctx: &Ctx) -> Result<BTreeMap<String, String>> {
     let f: PackagesFile =
         toml::from_str(&s).with_context(|| format!("lecture de {}", p.display()))?;
     Ok(f.packages)
+}
+
+/// Les paquets du dépôt, plus ceux du dépôt de données.
+fn load_packages(ctx: &Ctx) -> Result<BTreeMap<String, String>> {
+    let mut out = read_packages(&ctx.dir)?;
+    if let Some(dd) = &ctx.data_dir {
+        out.extend(read_packages(dd)?);
+    }
+    Ok(out)
 }
 
 // ------------------------------------------------------------------ skip
@@ -1013,6 +1079,53 @@ mod tests {
             .collect();
         let have: HashSet<String> = ["a", "c", "z"].iter().map(|s| s.to_string()).collect();
         assert_eq!(missing_of(&wanted, &have), vec!["b"]);
+    }
+
+    #[test]
+    fn etapes_et_paquets_du_depot_de_donnees() {
+        let (d, repo, env) = fixture();
+        write(&repo, "packages.toml", "[packages]\na = \"\"\n");
+        write(
+            &repo,
+            "steps.toml",
+            "[[system]]\nid = \"s\"\ntitle = \"exemple\"\ncheck = [\"true\"]\n\
+             [[manual]]\nid = \"m\"\ntitle = \"m\"\n",
+        );
+        let data = d.path().join("data");
+        let dw = |rel: &str, s: &str| {
+            let p = data.join("bootstrap").join(rel);
+            fs::create_dir_all(p.parent().unwrap()).unwrap();
+            fs::write(p, s).unwrap();
+        };
+        dw("packages.toml", "[packages]\nb = \"\"\n");
+        dw("system/x.line", "LIGNE @DATA@\n");
+        dw(
+            "steps.toml",
+            "[[system]]\nid = \"s\"\ntitle = \"vrai\"\nfile = \"/f\"\nline = \"system/x.line\"\n\
+             [[manual]]\nid = \"n\"\ntitle = \"n\"\n",
+        );
+        fs::create_dir_all(env.config_file().parent().unwrap()).unwrap();
+        fs::write(
+            env.config_file(),
+            format!("data = \"{}\"\n", data.display()),
+        )
+        .unwrap();
+
+        let ctx = Ctx::new(&env, &repo);
+        let pk: Vec<_> = load_packages(&ctx).unwrap().into_keys().collect();
+        assert_eq!(pk, ["a", "b"]);
+        let steps = load_steps(&ctx).unwrap();
+        // Même id : l'étape du dépôt de données remplace celle du dépôt.
+        assert_eq!(steps.system.len(), 1);
+        assert_eq!(steps.system[0].title, "vrai");
+        let ids: Vec<_> = steps.manual.iter().map(|m| m.id.as_str()).collect();
+        assert_eq!(ids, ["m", "n"]);
+        // Source lue dans le bootstrap/ du dépôt de données, @DATA@ remplacé.
+        let cmds = sys_commands(&ctx, &steps.system[0]).unwrap();
+        assert!(
+            cmds[0].contains(&format!("LIGNE {}", data.display())),
+            "{cmds:?}"
+        );
     }
 
     #[test]

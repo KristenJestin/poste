@@ -113,15 +113,6 @@ source = "system/polkit-systemd-creds.rules"
 # rules.d n'est lisible que par root : poste ne peut pas vérifier, l'étape reste affichée
 # jusqu'à `poste sys done polkit-systemd-creds`.
 
-[[system]]
-id = "fstab-ssd"
-title = "SSD NTFS : montage automatique (fstab)"
-file = "/etc/fstab"
-line = "system/fstab-ssd.line"
-contains = "UUID=0123456789ABCDEF"
-when = ["test", "-e", "/dev/disk/by-uuid/0123456789ABCDEF"] # étape ignorée si le disque est absent
-after = ["sudo mkdir -p /run/media/@USER@/SSD", "sudo systemctl daemon-reload", "sudo mount /run/media/@USER@/SSD"]
-
 # ------------------------------------------------------------ étapes manuelles
 [[manual]]
 id = "gh-auth"
@@ -151,10 +142,6 @@ title = "Omamail (SUPER+SHIFT+M) : cliquer « Install backend » dans la fenêtr
 [[manual]]
 id = "proton-vpn"
 title = "Proton VPN : se connecter depuis le panneau OmaProton (tuile VPN du control center de l'île) ou « protonvpn signin »"
-
-[[manual]]
-id = "ip-fixe"
-title = "(Facultatif) IP fixe : nmcli con mod \"<connexion>\" ipv4.method manual ipv4.addresses 192.0.2.10/24 ipv4.gateway 192.0.2.1 ipv4.dns \"1.1.1.1 1.0.0.1\" ipv4.ignore-auto-dns yes ipv6.dns \"2606:4700:4700::1111 2606:4700:4700::1001\" ipv6.ignore-auto-dns yes && nmcli con up \"<connexion>\""
 
 [[manual]]
 id = "secrets"

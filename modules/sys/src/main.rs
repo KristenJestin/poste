@@ -67,7 +67,7 @@ enum Cmd {
     },
     /// Remet un fichier ordinaire à la place du lien (le dépôt garde son fichier)
     Forget { path: String },
-    /// git pull --ff-only, puis setup (aperçu compris)
+    /// git pull --ff-only (dépôt et dépôt de données), puis setup (aperçu compris)
     Sync {
         #[arg(short, long)]
         yes: bool,
@@ -231,17 +231,36 @@ fn run(cli: Cli) -> Result<ExitCode> {
         }
         Cmd::Sync { yes, dry_run } => {
             let repo = util::repo(&env, &cfg)?;
-            if dry_run {
-                println!("Simulation : git pull --ff-only non lancé.");
-            } else {
+            // Le dépôt, puis le dépôt de données de la machine s'il est déclaré.
+            let mut dirs = vec![repo.clone()];
+            if let Some(d) = cfg.data_path(&env) {
+                if !d.join(".git").exists() {
+                    bail!(
+                        "data = {} : pas un dépôt git (./setup --data <adresse> le clone)",
+                        d.display()
+                    );
+                }
+                dirs.push(d);
+            }
+            for dir in &dirs {
+                if dry_run {
+                    println!(
+                        "Simulation : git pull --ff-only non lancé ({}).",
+                        dir.display()
+                    );
+                    continue;
+                }
                 let st = Command::new("git")
                     .arg("-C")
-                    .arg(&repo)
+                    .arg(dir)
                     .args(["pull", "--ff-only"])
                     .status()
                     .context("impossible de lancer git")?;
                 if !st.success() {
-                    bail!("git pull --ff-only a échoué, setup non lancé");
+                    bail!(
+                        "git pull --ff-only a échoué dans {}, setup non lancé",
+                        dir.display()
+                    );
                 }
             }
             setup::run(

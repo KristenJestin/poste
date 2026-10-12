@@ -30,22 +30,6 @@
       "cwd": "~"
     },
     {
-      "name": "Jellyfin",
-      "subtitle": "media.example.org",
-      "icon": "~/.config/poste-island/launcher/icons/jellyfin.png",
-      "keywords": [
-        "media",
-        "films",
-        "séries",
-        "streaming",
-        "movies",
-        "series",
-        "tv"
-      ],
-      "type": "url",
-      "url": "https://media.example.org"
-    },
-    {
       "name": "Proton VPN",
       "subtitle": "Open the VPN panel",
       "icon": "network-vpn",
@@ -130,24 +114,6 @@
         "musique",
         "music",
         "ytmusic"
-      ]
-    },
-    {
-      "keyword": [
-        "jf",
-        "media"
-      ],
-      "name": "Jellyfin",
-      "url": "https://media.example.org/web/#/search?query=%s",
-      "icon": "~/.config/poste-island/launcher/icons/jellyfin.png",
-      "keywords": [
-        "jellyfin",
-        "film",
-        "films",
-        "série",
-        "séries",
-        "movie",
-        "tv"
       ]
     },
     {

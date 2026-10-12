@@ -3,7 +3,10 @@
 use crate::env::Env;
 use anyhow::{Context, Result};
 use serde::Deserialize;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+
+/// Réglages de la machine versionnés dans le dépôt de données, à sa racine.
+pub const DATA_CONFIG: &str = "poste.toml";
 
 /// Configuration de poste. Les clés inconnues sont ignorées : d'autres
 /// modules ou étapes ultérieures peuvent en ajouter.
@@ -12,6 +15,11 @@ pub struct Config {
     /// Emplacement du dépôt poste (écrit par `./setup`).
     #[serde(default)]
     pub repo: Option<String>,
+    /// Dépôt des données de cette machine (`poste-data`, privé) : ses fichiers `config/` et ses
+    /// étapes `bootstrap/` se posent par-dessus ceux du dépôt, et son `poste.toml` complète
+    /// cette config (écrit par `./setup --data`).
+    #[serde(default)]
+    pub data: Option<String>,
     /// Dossiers supplémentaires où chercher des modules.
     #[serde(default)]
     pub modules: Vec<String>,
@@ -46,14 +54,50 @@ impl Config {
         toml::from_str(text).context("config.toml invalide")
     }
 
-    /// Charge la configuration ; un fichier absent donne la configuration vide.
+    /// Charge la configuration ; un fichier absent donne la configuration vide. Avec `data`, le
+    /// `poste.toml` du dépôt de données s'y ajoute (listes mises bout à bout, sans doublon).
     pub fn load(env: &Env) -> Result<Self> {
-        let file = env.config_file();
-        match std::fs::read_to_string(&file) {
-            Ok(text) => Self::parse(&text).with_context(|| file.display().to_string()),
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(Self::default()),
+        let mut cfg = Self::load_file(&env.config_file())?.unwrap_or_default();
+        if let Some(data) = cfg.data_path(env) {
+            if let Some(more) = Self::load_file(&data.join(DATA_CONFIG))? {
+                cfg.merge(more);
+            }
+        }
+        Ok(cfg)
+    }
+
+    fn load_file(file: &Path) -> Result<Option<Self>> {
+        match std::fs::read_to_string(file) {
+            Ok(text) => Self::parse(&text)
+                .with_context(|| file.display().to_string())
+                .map(Some),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
             Err(e) => Err(e).with_context(|| format!("lecture de {}", file.display())),
         }
+    }
+
+    /// Ajoute les réglages du dépôt de données ; `repo` et `data` restent ceux de la machine.
+    fn merge(&mut self, more: Self) {
+        fn extend(a: &mut Vec<String>, b: Vec<String>) {
+            for v in b {
+                if !a.contains(&v) {
+                    a.push(v);
+                }
+            }
+        }
+        extend(&mut self.modules, more.modules);
+        extend(&mut self.local, more.local);
+        extend(&mut self.disabled, more.disabled);
+        extend(&mut self.skip, more.skip);
+        self.overrides.extend(more.overrides);
+    }
+
+    /// Chemin du dépôt de données, `~` développé.
+    pub fn data_path(&self, env: &Env) -> Option<PathBuf> {
+        self.data
+            .as_deref()
+            .filter(|r| !r.is_empty())
+            .map(|r| env.expand(r))
     }
 
     /// Chemin du dépôt, `~` développé.
@@ -119,6 +163,33 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let e = Env::with_home(dir.path());
         assert_eq!(Config::load(&e).unwrap(), Config::default());
+    }
+
+    #[test]
+    fn poste_toml_du_depot_de_donnees() {
+        let dir = tempfile::tempdir().unwrap();
+        let e = Env::with_home(dir.path());
+        let data = dir.path().join("data");
+        std::fs::create_dir_all(&data).unwrap();
+        std::fs::create_dir_all(e.config_file().parent().unwrap()).unwrap();
+        std::fs::write(
+            e.config_file(),
+            "repo = \"~/poste\"\ndata = \"~/data\"\ndisabled = [\"power\"]\n",
+        )
+        .unwrap();
+        // Sans poste.toml : la config de la machine seule.
+        let c = Config::load(&e).unwrap();
+        assert_eq!(c.data_path(&e), Some(data.clone()));
+        assert_eq!(c.disabled, ["power"]);
+        std::fs::write(
+            data.join(DATA_CONFIG),
+            "repo = \"/ailleurs\"\ndisabled = [\"power\", \"record\"]\nlocal = [\".x\"]\n",
+        )
+        .unwrap();
+        let c = Config::load(&e).unwrap();
+        assert_eq!(c.repo.as_deref(), Some("~/poste"));
+        assert_eq!(c.disabled, ["power", "record"]);
+        assert_eq!(c.local, [".x"]);
     }
 
     #[test]

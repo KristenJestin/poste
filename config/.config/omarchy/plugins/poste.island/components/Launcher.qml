@@ -356,7 +356,7 @@ Item {
     requiresScan.running = true
   }
   function applyConfig() {
-    var docs = [userDoc]
+    var docs = [userDoc, machineDoc]
     for (var m = 0; m < moduleDocs.length; m++) docs.push(moduleDocs[m].data || {})
     scanRequires(docs)
     var items = [], exts = [], engs = [], ids = {}
@@ -389,6 +389,23 @@ Item {
       launcher.applyConfig()
     }
     onLoadFailed: { launcher.userDoc = ({}); launcher.applyConfig() }
+  }
+  // Propre à la machine et versionné ailleurs (dépôt de données, poste-data) :
+  // ~/.config/poste-island/launcher/machine.json, même format, ajouté après launcher.json
+  // (entrées vers des services privés, par exemple).
+  property var machineDoc: ({})
+  FileView {
+    path: Quickshell.env("HOME") + "/.config/poste-island/launcher/machine.json"
+    watchChanges: true
+    printErrors: false
+    onFileChanged: reload()
+    onLoaded: {
+      var data = {}
+      try { data = JSON.parse(text()) } catch (e) { data = {} }
+      launcher.machineDoc = data
+      launcher.applyConfig()
+    }
+    onLoadFailed: { launcher.machineDoc = ({}); launcher.applyConfig() }
   }
 
   function expandHome(path) { path = String(path || ""); return path.indexOf("~") === 0 ? Quickshell.env("HOME") + path.slice(1) : path }

@@ -64,7 +64,7 @@
 [gpg]
 	format = ssh
 [gpg "ssh"]
-	allowedSignersFile = /home/kris/.config/git/allowed_signers
+	allowedSignersFile = ~/.config/git/allowed_signers
 [credential]
 	helper = /usr/lib/git-core/git-credential-libsecret
 [credential "https://github.com"]
