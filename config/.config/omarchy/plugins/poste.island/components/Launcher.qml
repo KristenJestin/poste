@@ -201,8 +201,12 @@ Item {
 
   // ---------------------------------------------------------------- calculator
   property string calcResult: ""
-  readonly property bool looksLikeMath: /[0-9]/.test(query) && /^[0-9\s.,+\-*\/^%()a-zA-Zà-ÿ²³√π!€$]+$/.test(query)
-    && /[+\-*\/^%()!√]|sqrt|sin|cos|tan|log|\s(to|en|in|de|of)\s/.test(query)
+  // Des fonctions et non des propriétés liées : onQueryChanged et rebuild() les lisent pendant
+  // que la saisie change, quand une liaison peut encore valoir la saisie d'avant.
+  function looksLikeMath() {
+    return /[0-9]/.test(query) && /^[0-9\s.,+\-*\/^%()a-zA-Zà-ÿ²³√π!€$]+$/.test(query)
+      && /[+\-*\/^%()!√]|sqrt|sin|cos|tan|log|\s(to|en|in|de|of)\s/.test(query)
+  }
   // qalc speaks English and prints conversions in mixed units ("6 mi + 376
   // yd…"): "15% de 80" becomes (15/100)*(80), "10 km en miles" becomes
   // (10 km)/(1 miles) with the unit put back on the number.
@@ -216,7 +220,7 @@ Item {
     if (conv) { calcUnit = conv[3].trim(); return "(" + conv[1] + ")/(1 " + calcUnit + ")" }
     return q
   }
-  Timer { id: calcDelay; interval: 120; onTriggered: if (launcher.looksLikeMath) { calcProc.command = ["qalc", "-t", launcher.calcExpression(launcher.query)]; calcProc.running = true } }
+  Timer { id: calcDelay; interval: 120; onTriggered: if (launcher.looksLikeMath()) { calcProc.command = ["qalc", "-t", launcher.calcExpression(launcher.query)]; calcProc.running = true } }
   Process {
     id: calcProc
     stdout: StdioCollector {
@@ -775,7 +779,7 @@ Item {
   }
   // Une adresse : un nom de domaine, localhost ou une IPv4, avec port et chemin facultatifs.
   // Sans protocole : https, sauf localhost et les IP (un service local est rarement en https).
-  readonly property bool looksLikeUrl: /^(https?:\/\/)?(([a-z0-9-]+\.)+[a-z]{2,}|localhost|(\d{1,3}\.){3}\d{1,3})(:[0-9]+)?(\/\S*)?$/i.test(query.trim())
+  function looksLikeUrl() { return /^(https?:\/\/)?(([a-z0-9-]+\.)+[a-z]{2,}|localhost|(\d{1,3}\.){3}\d{1,3})(:[0-9]+)?(\/\S*)?$/i.test(query.trim()) }
   function urlFor(text) {
     text = text.trim()
     if (/^https?:\/\//i.test(text)) return text
@@ -825,7 +829,7 @@ Item {
           chevron: false, key: "", pinned: false, ref: JSON.stringify({ type: r.entryType, path: r.path || "", mime: r.mime || "", index: r.index }) })
       }
     } else {
-      if (q && looksLikeUrl)
+      if (q && looksLikeUrl())
         rows.push({ kind: "url", title: "Open " + query.trim(), subtitle: urlFor(query), icon: "", glyph: "󰖟", chevron: false, key: "", pinned: false, ref: urlFor(query) })
       // « timer 10m pâtes » (ou minuteur) : lance un minuteur dans l'île.
       var tm = query.trim().match(/^(timer|minuteur|minuterie)\b\s*(.*)$/i)
@@ -839,7 +843,7 @@ Item {
           rows.push({ kind: "loading", title: "timer <duration> [label]", subtitle: "e.g. timer 10m pasta · timer 1h30 · timer 90s tea",
             icon: "", glyph: "󰔛", chevron: false, key: "", pinned: false, ref: "" })
       }
-      if (calcResult !== "" && looksLikeMath)
+      if (calcResult !== "" && looksLikeMath())
         rows.push({ kind: "calc", title: calcResult, subtitle: "Enter to copy the result", icon: "", glyph: "󰃬", chevron: false, key: "", pinned: false, ref: calcResult })
       // Every candidate row with its match score (0 when the query is empty):
       // apps, extensions, the user's items, and items already loaded in extensions.
@@ -1011,7 +1015,7 @@ Item {
     }
     actionsOpen = false
     if (currentExt !== "" && query.trim() !== "") liveDebounce.restart()
-    if (!looksLikeMath) calcResult = ""
+    if (!looksLikeMath()) calcResult = ""
     else calcDelay.restart()
     rebuild()
   }
