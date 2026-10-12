@@ -25,7 +25,7 @@ PanelWindow {
     partial = host.dictationPartial
   }
 
-  function escape(s) {
+  function escapeHtml(s) {
     return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
   }
   readonly property string plain: finals + (finals !== "" && partial !== "" ? " " : "") + partial
@@ -34,8 +34,8 @@ PanelWindow {
     host.colorText.r * 0.45 + host.colorIsland.r * 0.55,
     host.colorText.g * 0.45 + host.colorIsland.g * 0.55,
     host.colorText.b * 0.45 + host.colorIsland.b * 0.55, 1)
-  readonly property string styled: escape(finals) + (finals !== "" && partial !== "" ? " " : "")
-    + (partial !== "" ? "<font color=\"" + partialColor + "\">" + escape(partial) + "</font>" : "")
+  readonly property string styled: escapeHtml(finals) + (finals !== "" && partial !== "" ? " " : "")
+    + (partial !== "" ? "<font color=\"" + partialColor + "\">" + escapeHtml(partial) + "</font>" : "")
 
   readonly property int fontSize: 16
   readonly property int lines: 3
@@ -78,10 +78,10 @@ PanelWindow {
       x: win.padX
       y: win.padY
       width: box.width - 2 * win.padX
-      height: Math.min(text.implicitHeight, Math.ceil(oneLine.height) * win.lines)
+      height: Math.min(label.implicitHeight, Math.ceil(oneLine.height) * win.lines)
       clip: true
       Text {
-        id: text
+        id: label
         anchors.bottom: parent.bottom
         width: parent.width
         text: win.styled
