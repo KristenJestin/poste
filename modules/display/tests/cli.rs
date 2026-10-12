@@ -95,6 +95,8 @@ impl Bench {
 }
 
 const EDP: (&str, &str) = ("eDP-1", "BOE 0x0B8E");
+const AOC_MID: (&str, &str) = ("HDMI-A-1", "AOC 24G2W1G3- SERIE000000002");
+const AOC_LEFT: (&str, &str) = ("DP-1", "AOC 24G2W1G3- SERIE000000001");
 
 #[test]
 fn auto_applique_une_fois_notifie_et_respecte_le_manuel() {
@@ -119,7 +121,7 @@ fn auto_applique_une_fois_notifie_et_respecte_le_manuel() {
     assert_eq!(fs::read_to_string(&b.notif).unwrap().lines().count(), 1);
 
     // On branche le bureau : nouveau profil, nouvelle notification.
-    b.set(&[EDP, ("HDMI-A-1", "Dell"), ("DP-1", "LG")]);
+    b.set(&[EDP, AOC_MID, AOC_LEFT]);
     let (_, out) = b.go(&["auto"]);
     assert!(out.contains("Boulot"), "{out}");
     assert_eq!(fs::read_to_string(&b.notif).unwrap().lines().count(), 2);
@@ -137,12 +139,24 @@ fn auto_applique_une_fois_notifie_et_respecte_le_manuel() {
         st.contains("Profil courant : nomade") && st.contains("à la main") && st.contains("boulot"),
         "{st}"
     );
+
+    // Le lanceur (« réappliquer », auto --force) choisit de nouveau selon les écrans.
+    let (_, it) = b.go(&["items"]);
+    assert!(it.contains("Profil actuel : Nomade"), "{it}");
+    let (c, out) = b.go(&["auto", "--force"]);
+    assert_eq!(c, 0);
+    assert!(out.contains("Boulot"), "{out}");
+    let (_, st) = b.go(&["status"]);
+    assert!(
+        st.contains("Profil courant : boulot") && !st.contains("à la main"),
+        "{st}"
+    );
 }
 
 #[test]
 fn dry_run_n_applique_rien_et_erreurs() {
     let b = Bench::new();
-    b.set(&[EDP, ("HDMI-A-1", "Dell")]);
+    b.set(&[EDP, AOC_MID]);
     let (c, out) = b.go(&["apply", "boulot", "--dry-run"]);
     assert_eq!(c, 0);
     assert!(
@@ -161,9 +175,9 @@ fn dry_run_n_applique_rien_et_erreurs() {
     assert_eq!(b.go(&["apply", "inconnu"]).0, 1);
     assert_eq!(b.go(&["apply"]).0, 2);
     let (_, l) = b.go(&["list"]);
-    assert!(l.contains("nomade") && l.contains("boulot") && l.contains("maison"));
+    assert!(l.contains("nomade") && l.contains("boulot"));
     let (_, it) = b.go(&["items"]);
-    assert!(it.contains("poste display apply 'maison'"));
+    assert!(it.contains("poste display auto --force"), "{it}");
 }
 
 #[test]
@@ -213,8 +227,8 @@ fn demon_reagit_au_branchement() {
     // Au démarrage : « auto » applique nomade.
     wait("profil initial", &|| b.notif.exists());
     // On branche des écrans : l'événement déclenche le profil boulot (après stabilisation).
-    b.set(&[EDP, ("HDMI-A-1", "Dell")]);
-    sock.write_all(b"monitoradded>>HDMI-A-1\nmonitoraddedv2>>1,HDMI-A-1,Dell\n")
+    b.set(&[EDP, AOC_MID]);
+    sock.write_all(b"monitoradded>>HDMI-A-1\nmonitoraddedv2>>1,HDMI-A-1,AOC\n")
         .unwrap();
     wait("profil boulot", &|| {
         fs::read_to_string(&b.notif).is_ok_and(|s| s.lines().count() >= 2)

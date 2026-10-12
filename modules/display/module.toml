@@ -1,10 +1,10 @@
 name = "display"
-description = "Profils d'écrans Hyprland (maison, boulot, nomade) choisis selon les écrans branchés, avec démon de surveillance"
+description = "Profils d'écrans Hyprland (disposition des écrans) choisis selon les écrans branchés, avec démon de surveillance"
 commands = [
   { name = "status", description = "profil courant, écrans branchés, profil que choisirait « auto »" },
   { name = "list", description = "profils déclarés dans display.toml" },
   { name = "apply", description = "apply <profil> [--dry-run] : applique un profil (--dry-run : montre les commandes)" },
-  { name = "auto", description = "auto [--dry-run] : choisit et applique le profil qui correspond aux écrans branchés" },
+  { name = "auto", description = "auto [--force] [--dry-run] : choisit et applique le profil qui correspond aux écrans branchés (--force : même sans changement d'écrans)" },
   { name = "items", description = "liste de l'extension « Écrans » du lanceur (JSON)" },
   { name = "watch", description = "le démon : écoute les branchements d'écrans d'Hyprland et applique « auto » (unité poste-display.service)" },
 ]

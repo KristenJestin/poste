@@ -66,23 +66,69 @@ pub struct MonitorCfg {
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize)]
-pub struct WorkspaceCfg {
-    /// `3`, `1-10`, `name:mid`.
-    pub workspace: String,
-    /// `internal`, un critère (EDID, `connector:`).
-    pub monitor: String,
-    #[serde(default)]
-    pub default: bool,
-    #[serde(default)]
-    pub persistent: bool,
+pub struct Rescue {
+    /// Espaces à vider : un numéro (`3`), une plage (`1-10`), comparés au numéro de l'espace, ou un
+    /// nom (`mid`), comparé à son nom.
+    pub from: String,
+    /// Destination : un numéro, ou une plage de même longueur que `from` (`1-10` vers `21-30` :
+    /// 1 va sur 21, 2 sur 22…).
+    pub to: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Deserialize)]
-pub struct Rescue {
-    /// Nom de l'espace de travail à vider.
-    pub from: String,
-    /// Espace de destination.
-    pub to: String,
+/// Espace à vider, désigné par son numéro ou par son nom.
+#[derive(Debug, Clone, PartialEq)]
+pub enum RescueFrom {
+    Id(i64),
+    Name(String),
+}
+
+/// `3` ou `1-10` en numéros ; `None` pour un nom.
+fn ids(spec: &str) -> Option<Vec<i64>> {
+    let s = spec.trim();
+    if let Ok(n) = s.parse::<i64>() {
+        return Some(vec![n]);
+    }
+    let (a, b) = s.split_once('-')?;
+    let (a, b) = (a.trim().parse::<i64>().ok()?, b.trim().parse::<i64>().ok()?);
+    (a <= b && b - a < 100).then(|| (a..=b).collect())
+}
+
+impl Rescue {
+    /// Les paires (espace à vider, destination), ou l'erreur à montrer.
+    pub fn pairs(&self) -> Result<Vec<(RescueFrom, String)>, String> {
+        let to = ids(&self.to).ok_or_else(|| {
+            format!(
+                "rescue : destination « {} » : un numéro ou une plage (21-30)",
+                self.to
+            )
+        })?;
+        let Some(from) = ids(&self.from) else {
+            if to.len() != 1 {
+                return Err(format!(
+                    "rescue : « {} » est un nom, la destination doit être un seul numéro",
+                    self.from
+                ));
+            }
+            return Ok(vec![(
+                RescueFrom::Name(self.from.trim().into()),
+                to[0].to_string(),
+            )]);
+        };
+        if to.len() != 1 && to.len() != from.len() {
+            return Err(format!(
+                "rescue : « {} » vers « {} » : plages de longueurs différentes",
+                self.from, self.to
+            ));
+        }
+        Ok(from
+            .iter()
+            .enumerate()
+            .map(|(i, &f)| {
+                let t = if to.len() == 1 { to[0] } else { to[i] };
+                (RescueFrom::Id(f), t.to_string())
+            })
+            .collect())
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize)]
@@ -98,8 +144,10 @@ pub struct Profile {
     pub internal: Option<Internal>,
     #[serde(default)]
     pub monitor: Vec<MonitorCfg>,
+    /// Refusé : les espaces de travail par écran se règlent dans `monitors.lua`
+    /// (`workspace_monitors`). Lu seulement pour le dire clairement.
     #[serde(default)]
-    pub workspace: Vec<WorkspaceCfg>,
+    pub workspace: Vec<toml::Value>,
     #[serde(default)]
     pub rescue: Vec<Rescue>,
 }
@@ -169,6 +217,19 @@ impl Config {
                     bail!("display.toml : profil {} : critère vide", p.name);
                 }
             }
+            if !p.workspace.is_empty() {
+                bail!(
+                    "display.toml : profil {} : [[profile.workspace]] n'existe plus ; les espaces de \
+                     chaque écran se règlent dans ~/.config/hypr/monitors.lua (workspace_monitors). \
+                     Pour ranger des fenêtres, voir [[profile.rescue]]",
+                    p.name
+                );
+            }
+            for r in &p.rescue {
+                if let Err(e) = r.pairs() {
+                    bail!("display.toml : profil {} : {e}", p.name);
+                }
+            }
         }
         Ok(c)
     }
@@ -200,12 +261,50 @@ mod tests {
     fn exemple_valide() {
         let c = Config::parse(include_str!("../display.toml.example")).unwrap();
         let names: Vec<_> = c.profile.iter().map(|p| p.name.as_str()).collect();
-        assert_eq!(names, ["nomade", "boulot", "maison"]);
+        assert_eq!(names, ["nomade", "boulot"]);
         let b = c.find("boulot").unwrap();
         assert_eq!(b.monitor.len(), 2);
         assert_eq!(b.monitor[1].transform, Some(1));
         assert_eq!(b.internal.as_ref().unwrap().scale, Some(Scale::Float(1.6)));
-        assert_eq!(c.find("maison").unwrap().detect.len(), 3);
+        assert_eq!(b.detect_any.len(), 2);
+    }
+
+    #[test]
+    fn rescue_par_numero_plage_ou_nom() {
+        let r = |from: &str, to: &str| {
+            Rescue {
+                from: from.into(),
+                to: to.into(),
+            }
+            .pairs()
+        };
+        let p = r("1-3", "21-23").unwrap();
+        assert_eq!(p[0], (RescueFrom::Id(1), "21".into()));
+        assert_eq!(p[2], (RescueFrom::Id(3), "23".into()));
+        assert_eq!(
+            r("11-20", "21").unwrap()[9],
+            (RescueFrom::Id(20), "21".into())
+        );
+        assert_eq!(
+            r("mid", "11").unwrap(),
+            [(RescueFrom::Name("mid".into()), "11".into())]
+        );
+        assert!(r("1-3", "21-22").is_err());
+        assert!(r("mid", "1-2").is_err());
+        assert!(r("1", "mid").is_err());
+    }
+
+    #[test]
+    fn regles_d_espaces_refusees() {
+        let e = Config::parse(
+            "[[profile]]\nname = \"a\"\n[[profile.workspace]]\nworkspace = \"1-10\"\nmonitor = \"internal\"\n",
+        )
+        .unwrap_err();
+        assert!(format!("{e:#}").contains("monitors.lua"), "{e:#}");
+        assert!(Config::parse(
+            "[[profile]]\nname = \"a\"\n[[profile.rescue]]\nfrom = \"1-3\"\nto = \"5-6\"\n"
+        )
+        .is_err());
     }
 
     #[test]

@@ -21,7 +21,9 @@ pub const USAGE: &str = "Module display de poste : profils d'écrans Hyprland.
   poste display status              profil courant, écrans branchés, profil que choisirait « auto »
   poste display list                profils déclarés (~/.config/poste/display.toml)
   poste display apply <profil> [--dry-run]   applique un profil (--dry-run : affiche les commandes)
-  poste display auto [--dry-run]    choisit et applique le profil qui correspond aux écrans branchés
+  poste display auto [--force] [--dry-run]   choisit et applique le profil qui correspond aux écrans
+                                    branchés (--force : même si les écrans n'ont pas changé, et
+                                    même si un profil a été choisi à la main)
   poste display items               liste de l'extension « Écrans » du lanceur (JSON)
   poste display watch               le démon : écoute les branchements d'écrans et applique « auto »
 
@@ -119,10 +121,21 @@ fn apply_profile(
     failed
 }
 
-/// « auto » : choisit selon les écrans. `force` : réappliquer même si rien n'a changé (après un
-/// rechargement de la config d'Hyprland, qui remet les règles du fichier). `notify` : prévenir si
-/// le profil change. Renvoie 0 si tout va bien.
-fn auto(env: &Env, cfg: &Config, dry_run: bool, force: bool, notify: bool) -> i32 {
+/// Quand réappliquer, en plus d'un changement d'écrans.
+#[derive(Clone, Copy, PartialEq)]
+enum Force {
+    /// Seulement si les écrans ont changé.
+    No,
+    /// Après un rechargement de la config d'Hyprland, qui remet les règles du fichier : on remet
+    /// ce qui était appliqué, y compris un profil choisi à la main.
+    Reload,
+    /// Demandé (`auto --force`, le lanceur) : choisir à nouveau selon les écrans branchés.
+    Reselect,
+}
+
+/// « auto » : choisit selon les écrans et applique. `notify` : prévenir si le profil change.
+/// Renvoie 0 si tout va bien.
+fn auto(env: &Env, cfg: &Config, dry_run: bool, force: Force, notify: bool) -> i32 {
     let mons = match monitors() {
         Ok(m) => m,
         Err(e) => {
@@ -133,14 +146,13 @@ fn auto(env: &Env, cfg: &Config, dry_run: bool, force: bool, notify: bool) -> i3
     let sig = model::signature(&mons);
     let st = load_state(env);
     let same_screens = st.as_ref().is_some_and(|s| s.sig == sig);
-    if same_screens && !force {
+    if same_screens && force == Force::No {
         if dry_run {
             println!("Les écrans n'ont pas changé depuis le dernier profil : rien à faire.");
         }
         return 0;
     }
-    // Après un rechargement, on remet ce qui était appliqué (y compris un profil choisi à la main).
-    let chosen: Option<&Profile> = match (&st, same_screens && force) {
+    let chosen: Option<&Profile> = match (&st, same_screens && force == Force::Reload) {
         (Some(s), true) if s.manual => s.profile.as_deref().and_then(|n| cfg.find(n)),
         _ => model::choose(cfg, &mons),
     };
@@ -235,36 +247,30 @@ fn cmd_status(env: &Env, cfg: &Config) -> i32 {
     0
 }
 
-/// Entrées du lanceur : un profil par ligne, plus « automatique ».
-pub fn items_json(cfg: &Config) -> String {
-    let cmd = |args: &str| serde_json::json!({"type": "command", "command": format!("poste display {args}")});
-    let mut items: Vec<serde_json::Value> = cfg
-        .profile
-        .iter()
-        .map(|p| {
-            serde_json::json!({
-                "id": format!("profile:{}", p.name),
-                "name": format!("Écrans : {}", p.label()),
-                "subtitle": format!("Appliquer le profil « {} »", p.label()),
-                "icon": "\u{f0379}",
-                "verb": "Appliquer",
-                "keywords": ["écrans", "ecrans", "display", "profil", p.name],
-                "action": cmd(&format!("apply '{}'", p.name)),
-            })
-        })
-        .collect();
-    if !cfg.profile.is_empty() {
-        items.push(serde_json::json!({
-            "id": "auto",
-            "name": "Écrans : automatique",
-            "subtitle": "Choisir le profil selon les écrans branchés",
-            "icon": "\u{f0379}",
-            "verb": "Appliquer",
-            "keywords": ["écrans", "ecrans", "display", "auto", "automatique"],
-            "action": cmd("auto"),
-        }));
+/// Entrée du lanceur : une seule, « réappliquer » (choisir selon les écrans branchés), avec le
+/// profil en cours (`current`, son nom) dans le sous-titre. Le démon choisit déjà tout seul à
+/// chaque branchement : la liste des profils n'y est pas, `poste display apply` reste pour la main.
+pub fn items_json(cfg: &Config, current: Option<&str>) -> String {
+    if cfg.profile.is_empty() {
+        return "[]".into();
     }
-    serde_json::Value::Array(items).to_string()
+    let subtitle = match current.and_then(|n| cfg.find(n)) {
+        Some(p) => format!(
+            "Profil actuel : {} · choisir selon les écrans branchés",
+            p.label()
+        ),
+        None => "Choisir le profil selon les écrans branchés".into(),
+    };
+    serde_json::json!([{
+        "id": "auto",
+        "name": "Écrans : réappliquer",
+        "subtitle": subtitle,
+        "icon": "\u{f0379}",
+        "verb": "Appliquer",
+        "keywords": ["écrans", "ecrans", "display", "profil", "réappliquer", "reappliquer", "auto"],
+        "action": {"type": "command", "command": "poste display auto --force"},
+    }])
+    .to_string()
 }
 
 // ---------------------------------------------------------------- démon
@@ -278,7 +284,7 @@ fn watch(env: &Env) -> i32 {
         }
     };
     if let Some(cfg) = load() {
-        auto(env, &cfg, false, false, true);
+        auto(env, &cfg, false, Force::No, true);
     }
     let mut last_apply = Instant::now();
     loop {
@@ -325,6 +331,7 @@ fn watch(env: &Env) -> i32 {
                 if Instant::now() >= due {
                     pending = None;
                     if let Some(cfg) = load() {
+                        let force = if force { Force::Reload } else { Force::No };
                         auto(env, &cfg, false, force, true);
                     }
                     last_apply = Instant::now();
@@ -360,10 +367,21 @@ pub fn run(argv: &[String]) -> i32 {
         "status" => cmd_status(&env, &cfg),
         "list" => cmd_list(&env, &cfg),
         "items" => {
-            println!("{}", items_json(&cfg));
+            let st = load_state(&env);
+            println!(
+                "{}",
+                items_json(&cfg, st.as_ref().and_then(|s| s.profile.as_deref()))
+            );
             0
         }
-        "auto" => auto(&env, &cfg, dry_run, false, true),
+        "auto" => {
+            let force = if rest.iter().any(|a| a == "--force" || a == "-f") {
+                Force::Reselect
+            } else {
+                Force::No
+            };
+            auto(&env, &cfg, dry_run, force, true)
+        }
         "apply" => {
             let Some(name) = rest.iter().find(|a| !a.starts_with('-')) else {
                 eprintln!("poste display : apply demande un nom de profil (poste display list)");
@@ -396,12 +414,20 @@ mod tests {
     #[test]
     fn items_du_lanceur() {
         let cfg = Config::parse(include_str!("../display.toml.example")).unwrap();
-        let v: serde_json::Value = serde_json::from_str(&items_json(&cfg)).unwrap();
+        let v: serde_json::Value = serde_json::from_str(&items_json(&cfg, Some("boulot"))).unwrap();
         let a = v.as_array().unwrap();
-        assert_eq!(a.len(), 4);
-        assert_eq!(a[0]["action"]["command"], "poste display apply 'nomade'");
-        assert_eq!(a[3]["action"]["command"], "poste display auto");
-        assert_eq!(items_json(&Config::default()), "[]");
+        assert_eq!(a.len(), 1);
+        assert_eq!(a[0]["action"]["command"], "poste display auto --force");
+        assert_eq!(
+            a[0]["subtitle"],
+            "Profil actuel : Boulot · choisir selon les écrans branchés"
+        );
+        let v: serde_json::Value = serde_json::from_str(&items_json(&cfg, None)).unwrap();
+        assert_eq!(
+            v[0]["subtitle"],
+            "Choisir le profil selon les écrans branchés"
+        );
+        assert_eq!(items_json(&Config::default(), None), "[]");
     }
 
     #[test]

@@ -1,10 +1,17 @@
 # poste display
 
-Profils d'écrans pour Hyprland (0.56, config Lua) : maison, boulot, nomade. Le démon
+Profils d'écrans pour Hyprland (0.56, config Lua) : où sont les écrans selon ceux qui sont branchés
+(au bureau, portable seul…). Le démon
 (`poste-display watch`, lancé par `poste-display.service`, activé par `poste sys setup`) écoute les
 branchements d'écrans et applique le profil qui correspond. Il remplace `display-profile` et
 `display-profile-watch` de l'ancien portable pro (Omarchy 3, profils work / nomad / home faits à la va-vite).
 Prévu pour le portable ; à désactiver ailleurs (`poste sys module disable display`).
+
+Un profil règle seulement la disposition des écrans (mode, position, échelle, rotation) et, au besoin,
+range des fenêtres. Les espaces de travail de chaque écran viennent de `~/.config/hypr/monitors.lua`
+(`workspace_monitors`) et de lui seul : un profil qui en déclare (`[[profile.workspace]]`) est refusé
+avec un message qui le dit. Avant le 2026-10-12, les profils du pro posaient leurs propres règles
+d'espaces et le démon les remettait à chaque rechargement d'Hyprland, par-dessus `monitors.lua`.
 
 ## Commandes
 
@@ -12,43 +19,45 @@ Prévu pour le portable ; à désactiver ailleurs (`poste sys module disable dis
 - `poste display list` : profils déclarés.
 - `poste display apply <profil> [--dry-run]` : applique un profil. Choisi à la main, il n'est pas défait
   par `auto` tant que les écrans branchés ne changent pas. `--dry-run` montre les commandes sans rien appliquer.
-- `poste display auto [--dry-run]` : choisit selon les écrans branchés et applique (sans effet si les écrans n'ont pas changé).
+- `poste display auto [--force] [--dry-run]` : choisit selon les écrans branchés et applique (sans effet si les
+  écrans n'ont pas changé, sauf avec `--force`, qui choisit à nouveau même après un `apply` à la main).
 - `poste display items` : entrées du lanceur (JSON).
 - `poste display watch` : le démon.
 
-L'île : l'extension « Écrans » du lanceur (mots-clés `ecrans`, `display`) liste « Écrans : Maison / Boulot /
-Nomade / automatique » (`island/launcher.json`, entrées lues dans `display.toml`).
+L'île : l'extension « Écrans » du lanceur (mots-clés `ecrans`, `display`) a une seule entrée, « Écrans :
+réappliquer » (`poste display auto --force`), avec le profil en cours en sous-titre (`island/launcher.json`).
+Le démon choisit déjà à chaque branchement : la liste des profils n'y est pas, `apply` reste pour la main.
 Quand le démon change de profil tout seul : notification discrète (urgence basse).
 
 ## Profils : `~/.config/poste/display.toml`
 
 Local à la machine, non versionné. Modèle commenté : [`display.toml.example`](display.toml.example)
-(`cp` puis ajuster). Profils déduits des anciens scripts du pro ; l'exemple dit ce qui est sûr et ce qui
-ne l'est pas :
+(`cp` puis ajuster), celui du portable pro, vérifié au bureau le 2026-10-12 :
 
-- nomade (portable seul, 2880x1800@120 échelle 1.6, rapatrie les fenêtres de `mid` et `left` vers 9 et 10) : sûr ;
-- boulot (HDMI-A-1 au milieu au-dessus, DP-1 portrait à gauche) : disposition sûre, détection par prise
-  (`connector:`) PAS fiable : les descriptions EDID du bureau ne sont pas connues, à remplacer ;
-- maison : hypothèse (les trois Iiyama PL2470H du PC fixe), à confirmer ou supprimer.
+- nomade (portable seul) : range les fenêtres des espaces des écrans du bureau (1-10 et 11-20) sur ceux du
+  portable (21-30), les seuls que la barre de l'île y montre ;
+- boulot : les deux AOC 24G2W1G3 du bureau, reconnus par leur numéro de série (HDMI-A-1 au milieu au-dessus
+  du portable, DP-1 en portrait à gauche) ; un seul des deux suffit.
 
 Un profil : `detect` (tous présents), `detect_any` (au moins un) parmi les écrans EXTERNES, `internal`
 (activé ou non, mode, position, échelle), `[[profile.monitor]]` (`match`, `mode`, `position`, `scale`,
-`transform`), `[[profile.workspace]]` (règles d'espaces de travail, `1-10` accepté, `internal` désigne l'écran interne),
-`[[profile.rescue]]` (fenêtres d'un espace nommé ramenées vers un autre). Un critère est un morceau de description EDID
+`transform`), `[[profile.rescue]]` (fenêtres à ranger : `from` est un numéro d'espace, une plage `1-10` ou un
+nom d'espace, `to` un numéro ou une plage de même longueur). Un critère est un morceau de description EDID
 (sans casse) ou `connector:NOM`. Le plus précis gagne ; sans `detect` ni `detect_any`, le profil
 ne vaut que sans écran externe ; aucun profil ne correspond : rien n'est changé.
 
 ## Comment c'est appliqué (Hyprland 0.56, Lua)
 
 Pour chaque règle, d'abord `hyprctl eval 'hl.monitor({ output = …, mode = …, position = …, scale = … })'`
-(de même `hl.workspace_rule`, `hl.dispatch(hl.dsp.window.move / workspace.move …)`), puis, si Hyprland ne
-répond pas `ok`, la forme historique (`hyprctl keyword monitor …`, `dispatch moveworkspacetomonitor …`).
-`--dry-run` affiche les deux. Ordre : fenêtres à rapatrier, écrans (l'interne d'abord s'il reste actif, après
-les autres s'il est désactivé : jamais zéro écran), règles d'espaces, déplacement des espaces existants.
+(de même `hl.dispatch(hl.dsp.window.move …)`), puis, si Hyprland ne répond pas `ok`, la forme historique
+(`hyprctl keyword monitor …`, `dispatch movetoworkspacesilent …`). `--dry-run` affiche les deux. Ordre :
+fenêtres à ranger, puis écrans (l'interne d'abord s'il reste actif, après les autres s'il est désactivé :
+jamais zéro écran).
 
-Vérifié sur le pro le 2026-10-12 : `hl.monitor`, `window.move` avec `window = "address:…"`, et `workspace.move`
-qui prend `workspace` (avec `id`, Hyprland répond `ok` mais ne déplace rien). Reste à valider : `disabled = true`
-de `hl.monitor`. Le démon réapplique le profil après un `hyprctl reload` (qui remet les règles de `monitors.lua`).
+Vérifié sur le pro le 2026-10-12 : `hl.monitor`, `window.move` avec `window = "address:…"` (et, pour mémoire,
+`hl.dsp.workspace.move` prend `workspace`, pas `id` : avec `id`, Hyprland répond `ok` sans rien déplacer).
+Reste à valider : `disabled = true` de `hl.monitor`. Le démon réapplique le profil après un `hyprctl reload`,
+qui remet les écrans de `monitors.lua`.
 
 Attention : Omarchy 4 gère aussi l'écran interne (`omarchy-hyprland-monitor-clamshell`, à la fermeture
 du capot). Désactiver l'écran interne par un profil peut être contredit par cette bascule.

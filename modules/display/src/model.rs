@@ -94,11 +94,8 @@ pub mod tests {
     }
 
     pub const EDP: (&str, &str) = ("eDP-1", "BOE 0x0B8E");
-    pub const IIYAMA: [(&str, &str); 3] = [
-        ("DP-3", "Iiyama North America PL2470H 0x33303433"),
-        ("DP-1", "Iiyama North America PL2470H 0x33363338"),
-        ("DP-2", "Iiyama North America PL2470H 0x31303231"),
-    ];
+    pub const AOC_MID: (&str, &str) = ("HDMI-A-1", "AOC 24G2W1G3- SERIE000000002");
+    pub const AOC_LEFT: (&str, &str) = ("DP-1", "AOC 24G2W1G3- SERIE000000001");
 
     fn cfg() -> Config {
         Config::parse(include_str!("../display.toml.example")).unwrap()
@@ -115,27 +112,17 @@ pub mod tests {
     }
 
     #[test]
-    fn trois_iiyama_est_maison() {
-        let mut v = vec![EDP];
-        v.extend(IIYAMA);
-        assert_eq!(pick(&v).as_deref(), Some("maison"));
-        // Deux seulement (sur DP-3 et DP-2) : pas la maison, et pas le bureau non plus.
-        let v = vec![EDP, IIYAMA[0], IIYAMA[2]];
-        assert_eq!(pick(&v), None);
-    }
-
-    #[test]
-    fn prises_du_bureau_est_boulot_un_seul_suffit() {
-        assert_eq!(
-            pick(&[EDP, ("HDMI-A-1", "Dell P2422H")]).as_deref(),
-            Some("boulot")
-        );
-        assert_eq!(pick(&[EDP, ("DP-1", "LG 27")]).as_deref(), Some("boulot"));
+    fn ecrans_du_bureau_un_seul_suffit() {
+        assert_eq!(pick(&[EDP, AOC_MID, AOC_LEFT]).as_deref(), Some("boulot"));
+        assert_eq!(pick(&[EDP, AOC_MID]).as_deref(), Some("boulot"));
+        assert_eq!(pick(&[EDP, AOC_LEFT]).as_deref(), Some("boulot"));
     }
 
     #[test]
     fn ecran_inconnu_aucun_profil() {
         assert_eq!(pick(&[EDP, ("HDMI-A-2", "Epson projector")]), None);
+        // Un autre écran sur la même prise que celui du bureau n'est pas le bureau.
+        assert_eq!(pick(&[EDP, ("HDMI-A-1", "Dell P2422H")]), None);
     }
 
     #[test]

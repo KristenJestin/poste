@@ -2,7 +2,7 @@
 //! 0.56 avec config Lua) et, quand elle existe, une forme historique (`hyprctl keyword|dispatch`)
 //! essayée si la première échoue. Rien ici n'exécute quoi que ce soit.
 
-use crate::config::{Config, Internal, MonitorCfg, Profile, Scale};
+use crate::config::{Config, Internal, MonitorCfg, Profile, RescueFrom, Scale};
 use crate::model::{matches, Monitor};
 use serde::Deserialize;
 
@@ -83,18 +83,6 @@ fn resolve<'a>(cfg: &'a Config, mons: &'a [Monitor], target: &str) -> Option<&'a
         .map(|m| m.name.as_str())
 }
 
-/// `1-10` en 1, 2, … 10 ; sinon l'identifiant tel quel.
-pub fn expand_workspaces(spec: &str) -> Vec<String> {
-    if let Some((a, b)) = spec.split_once('-') {
-        if let (Ok(a), Ok(b)) = (a.trim().parse::<u32>(), b.trim().parse::<u32>()) {
-            if a <= b && b - a < 100 {
-                return (a..=b).map(|n| n.to_string()).collect();
-            }
-        }
-    }
-    vec![spec.trim().to_string()]
-}
-
 #[derive(Debug, Deserialize)]
 struct Client {
     address: String,
@@ -102,6 +90,8 @@ struct Client {
 }
 #[derive(Debug, Deserialize)]
 struct ClientWs {
+    #[serde(default)]
+    id: i64,
     #[serde(default)]
     name: String,
 }
@@ -111,20 +101,34 @@ fn rescue_cmds(p: &Profile, clients_json: &str) -> Vec<Cmd> {
     let clients: Vec<Client> = serde_json::from_str(clients_json).unwrap_or_default();
     let mut out = Vec::new();
     for r in &p.rescue {
-        for c in clients.iter().filter(|c| c.workspace.name == r.from) {
-            out.push(Cmd {
-                desc: format!("fenêtre {} : de « {} » vers {}", c.address, r.from, r.to),
-                lua: format!(
-                    "hl.dispatch(hl.dsp.window.move({{ workspace = {}, follow = false, window = {} }}))",
-                    q(&r.to),
-                    q(&format!("address:{}", c.address))
-                ),
-                legacy: Some(vec![
-                    "dispatch".into(),
-                    "movetoworkspacesilent".into(),
-                    format!("{},address:{}", r.to, c.address),
-                ]),
-            });
+        // Règles vérifiées au chargement de display.toml.
+        for (from, to) in r.pairs().unwrap_or_default() {
+            let hit = |c: &&Client| match &from {
+                RescueFrom::Id(n) => c.workspace.id == *n,
+                RescueFrom::Name(n) => c.workspace.name == *n,
+            };
+            for c in clients.iter().filter(hit) {
+                if c.workspace.id.to_string() == to {
+                    continue;
+                }
+                let label = match &from {
+                    RescueFrom::Id(n) => n.to_string(),
+                    RescueFrom::Name(n) => format!("« {n} »"),
+                };
+                out.push(Cmd {
+                    desc: format!("fenêtre {} : de {label} vers {to}", c.address),
+                    lua: format!(
+                        "hl.dispatch(hl.dsp.window.move({{ workspace = {}, follow = false, window = {} }}))",
+                        q(&to),
+                        q(&format!("address:{}", c.address))
+                    ),
+                    legacy: Some(vec![
+                        "dispatch".into(),
+                        "movetoworkspacesilent".into(),
+                        format!("{to},address:{}", c.address),
+                    ]),
+                });
+            }
         }
     }
     out
@@ -153,9 +157,9 @@ fn external_cmd(output: &str, m: &MonitorCfg) -> Cmd {
     })
 }
 
-/// Toutes les commandes d'un profil, dans l'ordre : fenêtres à rapatrier, écrans (l'interne
-/// d'abord s'il reste actif, après les autres s'il est désactivé : jamais zéro écran), règles
-/// d'espaces de travail, puis déplacement immédiat des espaces existants.
+/// Toutes les commandes d'un profil, dans l'ordre : fenêtres à rapatrier, puis écrans (l'interne
+/// d'abord s'il reste actif, après les autres s'il est désactivé : jamais zéro écran). Les espaces
+/// de travail de chaque écran ne sont pas touchés : ils viennent de `monitors.lua`.
 pub fn commands(cfg: &Config, p: &Profile, mons: &[Monitor], clients_json: &str) -> Vec<Cmd> {
     let mut out = rescue_cmds(p, clients_json);
     let internal = p.internal.clone().unwrap_or_default();
@@ -171,48 +175,6 @@ pub fn commands(cfg: &Config, p: &Profile, mons: &[Monitor], clients_json: &str)
     if !internal_first {
         out.push(internal_cmd(cfg, &internal));
     }
-    let mut moves = Vec::new();
-    for w in &p.workspace {
-        let Some(mon) = resolve(cfg, mons, &w.monitor) else {
-            continue;
-        };
-        for id in expand_workspaces(&w.workspace) {
-            let mut lua = format!(
-                "hl.workspace_rule({{ workspace = {}, monitor = {}",
-                q(&id),
-                q(mon)
-            );
-            let mut legacy = format!("{id},monitor:{mon}");
-            if w.default {
-                lua.push_str(", default = true");
-                legacy.push_str(",default:true");
-            }
-            if w.persistent {
-                lua.push_str(", persistent = true");
-                legacy.push_str(",persistent:true");
-            }
-            lua.push_str(" })");
-            out.push(Cmd {
-                desc: format!("espace {id} : sur {mon}"),
-                lua,
-                legacy: Some(vec!["keyword".into(), "workspace".into(), legacy]),
-            });
-            moves.push(Cmd {
-                desc: format!("espace {id} : déplacé vers {mon}"),
-                lua: format!(
-                    "hl.dispatch(hl.dsp.workspace.move({{ workspace = {}, monitor = {} }}))",
-                    q(&id),
-                    q(mon)
-                ),
-                legacy: Some(vec![
-                    "dispatch".into(),
-                    "moveworkspacetomonitor".into(),
-                    format!("{id} {mon}"),
-                ]),
-            });
-        }
-    }
-    out.extend(moves);
     out
 }
 
@@ -220,42 +182,26 @@ pub fn commands(cfg: &Config, p: &Profile, mons: &[Monitor], clients_json: &str)
 mod tests {
     use super::*;
     use crate::model::parse_monitors;
-    use crate::model::tests::{fake, EDP, IIYAMA};
+    use crate::model::tests::{fake, AOC_LEFT, AOC_MID, EDP};
 
     fn cfg() -> Config {
         Config::parse(include_str!("../display.toml.example")).unwrap()
     }
 
     #[test]
-    fn plages() {
-        assert_eq!(expand_workspaces("1-3"), ["1", "2", "3"]);
-        assert_eq!(expand_workspaces("name:mid"), ["name:mid"]);
-        assert_eq!(expand_workspaces("5"), ["5"]);
-    }
-
-    #[test]
     fn boulot_avec_les_deux_ecrans() {
         let c = cfg();
-        let ms = parse_monitors(&fake(&[EDP, ("HDMI-A-1", "Dell"), ("DP-1", "LG")])).unwrap();
+        let ms = parse_monitors(&fake(&[EDP, AOC_MID, AOC_LEFT])).unwrap();
         let cmds = commands(&c, c.find("boulot").unwrap(), &ms, "[]");
         let lua: Vec<&str> = cmds.iter().map(|c| c.lua.as_str()).collect();
         assert_eq!(
-            lua[0],
-            "hl.monitor({ output = \"eDP-1\", mode = \"2880x1800@120\", position = \"0x0\", scale = 1.6 })"
+            lua,
+            [
+                "hl.monitor({ output = \"eDP-1\", mode = \"2880x1800@120\", position = \"0x0\", scale = 1.6 })",
+                "hl.monitor({ output = \"HDMI-A-1\", mode = \"1920x1080@144\", position = \"0x-1080\", scale = 1 })",
+                "hl.monitor({ output = \"DP-1\", mode = \"1920x1080@144\", position = \"-1080x-1080\", scale = 1, transform = 1 })",
+            ]
         );
-        assert_eq!(
-            lua[1],
-            "hl.monitor({ output = \"HDMI-A-1\", mode = \"1920x1080@144\", position = \"0x-1080\", scale = 1 })"
-        );
-        assert_eq!(
-            lua[2],
-            "hl.monitor({ output = \"DP-1\", mode = \"1920x1080@144\", position = \"-1080x-1080\", scale = 1, transform = 1 })"
-        );
-        assert!(lua.contains(&"hl.workspace_rule({ workspace = \"name:mid\", monitor = \"HDMI-A-1\", default = true, persistent = true })"));
-        assert!(lua.contains(&"hl.workspace_rule({ workspace = \"7\", monitor = \"eDP-1\" })"));
-        assert!(lua.contains(
-            &"hl.dispatch(hl.dsp.workspace.move({ workspace = \"name:left\", monitor = \"DP-1\" }))"
-        ));
         // Forme historique de repli.
         assert_eq!(
             cmds[0].legacy.as_deref().unwrap(),
@@ -265,47 +211,45 @@ mod tests {
             cmds[2].legacy.as_deref().unwrap()[2],
             "DP-1,1920x1080@144,-1080x-1080,1,transform,1"
         );
-        // Les règles d'espaces précèdent les déplacements.
-        let last_rule = lua
-            .iter()
-            .rposition(|l| l.starts_with("hl.workspace_rule"))
-            .unwrap();
-        let first_move = lua
-            .iter()
-            .position(|l| l.contains("workspace.move"))
-            .unwrap();
-        assert!(last_rule < first_move);
     }
 
     #[test]
     fn ecran_absent_ignore() {
         let c = cfg();
-        let ms = parse_monitors(&fake(&[EDP, ("HDMI-A-1", "Dell")])).unwrap();
+        let ms = parse_monitors(&fake(&[EDP, AOC_MID])).unwrap();
         let cmds = commands(&c, c.find("boulot").unwrap(), &ms, "[]");
+        assert_eq!(cmds.len(), 2);
         assert!(!cmds.iter().any(|c| c.lua.contains("\"DP-1\"")));
-        assert!(!cmds.iter().any(|c| c.lua.contains("name:left")));
     }
 
     #[test]
-    fn nomade_rapatrie_les_fenetres() {
+    fn nomade_range_les_fenetres_sur_le_portable() {
         let c = cfg();
         let ms = parse_monitors(&fake(&[EDP])).unwrap();
-        let clients = r#"[{"address":"0xaa","workspace":{"id":-99,"name":"mid"}},
-                          {"address":"0xbb","workspace":{"id":3,"name":"3"}},
-                          {"address":"0xcc","workspace":{"id":-98,"name":"left"}}]"#;
+        let clients = r#"[{"address":"0xaa","workspace":{"id":1,"name":"1"}},
+                          {"address":"0xbb","workspace":{"id":13,"name":"3"}},
+                          {"address":"0xcc","workspace":{"id":22,"name":"2"}},
+                          {"address":"0xdd","workspace":{"id":-99,"name":"mid"}}]"#;
         let cmds = commands(&c, c.find("nomade").unwrap(), &ms, clients);
-        assert_eq!(cmds[0].lua, "hl.dispatch(hl.dsp.window.move({ workspace = \"9\", follow = false, window = \"address:0xaa\" }))");
+        assert_eq!(cmds.len(), 3, "{cmds:?}");
+        assert_eq!(cmds[0].lua, "hl.dispatch(hl.dsp.window.move({ workspace = \"21\", follow = false, window = \"address:0xaa\" }))");
         assert_eq!(
             cmds[1].legacy.as_deref().unwrap(),
-            ["dispatch", "movetoworkspacesilent", "10,address:0xcc"]
+            ["dispatch", "movetoworkspacesilent", "23,address:0xbb"]
         );
         assert!(cmds[2].lua.starts_with("hl.monitor({ output = \"eDP-1\""));
-        assert_eq!(
-            cmds.iter()
-                .filter(|c| c.lua.contains("movetoworkspace") || c.lua.contains("window.move"))
-                .count(),
-            2
-        );
+    }
+
+    #[test]
+    fn rapatrier_par_nom() {
+        let c =
+            Config::parse("[[profile]]\nname=\"a\"\n[[profile.rescue]]\nfrom=\"mid\"\nto=\"11\"\n")
+                .unwrap();
+        let clients = r#"[{"address":"0xaa","workspace":{"id":-1337,"name":"mid"}},
+                          {"address":"0xbb","workspace":{"id":11,"name":"1"}}]"#;
+        let cmds = commands(&c, &c.profile[0], &[], clients);
+        assert_eq!(cmds[0].desc, "fenêtre 0xaa : de « mid » vers 11");
+        assert_eq!(cmds.len(), 2, "une fenêtre rangée, puis l'écran interne");
     }
 
     #[test]
@@ -323,22 +267,6 @@ mod tests {
             "hl.monitor({ output = \"eDP-1\", disabled = true })"
         );
         assert_eq!(cmds[1].legacy.as_deref().unwrap()[2], "eDP-1,disable");
-    }
-
-    #[test]
-    fn maison_trois_ecrans_par_edid() {
-        let c = cfg();
-        let mut v = vec![EDP];
-        v.extend(IIYAMA);
-        let ms = parse_monitors(&fake(&v)).unwrap();
-        let cmds = commands(&c, c.find("maison").unwrap(), &ms, "[]");
-        assert!(cmds
-            .iter()
-            .any(|c| c.lua.contains("output = \"DP-3\"") && c.lua.contains("transform = 1")));
-        assert!(cmds
-            .iter()
-            .any(|c| c.lua.contains("output = \"DP-2\"")
-                && c.lua.contains("position = \"3000x420\"")));
     }
 
     #[test]
