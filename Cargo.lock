@@ -1157,18 +1157,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "poste-display"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "poste-core",
- "serde",
- "serde_json",
- "tempfile",
- "toml",
-]
-
-[[package]]
 name = "poste-music"
 version = "0.1.0"
 dependencies = [

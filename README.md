@@ -51,7 +51,6 @@ commands = [{ name = "status", description = "état du dépôt" }]   # facultati
 | [`music`](modules/music/README.md) | client Navidrome : connexion, copie locale, recherche, lecture, favoris, playlists, mixes. |
 | [`record`](modules/record/README.md) | enregistrement d'écran (gpu-screen-recorder) piloté par l'île : préréglages, fenêtres, écrans, zone. |
 | [`power`](modules/power/README.md) | alertes batterie (faible, critique, branché mais ça se vide) et disque presque plein ; démon léger (portable). |
-| [`display`](modules/display/README.md) | profils d'écrans Hyprland (maison, boulot, nomade) choisis selon les écrans branchés ; démon et entrée de lanceur (portable). |
 
 Un module est une application à part, dans `modules/<nom>/`, avec son `README.md`,
 son `AGENTS.md` et sa fiche `module.toml`. Son programme est soit une caisse Rust
@@ -164,7 +163,7 @@ Détail et règles : [`modules/sys/README.md`](modules/sys/README.md), « Régla
 config/     la config de ~ (liens posés par poste sys setup)
 core/       poste-core : chemins XDG, config, découverte des modules, notifications
 poste/      l'aiguillage
-modules/    un dossier par module (sys, music, record, power, display, …)
+modules/    un dossier par module (sys, music, record, power, …)
 bootstrap/  paquets, étapes système/utilisateur/manuelles, patchs de plugins (lus par poste sys setup)
 setup       premier lancement
 ```
