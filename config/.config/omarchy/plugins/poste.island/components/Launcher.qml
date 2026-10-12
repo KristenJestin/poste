@@ -950,6 +950,7 @@ Item {
   // place, animated by `displaced`/`move`), only new rows play `add`, and
   // gone rows fade out through `remove`. The selection follows its row.
   property var shownUids: []
+  property string shownQuery: ""
   function rowUid(r) {
     if (r.kind === "web" || r.kind === "url" || r.kind === "calc" || r.kind === "loading" || r.kind === "timer") return r.kind
     if (r.key) return r.kind + "|" + r.key
@@ -957,8 +958,13 @@ Item {
   }
   function applyRows(rows) {
     // The default selection (first row) stays on the best match; a row the
-    // user moved to is followed while it stays in the list.
+    // user moved to is followed while it stays in the list. Quand la saisie
+    // change, pas les lignes faites de la saisie (adresse, recherche web,
+    // calcul…) : suivre « Search the web » faisait chercher une adresse au
+    // lieu de l'ouvrir.
     var prevUid = selected > 0 && selected < shownUids.length ? shownUids[selected] : ""
+    if (query !== shownQuery && prevUid.indexOf("|") === -1) prevUid = ""
+    shownQuery = query
     var uids = []
     var wanted = {}
     for (var i = 0; i < rows.length; i++) {
