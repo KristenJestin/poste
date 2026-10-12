@@ -600,9 +600,12 @@ Item {
   // voxtype-audio-bridge sidecar (NDJSON {"peak","rms","vad"} frames). The
   // voxtype OSD is disabled (osd.enabled = false); the island shows it.
   readonly property string voxStatePath: (Quickshell.env("XDG_RUNTIME_DIR") || "/tmp") + "/voxtype/state"
-  property string voxState: "idle"
-  readonly property bool voxListening: voxState === "recording" || voxState === "streaming"
-  readonly property bool voxTranscribing: voxState === "transcribing"
+  property string voxtypeState: "idle"
+  readonly property bool voxtypeListening: voxtypeState === "recording" || voxtypeState === "streaming"
+  readonly property bool voxtypeTranscribing: voxtypeState === "transcribing"
+  // Ce que montre la pastille : voxtype ou Vocaline (jamais les deux en même temps en pratique).
+  readonly property bool voxListening: voxtypeListening || vocState === "loading" || vocState === "listening"
+  readonly property bool voxTranscribing: voxtypeTranscribing || vocState === "stopping"
   readonly property bool voxActive: voxListening || voxTranscribing
   // The daemon may replace the file by rename, which a watch can miss: also
   // re-read it a few times a second (a 9-byte file).
@@ -613,15 +616,15 @@ Item {
     watchChanges: true
     printErrors: false
     onFileChanged: reload()
-    onLoaded: root.voxState = (text() || "idle").trim() || "idle"
-    onLoadFailed: root.voxState = "idle"
+    onLoaded: root.voxtypeState = (text() || "idle").trim() || "idle"
+    onLoadFailed: root.voxtypeState = "idle"
   }
   // Recent RMS levels, newest last, 0..1 (boosted: speech RMS is small).
   readonly property int voxBars: 14
   property var voxLevels: []
   Process {
     id: voxBridge
-    running: root.voxListening
+    running: root.voxtypeListening
     command: ["voxtype-audio-bridge"]
     stdout: SplitParser {
       onRead: function(line) {
@@ -636,6 +639,59 @@ Item {
     }
   }
   onVoxListeningChanged: if (!voxListening) voxLevels = []
+
+  // Vocaline : même pastille que voxtype, plus le texte dicté en direct. Source : le flux de
+  // `vocaline watch` (un objet JSON par ligne : hello, state, level, partial, final, silence).
+  // Vocaline colle toute la dictée une seule fois, à l'arrêt : cette pastille est le seul
+  // endroit où le texte se voit pendant qu'on parle. Le binaire se règle ici (variable
+  // d'environnement POSTE_VOCALINE pour un chemin propre à la machine, sinon `vocaline` du PATH).
+  readonly property string vocalineBin: Quickshell.env("POSTE_VOCALINE") || "vocaline"
+  property string vocState: "idle"       // idle, loading, listening, stopping
+  property string vocFinals: ""          // phrases figées de cette dictée, en couleur normale
+  property string vocPartial: ""         // phrase en cours, en gris derrière
+  property int vocPartialUtterance: -1
+  readonly property bool vocHasText: vocFinals !== "" || vocPartial !== ""
+  function vocReset() {
+    vocFinals = ""
+    vocPartial = ""
+    vocPartialUtterance = -1
+  }
+  // Une ligne du flux ; ce qui est inconnu ou mal formé est ignoré.
+  function vocalineEvent(line) {
+    var ev
+    try { ev = JSON.parse(line) } catch (e) { return }
+    if (!ev || typeof ev !== "object") return
+    if (ev.type === "state") {
+      var s = String(ev.state || "idle")
+      if (s === "loading" || s === "idle") vocReset()   // nouvelle dictée, ou fin : le texte disparaît
+      if (s !== "idle" && s !== "loading" && s !== "listening" && s !== "stopping") s = "idle"
+      vocState = s
+    } else if (ev.type === "level") {
+      if (vocState !== "listening" && vocState !== "loading") return
+      var level = Math.min(1, Math.sqrt(Math.max(0, Number(ev.rms) || 0)) * 2.2)
+      var next = voxLevels.slice(Math.max(0, voxLevels.length - voxBars + 1))
+      next.push(level)
+      voxLevels = next
+    } else if (ev.type === "partial") {
+      if (vocState === "idle") return
+      vocPartialUtterance = Number(ev.utterance)
+      vocPartial = String(ev.text || "").trim()
+    } else if (ev.type === "final") {
+      if (vocState === "idle") return
+      var t = String(ev.text || "").trim()
+      if (t !== "") vocFinals = vocFinals === "" ? t : vocFinals + " " + t
+      if (Number(ev.utterance) === vocPartialUtterance) { vocPartial = ""; vocPartialUtterance = -1 }
+    }
+  }
+  Process {
+    id: vocWatch
+    command: [root.vocalineBin, "watch"]
+    stdout: SplitParser { onRead: function(line) { root.vocalineEvent(line) } }
+    Component.onCompleted: running = true
+    // Flux coupé (démon absent, redémarré) : plus rien n'est en cours, on se reconnecte plus tard.
+    onRunningChanged: if (!running) { root.vocState = "idle"; root.vocReset() }
+  }
+  Timer { interval: 5000; repeat: true; running: !vocWatch.running; onTriggered: vocWatch.running = true }
 
   // Sons de dictée (poste-sfx) : boucle pendant l'écoute, « stop » à la fin.
   readonly property string sfx: root.home + "/.config/omarchy/plugins/poste.island/bin/poste-sfx"
@@ -691,13 +747,13 @@ Item {
   property string voxPrevState: "idle"
   Process {
     id: voxLoop
-    running: root.voxListening
+    running: root.voxtypeListening
     command: ["sh", "-c", 'while :; do "$1" dictation-start || exit; done', "vox-loop", root.sfx]
   }
-  onVoxStateChanged: {
+  onVoxtypeStateChanged: {
     var was = voxPrevState
-    voxPrevState = voxState
-    var listening = voxState === "recording" || voxState === "streaming"
+    voxPrevState = voxtypeState
+    var listening = voxtypeListening
     var wasListening = was === "recording" || was === "streaming"
     // Le son d'écoute tourne en boucle (voxLoop) ; à l'arrêt, « stop ».
     if (wasListening && !listening) Quickshell.execDetached([root.sfx, "dictation-stop"])

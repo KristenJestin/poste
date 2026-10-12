@@ -709,6 +709,47 @@ PanelWindow {
         anchors.verticalCenter: parent.verticalCenter
         host: window.host
       }
+      // Texte dicté (Vocaline) : les phrases figées, puis la phrase en cours en gris. Une seule
+      // ligne ; trop long, c'est la fin qui reste visible (début coupé, estompé).
+      Item {
+        id: voxTextBox
+        readonly property real maxWidth: Math.max(160, Math.min(560, window.width - 240))
+        anchors.verticalCenter: parent.verticalCenter
+        visible: window.host.vocHasText
+        height: voxTextRow.implicitHeight
+        width: Math.min(voxTextRow.implicitWidth, maxWidth)
+        clip: true
+        Row {
+          id: voxTextRow
+          anchors.right: parent.right
+          Text {
+            text: window.host.vocFinals
+            color: window.host.colorText
+            font.family: window.host.fontFamily
+            font.pixelSize: 13
+            textFormat: Text.PlainText
+          }
+          Text {
+            text: (window.host.vocFinals !== "" && window.host.vocPartial !== "" ? " " : "") + window.host.vocPartial
+            color: window.host.withAlpha(window.host.colorText, 0.45)
+            font.family: window.host.fontFamily
+            font.pixelSize: 13
+            textFormat: Text.PlainText
+          }
+        }
+        Rectangle {
+          anchors.left: parent.left
+          anchors.top: parent.top
+          anchors.bottom: parent.bottom
+          width: 28
+          visible: voxTextRow.implicitWidth > voxTextBox.maxWidth
+          gradient: Gradient {
+            orientation: Gradient.Horizontal
+            GradientStop { position: 0; color: window.host.colorIsland }
+            GradientStop { position: 1; color: window.host.withAlpha(window.host.colorIsland, 0) }
+          }
+        }
+      }
     }
   }
 
