@@ -19,7 +19,7 @@ installer sur la machine.
 Une copie de chaque graisse de FiraCode Nerd Font (Light à Bold), familles renommées. Les
 points de code de `glyphs.tsv` pointent vers les contours de la webfont `@tabler/icons-webfont`
 3.49.0 (MIT, licence à côté des TTF). Le texte, les autres glyphes et les métriques sont ceux
-de FiraCode. Graisse Light : Tabler en trait fin. Une grille Tabler de 24 vaut un em, centrée
+de FiraCode (SIL Open Font License 1.1, sans nom réservé : `LICENSE-firacode` à côté des TTF). Graisse Light : Tabler en trait fin. Une grille Tabler de 24 vaut un em, centrée
 dans la cellule comme le fait le patcher Nerd Font.
 
 ## La règle fontconfig
