@@ -200,7 +200,7 @@ pub fn commands(cfg: &Config, p: &Profile, mons: &[Monitor], clients_json: &str)
             moves.push(Cmd {
                 desc: format!("espace {id} : déplacé vers {mon}"),
                 lua: format!(
-                    "hl.dispatch(hl.dsp.workspace.move({{ id = {}, monitor = {} }}))",
+                    "hl.dispatch(hl.dsp.workspace.move({{ workspace = {}, monitor = {} }}))",
                     q(&id),
                     q(mon)
                 ),
@@ -254,7 +254,7 @@ mod tests {
         assert!(lua.contains(&"hl.workspace_rule({ workspace = \"name:mid\", monitor = \"HDMI-A-1\", default = true, persistent = true })"));
         assert!(lua.contains(&"hl.workspace_rule({ workspace = \"7\", monitor = \"eDP-1\" })"));
         assert!(lua.contains(
-            &"hl.dispatch(hl.dsp.workspace.move({ id = \"name:left\", monitor = \"DP-1\" }))"
+            &"hl.dispatch(hl.dsp.workspace.move({ workspace = \"name:left\", monitor = \"DP-1\" }))"
         ));
         // Forme historique de repli.
         assert_eq!(

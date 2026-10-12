@@ -46,10 +46,9 @@ répond pas `ok`, la forme historique (`hyprctl keyword monitor …`, `dispatch 
 `--dry-run` affiche les deux. Ordre : fenêtres à rapatrier, écrans (l'interne d'abord s'il reste actif, après
 les autres s'il est désactivé : jamais zéro écran), règles d'espaces, déplacement des espaces existants.
 
-À VALIDER sur le pro (rien n'a été appliqué sur la machine de développement, seules les formes ont été
-vérifiées contre les fonctions de `hl.*` présentes dans Hyprland) : l'argument `id` de `workspace.move`,
-`window` de `window.move`, `disabled = true` de `hl.monitor`. Le démon réapplique le profil après un
-`hyprctl reload` (qui remet les règles de `monitors.lua`).
+Vérifié sur le pro le 2026-10-12 : `hl.monitor`, `window.move` avec `window = "address:…"`, et `workspace.move`
+qui prend `workspace` (avec `id`, Hyprland répond `ok` mais ne déplace rien). Reste à valider : `disabled = true`
+de `hl.monitor`. Le démon réapplique le profil après un `hyprctl reload` (qui remet les règles de `monitors.lua`).
 
 Attention : Omarchy 4 gère aussi l'écran interne (`omarchy-hyprland-monitor-clamshell`, à la fermeture
 du capot). Désactiver l'écran interne par un profil peut être contredit par cette bascule.
