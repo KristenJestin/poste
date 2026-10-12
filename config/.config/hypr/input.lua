@@ -67,13 +67,13 @@ hl.config({
 
 -- Pointeurs intégrés du portable (sans effet sur le fixe) : plus rapides que la
 -- souris du fixe, toujours sans accélération. 0,2 validé par Kris le 2026-10-11,
--- passé à 0,4 le 2026-10-12 (« plus lent qu'avant » ; 0,5 était trop rapide).
+-- passé à 0,8 le 2026-10-12 (0,4 encore trop lent au bureau ; 1 est le maximum).
 for _, name in ipairs({
   "snsl0035:00-2c2f:0035-touchpad",
   "snsl0035:00-2c2f:0035-mouse",
   "tpps/2-synaptics-trackpoint",
 }) do
-  hl.device({ name = name, sensitivity = 0.4, accel_profile = "flat" })
+  hl.device({ name = name, sensitivity = 0.8, accel_profile = "flat" })
 end
 
 -- Pas de collage au clic molette (sélection primaire).
