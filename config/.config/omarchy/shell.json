@@ -98,14 +98,19 @@
       "id": "poste.notifications"
     },
     {
+      "id": "poste.osd"
+    },
+    {
       "id": "io.github.smoothpixels.cursor-accent"
     }
   ],
   "version": 1,
   "disabledPlugins": [
-    "omarchy.notifications"
+    "omarchy.notifications",
+    "omarchy.osd"
   ],
   "cloneSourceRestores": [
-    "poste.notifications"
+    "poste.notifications",
+    "poste.osd"
   ]
 }

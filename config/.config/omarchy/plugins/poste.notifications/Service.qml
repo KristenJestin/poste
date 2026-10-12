@@ -1,16 +1,15 @@
 // Notification service for the omarchy shell.
 
 import QtQuick
-import QtQuick.Layouts
 import Quickshell
 import Quickshell.Io
 import Quickshell.Hyprland
-import Quickshell.Wayland
 import Quickshell.Services.Notifications
 import qs.Commons
 
-import "components"
 import "NotificationLogic.js" as NotificationLogic
+import "components/AgentBrand.js" as AgentBrand
+import "../poste.island/bandeau"
 
 Item {
   id: service
@@ -38,19 +37,6 @@ Item {
   // originals don't outlive the notification (see persistablePopup). Each
   // copy lives and dies with the JSON file whose stem it carries.
   readonly property string imagesDir: popupStateDir + "images/"
-  // Corner radius is shared with the menu and shell panels.
-  // It mirrors Hyprland's current decoration:rounding value.
-  readonly property int cornerRadius: Style.cornerRadius
-  // Toasts are fixed to the top-right corner. They only clear the omarchy bar
-  // when the bar occupies the top or right edge, so left/bottom bars do not
-  // pull notification popups away from the expected top-right location.
-  // Falls back to the bar's default size (26 horizontal / 28 vertical) when
-  // shell.bar isn't reachable so the popup never lands on top of the bar.
-  readonly property string barPosition: shell && shell.barConfig ? String(shell.barConfig.position || "top") : "top"
-  readonly property bool barVertical: barPosition === "left" || barPosition === "right"
-  readonly property int defaultBarSize: barVertical ? Style.bar.sizeVertical : Style.bar.sizeHorizontal
-  readonly property int liveBarSize: shell && shell.bar && !shell.bar.barHidden ? Math.max(0, shell.bar.barSize) : defaultBarSize
-  readonly property int barClearance: liveBarSize + Style.gapsOut
 
   // Live Notification objects by originalId, kept OUT of the ListModels: a
   // QObject stored in a model role becomes a dangling C++ pointer when the
@@ -872,6 +858,7 @@ Item {
   }
 
   Component.onCompleted: {
+    Bandeau.attachNotifications(service)
     ensureDirsProc.running = true
     // Once mkdir has had a tick, load the existing settings file. FileView
     // surfaces an empty string when the file doesn't exist; loadSettings
@@ -983,11 +970,9 @@ Item {
 
   // -------------------------------------------------------------- popup UI
   //
-  // Kris: toasts in the island's style, centered under the island of the
-  // focused screen (one PanelWindow per output, only the focused one shows
-  // cards). A ListView gives the stack add/remove/displace transitions: cards
-  // drop out of the island with a slight scale, float back up when they go,
-  // and the ones below glide into place. Layer Overlay, no keyboard focus.
+  // Kris : les toasts sont dessinés par le bandeau (poste.island/bandeau), en bas de l'écran,
+  // avec l'OSD et le texte dicté. Le service y inscrit son modèle et garde toute la logique :
+  // à quel écran va un toast, combien de temps il reste, ce que fait un clic.
 
   readonly property string focusedScreenName: Hyprland.focusedMonitor ? String(Hyprland.focusedMonitor.name) : ""
 
@@ -1012,157 +997,34 @@ Item {
     return owner === String(screenName)
   }
 
-  // Island state published by poste.island ($XDG_RUNTIME_DIR/poste-island.json):
-  // per screen, the open view and the island's bottom edge. Toasts always
-  // land below the island, unfolded or not. Missing or empty (island not the
-  // active bar) means the default placement.
-  property var islandScreens: ({})
-  FileView {
-    path: (Quickshell.env("XDG_RUNTIME_DIR") || "/tmp") + "/poste-island.json"
-    watchChanges: true
-    printErrors: false
-    onFileChanged: reload()
-    onLoaded: {
-      var data = null
-      try { data = JSON.parse(text()) } catch (e) { data = null }
-      service.islandScreens = data && data.screens ? data.screens : ({})
-    }
-    onLoadFailed: service.islandScreens = ({})
-  }
-  function islandState(screenName) {
-    var st = islandScreens[String(screenName || "")]
-    return st && typeof st === "object" ? st : null
-  }
-
-  Variants {
-    model: Quickshell.screens
-
-    PanelWindow {
-      id: popupWindow
-      required property var modelData
-      screen: modelData
-      visible: popupModel.count > 0 || popupList.count > 0
-
-      WlrLayershell.namespace: "omarchy-notifications"
-      WlrLayershell.layer: WlrLayer.Overlay
-      WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
-      exclusionMode: ExclusionMode.Ignore
-      color: "transparent"
-
-      // Full-screen, fixed-size surface: adding or removing a toast only
-      // changes content, so the compositor never rescales a stale buffer.
-      anchors { top: true; bottom: true; left: true; right: true }
-
-      // Click-through except over the cards themselves.
-      mask: Region { item: popupList.contentItem }
-
-      ListView {
-        id: popupList
-        width: 440
-        anchors.horizontalCenter: parent.horizontalCenter
-        anchors.top: parent.top
-        readonly property var island: service.islandState(popupWindow.modelData.name)
-        anchors.topMargin: island && island.bottom > 0 ? island.bottom + 10 : service.barClearance + 4
-        Behavior on anchors.topMargin { NumberAnimation { duration: 380; easing.type: Easing.OutQuint } }
-        height: parent.height - anchors.topMargin
-        interactive: false
-        // Every window lists every toast; a card only takes room (and runs
-        // its countdown) on its own screen, so the gap lives in the slot.
-        spacing: 0
-        model: popupModel
-
-        // Entry is animated inside each card (see `entered` below): a ListView
-        // add transition interrupted by a displace leaves items stuck
-        // half-faded. The view only animates exits and the stack sliding.
-        remove: Transition {
-          ParallelAnimation {
-            NumberAnimation { property: "opacity"; to: 0; duration: 220; easing.type: Easing.InCubic }
-            NumberAnimation { property: "scale"; to: 0.94; duration: 260; easing.type: Easing.InCubic }
-            NumberAnimation { property: "y"; to: -50; duration: 260; easing.type: Easing.InQuint }
-          }
-        }
-        displaced: Transition {
-          NumberAnimation { property: "y"; duration: 340; easing.type: Easing.OutQuint }
-        }
-
-        // The delegate owns lifetime timer state; visuals live in IslandToast.
-        delegate: Item {
-          id: cardSlot
-          required property int index
-          required property string app
-          required property string appIcon
-          required property string summary
-          required property string body
-          required property string image
-          required property string glyph
-          required property int urgency
-          required property double expireTimeout
-          required property double timestamp
-
-          readonly property bool here: {
-            service.popupScreensRev
-            return service.popupOnScreen(service.popupKey(cardSlot), popupWindow.modelData.name)
-          }
-          width: popupList.width
-          height: here ? card.implicitHeight + 10 : 0
-          visible: here
-          transformOrigin: Item.Top
-
-          readonly property real lifetime: service.durationFor(cardSlot.urgency, cardSlot.expireTimeout)
-          property real remainingLifetime: 1.0
-          readonly property bool ticking: cardSlot.here && cardSlot.lifetime > 0 && !card.hovered
-
-          // An in-place update shows new text: restart the countdown.
-          onSummaryChanged: cardSlot.remainingLifetime = 1.0
-          onBodyChanged: cardSlot.remainingLifetime = 1.0
-          onImageChanged: cardSlot.remainingLifetime = 1.0
-
-          Timer {
-            interval: 50
-            repeat: true
-            running: cardSlot.ticking
-            onTriggered: {
-              if (cardSlot.lifetime <= 0) return
-              cardSlot.remainingLifetime -= 50.0 / cardSlot.lifetime
-              if (cardSlot.remainingLifetime <= 0) {
-                cardSlot.remainingLifetime = 0
-                service.expirePopup(cardSlot.index)
-              }
-            }
-          }
-
-          // Drop out of the island: slide down, scale 0.92 -> 1, fade in.
-          property bool entered: false
-          Component.onCompleted: Qt.callLater(function() { cardSlot.entered = true })
-          required property double originalId
-
-          IslandToast {
-            id: card
-            width: 420
-            anchors.horizontalCenter: parent.horizontalCenter
-            transformOrigin: Item.Top
-            opacity: cardSlot.entered ? 1 : 0
-            // Hover lift on top of the entry.
-            y: !cardSlot.entered ? -48 : card.hovered ? -2 : 0
-            scale: !cardSlot.entered ? 0.92 : card.hovered ? 1.015 : 1
-            Behavior on opacity { NumberAnimation { duration: 260; easing.type: Easing.OutCubic } }
-            Behavior on y { NumberAnimation { duration: 380; easing.type: Easing.OutQuint } }
-            Behavior on scale { NumberAnimation { duration: 380; easing.type: Easing.OutBack; easing.overshoot: 1.4 } }
-            app: cardSlot.app
-            appIcon: cardSlot.appIcon
-            summary: cardSlot.summary
-            body: cardSlot.body
-            image: cardSlot.image
-            glyph: cardSlot.glyph
-            urgency: cardSlot.urgency
-            progress: cardSlot.remainingLifetime
-            showProgress: cardSlot.lifetime > 0
-
-            onCloseRequested: service.closePopup(cardSlot.index)
-            onCardClicked: service.invokePopupDefault(cardSlot.index)
-          }
-        }
-      }
+  // Ce que montre la carte du bandeau pour une ligne du modèle (voir NotificationView.qml) :
+  // la tuile de marque (Claude Code, Codex), sinon l'image ou l'icône de l'application, sinon
+  // le glyphe ; le corps sans balises d'image.
+  function present(row) {
+    var brand = AgentBrand.brand(row.summary, row.app, row.appIcon)
+    var image = String(row.image || "")
+    return {
+      title: String(row.summary || row.app || "Notification"),
+      body: NotificationLogic.sanitizeBody(row.body, row.app, row.appIcon),
+      icon: brand ? "" : (image.length > 0 ? fileUrl(image) : themedIcon(row.appIcon)),
+      crop: image.length > 0,
+      glyph: brand ? brand.glyph : String(row.glyph || ""),
+      tile: brand ? brand.tile : "",
+      ink: brand ? brand.ink : "",
+      critical: row.urgency === NotificationUrgency.Critical
     }
   }
+  function fileUrl(value) {
+    if (value.indexOf("file://") === 0 || value.indexOf("image://") === 0) return value
+    if (value.charAt(0) === "/") return Util.fileUrl(value)
+    return value
+  }
+  function themedIcon(value) {
+    value = String(value || "")
+    if (value === "") return ""
+    if (value.indexOf("file://") === 0 || value.indexOf("image://") === 0 || value.charAt(0) === "/") return fileUrl(value)
+    return Quickshell.iconPath(value, true)
+  }
+
+  Component.onDestruction: Bandeau.detachNotifications(service)
 }

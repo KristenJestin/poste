@@ -10,7 +10,7 @@
 #   [[manual]]  étape à la main ; `check` facultatif, sinon `poste sys done <id>`
 
 # ------------------------------------------------------------ plugins tiers (versions auditées)
-# poste.island, poste.notifications et poste.workspaces viennent de config/ (liens).
+# poste.island, poste.notifications, poste.osd et poste.workspaces viennent de config/ (liens).
 [[plugin]]
 id = "crmne.mpris"
 url = "https://github.com/crmne/omarchy-mpris"

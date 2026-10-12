@@ -22,6 +22,7 @@ import Quickshell.Services.Pipewire
 import Quickshell.Wayland
 import qs.Commons
 import "components"
+import "bandeau"
 import "file:///usr/share/flea/shelf" as Flea
 
 Item {
@@ -641,7 +642,7 @@ Item {
   // de barres de l'onde) ; propriétés lues `listening` (micro ouvert), `transcribing` (fin en
   // cours), `levels` (niveaux récents de 0 à 1, le plus récent en dernier, `bars` au plus),
   // `finals` (texte figé de la dictée) et `partial` (phrase en cours). Le texte, s'il y en a,
-  // s'affiche en bas de l'écran actif (DictationText.qml).
+  // s'affiche en bas de l'écran actif (le bandeau, bandeau/DictationView.qml).
   property var dictationItems: []
   function collectDictations() {
     var list = []
@@ -678,6 +679,10 @@ Item {
   readonly property var voxLevels: dictation && dictation.listening ? (dictation.levels || []) : voxtypeLevels
   readonly property string dictationFinals: dictation ? String(dictation.finals || "") : ""
   readonly property string dictationPartial: dictation ? String(dictation.partial || "") : ""
+  // Le texte dicté va au bandeau, en bas de l'écran actif.
+  Binding { target: Bandeau; property: "dictationActive"; value: root.voxActive }
+  Binding { target: Bandeau; property: "dictationFinals"; value: root.dictationFinals }
+  Binding { target: Bandeau; property: "dictationPartial"; value: root.dictationPartial }
 
   // Sons de dictée (poste-sfx) : boucle pendant l'écoute, « stop » à la fin.
   readonly property string sfx: root.home + "/.config/omarchy/plugins/poste.island/bin/poste-sfx"
@@ -862,10 +867,10 @@ Item {
   }
 
   // ---------------------------------------------------------------- shared state
-  // Each screen's open view and island bottom edge, for poste.notifications:
-  // toasts go below an unfolded island, and straight into the list while it
-  // is open. Written to $XDG_RUNTIME_DIR/poste-island.json; reset on unload so
-  // a disabled island never leaves toasts suppressed.
+  // Each screen's open view and island bottom edge, written to
+  // $XDG_RUNTIME_DIR/poste-island.json (reset on unload). The toasts no longer
+  // read it (they live in the bandeau, at the bottom); the island still uses
+  // the views to refresh the list while it is open.
   readonly property string statePath: (Quickshell.env("XDG_RUNTIME_DIR") || "/tmp") + "/poste-island.json"
   property var islandStates: ({})
   function reportState(screenName, view, bottom) {
@@ -881,7 +886,10 @@ Item {
     onTriggered: stateFile.setText(JSON.stringify({ screens: root.islandStates }))
   }
   FileView { id: stateFile; path: root.statePath; printErrors: false }
-  Component.onDestruction: stateFile.setText(JSON.stringify({ screens: {} }))
+  Component.onDestruction: {
+    stateFile.setText(JSON.stringify({ screens: {} }))
+    Bandeau.dictationActive = false
+  }
   // Refresh the list quickly while it is open, so arrivals slide in.
   readonly property bool anyListOpen: {
     for (var k in islandStates) if (islandStates[k].view === "notifications") return true
@@ -1232,13 +1240,6 @@ Item {
           id: islandWindow
           host: root
           screen: screenScope.modelData
-        }
-
-        // Texte de la dictée en cours (slot « dictation »), en bas de l'écran actif.
-        DictationText {
-          host: root
-          screen: screenScope.modelData
-          here: String(screenScope.modelData.name) === root.focusedScreen
         }
 
         // Rail de bord du Shelf (réglage « Edge rail » de Flea), écran du milieu.

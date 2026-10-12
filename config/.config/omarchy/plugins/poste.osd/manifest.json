@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "id": "poste.osd",
+  "name": "Poste OSD",
+  "version": "0.1.0",
+  "author": "kris",
+  "description": "Volume, brightness, mic, media and power overlays, drawn in the poste bandeau at the bottom of the screen",
+  "kinds": [
+    "panel"
+  ],
+  "keepLoaded": true,
+  "entryPoints": {
+    "panel": "Osd.qml"
+  },
+  "omarchy": {
+    "clonedFrom": "omarchy.osd"
+  }
+}
