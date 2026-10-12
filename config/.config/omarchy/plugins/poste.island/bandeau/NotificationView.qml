@@ -404,8 +404,9 @@ Item {
           }
 
           // Durée de vie restante : une piste fine sous le texte, de son bord gauche au bord
-          // droit du contenu, bouts arrondis ; ce qui reste est à l'accent, adouci. Alignée sur
-          // le texte, elle se lit comme une jauge et non comme un trait égaré.
+          // droit du contenu, bouts arrondis ; ce qui reste est à l'accent, adouci. La piste
+          // entière reste visible (discrète, 13 %) : la barre se lit comme une jauge qui se vide,
+          // et non comme un trait égaré en bas à gauche.
           Item {
             id: lifeTrack
             visible: slot.lifetime > 0
@@ -417,7 +418,7 @@ Item {
             Rectangle {
               anchors.fill: parent
               radius: height / 2
-              color: view.bandeau.withAlpha(view.bandeau.colorText, 0.07)
+              color: view.bandeau.withAlpha(view.bandeau.colorText, 0.13)
             }
             Rectangle {
               height: parent.height
