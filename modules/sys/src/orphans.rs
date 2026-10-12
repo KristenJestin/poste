@@ -3,7 +3,8 @@
 //! - un lien de `~` qui pointe vers `<dépôt>/config/…` et dont la cible a disparu (fichier
 //!   renommé ou retiré du dépôt) ;
 //! - un fichier de module (`~/.local/share/poste/modules/…`) noté dans `installed.json`, que le
-//!   dépôt ne produit plus (module supprimé, fichier renommé) et qui est resté tel qu'installé.
+//!   dépôt ne produit plus (module supprimé, fichier renommé) et qui est resté tel qu'installé ;
+//!   s'il a déjà disparu de `~`, il n'y a rien à retirer : son entrée sort du manifeste.
 //!
 //! Jamais un fichier ordinaire qui n'est pas dans `installed.json`, jamais un fichier de module
 //! modifié à la main. Le retrait passe par un aperçu et une confirmation.
@@ -129,7 +130,8 @@ pub fn find(
         if e.module == config::MODULE || produced.contains(p) || !p.starts_with(&modules_dir) {
             continue;
         }
-        if matches!(sha256_file(p), Ok(h) if h == e.sha256) {
+        let intact = matches!(sha256_file(p), Ok(h) if h == e.sha256);
+        if intact || p.symlink_metadata().is_err() {
             out.push(Orphan {
                 path: p.to_path_buf(),
                 kind: Kind::ModuleFile {
@@ -160,7 +162,9 @@ pub fn print(env: &Env, orphans: &[Orphan]) {
             Kind::ModuleFile { module } => println!(
                 "  fichier orphelin {}  [{module}]  ({})",
                 env.display(&o.path),
-                if off.contains(module) {
+                if o.path.symlink_metadata().is_err() {
+                    "déjà disparu, oublié du manifeste"
+                } else if off.contains(module) {
                     "module désactivé sur cette machine"
                 } else {
                     "le dépôt ne le produit plus"
@@ -190,6 +194,7 @@ pub fn apply(
                 }
                 std::fs::remove_file(&o.path)?;
             }
+            Kind::ModuleFile { .. } if o.path.symlink_metadata().is_err() => {}
             Kind::ModuleFile { .. } => {
                 let still = manifest
                     .get(&o.path)
@@ -295,5 +300,20 @@ mod tests {
         };
         m.files[0].sha256 = sha256_file(&b).unwrap();
         assert!(find(&repo, &env, None, &m, &[item]).unwrap().is_empty());
+    }
+
+    #[test]
+    fn fichier_de_module_deja_disparu_oublie_du_manifeste() {
+        let d = tempfile::tempdir().unwrap();
+        let repo = d.path().join("repo");
+        fs::create_dir_all(&repo).unwrap();
+        let env = Env::with_home(d.path().join("home"));
+        let gone = env.modules_dir().join("ancien/poste-ancien");
+        let mut m = Manifest::default();
+        m.files.push(entry(&gone, "empreinte", "ancien"));
+        let o = find(&repo, &env, None, &m, &[]).unwrap();
+        assert_eq!(o.len(), 1);
+        assert_eq!(apply(&env, &repo, &o, "t", &mut m).unwrap(), 1);
+        assert!(m.files.is_empty());
     }
 }
