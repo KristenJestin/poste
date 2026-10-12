@@ -600,10 +600,9 @@ Item {
   // voxtype-audio-bridge sidecar (NDJSON {"peak","rms","vad"} frames). The
   // voxtype OSD is disabled (osd.enabled = false); the island shows it.
   readonly property string voxStatePath: (Quickshell.env("XDG_RUNTIME_DIR") || "/tmp") + "/voxtype/state"
-  property string voxState: "idle"
-  readonly property bool voxListening: voxState === "recording" || voxState === "streaming"
-  readonly property bool voxTranscribing: voxState === "transcribing"
-  readonly property bool voxActive: voxListening || voxTranscribing
+  property string voxtypeState: "idle"
+  readonly property bool voxtypeListening: voxtypeState === "recording" || voxtypeState === "streaming"
+  readonly property bool voxtypeTranscribing: voxtypeState === "transcribing"
   // The daemon may replace the file by rename, which a watch can miss: also
   // re-read it a few times a second (a 9-byte file).
   Timer { interval: 250; running: true; repeat: true; onTriggered: voxStateFile.reload() }
@@ -613,15 +612,15 @@ Item {
     watchChanges: true
     printErrors: false
     onFileChanged: reload()
-    onLoaded: root.voxState = (text() || "idle").trim() || "idle"
-    onLoadFailed: root.voxState = "idle"
+    onLoaded: root.voxtypeState = (text() || "idle").trim() || "idle"
+    onLoadFailed: root.voxtypeState = "idle"
   }
   // Recent RMS levels, newest last, 0..1 (boosted: speech RMS is small).
   readonly property int voxBars: 14
-  property var voxLevels: []
+  property var voxtypeLevels: []
   Process {
     id: voxBridge
-    running: root.voxListening
+    running: root.voxtypeListening
     command: ["voxtype-audio-bridge"]
     stdout: SplitParser {
       onRead: function(line) {
@@ -629,13 +628,56 @@ Item {
         try { frame = JSON.parse(line) } catch (e) { return }
         if (frame.rms === undefined) return
         var level = Math.min(1, Math.sqrt(Math.max(0, Number(frame.rms))) * 2.2)
-        var next = root.voxLevels.slice(Math.max(0, root.voxLevels.length - root.voxBars + 1))
+        var next = root.voxtypeLevels.slice(Math.max(0, root.voxtypeLevels.length - root.voxBars + 1))
         next.push(level)
-        root.voxLevels = next
+        root.voxtypeLevels = next
       }
     }
   }
-  onVoxListeningChanged: if (!voxListening) voxLevels = []
+  onVoxtypeListeningChanged: if (!voxtypeListening) voxtypeLevels = []
+
+  // Slot « dictation » : un module peut fournir sa propre source de dictée, affichée dans la
+  // même pastille que voxtype. Contrat de l'élément chargé : propriété injectée `bars` (nombre
+  // de barres de l'onde) ; propriétés lues `listening` (micro ouvert), `transcribing` (fin en
+  // cours), `levels` (niveaux récents de 0 à 1, le plus récent en dernier, `bars` au plus),
+  // `finals` (texte figé de la dictée) et `partial` (phrase en cours). Le texte, s'il y en a,
+  // s'affiche en bas de l'écran actif (DictationText.qml).
+  property var dictationItems: []
+  function collectDictations() {
+    var list = []
+    for (var i = 0; i < dictationLoaders.count; i++) {
+      var ld = dictationLoaders.itemAt(i)
+      if (ld && ld.item) list.push(ld.item)
+    }
+    dictationItems = list
+  }
+  Repeater {
+    id: dictationLoaders
+    model: moduleRegistry.slots["dictation"] || []
+    delegate: Loader {
+      required property string modelData
+      source: modelData
+      onLoaded: {
+        if (item && "bars" in item) item.bars = root.voxBars
+        root.collectDictations()
+      }
+    }
+    onItemAdded: Qt.callLater(root.collectDictations)
+    onItemRemoved: Qt.callLater(root.collectDictations)
+  }
+  readonly property var dictation: {
+    var list = dictationItems
+    for (var i = 0; i < list.length; i++) if (list[i].listening || list[i].transcribing) return list[i]
+    return null
+  }
+
+  // Ce que montre la pastille de dictée : voxtype ou la source du slot qui dicte.
+  readonly property bool voxListening: voxtypeListening || (!!dictation && dictation.listening)
+  readonly property bool voxTranscribing: voxtypeTranscribing || (!!dictation && dictation.transcribing)
+  readonly property bool voxActive: voxListening || voxTranscribing
+  readonly property var voxLevels: dictation && dictation.listening ? (dictation.levels || []) : voxtypeLevels
+  readonly property string dictationFinals: dictation ? String(dictation.finals || "") : ""
+  readonly property string dictationPartial: dictation ? String(dictation.partial || "") : ""
 
   // Sons de dictée (poste-sfx) : boucle pendant l'écoute, « stop » à la fin.
   readonly property string sfx: root.home + "/.config/omarchy/plugins/poste.island/bin/poste-sfx"
@@ -688,20 +730,14 @@ Item {
     if (!sessionLocked) lockAnnounced = false
     lockKnown = true
   }
-  property string voxPrevState: "idle"
   Process {
     id: voxLoop
     running: root.voxListening
     command: ["sh", "-c", 'while :; do "$1" dictation-start || exit; done', "vox-loop", root.sfx]
   }
-  onVoxStateChanged: {
-    var was = voxPrevState
-    voxPrevState = voxState
-    var listening = voxState === "recording" || voxState === "streaming"
-    var wasListening = was === "recording" || was === "streaming"
-    // Le son d'écoute tourne en boucle (voxLoop) ; à l'arrêt, « stop ».
-    if (wasListening && !listening) Quickshell.execDetached([root.sfx, "dictation-stop"])
-  }
+  // Le son d'écoute tourne en boucle (voxLoop) ; à l'arrêt, « stop ». Même chose pour
+  // voxtype et pour la source du slot « dictation ».
+  onVoxListeningChanged: if (!voxListening) Quickshell.execDetached([root.sfx, "dictation-stop"])
 
   // ---------------------------------------------------------------- AI usage
   // Records written by omarchy-agent-usage-update into
@@ -1196,6 +1232,13 @@ Item {
           id: islandWindow
           host: root
           screen: screenScope.modelData
+        }
+
+        // Texte de la dictée en cours (slot « dictation »), en bas de l'écran actif.
+        DictationText {
+          host: root
+          screen: screenScope.modelData
+          here: String(screenScope.modelData.name) === root.focusedScreen
         }
 
         // Rail de bord du Shelf (réglage « Edge rail » de Flea), écran du milieu.
