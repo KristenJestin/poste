@@ -339,14 +339,21 @@ impl Hit {
     pub fn to_json(&self) -> Value {
         let cmd = |c: String| json!({"type": "command", "command": c});
         let act = |label: &str, icon: &str, c: String| json!({"label": label, "icon": icon, "action": cmd(c)});
-        let mut actions = vec![act("Lire", ICON_PLAY, self.command("play", ""))];
-        if self.kind != Kind::Track {
-            actions.push(act(
-                "Shuffle",
-                ICON_SHUFFLE,
-                self.command("play", "--shuffle"),
-            ));
-        }
+        // Une playlist, un album ou un artiste se lit en aléatoire par défaut
+        // (Entrée) ; l'ordre reste en action secondaire.
+        let play = if self.kind == Kind::Track {
+            self.command("play", "")
+        } else {
+            self.command("play", "--shuffle")
+        };
+        let mut actions = if self.kind == Kind::Track {
+            vec![act("Lire", ICON_PLAY, play.clone())]
+        } else {
+            vec![
+                act("Shuffle", ICON_SHUFFLE, play.clone()),
+                act("Dans l'ordre", ICON_PLAY, self.command("play", "")),
+            ]
+        };
         actions.push(act(
             "Ajouter à la file",
             ICON_QUEUE,
@@ -375,7 +382,7 @@ impl Hit {
             "subtitle": self.subtitle(),
             "icon": self.kind.icon(),
             "verb": "Play",
-            "action": cmd(self.command("play", "")),
+            "action": cmd(play),
             "actions": actions,
         });
         if let Some(c) = &self.cover {
@@ -532,21 +539,22 @@ mod tests {
         assert_eq!(pl["subtitle"], "Playlist · 42 tracks · 2 h 05");
         assert_eq!(pl["verb"], "Play");
         assert_eq!(pl["action"]["type"], "command");
-        assert_eq!(pl["action"]["command"], "poste music play playlist p1");
+        assert_eq!(pl["action"]["command"], "poste music play playlist p1 --shuffle");
         assert!(pl.get("_cover").is_none());
         let acts = pl["actions"].as_array().unwrap();
         let labels: Vec<_> = acts.iter().map(|a| a["label"].as_str().unwrap()).collect();
-        assert_eq!(labels, ["Lire", "Shuffle", "Ajouter à la file"]);
+        assert_eq!(labels, ["Shuffle", "Dans l'ordre", "Ajouter à la file"]);
         for a in acts {
             assert!(a.get("name").is_none());
             assert!(!a["icon"].as_str().unwrap().is_empty());
             assert_eq!(a["action"]["type"], "command");
         }
-        assert_eq!(acts[1]["icon"], "󰒟");
+        assert_eq!(acts[0]["icon"], "󰒟");
         assert_eq!(
-            acts[1]["action"]["command"],
+            acts[0]["action"]["command"],
             "poste music play playlist p1 --shuffle"
         );
+        assert_eq!(acts[1]["action"]["command"], "poste music play playlist p1");
         assert_eq!(acts[2]["icon"], "󰐕");
         assert_eq!(
             acts[2]["action"]["command"],
@@ -585,8 +593,8 @@ mod tests {
         assert_eq!(
             al,
             [
-                "Lire",
                 "Shuffle",
+                "Dans l'ordre",
                 "Ajouter à la file",
                 "Mix instantané",
                 "J'aime",
@@ -610,8 +618,8 @@ mod tests {
         assert_eq!(
             ar,
             [
-                "Lire",
                 "Shuffle",
+                "Dans l'ordre",
                 "Ajouter à la file",
                 "Mix instantané",
                 "J'aime"

@@ -212,10 +212,10 @@ fermées) qui relit lui-même le trousseau : aucun identifiant dans les argument
 ## Format JSON des résultats
 
 Une entrée par résultat, au format du lanceur de l'île : `id` (`<kind>:<id>`), `name`,
-`subtitle`, `icon`, `verb: "Play"`, `action` (`poste music play <kind> <id>`), `actions`
+`subtitle`, `icon`, `verb: "Play"`, `action` (`poste music play <kind> <id> --shuffle`, sans `--shuffle` pour un morceau), `actions`
 et, quand la pochette existe, `icon` = chemin local de l'image (voir « Pochettes du lanceur »). Chaque action secondaire est
 `{"label", "icon" (glyphe Nerd Font), "action": {"type":"command","command":…}}` :
-« Lire », « Shuffle » (sauf pour un morceau), « Ajouter à la file », puis, hors playlists,
+« Shuffle » puis « Dans l'ordre » (« Lire » pour un morceau), « Ajouter à la file », puis, hors playlists,
 « Mix instantané » (󰒝, `mix <kind> <id>`) et « J'aime » (󰋑) ou « Je n'aime plus » (󰋕) selon
 l'état local ; pour les morceaux et les albums, « Ajouter à une playlist… » (󰲸) dont l'action est
 `{"type":"submenu","command":"poste music playlist pick --json <kind> <id>"}`. Le sous-titre d'un
