@@ -5,6 +5,7 @@
 - `poste` (l'aiguillage) ne code aucun module en dur : il cherche `poste-<nom>`, c'est tout.
 - `poste sys setup` ne doit jamais écraser ni supprimer ce qu'il n'a pas posé ; avant de remplacer un fichier posé par lui, il garde une copie dans `~/.local/state/poste/backup/`.
 - Aucun secret dans le dépôt ni dans les logs : les identifiants vont dans le trousseau système (Secret Service).
+- Le dépôt est fait pour être public : aucune donnée personnelle dans les fichiers ni dans les messages de commit (adresses mail, expéditeurs ou contenus de vrais mails, noms de services ou de personnes, IP et noms du réseau local, numéros de série, UUID de disques, détails du travail ou du PC pro). Les exemples sont inventés (`example.com`, `192.0.2.10`, `<connexion>`). Ce qui est propre à une machine vit dans sa config locale non versionnée (`~/.config/poste/`, `config.local`, `monitors.lua` propre au PC pro), jamais dans le dépôt.
 - Pas de `sudo` (les étapes root sont affichées, jamais lancées).
 - Tester avant de commiter : `cargo test` et `cargo clippy -- -D warnings`.
 - Ne jamais arrêter un enregistrement d'écran en cours ni la lecture musicale en cours : vérifier `poste record status` avant de redémarrer l'île ou le portail.
