@@ -573,9 +573,11 @@ Item {
     onLoaded: root.voxtypeState = (text() || "idle").trim() || "idle"
     onLoadFailed: root.voxtypeState = "idle"
   }
-  // Recent RMS levels, newest last, 0..1 (boosted: speech RMS is small).
+  // Niveau courant de voxtype, 0..1 (boosted: speech RMS is small). Le bridge envoie 100 images
+  // par seconde (fenêtres de 10 ms, source voxtype : src/audio/levels.rs), `rms` y vaut le pic de
+  // la fenêtre divisé par racine de 2. L'historique des barres est rempli plus bas, à cadence fixe.
+  property real voxtypeLevel: 0
   readonly property int voxBars: 14
-  property var voxtypeLevels: []
   Process {
     id: voxBridge
     running: root.voxtypeListening
@@ -586,20 +588,18 @@ Item {
         try { frame = JSON.parse(line) } catch (e) { return }
         if (frame.rms === undefined) return
         var level = Math.min(1, Math.sqrt(Math.max(0, Number(frame.rms))) * 2.2)
-        var next = root.voxtypeLevels.slice(Math.max(0, root.voxtypeLevels.length - root.voxBars + 1))
-        next.push(level)
-        root.voxtypeLevels = next
+        root.voxtypeLevel = level
       }
     }
   }
-  onVoxtypeListeningChanged: if (!voxtypeListening) voxtypeLevels = []
+  onVoxtypeListeningChanged: if (!voxtypeListening) voxtypeLevel = 0
 
   // Slot « dictation » : un module peut fournir sa propre source de dictée, affichée dans la
-  // même pastille que voxtype. Contrat de l'élément chargé : propriété injectée `bars` (nombre
-  // de barres de l'onde) ; propriétés lues `listening` (micro ouvert), `transcribing` (fin en
-  // cours), `levels` (niveaux récents de 0 à 1, le plus récent en dernier, `bars` au plus),
-  // `finals` (texte figé de la dictée) et `partial` (phrase en cours). Le texte, s'il y en a,
-  // s'affiche en bas de l'écran actif (le bandeau, bandeau/DictationView.qml).
+  // même pastille que voxtype. Contrat de l'élément chargé : propriétés lues `listening` (micro
+  // ouvert), `transcribing` (fin en cours), `level` (niveau courant de 0 à 1, à l'échelle de
+  // voxtype ; la source le met à jour à son rythme et le lisse si elle est lente), `finals`
+  // (texte figé de la dictée) et `partial` (phrase en cours). Le texte, s'il y en a, s'affiche
+  // en bas de l'écran actif (le bandeau, bandeau/DictationView.qml).
   property var dictationItems: []
   function collectDictations() {
     var list = []
@@ -615,10 +615,7 @@ Item {
     delegate: Loader {
       required property string modelData
       source: modelData
-      onLoaded: {
-        if (item && "bars" in item) item.bars = root.voxBars
-        root.collectDictations()
-      }
+      onLoaded: root.collectDictations()
     }
     onItemAdded: Qt.callLater(root.collectDictations)
     onItemRemoved: Qt.callLater(root.collectDictations)
@@ -633,7 +630,22 @@ Item {
   readonly property bool voxListening: voxtypeListening || (!!dictation && dictation.listening)
   readonly property bool voxTranscribing: voxtypeTranscribing || (!!dictation && dictation.transcribing)
   readonly property bool voxActive: voxListening || voxTranscribing
-  readonly property var voxLevels: dictation && dictation.listening ? (dictation.levels || []) : voxtypeLevels
+  // Une seule onde pour toutes les sources : chacune ne donne que son niveau courant, et l'île
+  // l'échantillonne à la cadence de voxtype (100 par seconde) dans l'historique des barres, le
+  // plus récent en dernier. L'onde bouge donc pareil quelle que soit la source.
+  readonly property real voxLevel: dictation && dictation.listening ? Number(dictation.level) || 0 : voxtypeLevel
+  property var voxLevels: []
+  Timer {
+    interval: 10
+    repeat: true
+    running: root.voxListening
+    onTriggered: {
+      var next = root.voxLevels.slice(Math.max(0, root.voxLevels.length - root.voxBars + 1))
+      next.push(root.voxLevel)
+      root.voxLevels = next
+    }
+  }
+  onVoxListeningChanged: if (!voxListening) voxLevels = []
   readonly property string dictationFinals: dictation ? String(dictation.finals || "") : ""
   readonly property string dictationPartial: dictation ? String(dictation.partial || "") : ""
   // Le texte dicté va au bandeau, en bas de l'écran actif.

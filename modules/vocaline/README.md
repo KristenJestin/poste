@@ -14,6 +14,9 @@ poste : ce module ne fait que le relier à l'île et à Hyprland.
 - L'île lit le flux `watch` directement sur le socket de Vocaline (`$XDG_RUNTIME_DIR/vocaline.sock`,
   `island/VocalineState.qml`, slot `dictation`) :
   - `loading` et `listening` : la pastille avec l'onde du micro (`level`), et le son d'écoute ;
+    l'onde est la même que celle de voxtype : le module ne donne que le niveau courant (`level`, mis à
+    l'échelle de voxtype et lissé entre deux évènements, car le démon en envoie 10 par seconde), et
+    l'île l'échantillonne à 100 par seconde, comme voxtype ;
   - `stopping` : les points de fin, et le son de fin ;
   - en bas de l'écran : les phrases figées (`final`), puis la phrase en cours (`partial`) en gris,
     trois lignes au plus (la fin reste visible) ;
