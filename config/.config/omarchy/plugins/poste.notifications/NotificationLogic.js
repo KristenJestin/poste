@@ -418,24 +418,6 @@ function popupExpired(entry, duration, now) {
   return (Number(now) - Number((entry || {}).timestamp || 0)) >= lifetime
 }
 
-function popupPlacement(barPosition, barClearance, gapsOut) {
-  var position = String(barPosition || "top")
-  var clearance = Number(barClearance)
-  var gap = Number(gapsOut)
-  if (!isFinite(clearance)) clearance = 0
-  if (!isFinite(gap)) gap = 0
-
-  return {
-    anchors: { top: true, bottom: false, left: false, right: true },
-    margins: {
-      top: position === "top" ? clearance : gap,
-      bottom: gap,
-      left: gap,
-      right: position === "right" ? clearance : gap
-    }
-  }
-}
-
 // The archived files are the history. They are read back exactly like the
 // live popup files, then normalized into history rows: replaying a toast
 // must not inherit the original's expire timeout or restore deadline, so it
@@ -496,7 +478,6 @@ if (typeof module !== "undefined") {
     persistablePopup: persistablePopup,
     serializePopup: serializePopup,
     parsePopupFiles: parsePopupFiles,
-    popupExpired: popupExpired,
-    popupPlacement: popupPlacement
+    popupExpired: popupExpired
   }
 }

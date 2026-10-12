@@ -38,8 +38,7 @@ PanelWindow {
   // Control-center modules grown inside the island (level 2).
   readonly property bool moduleOpen: wifiOpen || bluetoothOpen || audioOpen || vpnOpen || tailscaleOpen
   readonly property bool surfaceOpen: playerOpen || controlsOpen || notificationsOpen || launcherOpen || menuOpen || moduleOpen || shelfOpen || askOpen || usageOpen
-  readonly property bool volumePill: !surfaceOpen && focusedScreen && host.feedbackKind === "volume"
-  readonly property bool restPill: !surfaceOpen && !volumePill
+  readonly property bool restPill: !surfaceOpen
 
   Connections {
     target: window.host
@@ -262,7 +261,6 @@ PanelWindow {
       : window.wifiOpen || window.bluetoothOpen || window.vpnOpen || window.tailscaleOpen ? 400
       : window.audioOpen ? 420
       : window.playerOpen ? 420
-      : window.volumePill ? 240
       : restRow.implicitWidth + 30
     // 16 px above the launcher, 12 px below its footer.
     readonly property real targetHeight: window.menuOpen ? menuView.implicitHeight + 32
@@ -278,7 +276,6 @@ PanelWindow {
       : window.vpnOpen ? vpnView.implicitHeight + 36
       : window.tailscaleOpen ? tailscaleView.implicitHeight + 36
       : window.playerOpen ? playerView.implicitHeight + 44
-      : window.volumePill ? 46
       : window.host.restHeight
 
     readonly property real springStiffness: 6.5 / window.host.motionScale
@@ -289,7 +286,7 @@ PanelWindow {
     width: Math.max(40, springWidth)
     height: Math.max(26, springHeight)
 
-    property real radiusCap: window.surfaceOpen ? 28 : window.volumePill ? 20 : 36
+    property real radiusCap: window.surfaceOpen ? 28 : 36
     Behavior on radiusCap { NumberAnimation { duration: 390 * window.host.motionScale; easing.type: Easing.OutQuint } }
     radius: Math.min(height / 2, radiusCap)
 
@@ -398,14 +395,6 @@ PanelWindow {
 
       // Dictée : pastille sous l'île (voxDock) ; OBS : pastille à gauche (capture). Musique et autres
       // activités : de part et d'autre de l'île (ActivityStrip.qml).
-    }
-
-    // ---------------------------------------------------------------- volume
-    VolumeSlider {
-      anchors.fill: parent
-      host: window.host
-      shown: window.volumePill
-      shape: island
     }
 
     // ---------------------------------------------------------------- controls

@@ -11,9 +11,13 @@ import "../components"
 // glyph, tile (fond de tuile d'une marque ou ""), ink (couleur du glyphe sur cette tuile),
 // critical }.
 //
-// Animations : l'entrée se fait dans chaque carte (`entered`, posé par Qt.callLater) et la vue
-// n'anime que la sortie et le glissement de la pile. Une transition `add` de ListView
-// interrompue par un `displaced` laisse des cartes à moitié transparentes.
+// La vue garde sa propre liste des cartes affichées (`cards`), tenue à jour depuis le modèle
+// du service : une carte partie y reste le temps de sa sortie, puis la vue la retire. Les
+// cartes sont posées par une Column ; chacune y prend une place (`slot`) dont la hauteur est
+// animée. La place s'ouvre avant que la carte apparaisse, suit sa hauteur quand le contenu
+// change, et se referme une fois la carte effacée : deux cartes ne se chevauchent jamais, même
+// au milieu d'une animation. (Avant : une ListView et sa transition `displaced`, dont la cible
+// restait figée quand la carte du dessous grandissait juste après son arrivée.)
 Item {
   id: view
   required property var bandeau
@@ -23,288 +27,406 @@ Item {
   readonly property int cardWidth: 400
   width: cardWidth
 
-  // Rang d'une ligne parmi celles de cet écran (0 = la plus récente).
-  function rankOf(index) {
-    var src = source
-    if (!src) return 0
-    src.popupScreensRev
-    var m = src.popupModel
-    var rank = 0
-    for (var k = 0; k < index && k < m.count; k++)
-      if (src.popupOnScreen(src.popupKey(m.get(k)), screenName)) rank++
-    return rank
-  }
-
-  readonly property int shownCount: {
-    var src = source
-    if (!src) return 0
-    src.popupScreensRev
-    var m = src.popupModel
-    var n = 0
-    for (var k = 0; k < m.count; k++)
-      if (src.popupOnScreen(src.popupKey(m.get(k)), screenName)) n++
-    return Math.min(n, bandeau.maxNotifications)
-  }
-  // La fenêtre reste là le temps que la dernière carte s'en aille.
-  readonly property bool live: shownCount > 0 || linger.running
-  onShownCountChanged: if (shownCount === 0) linger.restart()
-  Timer { id: linger; interval: 400 }
-
+  // La fenêtre reste là tant qu'une carte est affichée ou en train de partir.
+  readonly property bool live: cards.count > 0
   // Hauteur occupée par les cartes, depuis le bas de la vue (zone qui prend la souris).
-  readonly property real cardsHeight: Math.min(height, list.contentHeight)
+  readonly property real cardsHeight: Math.min(height, stack.height)
 
-  ListView {
-    id: list
-    anchors.fill: parent
-    verticalLayoutDirection: ListView.BottomToTop
-    interactive: false
-    spacing: 0
-    model: view.source ? view.source.popupModel : null
+  // ---------------------------------------------------------------- la liste affichée
+  // Du haut (la plus ancienne) vers le bas (la plus récente), comme la Column les pose.
+  ListModel { id: cards }
+  property int nextUid: 1
 
-    remove: Transition {
-      NumberAnimation { property: "leave"; to: 1; duration: 240; easing.type: Easing.InCubic }
+  // Ce qui doit être affiché : les lignes de cet écran, de la plus récente à la plus ancienne,
+  // trois au plus.
+  function wanted() {
+    var src = source
+    var out = []
+    if (!src || !src.popupModel) return out
+    var m = src.popupModel
+    for (var i = 0; i < m.count && out.length < bandeau.maxNotifications; i++) {
+      var row = m.get(i)
+      var key = src.popupKey(row)
+      if (src.popupOnScreen(key, screenName)) out.push({ key: key, row: row })
     }
-    displaced: Transition {
-      NumberAnimation { property: "y"; duration: 340; easing.type: Easing.OutQuint }
+    return out
+  }
+  // Ce que la carte montre d'une ligne : tout est copié, la carte ne relit plus le service.
+  function lookOf(row) {
+    var look = source.present(row) || {}
+    return {
+      title: String(look.title || "Notification"),
+      body: String(look.body || ""),
+      icon: String(look.icon || ""),
+      crop: !!look.crop,
+      glyph: String(look.glyph || ""),
+      tile: String(look.tile || ""),
+      ink: String(look.ink || ""),
+      critical: !!look.critical,
+      lifetime: Number(source.durationFor(row.urgency, row.expireTimeout)) || 0
     }
-
-    delegate: Item {
-      id: slot
-      required property int index
-      required property double originalId
-      required property double timestamp
-      required property string app
-      required property string appIcon
-      required property string summary
-      required property string body
-      required property string image
-      required property string glyph
-      required property int urgency
-      required property double expireTimeout
-
-      readonly property var src: view.source
-      readonly property bool here: {
-        if (!src) return false
-        src.popupScreensRev
-        return src.popupOnScreen(src.popupKey(slot), view.screenName)
+  }
+  function sync() {
+    var want = wanted()
+    var rank = {}
+    for (var w = 0; w < want.length; w++) rank[want[w].key] = w
+    // Les cartes qui n'ont plus de place partent ; les autres reprennent leur contenu.
+    var present = {}
+    for (var c = 0; c < cards.count; c++) {
+      var e = cards.get(c)
+      if (e.leaving) continue
+      if (rank[e.entryKey] === undefined) {
+        cards.setProperty(c, "leaving", true)
+        continue
       }
-      readonly property bool shown: here && view.rankOf(index) < view.bandeau.maxNotifications
-      readonly property var look: src ? src.present(slot) : ({})
-
-      // Retirée du modèle, la carte garde sa place le temps de sa sortie.
-      property bool removing: false
-      ListView.onRemove: removing = true
-      readonly property bool held: shown || removing
-
-      width: list.width
-      height: held ? card.height + view.bandeau.gap : 0
-      Behavior on height {
-        enabled: slot.entered
-        NumberAnimation { duration: 300; easing.type: Easing.OutQuint }
+      present[e.entryKey] = true
+      var look = lookOf(want[rank[e.entryKey]].row)
+      for (var name in look)
+        if (e[name] !== look[name]) cards.setProperty(c, name, look[name])
+    }
+    // Les nouvelles entrent à leur rang : au-dessus de la première carte plus récente.
+    for (var k = want.length - 1; k >= 0; k--) {
+      if (present[want[k].key]) continue
+      var at = cards.count
+      for (var j = 0; j < cards.count; j++) {
+        var other = cards.get(j)
+        if (!other.leaving && rank[other.entryKey] !== undefined && rank[other.entryKey] < k) { at = j; break }
       }
-      visible: held || height > 0.5
+      var entry = lookOf(want[k].row)
+      entry.uid = nextUid++
+      entry.entryKey = want[k].key
+      entry.leaving = false
+      cards.insert(at, entry)
+    }
+  }
+  function drop(uid) {
+    for (var c = 0; c < cards.count; c++)
+      if (cards.get(c).uid === uid) { cards.remove(c); return }
+  }
+  // Un clic : la ligne est retrouvée par sa clé dans le modèle d'aujourd'hui.
+  function act(entryKey, what) {
+    var src = source
+    if (!src || !src.popupModel) return
+    var m = src.popupModel
+    for (var i = 0; i < m.count; i++) {
+      if (src.popupKey(m.get(i)) !== entryKey) continue
+      if (what === "close") src.closePopup(i)
+      else if (what === "invoke") src.invokePopupDefault(i)
+      else src.expirePopup(i)
+      return
+    }
+  }
 
-      // Durée de vie : un trait fin en bas de la carte ; le survol la met en pause.
-      readonly property real lifetime: src ? src.durationFor(urgency, expireTimeout) : 0
-      property real remaining: 1.0
-      readonly property bool ticking: shown && lifetime > 0 && !hover.hovered && !removing
-      onSummaryChanged: remaining = 1.0
-      onBodyChanged: remaining = 1.0
-      onImageChanged: remaining = 1.0
-      Timer {
-        interval: 50
-        repeat: true
-        running: slot.ticking
-        onTriggered: {
-          if (slot.lifetime <= 0) return
-          slot.remaining -= 50.0 / slot.lifetime
-          if (slot.remaining <= 0) {
-            slot.remaining = 0
-            slot.src.expirePopup(slot.index)
-          }
-        }
-      }
+  // Une mise à jour par tour de boucle, quel que soit le nombre de changements.
+  property bool syncQueued: false
+  function queueSync() {
+    if (syncQueued) return
+    syncQueued = true
+    Qt.callLater(function() {
+      view.syncQueued = false
+      view.sync()
+    })
+  }
+  onSourceChanged: queueSync()
+  onScreenNameChanged: queueSync()
+  Component.onCompleted: queueSync()
+  Connections {
+    target: view.source ? view.source.popupModel : null
+    ignoreUnknownSignals: true
+    function onCountChanged() { view.queueSync() }
+    function onDataChanged() { view.queueSync() }
+    function onRowsMoved() { view.queueSync() }
+    function onModelReset() { view.queueSync() }
+  }
+  Connections {
+    target: view.source
+    ignoreUnknownSignals: true
+    function onPopupScreensRevChanged() { view.queueSync() }
+  }
+  // Un toast sans écran connu va sur l'écran actif.
+  Connections {
+    target: view.bandeau
+    function onFocusedScreenChanged() { view.queueSync() }
+  }
 
-      // Entrée (dans la carte) et sortie (transition `remove`, qui pousse `leave` à 1).
-      property bool entered: false
-      property real leave: 0
-      Component.onCompleted: Qt.callLater(function() { slot.entered = true })
-      // Une carte qui attendait sa place entre comme une nouvelle.
-      onShownChanged: if (shown && entered) {
-        entered = false
-        Qt.callLater(function() { slot.entered = true })
-      }
+  // ---------------------------------------------------------------- la pile
+  Column {
+    id: stack
+    anchors.bottom: parent.bottom
+    anchors.horizontalCenter: parent.horizontalCenter
+    width: view.cardWidth
 
-      Item {
-        id: card
+    Repeater {
+      model: cards
+
+      delegate: Item {
+        id: slot
+        required property int uid
+        required property string entryKey
+        required property bool leaving
+        required property string title
+        required property string body
+        required property string icon
+        required property bool crop
+        required property string glyph
+        required property string tile
+        required property string ink
+        required property bool critical
+        required property double lifetime
+
         width: view.cardWidth
-        height: Math.max(52, content.implicitHeight + 2 * 11)
-        anchors.horizontalCenter: parent.horizontalCenter
-        anchors.bottom: parent.bottom
+        // La place de la carte et de l'écart au-dessus, à la proportion de son ouverture.
+        property real openness: 0
+        property real collapse: 0
+        height: (card.height + view.bandeau.gap) * openness * (1 - collapse)
+        Behavior on openness { NumberAnimation { duration: 300; easing.type: Easing.OutQuint } }
+        Component.onCompleted: Qt.callLater(function() { slot.openness = 1 })
 
-        property real rise: slot.entered ? 0 : 16
-        Behavior on rise { NumberAnimation { duration: 360; easing.type: Easing.OutQuint } }
-        transform: Translate { y: card.rise + slot.leave * 12 }
-        opacity: (slot.entered && slot.held ? 1 : 0) * (1 - slot.leave)
-        Behavior on opacity { enabled: slot.leave === 0; NumberAnimation { duration: 260; easing.type: Easing.OutCubic } }
-        scale: (slot.entered ? (hover.hovered ? 1.012 : 1) : 0.94) - slot.leave * 0.05
-        Behavior on scale { enabled: slot.leave === 0; NumberAnimation { duration: 340; easing.type: Easing.OutBack; easing.overshoot: 1.2 } }
-
-        readonly property bool oneLine: (slot.look.body || "") === ""
-        readonly property bool critical: !!slot.look.critical
-
-        HoverHandler { id: hover }
-
-        BandeauSurface {
-          id: surface
-          anchors.fill: parent
-          bandeau: view.bandeau
-          radius: card.oneLine ? height / 2 : view.bandeau.blockRadius
+        // Entrée : la carte apparaît dès que sa place peut la contenir (l'écart absorbe la fin
+        // de l'ouverture). Sortie : la carte s'efface sur place, puis sa place se referme.
+        property bool entered: false
+        onHeightChanged: if (!entered && !leaving && openness > 0 && height >= card.height - 0.5) entered = true
+        property real leave: 0
+        onLeavingChanged: if (leaving) {
+          life.stop()
+          exit.start()
+        }
+        SequentialAnimation {
+          id: exit
+          NumberAnimation { target: slot; property: "leave"; to: 1; duration: 200; easing.type: Easing.InCubic }
+          NumberAnimation { target: slot; property: "collapse"; to: 1; duration: 260; easing.type: Easing.InOutCubic }
+          ScriptAction { script: view.drop(slot.uid) }
         }
 
-        MouseArea {
-          anchors.fill: parent
-          acceptedButtons: Qt.LeftButton | Qt.RightButton
-          cursorShape: Qt.PointingHandCursor
-          onClicked: function(mouse) {
-            if (mouse.button === Qt.RightButton) slot.src.closePopup(slot.index)
-            else slot.src.invokePopupDefault(slot.index)
+        // Durée de vie : une animation sur toute la durée, mise en pause au survol, reprise du
+        // début quand le contenu change.
+        property real remaining: 1
+        NumberAnimation {
+          id: life
+          target: slot
+          property: "remaining"
+          to: 0
+          duration: Math.max(1, slot.lifetime)
+          paused: running && hover.hovered
+          onFinished: if (!slot.leaving && slot.remaining <= 0.001) view.act(slot.entryKey, "expire")
+        }
+        function restartLife() {
+          life.stop()
+          remaining = 1
+          if (entered && !leaving && lifetime > 0) {
+            life.from = 1
+            life.start()
           }
         }
+        onEnteredChanged: restartLife()
+        onTitleChanged: restartLife()
+        onBodyChanged: restartLife()
+        onIconChanged: restartLife()
+        onLifetimeChanged: restartLife()
 
-        Row {
-          id: content
-          anchors.left: parent.left
-          anchors.right: parent.right
-          anchors.leftMargin: 11
-          anchors.rightMargin: 40
-          anchors.verticalCenter: parent.verticalCenter
-          spacing: 12
+        Item {
+          id: card
+          width: view.cardWidth
+          anchors.bottom: parent.bottom
+          anchors.horizontalCenter: parent.horizontalCenter
+          // Hauteur finale (le contenu y est posé tout de suite), puis hauteur montrée, animée
+          // quand le contenu change ; la place suit, la carte du dessus monte avec.
+          readonly property real fullHeight: Math.max(52, content.implicitHeight + 2 * 12)
+          height: fullHeight
+          Behavior on height {
+            enabled: slot.entered && !slot.leaving
+            NumberAnimation { duration: 260; easing.type: Easing.OutCubic }
+          }
 
-          // L'icône : l'image ou l'icône de l'application, sinon le glyphe à l'accent (ou la
-          // tuile de la marque, Claude Code ou Codex).
+          property real rise: slot.entered ? 0 : view.bandeau.gap
+          Behavior on rise { NumberAnimation { duration: 360; easing.type: Easing.OutQuint } }
+          transform: Translate { y: card.rise + slot.leave * 8 }
+          opacity: (slot.entered ? 1 : 0) * (1 - slot.leave)
+          Behavior on opacity { enabled: slot.leave === 0; NumberAnimation { duration: 260; easing.type: Easing.OutCubic } }
+          scale: (slot.entered ? (hover.hovered && !slot.leaving ? 1.012 : 1) : 0.94) - slot.leave * 0.05
+          Behavior on scale { enabled: slot.leave === 0; NumberAnimation { duration: 340; easing.type: Easing.OutBack; easing.overshoot: 1.2 } }
+
+          readonly property bool oneLine: slot.body === ""
+
+          HoverHandler { id: hover }
+
+          BandeauSurface {
+            id: surface
+            anchors.fill: parent
+            bandeau: view.bandeau
+            radius: card.oneLine ? height / 2 : view.bandeau.blockRadius
+          }
+
+          MouseArea {
+            anchors.fill: parent
+            enabled: !slot.leaving
+            acceptedButtons: Qt.LeftButton | Qt.RightButton
+            cursorShape: Qt.PointingHandCursor
+            onClicked: function(mouse) { view.act(slot.entryKey, mouse.button === Qt.RightButton ? "close" : "invoke") }
+          }
+
+          // Le contenu, à sa hauteur finale, coupé à la hauteur montrée.
           Item {
-            id: tile
-            width: 32; height: 32
-            anchors.verticalCenter: parent.verticalCenter
-            readonly property bool hasImage: tileImage.status === Image.Ready
-            readonly property bool branded: (slot.look.tile || "") !== ""
-            Rectangle {
-              anchors.fill: parent
-              radius: card.oneLine ? width / 2 : 10
-              visible: tile.branded || !tile.hasImage
-              color: tile.branded ? slot.look.tile : view.bandeau.withAlpha(view.bandeau.colorAccent, 0.14)
-            }
-            Image {
-              id: tileImage
-              anchors.fill: parent
-              source: tile.branded ? "" : (slot.look.icon || "")
-              sourceSize.width: 64
-              sourceSize.height: 64
-              fillMode: slot.look.crop ? Image.PreserveAspectCrop : Image.PreserveAspectFit
-              asynchronous: true
-              visible: false
-            }
-            MultiEffect {
-              anchors.fill: parent
-              source: tileImage
-              visible: !tile.branded && tile.hasImage
-              maskEnabled: true
-              maskSource: tileMask
-            }
+            anchors.fill: parent
+            clip: card.height < card.fullHeight - 0.5
+
             Item {
-              id: tileMask
-              anchors.fill: parent
-              layer.enabled: true
-              visible: false
-              Rectangle { anchors.fill: parent; radius: card.oneLine ? width / 2 : 10 }
+              anchors.left: parent.left
+              anchors.right: parent.right
+              anchors.top: parent.top
+              height: card.fullHeight
+
+              Row {
+                id: content
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.leftMargin: 11
+                anchors.rightMargin: 40
+                anchors.verticalCenter: parent.verticalCenter
+                spacing: 12
+
+                // L'icône : l'image ou l'icône de l'application, sinon le glyphe à l'accent (ou
+                // la tuile de la marque, Claude Code ou Codex).
+                Item {
+                  id: tile
+                  width: 32; height: 32
+                  anchors.verticalCenter: parent.verticalCenter
+                  readonly property bool hasImage: tileImage.status === Image.Ready
+                  readonly property bool branded: slot.tile !== ""
+                  Rectangle {
+                    anchors.fill: parent
+                    radius: card.oneLine ? width / 2 : 10
+                    visible: tile.branded || !tile.hasImage
+                    color: tile.branded ? slot.tile : view.bandeau.withAlpha(view.bandeau.colorAccent, 0.14)
+                  }
+                  Image {
+                    id: tileImage
+                    anchors.fill: parent
+                    source: tile.branded ? "" : slot.icon
+                    sourceSize.width: 64
+                    sourceSize.height: 64
+                    fillMode: slot.crop ? Image.PreserveAspectCrop : Image.PreserveAspectFit
+                    asynchronous: true
+                    visible: false
+                  }
+                  MultiEffect {
+                    anchors.fill: parent
+                    source: tileImage
+                    visible: !tile.branded && tile.hasImage
+                    maskEnabled: true
+                    maskSource: tileMask
+                  }
+                  Item {
+                    id: tileMask
+                    anchors.fill: parent
+                    layer.enabled: true
+                    visible: false
+                    Rectangle { anchors.fill: parent; radius: card.oneLine ? width / 2 : 10 }
+                  }
+                  Glyph {
+                    anchors.centerIn: parent
+                    visible: tile.branded || !tile.hasImage
+                    glyph: slot.glyph || "󰂚"
+                    color: tile.branded ? slot.ink : view.bandeau.colorAccent
+                    pixelSize: tile.branded ? 20 : 17
+                    fontFamily: view.bandeau.fontFamily
+                  }
+                }
+
+                Column {
+                  id: texts
+                  anchors.verticalCenter: parent.verticalCenter
+                  width: content.width - tile.width - content.spacing
+                  spacing: 2
+                  Row {
+                    width: parent.width
+                    spacing: 7
+                    // Critique : un point rouge discret devant le titre.
+                    Rectangle {
+                      visible: slot.critical
+                      anchors.verticalCenter: parent.verticalCenter
+                      width: 7; height: 7; radius: 3.5
+                      color: view.bandeau.colorUrgent
+                    }
+                    Text {
+                      width: parent.width - (slot.critical ? 14 : 0)
+                      text: slot.title
+                      textFormat: Text.PlainText
+                      elide: Text.ElideRight
+                      maximumLineCount: 1
+                      color: view.bandeau.colorText
+                      font.family: view.bandeau.fontFamily
+                      font.pixelSize: 14
+                      font.bold: true
+                    }
+                  }
+                  Text {
+                    width: parent.width
+                    visible: text !== ""
+                    text: slot.body
+                    textFormat: Text.PlainText
+                    wrapMode: Text.Wrap
+                    maximumLineCount: 2
+                    elide: Text.ElideRight
+                    color: view.bandeau.colorMuted
+                    font.family: view.bandeau.fontFamily
+                    font.pixelSize: 13
+                  }
+                }
+              }
             }
+          }
+
+          // Fermer, au survol.
+          Rectangle {
+            anchors.right: parent.right
+            anchors.rightMargin: 11
+            anchors.verticalCenter: parent.verticalCenter
+            width: 22; height: 22; radius: 11
+            color: view.bandeau.withAlpha(view.bandeau.colorText, closeMouse.containsMouse ? 0.16 : 0.07)
+            opacity: hover.hovered && !slot.leaving ? 1 : 0
+            Behavior on opacity { NumberAnimation { duration: 150 } }
             Glyph {
               anchors.centerIn: parent
-              visible: tile.branded || !tile.hasImage
-              glyph: slot.look.glyph || "󰂚"
-              color: tile.branded ? slot.look.ink : view.bandeau.colorAccent
-              pixelSize: tile.branded ? 20 : 17
+              glyph: "󰅖"
+              color: view.bandeau.colorText
+              pixelSize: 12
               fontFamily: view.bandeau.fontFamily
             }
-          }
-
-          Column {
-            anchors.verticalCenter: parent.verticalCenter
-            width: content.width - tile.width - content.spacing
-            spacing: 2
-            Row {
-              width: parent.width
-              spacing: 7
-              // Critique : un point rouge discret devant le titre.
-              Rectangle {
-                visible: card.critical
-                anchors.verticalCenter: parent.verticalCenter
-                width: 7; height: 7; radius: 3.5
-                color: view.bandeau.colorUrgent
-              }
-              Text {
-                width: parent.width - (card.critical ? 14 : 0)
-                text: slot.look.title || "Notification"
-                textFormat: Text.PlainText
-                elide: Text.ElideRight
-                maximumLineCount: 1
-                color: view.bandeau.colorText
-                font.family: view.bandeau.fontFamily
-                font.pixelSize: 14
-                font.bold: true
-              }
-            }
-            Text {
-              width: parent.width
-              visible: text !== ""
-              text: slot.look.body || ""
-              textFormat: Text.PlainText
-              wrapMode: Text.Wrap
-              maximumLineCount: 2
-              elide: Text.ElideRight
-              color: view.bandeau.colorMuted
-              font.family: view.bandeau.fontFamily
-              font.pixelSize: 13
+            MouseArea {
+              id: closeMouse
+              anchors.fill: parent
+              enabled: !slot.leaving
+              hoverEnabled: true
+              cursorShape: Qt.PointingHandCursor
+              onClicked: view.act(slot.entryKey, "close")
             }
           }
-        }
 
-        // Fermer, au survol.
-        Rectangle {
-          anchors.right: parent.right
-          anchors.rightMargin: 11
-          anchors.verticalCenter: parent.verticalCenter
-          width: 22; height: 22; radius: 11
-          color: view.bandeau.withAlpha(view.bandeau.colorText, closeMouse.containsMouse ? 0.16 : 0.07)
-          opacity: hover.hovered ? 1 : 0
-          Behavior on opacity { NumberAnimation { duration: 150 } }
-          Glyph {
-            anchors.centerIn: parent
-            glyph: "󰅖"
-            color: view.bandeau.colorText
-            pixelSize: 12
-            fontFamily: view.bandeau.fontFamily
+          // Durée de vie restante : une piste fine sous le texte, de son bord gauche au bord
+          // droit du contenu, bouts arrondis ; ce qui reste est à l'accent, adouci. Alignée sur
+          // le texte, elle se lit comme une jauge et non comme un trait égaré.
+          Item {
+            id: lifeTrack
+            visible: slot.lifetime > 0
+            x: content.x + texts.x
+            width: texts.width
+            height: 3
+            anchors.bottom: parent.bottom
+            anchors.bottomMargin: 6
+            Rectangle {
+              anchors.fill: parent
+              radius: height / 2
+              color: view.bandeau.withAlpha(view.bandeau.colorText, 0.07)
+            }
+            Rectangle {
+              height: parent.height
+              radius: height / 2
+              width: Math.max(height, parent.width * Math.max(0, Math.min(1, slot.remaining)))
+              opacity: slot.remaining > 0.002 ? 1 : 0
+              color: view.bandeau.withAlpha(view.bandeau.colorAccent, 0.55)
+            }
           }
-          MouseArea {
-            id: closeMouse
-            anchors.fill: parent
-            hoverEnabled: true
-            cursorShape: Qt.PointingHandCursor
-            onClicked: slot.src.closePopup(slot.index)
-          }
-        }
-
-        // Durée de vie restante.
-        Rectangle {
-          visible: slot.lifetime > 0
-          anchors.bottom: parent.bottom
-          anchors.bottomMargin: 2
-          x: surface.radius > 0 ? Math.min(surface.radius, card.width / 4) : 0
-          height: 2
-          radius: 1
-          width: (card.width - 2 * x) * Math.max(0, Math.min(1, slot.remaining))
-          color: view.bandeau.withAlpha(view.bandeau.colorText, 0.2)
         }
       }
     }

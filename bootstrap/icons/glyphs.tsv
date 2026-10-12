@@ -74,7 +74,7 @@ EC81	-	0		cod-openai	poste.island,poste.notifications
 EC82	-	0		cod-claude	poste.island,poste.notifications
 ED0D	brand-nodejs	0		fa-node_js	menu
 ED3E	brand-xbox	0		fa-xbox	menu
-EEE8	volume-3	0		fa-volume_xmark	osd,panels/audio
+EEE8	volume-3	0		fa-volume_xmark	osd,panels/audio,poste.island
 EF70	tools	0		fa-screwdriver_wrench	menu
 EF94	-	0		fa-battle_net	menu
 EFBA	mouse	0		fa-computer_mouse	menu
@@ -84,9 +84,9 @@ F00C	check	0		fa-check	bar
 F011	power	0		fa-power_off	menu
 F021	refresh	0		fa-refresh	bar,menu
 F023	lock	0		fa-lock	extensions,menu,polkit
-F026	volume-4	0		fa-volume_off	osd,panels/audio
-F027	volume-2	0		fa-volume_low	osd,panels/audio
-F028	volume	0		fa-volume_up	osd,panels/audio
+F026	volume-4	0		fa-volume_off	osd,panels/audio,poste.island
+F027	volume-2	0		fa-volume_low	osd,panels/audio,poste.island
+F028	volume	0		fa-volume_up	osd,panels/audio,poste.island
 F030	camera	0		fa-camera	menu
 F03A	list	0		fa-list	menu
 F03D	video	0		fa-video_camera	menu
@@ -166,7 +166,7 @@ F0141	chevron-left	0		md-chevron_left	panels/clock,poste.island
 F0142	chevron-right	0		md-chevron_right	panels/clock,poste.island
 F014C	clipboard	0		md-clipboard_outline	clipboard
 F014D	clipboard-text	0	clipboard	md-clipboard_text	poste.island
-F0156	x	0		md-close	menu,poste.island,poste.notifications
+F0156	x	0		md-close	menu,poste.island
 F0159	circle-x	0		md-close_circle	panels/bluetooth,panels/network
 F015B	network-off	0		md-close_network	poste.island
 F015F	cloud	0		md-cloud	menu
@@ -210,7 +210,7 @@ F032A	leaf	0		md-leaf	panels/power
 F033D	-	0		md-linux	panels/tailscale
 F033E	lock	0		md-lock	panels/network,poste.island
 F0342	login	0		md-login	poste.island
-F0343	logout	0		md-logout	io.github.grichard99.omaproton-vpn,menu,osd
+F0343	logout	0		md-logout	io.github.grichard99.omaproton-vpn,menu,osd,poste.island
 F0349	search	0		md-magnify	poste.island
 F035C	menu-2	0		md-menu	menu
 F036C	microphone	0		md-microphone	bar,osd,panels/audio,poste.island
@@ -271,13 +271,13 @@ F06E4	infinity	0		md-infinity	menu
 F06E7	device-laptop-off	0		md-laptop_off	menu
 F06F3	network	0		md-network	menu
 F0709	rotate-clockwise	0		md-restart	menu,osd,poste.island
-F0741	hand-finger	0		md-gesture_tap	osd
+F0741	hand-finger	0		md-gesture_tap	osd,poste.island
 F075A	music	0		md-music	crmne.mpris,osd,poste.island,services
 F075F	volume-3	0	volume-off	md-volume_mute	panels/audio,poste.island
 F0785	mood-wink	0		md-sticker_emoji	menu
 F07C0	device-desktop	0		md-desktop_classic	panels/tailscale,poste.island
 F07F5	password	0		md-form_textbox_password	menu
-F07F8	-	0		md-trackpad	menu,osd
+F07F8	-	0		md-trackpad	menu,osd,poste.island
 F0868	brand-docker	0		md-docker	menu
 F0881	-	0		md-onepassword	menu
 F088C	alarm	0		md-reminder	bar,menu
