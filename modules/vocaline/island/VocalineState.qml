@@ -2,7 +2,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 
-// Dictée Vocaline via « poste vocaline watch » (module vocaline), fournie au slot « dictation »
+// Dictée Vocaline, lue sur le socket du démon (module vocaline), fournie au slot « dictation »
 // de l'île (island/island.json). Le flux donne un objet JSON par ligne : hello, state, level,
 // partial, final, silence, error ; ce qui est inconnu ou mal formé est ignoré. Vocaline colle
 // toute la dictée une seule fois, à l'arrêt : l'île est le seul endroit où le texte se voit
@@ -10,7 +10,7 @@ import Quickshell.Io
 // tard, sans rien écrire au journal.
 Item {
   id: voc
-  readonly property var bin: ["poste", "vocaline"]
+  readonly property string socketPath: (Quickshell.env("XDG_RUNTIME_DIR") || "/tmp") + "/vocaline.sock"
 
   property int bars: 14                 // injecté par l'île
   property string phase: "idle"         // idle, loading, listening, stopping
@@ -60,17 +60,26 @@ Item {
     }
   }
 
-  Process {
-    id: watcher
-    running: true
-    command: voc.bin.concat(["watch"])
-    stdout: SplitParser { onRead: function(line) { voc.handle(line) } }
-    stderr: SplitParser { onRead: function(line) {} }
-    onExited: {
-      voc.phase = "idle"
-      voc.reset()
-      restartTimer.start()
+  // Le flux est lu sur le socket du démon (commande `watch`), sans passer par un processus : rien
+  // ne dépend de la façon dont le programme vide sa sortie dans un tuyau.
+  Socket {
+    id: sock
+    path: voc.socketPath
+    parser: SplitParser { onRead: function(line) { voc.handle(line) } }
+    onConnectionStateChanged: {
+      if (connected) {
+        write("watch\n")
+        flush()
+      } else {
+        voc.phase = "idle"
+        voc.reset()
+      }
     }
   }
-  Timer { id: restartTimer; interval: 5000; onTriggered: watcher.running = true }
+  function reconnect() {
+    sock.connected = false
+    sock.connected = true
+  }
+  Component.onCompleted: reconnect()
+  Timer { interval: 5000; repeat: true; running: !sock.connected; onTriggered: voc.reconnect() }
 }

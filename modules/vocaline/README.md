@@ -11,7 +11,8 @@ poste : ce module ne fait que le relier à l'île et à Hyprland.
   relâchement. Maintenir pour parler, ou taper pour démarrer puis taper encore pour arrêter.
 - Rien ne s'écrit dans la fenêtre pendant qu'on parle : à l'arrêt, Vocaline colle toute la dictée
   d'un bloc dans la fenêtre de départ.
-- L'île lit `poste vocaline watch` (`island/VocalineState.qml`, slot `dictation`) :
+- L'île lit le flux `watch` directement sur le socket de Vocaline (`$XDG_RUNTIME_DIR/vocaline.sock`,
+  `island/VocalineState.qml`, slot `dictation`) :
   - `loading` et `listening` : la pastille avec l'onde du micro (`level`), et le son d'écoute ;
   - `stopping` : les points de fin, et le son de fin ;
   - en bas de l'écran : les phrases figées (`final`), puis la phrase en cours (`partial`) en gris,
