@@ -20,6 +20,12 @@ hl.monitor({ output = "", mode = "preferred", position = "auto", scale = 1 })
 -- Chaque écran a ses propres workspaces 1 à 10 (voir bindings.lua) :
 -- en interne, gauche = 1-10, centre = 11-20, droite = 21-30.
 -- default_name affiche 1 à 10 sur chaque écran au lieu de 11-30.
+-- Un écran s'y désigne par sa prise (DP-1) ou par sa description EDID
+-- (desc:…, début de la description de `hyprctl monitors`), qui le reconnaît
+-- quelle que soit la prise. Plusieurs jeux d'écrans (portable au bureau,
+-- seul…) tiennent dans la même liste : un écran absent garde ses numéros.
+-- Débranché, Hyprland pose ses workspaces sur un écran restant (l'île les y
+-- montre à part) et les lui rend quand il revient sur la même prise.
 -- SUPER+CTRL+ALT+flèche envoie la fenêtre sur l'écran de cette flèche (bindings.lua).
 screen_keys = {
   { key = "LEFT", monitor = "DP-3", name = "left screen" },

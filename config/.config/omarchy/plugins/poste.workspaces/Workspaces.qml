@@ -43,9 +43,18 @@ BarWidget {
     if (name !== screenName) screenName = name
   }
 
+  // Une entrée de workspace_monitors : nom de prise (DP-1) ou « desc: » suivi du
+  // début de la description EDID de l'écran, comparée comme le fait Hyprland.
+  property string screenDescription: ""
   readonly property int offset: {
-    var slot = workspaceMonitors.indexOf(screenName)
-    return (slot === -1 ? workspaceMonitors.length : slot) * 10
+    for (var i = 0; i < workspaceMonitors.length; i++) {
+      var entry = workspaceMonitors[i]
+      var hit = entry.indexOf("desc:") === 0
+        ? screenDescription.indexOf(entry.slice(5).trim()) === 0
+        : entry === screenName
+      if (hit) return i * 10
+    }
+    return workspaceMonitors.length * 10
   }
 
   // État lu directement dans hyprctl (les objets Quickshell.Hyprland ne
@@ -94,7 +103,11 @@ BarWidget {
 
         var active = -1
         for (var i = 0; i < state.monitors.length; i++) {
-          if (state.monitors[i].name === root.screenName) active = state.monitors[i].activeWorkspace.id
+          if (state.monitors[i].name === root.screenName) {
+            active = state.monitors[i].activeWorkspace.id
+            if (root.screenDescription !== (state.monitors[i].description || ""))
+              root.screenDescription = state.monitors[i].description || ""
+          }
         }
 
         var counts = {}

@@ -31,12 +31,25 @@
 -- --- Workspaces par écran -------------------------------------------------
 -- SUPER+N va au workspace N de l'écran actif (écrans définis dans
 -- workspace_monitors, monitors.lua). Remplace les SUPER+1..0 d'Omarchy.
+
+-- Une entrée de workspace_monitors désigne-t-elle cet écran ? Nom de prise
+-- (DP-1) ou description EDID (desc:AOC 24G2W1G3- …), comparée au début de la
+-- description comme le fait Hyprland.
+local function screen_matches(entry, monitor)
+  if entry:sub(1, 5) == "desc:" then
+    local want = entry:sub(6):match("^%s*(.-)%s*$")
+    return (monitor.description or ""):sub(1, #want) == want
+  end
+  return monitor.name == entry
+end
+
 local function monitor_workspace(n)
   local monitor = hl.get_active_monitor()
   local slot = #workspace_monitors
-  for index, output in ipairs(workspace_monitors) do
-    if monitor and monitor.name == output then
+  for index, entry in ipairs(workspace_monitors) do
+    if monitor and screen_matches(entry, monitor) then
       slot = index - 1
+      break
     end
   end
   return tostring(slot * 10 + n)

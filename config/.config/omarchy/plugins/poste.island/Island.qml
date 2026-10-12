@@ -288,6 +288,8 @@ Item {
   // center 11-20, right 21-30, any other screen 31-40. State comes straight
   // from hyprctl on every workspace/window event.
   // Read from workspace_monitors in monitors.lua, so each machine keeps its own list.
+  // An entry is a port name (DP-1) or "desc:" + the start of the screen's EDID
+  // description, matched like Hyprland does.
   property var workspaceMonitors: []
   function parseWorkspaceMonitors(text) {
     var m = /^\s*workspace_monitors\s*=\s*\{([^}]*)\}/m.exec(text || "")
@@ -306,10 +308,26 @@ Item {
     onLoaded: root.workspaceMonitors = root.parseWorkspaceMonitors(text())
     onLoadFailed: root.workspaceMonitors = []
   }
-  function workspaceOffset(screenName) {
-    var slot = workspaceMonitors.indexOf(screenName)
-    return (slot === -1 ? workspaceMonitors.length : slot) * 10
+  // Screen name -> EDID description, from hyprctl.
+  property var monitorDescriptions: ({})
+  function screenMatches(entry, screenName) {
+    if (entry.indexOf("desc:") === 0) {
+      var want = entry.slice(5).trim()
+      return String(monitorDescriptions[screenName] || "").indexOf(want) === 0
+    }
+    return entry === screenName
   }
+  function workspaceSlot(screenName) {
+    for (var i = 0; i < workspaceMonitors.length; i++)
+      if (screenMatches(workspaceMonitors[i], screenName)) return i
+    return workspaceMonitors.length
+  }
+  function workspaceOffset(screenName) {
+    return workspaceSlot(screenName) * 10
+  }
+  // Screen name -> ids of workspaces it holds outside its own 1-10: those of
+  // an unplugged screen, which Hyprland parks here until it comes back.
+  property var visitingWorkspaces: ({})
   property var activeWorkspaces: ({})
   // Screens whose shown workspace has a fullscreen window: their island hides.
   property var fullscreenScreens: ({})
@@ -336,14 +354,28 @@ Item {
         var state
         try { state = JSON.parse(text) } catch (e) { return }
         var active = {}
-        for (var i = 0; i < state.monitors.length; i++)
+        var descriptions = {}
+        for (var i = 0; i < state.monitors.length; i++) {
           active[state.monitors[i].name] = state.monitors[i].activeWorkspace.id
+          descriptions[state.monitors[i].name] = state.monitors[i].description || ""
+        }
+        if (JSON.stringify(descriptions) !== JSON.stringify(root.monitorDescriptions))
+          root.monitorDescriptions = descriptions
         var counts = {}
         var fullscreenWs = {}
+        var visiting = {}
         for (var j = 0; j < state.workspaces.length; j++) {
-          counts[state.workspaces[j].id] = state.workspaces[j].windows
-          if (state.workspaces[j].hasfullscreen) fullscreenWs[state.workspaces[j].id] = true
+          var ws = state.workspaces[j]
+          counts[ws.id] = ws.windows
+          if (ws.hasfullscreen) fullscreenWs[ws.id] = true
+          var own = root.workspaceOffset(ws.monitor)
+          if (ws.id > 0 && (ws.id <= own || ws.id > own + 10) && (ws.windows > 0 || active[ws.monitor] === ws.id)) {
+            if (!visiting[ws.monitor]) visiting[ws.monitor] = []
+            visiting[ws.monitor].push(ws.id)
+          }
         }
+        for (var name in visiting) visiting[name].sort(function(a, b) { return a - b })
+        root.visitingWorkspaces = visiting
         var fullscreen = {}
         for (var m in active) if (fullscreenWs[active[m]]) fullscreen[m] = true
         root.activeWorkspaces = active
