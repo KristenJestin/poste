@@ -1,5 +1,5 @@
 name = "vocaline"
-description = "Dictée Vocaline : SUPER+Z, micro, onde et texte dicté en direct en bas de l'écran"
+description = "Dictée Vocaline : SUPER+Z, pastille de dictée en bas de l'écran et texte dicté en direct sous l'île"
 commands = [
   { name = "press", description = "appui sur la touche de dictée (SUPER+Z) : ouvre le micro" },
   { name = "release", description = "relâchement : maintenu, arrête et colle ; tapé, la dictée continue" },

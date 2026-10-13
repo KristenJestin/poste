@@ -1,19 +1,13 @@
 import QtQuick
 import QtQuick.Effects
+import "../components"
 
-// Les notifications qui arrivent, dans l'île : l'île grandit (son fond plein, son ressort) et
-// montre les cartes, la plus récente en haut, les autres en dessous. Trois au plus à la fois
-// sur un écran ; les plus anciennes attendent, cachées et sans décompte, qu'une place se
-// libère.
+// Les notifications du bandeau, sous le texte dicté et l'OSD : la plus récente en haut (au
+// plus près de l'île), les autres descendent. Trois au plus à la fois sur un écran ; les plus
+// anciennes attendent, cachées et sans décompte, qu'une place se libère.
 //
-// Priorité : l'île ne montre les notifications qu'au repos (`active`). Une vue ouverte
-// (lecteur, lanceur, centre de contrôle...) n'est jamais fermée par une notification : celle-ci
-// attend dans le service, sans décompte, et entre quand la vue se referme. Ouvrir une vue
-// pendant qu'une carte est là la fait attendre de même (son décompte repartira du début).
-//
-// Le service (poste.notifications, inscrit auprès du singleton du bandeau, voir
-// ../bandeau/Bandeau.qml) donne le modèle, l'écran de chaque toast et, par present(row), ce
-// que montre la carte : { title, body, icon (URL d'image ou ""), crop (image à recadrer),
+// Le service (voir Bandeau.qml) donne le modèle, l'écran de chaque toast et, par present(row),
+// ce que montre la carte : { title, body, icon (URL d'image ou ""), crop (image à recadrer),
 // glyph, tile (fond de tuile d'une marque ou ""), ink (couleur du glyphe sur cette tuile),
 // critical }.
 //
@@ -22,20 +16,20 @@ import QtQuick.Effects
 // cartes sont posées par une Column ; chacune y prend une place (`slot`) dont la hauteur est
 // animée. La place s'ouvre avant que la carte apparaisse, suit sa hauteur quand le contenu
 // change, et se referme une fois la carte effacée : deux cartes ne se chevauchent jamais, même
-// au milieu d'une animation. L'île suit la hauteur de la pile (implicitHeight).
+// au milieu d'une animation.
 Item {
   id: view
-  required property var host
+  required property var bandeau
   required property string screenName
-  property bool active: false
 
-  readonly property var source: host.notificationSource
-  readonly property int maxCards: 3
-  readonly property int gap: 6
+  readonly property var source: bandeau.source
+  readonly property int cardWidth: 400
+  width: cardWidth
 
-  // L'île reste ouverte tant qu'une carte est affichée ou en train de partir.
+  // La fenêtre reste là tant qu'une carte est affichée ou en train de partir.
   readonly property bool live: cards.count > 0
-  implicitHeight: Math.max(0, stack.height - gap)
+  // Hauteur occupée par les cartes, depuis le haut de la vue (zone qui prend la souris).
+  readonly property real cardsHeight: stack.height
 
   // ---------------------------------------------------------------- la liste affichée
   // Du haut (la plus récente) vers le bas (la plus ancienne), comme la Column les pose.
@@ -43,13 +37,13 @@ Item {
   property int nextUid: 1
 
   // Ce qui doit être affiché : les lignes de cet écran, de la plus récente à la plus ancienne,
-  // trois au plus. Rien tant que l'île montre autre chose.
+  // trois au plus.
   function wanted() {
     var src = source
     var out = []
-    if (!active || !src || !src.popupModel) return out
+    if (!src || !src.popupModel) return out
     var m = src.popupModel
-    for (var i = 0; i < m.count && out.length < maxCards; i++) {
+    for (var i = 0; i < m.count && out.length < bandeau.maxNotifications; i++) {
       var row = m.get(i)
       var key = src.popupKey(row)
       if (src.popupOnScreen(key, screenName)) out.push({ key: key, row: row })
@@ -72,12 +66,6 @@ Item {
     }
   }
   function sync() {
-    // L'île passe à une vue : les cartes s'effacent avec le reste du repos, sans sortie à
-    // elles (la vue prend toute la place) ; leurs notifications restent dans le service.
-    if (!active) {
-      cards.clear()
-      return
-    }
     var want = wanted()
     var rank = {}
     for (var w = 0; w < want.length; w++) rank[want[w].key] = w
@@ -140,7 +128,6 @@ Item {
   }
   onSourceChanged: queueSync()
   onScreenNameChanged: queueSync()
-  onActiveChanged: queueSync()
   Component.onCompleted: queueSync()
   Connections {
     target: view.source ? view.source.popupModel : null
@@ -157,7 +144,7 @@ Item {
   }
   // Un toast sans écran connu va sur l'écran actif.
   Connections {
-    target: view.host
+    target: view.bandeau
     function onFocusedScreenChanged() { view.queueSync() }
   }
 
@@ -165,8 +152,8 @@ Item {
   Column {
     id: stack
     anchors.top: parent.top
-    anchors.left: parent.left
-    anchors.right: parent.right
+    anchors.horizontalCenter: parent.horizontalCenter
+    width: view.cardWidth
 
     Repeater {
       model: cards
@@ -190,7 +177,7 @@ Item {
         // La place de la carte et de l'écart en dessous, à la proportion de son ouverture.
         property real openness: 0
         property real collapse: 0
-        height: (card.height + view.gap) * openness * (1 - collapse)
+        height: (card.height + view.bandeau.gap) * openness * (1 - collapse)
         Behavior on openness { NumberAnimation { duration: 300; easing.type: Easing.OutQuint } }
         Component.onCompleted: Qt.callLater(function() { slot.openness = 1 })
 
@@ -249,24 +236,23 @@ Item {
             NumberAnimation { duration: 260; easing.type: Easing.OutCubic }
           }
 
-          property real fall: slot.entered ? 0 : -view.gap
+          property real fall: slot.entered ? 0 : -view.bandeau.gap
           Behavior on fall { NumberAnimation { duration: 360; easing.type: Easing.OutQuint } }
           transform: Translate { y: card.fall - slot.leave * 8 }
           opacity: (slot.entered ? 1 : 0) * (1 - slot.leave)
           Behavior on opacity { enabled: slot.leave === 0; NumberAnimation { duration: 260; easing.type: Easing.OutCubic } }
-          scale: (slot.entered ? 1 : 0.94) - slot.leave * 0.05
+          scale: (slot.entered ? (hover.hovered && !slot.leaving ? 1.012 : 1) : 0.94) - slot.leave * 0.05
           Behavior on scale { enabled: slot.leave === 0; NumberAnimation { duration: 340; easing.type: Easing.OutBack; easing.overshoot: 1.2 } }
 
           readonly property bool oneLine: slot.body === ""
 
           HoverHandler { id: hover }
 
-          // Le fond de l'île porte la carte ; au survol, un voile à peine plus clair.
-          Rectangle {
+          BandeauSurface {
+            id: surface
             anchors.fill: parent
-            radius: card.oneLine ? height / 2 : 22
-            color: view.host.withAlpha(view.host.colorText, hover.hovered && !slot.leaving ? 0.05 : 0)
-            Behavior on color { ColorAnimation { duration: 150 } }
+            bandeau: view.bandeau
+            radius: card.oneLine ? height / 2 : view.bandeau.blockRadius
           }
 
           MouseArea {
@@ -309,7 +295,7 @@ Item {
                     anchors.fill: parent
                     radius: card.oneLine ? width / 2 : 10
                     visible: tile.branded || !tile.hasImage
-                    color: tile.branded ? slot.tile : view.host.withAlpha(view.host.colorAccent, 0.14)
+                    color: tile.branded ? slot.tile : view.bandeau.withAlpha(view.bandeau.colorAccent, 0.14)
                   }
                   Image {
                     id: tileImage
@@ -339,9 +325,9 @@ Item {
                     anchors.centerIn: parent
                     visible: tile.branded || !tile.hasImage
                     glyph: slot.glyph || "󰂚"
-                    color: tile.branded ? slot.ink : view.host.colorAccent
+                    color: tile.branded ? slot.ink : view.bandeau.colorAccent
                     pixelSize: tile.branded ? 20 : 17
-                    fontFamily: view.host.fontFamily
+                    fontFamily: view.bandeau.fontFamily
                   }
                 }
 
@@ -358,7 +344,7 @@ Item {
                       visible: slot.critical
                       anchors.verticalCenter: parent.verticalCenter
                       width: 7; height: 7; radius: 3.5
-                      color: "#ff453a"
+                      color: view.bandeau.colorUrgent
                     }
                     Text {
                       width: parent.width - (slot.critical ? 14 : 0)
@@ -366,8 +352,8 @@ Item {
                       textFormat: Text.PlainText
                       elide: Text.ElideRight
                       maximumLineCount: 1
-                      color: view.host.colorText
-                      font.family: view.host.fontFamily
+                      color: view.bandeau.colorText
+                      font.family: view.bandeau.fontFamily
                       font.pixelSize: 14
                       font.bold: true
                     }
@@ -380,8 +366,8 @@ Item {
                     wrapMode: Text.Wrap
                     maximumLineCount: 2
                     elide: Text.ElideRight
-                    color: view.host.colorMuted
-                    font.family: view.host.fontFamily
+                    color: view.bandeau.colorMuted
+                    font.family: view.bandeau.fontFamily
                     font.pixelSize: 13
                   }
                 }
@@ -395,15 +381,15 @@ Item {
             anchors.rightMargin: 11
             anchors.verticalCenter: parent.verticalCenter
             width: 22; height: 22; radius: 11
-            color: view.host.withAlpha(view.host.colorText, closeMouse.containsMouse ? 0.16 : 0.07)
+            color: view.bandeau.withAlpha(view.bandeau.colorText, closeMouse.containsMouse ? 0.16 : 0.07)
             opacity: hover.hovered && !slot.leaving ? 1 : 0
             Behavior on opacity { NumberAnimation { duration: 150 } }
             Glyph {
               anchors.centerIn: parent
               glyph: "󰅖"
-              color: view.host.colorText
+              color: view.bandeau.colorText
               pixelSize: 12
-              fontFamily: view.host.fontFamily
+              fontFamily: view.bandeau.fontFamily
             }
             MouseArea {
               id: closeMouse
@@ -418,14 +404,14 @@ Item {
           // Durée de vie restante : le contour de la carte, un trait fin à la couleur du texte,
           // très discret (22 %), sans piste. Il part du milieu du haut et se raccourcit dans le
           // sens des aiguilles ; il suit la hauteur montrée de la carte. Rentré de 2 px pour ne pas
-          // toucher le bord de la carte (et rester loin de celui de l'île).
+          // toucher le liseré de la carte.
           BorderProgress {
             visible: slot.lifetime > 0
             anchors.fill: parent
             anchors.margins: 2
-            radius: card.oneLine ? height / 2 : 20
+            radius: card.oneLine ? height / 2 : view.bandeau.blockRadius - 2
             progress: slot.remaining
-            color: view.host.withAlpha(view.host.colorText, 0.22)
+            color: view.bandeau.withAlpha(view.bandeau.colorText, 0.22)
             track: "transparent"
             lineWidth: 1.5
           }

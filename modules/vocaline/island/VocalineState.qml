@@ -5,8 +5,8 @@ import Quickshell.Io
 // Dictée Vocaline, lue sur le socket du démon (module vocaline), fournie au slot « dictation »
 // de l'île (island/island.json). Le flux donne un objet JSON par ligne : hello, state, level,
 // partial, final, silence, error ; ce qui est inconnu ou mal formé est ignoré. Vocaline colle
-// toute la dictée une seule fois, à l'arrêt : le bandeau, en bas de l'écran, est le seul endroit
-// où le texte se voit pendant qu'on parle. Démon absent ou flux coupé : rien n'est en cours,
+// toute la dictée une seule fois, à l'arrêt : le bandeau, sous l'île, est le seul endroit où
+// le texte se voit pendant qu'on parle. Démon absent ou flux coupé : rien n'est en cours,
 // nouvel essai 5 s plus tard, sans rien écrire au journal.
 Item {
   id: voc

@@ -970,11 +970,9 @@ Item {
 
   // -------------------------------------------------------------- popup UI
   //
-  // Kris : les toasts sont dessinés par l'île, qui grandit pour les montrer
-  // (poste.island/components/NotificationToasts.qml). Le service inscrit son modèle auprès du
-  // singleton du bandeau (poste.island/bandeau, seul objet commun aux plugins), où l'île le lit,
-  // et garde toute la logique : à quel écran va un toast, combien de temps il reste, ce que fait
-  // un clic.
+  // Kris : les toasts sont dessinés par le bandeau (poste.island/bandeau), empilés juste sous
+  // l'île, avec l'OSD et le texte dicté. Le service y inscrit son modèle et garde toute la
+  // logique : à quel écran va un toast, combien de temps il reste, ce que fait un clic.
 
   readonly property string focusedScreenName: Hyprland.focusedMonitor ? String(Hyprland.focusedMonitor.name) : ""
 
@@ -999,7 +997,7 @@ Item {
     return owner === String(screenName)
   }
 
-  // Ce que montre la carte de l'île pour une ligne du modèle (voir NotificationToasts.qml) :
+  // Ce que montre la carte du bandeau pour une ligne du modèle (voir NotificationView.qml) :
   // la tuile de marque (Claude Code, Codex), sinon l'image ou l'icône de l'application, sinon
   // le glyphe ; le corps sans balises d'image.
   function present(row) {

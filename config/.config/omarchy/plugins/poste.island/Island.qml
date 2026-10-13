@@ -7,9 +7,9 @@
 //
 // One island per screen shows that screen's workspaces, the clock, and the
 // now-playing cover + wave; clicking the music opens a player on that screen.
-// Les notifications qui arrivent sortent de l'île : elle grandit pour les montrer
-// (components/NotificationToasts.qml). Ce qui passe sans se lire (volume, OSD, dictée) va
-// dans le bandeau (bandeau/), en bas de l'écran actif.
+// Ce qui passe (notifications, volume, OSD, texte dicté) s'affiche dans le bandeau (bandeau/),
+// empilé juste sous l'île ; seule la pastille de la dictée (micro, onde) va en bas de l'écran
+// actif. L'île ne se transforme pas pour le montrer.
 import QtQuick
 import Qt.labs.folderlistmodel
 import Quickshell
@@ -477,11 +477,10 @@ Item {
     else item.open()
   }
 
-  // ---------------------------------------------------------------- notifications qui arrivent
-  // Le service poste.notifications s'inscrit auprès du singleton partagé du bandeau (seul objet
-  // commun aux plugins) ; l'île lit son modèle là (components/NotificationToasts.qml). Pendant
-  // la démo du bandeau, c'est la source inventée de la démo.
-  readonly property var notificationSource: Bandeau.source
+  // ---------------------------------------------------------------- bord de l'île
+  // Chaque île donne au bandeau son bord bas dessiné (IslandWindow.qml, `edge`) : la pile du
+  // bandeau se pose juste en dessous, sur le même écran.
+  function reportEdge(screenName, bottom) { Bandeau.setIslandEdge(screenName, bottom) }
 
   // ---------------------------------------------------------------- notifications list
   // Unread count and the list both come from the Notification Center
@@ -604,8 +603,8 @@ Item {
   // voxtype. Contrat de l'élément chargé : propriétés lues `listening` (micro ouvert),
   // `transcribing` (fin en cours), `level` (niveau courant de 0 à 1, à l'échelle de voxtype ;
   // la source le met à jour à son rythme et le lisse si elle est lente), `finals` (texte figé
-  // de la dictée) et `partial` (phrase en cours). Le micro, l'onde et le texte, s'il y en a,
-  // s'affichent en bas de l'écran actif (le bandeau, bandeau/DictationView.qml).
+  // de la dictée) et `partial` (phrase en cours). Le micro et l'onde vont en bas de l'écran actif,
+  // le texte, s'il y en a, juste sous l'île (le bandeau, bandeau/).
   property var dictationItems: []
   function collectDictations() {
     var list = []
@@ -640,7 +639,7 @@ Item {
   readonly property real voxLevel: dictation && dictation.listening ? Number(dictation.level) || 0 : voxtypeLevel
   readonly property string dictationFinals: dictation ? String(dictation.finals || "") : ""
   readonly property string dictationPartial: dictation ? String(dictation.partial || "") : ""
-  // La dictée (micro, onde, texte) s'affiche dans le bandeau, en bas de l'écran actif.
+  // La dictée s'affiche dans le bandeau : la pastille en bas, le texte sous l'île.
   Binding { target: Bandeau; property: "dictationListening"; value: root.voxListening }
   Binding { target: Bandeau; property: "dictationTranscribing"; value: root.voxTranscribing }
   Binding { target: Bandeau; property: "dictationLevel"; value: root.voxLevel }
@@ -831,8 +830,8 @@ Item {
 
   // ---------------------------------------------------------------- shared state
   // Each screen's open view and island bottom edge, written to
-  // $XDG_RUNTIME_DIR/poste-island.json (reset on unload). The toasts no longer
-  // read it (the island draws them itself); the island still uses
+  // $XDG_RUNTIME_DIR/poste-island.json (reset on unload). The toasts do not
+  // read it (the bandeau gets the edge directly, reportEdge); the island still uses
   // the views to refresh the list while it is open.
   readonly property string statePath: (Quickshell.env("XDG_RUNTIME_DIR") || "/tmp") + "/poste-island.json"
   property var islandStates: ({})
@@ -853,6 +852,7 @@ Item {
     stateFile.setText(JSON.stringify({ screens: {} }))
     Bandeau.dictationListening = false
     Bandeau.dictationTranscribing = false
+    Bandeau.islandEdges = ({})
   }
   // Refresh the list quickly while it is open, so arrivals slide in.
   readonly property bool anyListOpen: {
