@@ -1,8 +1,7 @@
 import QtQuick
-import "../components"
 
 // Le texte dicté en direct (Vocaline, ou toute source du slot « dictation » de l'île qui donne
-// du texte), en haut de la pile, juste sous l'île : le micro à l'accent, les phrases figées en
+// du texte), en haut de la pile, juste sous l'île, sans icône : les phrases figées en
 // couleur normale, puis la phrase en cours en gris. Trois lignes au plus : trop long, c'est la
 // fin qui reste visible. Le dernier texte reste affiché pendant le fondu de sortie. La pastille
 // animée (micro, onde, points) est à part, en bas de l'écran (DictationPill.qml).
@@ -61,8 +60,6 @@ Item {
   readonly property int lines: 3
   readonly property int padX: 20
   readonly property int padY: 11
-  readonly property int iconBox: 22
-  readonly property int gap: 12
 
   TextMetrics {
     id: oneLine
@@ -81,7 +78,7 @@ Item {
   readonly property bool multiLine: label.lineCount > 1
 
   // Taille finale, puis taille montrée (animée vers la finale).
-  readonly property real finalWidth: textWidth + iconBox + gap + 2 * padX
+  readonly property real finalWidth: textWidth + 2 * padX
   readonly property real finalHeight: textHeight + 2 * padY
   property real shownWidth: finalWidth
   property real shownHeight: finalHeight
@@ -140,24 +137,10 @@ Item {
     radius: view.multiLine ? view.bandeau.blockRadius : height / 2
   }
 
-  Item {
-    x: view.padX
-    y: view.padY
-    width: view.iconBox
-    height: view.lineHeight
-    Glyph {
-      anchors.centerIn: parent
-      glyph: "󰍬"
-      color: view.bandeau.colorAccent
-      pixelSize: 17
-      fontFamily: view.bandeau.fontFamily
-    }
-  }
-
   // La zone visible du texte : la place qu'il a dans la pilule montrée.
   Item {
     id: clipper
-    x: view.padX + view.iconBox + view.gap
+    x: view.padX
     y: view.padY
     width: Math.max(0, view.shownWidth - x - view.padX)
     height: Math.max(0, view.shownHeight - 2 * view.padY)
