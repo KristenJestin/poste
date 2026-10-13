@@ -30,11 +30,10 @@ Rectangle {
     : kind === "device" ? device.color
     : kind === "obs" ? (obs.paused ? "#ffd60a" : "#ff453a")
     : kind === "music" ? host.mediaTint
-    : kind === "vox" ? "#ff453a"
     : kind === "timer" ? (timer.paused ? host.colorMuted : host.colorAccent)
     : (aiReady || (conv && conv.busy) ? host.colorAccent : host.colorText)
   readonly property string trailing: {
-    if (kind === "music" || kind === "vox") return ""
+    if (kind === "music") return ""
     if (kind === "timer") return timer.done ? "Done" : host.formatLeft(timerLeft)
     if (kind === "battery") return Math.round(battery.percent * 100) + " %"
     if (kind === "device") return Math.round(device.percent * 100) + " %"
@@ -47,7 +46,6 @@ Rectangle {
 
   height: host.restHeight
   width: !compact ? height
-    : kind === "vox" ? voxPill.implicitWidth + 28
     : kind === "music" ? 22 + 20 + 10 + musicWave.width + 4
     : Math.max(height, content.implicitWidth + 26)
   radius: height / 2
@@ -91,7 +89,7 @@ Rectangle {
   // ------------------------------------------------ à gauche (ou seul, en rond)
   Item {
     id: leading
-    visible: bubble.kind !== "music" && bubble.kind !== "vox"
+    visible: bubble.kind !== "music"
     width: 18
     height: 18
     x: bubble.compact ? 11 : (bubble.width - width) / 2
@@ -216,23 +214,6 @@ Rectangle {
     font.features: { "tnum": 1 }
   }
 
-  // ------------------------------------------------ dictée : micro et niveau (VoxPill)
-  VoxPill {
-    id: voxPill
-    visible: bubble.kind === "vox" && bubble.compact
-    x: 14
-    anchors.verticalCenter: parent.verticalCenter
-    host: bubble.host
-  }
-  Glyph {
-    anchors.centerIn: parent
-    visible: bubble.kind === "vox" && !bubble.compact
-    glyph: "󰍬"
-    color: "#ff453a"
-    fontFamily: bubble.host.fontFamily
-    pixelSize: 15
-  }
-
   // Réponse prête, en rond : point dans le coin.
   Rectangle {
     visible: !bubble.compact && bubble.aiReady
@@ -249,7 +230,7 @@ Rectangle {
     x: 11
     anchors.verticalCenter: parent.verticalCenter
     spacing: 9
-    opacity: bubble.compact && bubble.kind !== "music" && bubble.kind !== "vox" ? 1 : 0
+    opacity: bubble.compact && bubble.kind !== "music" ? 1 : 0
     visible: opacity > 0.01
     Behavior on opacity { NumberAnimation { duration: 160 } }
     Item { width: 18; height: 18 }   // place de l'élément de gauche

@@ -82,7 +82,7 @@ hl.config({ decoration = { dim_around = 0.55 } })
 -- quasi opaque, le flou Acrylic ne se voyait plus). Actif / inactif.
 o.window({ tag = "default-opacity" }, { opacity = "0.97 0.9" })
 
--- Bandeau du bas (poste.island/bandeau : notifications, OSD, texte dicté) : fond plein,
+-- Bandeau du bas (poste.island/bandeau : OSD, dictée) : fond plein,
 -- sans flou ; ses apparitions sont animées dans l'île, pas par le compositeur.
 hl.layer_rule({ match = { namespace = "^poste-bandeau$" }, no_anim = true })
 

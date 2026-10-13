@@ -1,15 +1,20 @@
 import QtQuick
 import "../components"
 
-// Le texte dicté en direct (slot « dictation » de l'île) : le micro à l'accent, les phrases
-// figées en couleur normale, puis la phrase en cours en gris. Trois lignes au plus : trop long,
-// c'est la fin qui reste visible. Le dernier texte reste affiché pendant le fondu de sortie.
+// La dictée en cours (SUPER+A voxtype, SUPER+Z Vocaline ou toute source du slot « dictation »
+// de l'île), pareille pour toutes les sources : le micro, puis l'onde de la voix (14 barres, la
+// plus récente à droite, depuis l'historique des niveaux tenu par le bandeau), ou trois points
+// qui pulsent pendant la transcription. Si la source donne du texte (Vocaline), il suit l'onde :
+// les phrases figées en couleur normale, puis la phrase en cours en gris. Trois lignes au plus :
+// trop long, c'est la fin qui reste visible. Le dernier état reste affiché pendant le fondu de
+// sortie.
 //
-// Quand le texte s'allonge, la pilule grandit en douceur, en largeur puis en hauteur quand il
-// passe sur deux ou trois lignes. Le texte, lui, est posé tout de suite à sa taille finale
-// (sinon il repasserait à la ligne pendant l'animation) : seuls le fond et la zone visible
-// (`shownWidth`, `shownHeight`) s'animent. Le texte suit le bord gauche de la pilule et reste
-// collé en bas, donc la fin reste visible ; ce qui dépasse est coupé le temps de l'animation.
+// Quand le texte arrive ou s'allonge, la pilule grandit en douceur, en largeur puis en hauteur
+// quand il passe sur deux ou trois lignes. Le texte, lui, est posé tout de suite à sa taille
+// finale (sinon il repasserait à la ligne pendant l'animation) : seuls le fond et la zone
+// visible (`shownWidth`, `shownHeight`) s'animent. Le texte suit le bord gauche de la pilule et
+// reste collé en bas, donc la fin reste visible ; ce qui dépasse est coupé le temps de
+// l'animation.
 Item {
   id: view
   required property var bandeau
@@ -18,6 +23,8 @@ Item {
 
   property string finals: ""
   property string partial: ""
+  // Les points de la transcription à la place de l'onde.
+  property bool transcribing: false
   onActiveChanged: {
     if (active) {
       keep()
@@ -26,14 +33,29 @@ Item {
     }
     followActive()
   }
+  // Relu un tour de boucle plus tard, une fois toutes les valeurs de l'île posées : quand la
+  // dictée s'arrête, le texte se vide en même temps qu'elle se cache, et la pilule doit garder
+  // son dernier état pendant le fondu au lieu de rétrécir.
   Connections {
     target: view.bandeau
-    function onDictFinalsChanged() { if (view.active) view.keep() }
-    function onDictPartialChanged() { if (view.active) view.keep() }
+    function onDictFinalsChanged() { view.queueKeep() }
+    function onDictPartialChanged() { view.queueKeep() }
+    function onDictListeningChanged() { view.queueKeep() }
+    function onDictTranscribingChanged() { view.queueKeep() }
+  }
+  property bool keepQueued: false
+  function queueKeep() {
+    if (keepQueued) return
+    keepQueued = true
+    Qt.callLater(function() {
+      view.keepQueued = false
+      if (view.active && view.bandeau.dictShown) view.keep()
+    })
   }
   function keep() {
     finals = bandeau.dictFinals
     partial = bandeau.dictPartial
+    transcribing = bandeau.dictTranscribing && !bandeau.dictListening
   }
 
   function escapeHtml(s) {
@@ -42,13 +64,20 @@ Item {
   readonly property string plain: finals + (finals !== "" && partial !== "" ? " " : "") + partial
   readonly property string styled: escapeHtml(finals) + (finals !== "" && partial !== "" ? " " : "")
     + (partial !== "" ? "<font color=\"" + bandeau.colorMuted + "\">" + escapeHtml(partial) + "</font>" : "")
+  readonly property bool hasText: plain !== ""
 
   readonly property int fontSize: 15
   readonly property int lines: 3
-  readonly property int padX: 20
+  readonly property int padX: 18
   readonly property int padY: 11
-  readonly property int iconBox: 22
-  readonly property int gap: 12
+  readonly property int iconBox: 18
+  readonly property int gap: 10
+  // L'onde : 14 barres de 2,5 px espacées de 2 px (l'aspect de la pastille voxtype de l'île).
+  readonly property int bars: bandeau.dictBars
+  readonly property real barWidth: 2.5
+  readonly property real barSpacing: 2
+  readonly property real waveWidth: bars * barWidth + (bars - 1) * barSpacing
+  readonly property real waveMax: 18
 
   TextMetrics {
     id: oneLine
@@ -61,13 +90,15 @@ Item {
     id: fm
     font: oneLine.font
   }
-  readonly property real lineHeight: Math.ceil(fm.lineSpacing)
-  readonly property real textWidth: Math.min(maxTextWidth, Math.ceil(oneLine.advanceWidth) + 2)
+  readonly property real lineHeight: Math.max(waveMax, Math.ceil(fm.lineSpacing))
+  readonly property real textWidth: hasText ? Math.min(maxTextWidth, Math.ceil(oneLine.advanceWidth) + 2) : 0
   readonly property real textHeight: Math.max(lineHeight, Math.min(label.implicitHeight, lineHeight * lines))
-  readonly property bool multiLine: label.lineCount > 1
+  readonly property bool multiLine: hasText && label.lineCount > 1
+  // Début du texte, après le micro et l'onde.
+  readonly property real textX: padX + iconBox + gap + waveWidth + 2 * gap
 
   // Taille finale, puis taille montrée (animée vers la finale).
-  readonly property real finalWidth: textWidth + iconBox + gap + 2 * padX
+  readonly property real finalWidth: hasText ? textX + textWidth + padX : padX + iconBox + gap + waveWidth + padX
   readonly property real finalHeight: textHeight + 2 * padY
   property real shownWidth: finalWidth
   property real shownHeight: finalHeight
@@ -126,6 +157,7 @@ Item {
     radius: view.multiLine ? view.bandeau.blockRadius : height / 2
   }
 
+  // Le micro, gris clair et immobile : l'onde à côté porte le mouvement.
   Item {
     x: view.padX
     y: view.padY
@@ -134,16 +166,71 @@ Item {
     Glyph {
       anchors.centerIn: parent
       glyph: "󰍬"
-      color: view.bandeau.colorAccent
-      pixelSize: 17
+      color: view.bandeau.withAlpha(view.bandeau.colorText, 0.75)
+      pixelSize: 15
       fontFamily: view.bandeau.fontFamily
+    }
+  }
+
+  // L'onde (écoute) ou les points (transcription), à hauteur de la première ligne.
+  Item {
+    id: indicator
+    x: view.padX + view.iconBox + view.gap
+    y: view.padY
+    width: view.waveWidth
+    height: view.lineHeight
+
+    Row {
+      anchors.verticalCenter: parent.verticalCenter
+      visible: !view.transcribing
+      spacing: view.barSpacing
+      Repeater {
+        model: view.bars
+        delegate: Rectangle {
+          required property int index
+          readonly property int back: view.bars - 1 - index
+          readonly property var levels: view.bandeau.dictLevels
+          readonly property real level: back < levels.length ? levels[levels.length - 1 - back] : 0
+          anchors.verticalCenter: parent.verticalCenter
+          width: view.barWidth
+          height: 3 + (view.waveMax - 3) * level
+          radius: view.barWidth / 2
+          color: view.bandeau.colorAccent
+          opacity: 0.45 + 0.55 * (index / view.bars)
+          Behavior on height { NumberAnimation { duration: 90; easing.type: Easing.OutQuad } }
+        }
+      }
+    }
+
+    Row {
+      anchors.centerIn: parent
+      visible: view.transcribing
+      spacing: 4
+      Repeater {
+        model: 3
+        delegate: Rectangle {
+          id: dot
+          required property int index
+          width: 5; height: 5; radius: 2.5
+          color: view.bandeau.colorText
+          opacity: 0.35
+          SequentialAnimation on opacity {
+            running: view.transcribing && view.live
+            loops: Animation.Infinite
+            PauseAnimation { duration: dot.index * 160 }
+            NumberAnimation { to: 1; duration: 280; easing.type: Easing.OutQuad }
+            NumberAnimation { to: 0.35; duration: 280; easing.type: Easing.InQuad }
+            PauseAnimation { duration: (2 - dot.index) * 160 }
+          }
+        }
+      }
     }
   }
 
   // La zone visible du texte : la place qu'il a dans la pilule montrée.
   Item {
     id: clipper
-    x: view.padX + view.iconBox + view.gap
+    x: view.textX
     y: view.padY
     width: Math.max(0, view.shownWidth - x - view.padX)
     height: Math.max(0, view.shownHeight - 2 * view.padY)
@@ -151,7 +238,7 @@ Item {
     Text {
       id: label
       anchors.bottom: parent.bottom
-      width: view.textWidth
+      width: Math.max(1, view.textWidth)
       text: view.styled
       textFormat: Text.StyledText
       wrapMode: Text.WordWrap

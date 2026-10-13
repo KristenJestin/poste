@@ -7,8 +7,9 @@
 //
 // One island per screen shows that screen's workspaces, the clock, and the
 // now-playing cover + wave; clicking the music opens a player on that screen.
-// Ce qui passe (volume, OSD, notifications, texte dicté) s'affiche dans le bandeau
-// (bandeau/), en bas de l'écran actif : l'île ne se transforme plus pour le montrer.
+// Les notifications qui arrivent sortent de l'île : elle grandit pour les montrer
+// (components/NotificationToasts.qml). Ce qui passe sans se lire (volume, OSD, dictée) va
+// dans le bandeau (bandeau/), en bas de l'écran actif.
 import QtQuick
 import Qt.labs.folderlistmodel
 import Quickshell
@@ -476,6 +477,12 @@ Item {
     else item.open()
   }
 
+  // ---------------------------------------------------------------- notifications qui arrivent
+  // Le service poste.notifications s'inscrit auprès du singleton partagé du bandeau (seul objet
+  // commun aux plugins) ; l'île lit son modèle là (components/NotificationToasts.qml). Pendant
+  // la démo du bandeau, c'est la source inventée de la démo.
+  readonly property var notificationSource: Bandeau.source
+
   // ---------------------------------------------------------------- notifications list
   // Unread count and the list both come from the Notification Center
   // plugin's store (its CLI), so "read" and "cleared" mean the same thing as
@@ -556,7 +563,7 @@ Item {
   // Dictation state from the daemon's state file (idle, recording, streaming,
   // transcribing) and live mic levels from its audio socket through the
   // voxtype-audio-bridge sidecar (NDJSON {"peak","rms","vad"} frames). The
-  // voxtype OSD is disabled (osd.enabled = false); the island shows it.
+  // voxtype OSD is disabled (osd.enabled = false); the bandeau shows it.
   readonly property string voxStatePath: (Quickshell.env("XDG_RUNTIME_DIR") || "/tmp") + "/voxtype/state"
   property string voxtypeState: "idle"
   readonly property bool voxtypeListening: voxtypeState === "recording" || voxtypeState === "streaming"
@@ -575,9 +582,8 @@ Item {
   }
   // Niveau courant de voxtype, 0..1 (boosted: speech RMS is small). Le bridge envoie 100 images
   // par seconde (fenêtres de 10 ms, source voxtype : src/audio/levels.rs), `rms` y vaut le pic de
-  // la fenêtre divisé par racine de 2. L'historique des barres est rempli plus bas, à cadence fixe.
+  // la fenêtre divisé par racine de 2. L'historique des barres est rempli par le bandeau.
   property real voxtypeLevel: 0
-  readonly property int voxBars: 14
   Process {
     id: voxBridge
     running: root.voxtypeListening
@@ -594,12 +600,12 @@ Item {
   }
   onVoxtypeListeningChanged: if (!voxtypeListening) voxtypeLevel = 0
 
-  // Slot « dictation » : un module peut fournir sa propre source de dictée, affichée dans la
-  // même pastille que voxtype. Contrat de l'élément chargé : propriétés lues `listening` (micro
-  // ouvert), `transcribing` (fin en cours), `level` (niveau courant de 0 à 1, à l'échelle de
-  // voxtype ; la source le met à jour à son rythme et le lisse si elle est lente), `finals`
-  // (texte figé de la dictée) et `partial` (phrase en cours). Le texte, s'il y en a, s'affiche
-  // en bas de l'écran actif (le bandeau, bandeau/DictationView.qml).
+  // Slot « dictation » : un module peut fournir sa propre source de dictée, affichée comme
+  // voxtype. Contrat de l'élément chargé : propriétés lues `listening` (micro ouvert),
+  // `transcribing` (fin en cours), `level` (niveau courant de 0 à 1, à l'échelle de voxtype ;
+  // la source le met à jour à son rythme et le lisse si elle est lente), `finals` (texte figé
+  // de la dictée) et `partial` (phrase en cours). Le micro, l'onde et le texte, s'il y en a,
+  // s'affichent en bas de l'écran actif (le bandeau, bandeau/DictationView.qml).
   property var dictationItems: []
   function collectDictations() {
     var list = []
@@ -626,29 +632,18 @@ Item {
     return null
   }
 
-  // Ce que montre la pastille de dictée : voxtype ou la source du slot qui dicte.
+  // La dictée en cours : voxtype ou la source du slot qui dicte.
   readonly property bool voxListening: voxtypeListening || (!!dictation && dictation.listening)
   readonly property bool voxTranscribing: voxtypeTranscribing || (!!dictation && dictation.transcribing)
-  readonly property bool voxActive: voxListening || voxTranscribing
-  // Une seule onde pour toutes les sources : chacune ne donne que son niveau courant, et l'île
-  // l'échantillonne à la cadence de voxtype (100 par seconde) dans l'historique des barres, le
-  // plus récent en dernier. L'onde bouge donc pareil quelle que soit la source.
+  // Une seule onde pour toutes les sources : chacune ne donne que son niveau courant, que le
+  // bandeau échantillonne à la cadence de voxtype (bandeau/Bandeau.qml, « dictée »).
   readonly property real voxLevel: dictation && dictation.listening ? Number(dictation.level) || 0 : voxtypeLevel
-  property var voxLevels: []
-  Timer {
-    interval: 10
-    repeat: true
-    running: root.voxListening
-    onTriggered: {
-      var next = root.voxLevels.slice(Math.max(0, root.voxLevels.length - root.voxBars + 1))
-      next.push(root.voxLevel)
-      root.voxLevels = next
-    }
-  }
   readonly property string dictationFinals: dictation ? String(dictation.finals || "") : ""
   readonly property string dictationPartial: dictation ? String(dictation.partial || "") : ""
-  // Le texte dicté va au bandeau, en bas de l'écran actif.
-  Binding { target: Bandeau; property: "dictationActive"; value: root.voxActive }
+  // La dictée (micro, onde, texte) s'affiche dans le bandeau, en bas de l'écran actif.
+  Binding { target: Bandeau; property: "dictationListening"; value: root.voxListening }
+  Binding { target: Bandeau; property: "dictationTranscribing"; value: root.voxTranscribing }
+  Binding { target: Bandeau; property: "dictationLevel"; value: root.voxLevel }
   Binding { target: Bandeau; property: "dictationFinals"; value: root.dictationFinals }
   Binding { target: Bandeau; property: "dictationPartial"; value: root.dictationPartial }
 
@@ -709,11 +704,8 @@ Item {
     command: ["sh", "-c", 'while :; do "$1" dictation-start || exit; done', "vox-loop", root.sfx]
   }
   // Le son d'écoute tourne en boucle (voxLoop) ; à l'arrêt, « stop ». Même chose pour
-  // voxtype et pour la source du slot « dictation ». L'historique de l'onde repart de zéro.
-  onVoxListeningChanged: if (!voxListening) {
-    voxLevels = []
-    Quickshell.execDetached([root.sfx, "dictation-stop"])
-  }
+  // voxtype et pour la source du slot « dictation ».
+  onVoxListeningChanged: if (!voxListening) Quickshell.execDetached([root.sfx, "dictation-stop"])
 
   // ---------------------------------------------------------------- AI usage
   // Records written by omarchy-agent-usage-update into
@@ -840,7 +832,7 @@ Item {
   // ---------------------------------------------------------------- shared state
   // Each screen's open view and island bottom edge, written to
   // $XDG_RUNTIME_DIR/poste-island.json (reset on unload). The toasts no longer
-  // read it (they live in the bandeau, at the bottom); the island still uses
+  // read it (the island draws them itself); the island still uses
   // the views to refresh the list while it is open.
   readonly property string statePath: (Quickshell.env("XDG_RUNTIME_DIR") || "/tmp") + "/poste-island.json"
   property var islandStates: ({})
@@ -859,7 +851,8 @@ Item {
   FileView { id: stateFile; path: root.statePath; printErrors: false }
   Component.onDestruction: {
     stateFile.setText(JSON.stringify({ screens: {} }))
-    Bandeau.dictationActive = false
+    Bandeau.dictationListening = false
+    Bandeau.dictationTranscribing = false
   }
   // Refresh the list quickly while it is open, so arrivals slide in.
   readonly property bool anyListOpen: {

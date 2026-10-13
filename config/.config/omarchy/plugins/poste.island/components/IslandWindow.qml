@@ -39,6 +39,9 @@ PanelWindow {
   readonly property bool moduleOpen: wifiOpen || bluetoothOpen || audioOpen || vpnOpen || tailscaleOpen
   readonly property bool surfaceOpen: playerOpen || controlsOpen || notificationsOpen || launcherOpen || menuOpen || moduleOpen || shelfOpen || askOpen || usageOpen
   readonly property bool restPill: !surfaceOpen
+  // Au repos, l'île grandit pour montrer les notifications qui arrivent (NotificationToasts.qml) ;
+  // ce n'est pas une vue : ni clavier, ni voile, ni fermeture au clic extérieur.
+  readonly property bool toastShown: restPill && toasts.live
 
   Connections {
     target: window.host
@@ -144,9 +147,8 @@ PanelWindow {
   // viennent après elle, plus à gauche. Survol de la partie OBS : sa carte.
   Item {
     id: capture
-    readonly property bool vox: false   // la dictée a sa pastille sous l'île (voxDock)
     readonly property bool rec: !!window.host.obs && window.host.obs.active
-    readonly property bool shown: (vox || rec) && !window.surfaceOpen && !island.tucked
+    readonly property bool shown: rec && !window.surfaceOpen && !island.tucked
     readonly property real overlap: 0
     x: island.x - width - (shown ? 8 : 0)
     y: island.y
@@ -173,17 +175,6 @@ PanelWindow {
       spacing: 10
       opacity: capture.shown ? 1 : 0
       Behavior on opacity { NumberAnimation { duration: 180 } }
-      VoxPill {
-        anchors.verticalCenter: parent.verticalCenter
-        visible: capture.vox
-        host: window.host
-      }
-      Rectangle {
-        anchors.verticalCenter: parent.verticalCenter
-        visible: capture.vox && capture.rec
-        width: 1; height: 14
-        color: window.host.withAlpha(window.host.colorText, 0.15)
-      }
       Row {
         id: recPart
         anchors.verticalCenter: parent.verticalCenter
@@ -244,7 +235,7 @@ PanelWindow {
     x: (parent.width - width) / 2
     // Hidden (slid up) when the bar is toggled off, or over a fullscreen
     // window on this screen, unless it has something transient to show.
-    readonly property bool tucked: window.restPill && !window.host.voxActive
+    readonly property bool tucked: window.restPill && !window.toastShown
       && (window.host.barHidden || window.host.fullscreenScreens[window.screenName] === true)
     y: tucked ? -height - 12 : window.host.restTop
     opacity: tucked ? 0 : 1
@@ -261,6 +252,7 @@ PanelWindow {
       : window.wifiOpen || window.bluetoothOpen || window.vpnOpen || window.tailscaleOpen ? 400
       : window.audioOpen ? 420
       : window.playerOpen ? 420
+      : window.toastShown ? 420
       : restRow.implicitWidth + 30
     // 16 px above the launcher, 12 px below its footer.
     readonly property real targetHeight: window.menuOpen ? menuView.implicitHeight + 32
@@ -276,6 +268,7 @@ PanelWindow {
       : window.vpnOpen ? vpnView.implicitHeight + 36
       : window.tailscaleOpen ? tailscaleView.implicitHeight + 36
       : window.playerOpen ? playerView.implicitHeight + 44
+      : window.toastShown ? toasts.implicitHeight + 12
       : window.host.restHeight
 
     readonly property real springStiffness: 6.5 / window.host.motionScale
@@ -286,7 +279,7 @@ PanelWindow {
     width: Math.max(40, springWidth)
     height: Math.max(26, springHeight)
 
-    property real radiusCap: window.surfaceOpen ? 28 : 36
+    property real radiusCap: window.surfaceOpen || window.toastShown ? 28 : 36
     Behavior on radiusCap { NumberAnimation { duration: 390 * window.host.motionScale; easing.type: Easing.OutQuint } }
     radius: Math.min(height / 2, radiusCap)
 
@@ -295,7 +288,7 @@ PanelWindow {
     border.color: window.host.withAlpha(window.host.colorText, 0.07)
     clip: true
 
-    scale: window.restPill && hover.hovered ? 1.04 : 1
+    scale: window.restPill && !window.toastShown && hover.hovered ? 1.04 : 1
     Behavior on scale { NumberAnimation { duration: 240 * window.host.motionScale; easing.type: Easing.OutBack; easing.overshoot: 1.6 } }
     HoverHandler { id: hover }
 
@@ -307,9 +300,9 @@ PanelWindow {
       anchors.horizontalCenter: parent.horizontalCenter
       y: (window.host.restHeight - height) / 2
       spacing: 14
-      opacity: window.restPill ? 1 : 0
+      opacity: window.restPill && !window.toastShown ? 1 : 0
       visible: opacity > 0.01
-      Behavior on opacity { NumberAnimation { duration: window.restPill ? 220 * window.host.motionScale : 90; easing.type: Easing.InOutQuad } }
+      Behavior on opacity { NumberAnimation { duration: window.restPill && !window.toastShown ? 220 * window.host.motionScale : 90; easing.type: Easing.InOutQuad } }
 
       WorkspaceStrip {
         anchors.verticalCenter: parent.verticalCenter
@@ -393,7 +386,7 @@ PanelWindow {
         }
       }
 
-      // Dictée : pastille sous l'île (voxDock) ; OBS : pastille à gauche (capture). Musique et autres
+      // OBS : pastille à gauche (capture). Musique et autres
       // activités : de part et d'autre de l'île (ActivityStrip.qml).
     }
 
@@ -634,6 +627,23 @@ PanelWindow {
       onCloseRequested: window.view = "rest"
     }
 
+    // ---------------------------------------------------------------- notifications qui arrivent
+    NotificationToasts {
+      id: toasts
+      // Largeur fixe (celle de l'île ouverte, moins la marge) : le texte ne repasse pas à la
+      // ligne pendant le ressort, l'île le découvre en s'élargissant.
+      anchors.horizontalCenter: parent.horizontalCenter
+      anchors.top: parent.top
+      anchors.topMargin: 6
+      width: 408
+      host: window.host
+      screenName: window.screenName
+      active: window.restPill
+      opacity: window.toastShown ? 1 : 0
+      visible: opacity > 0.01
+      Behavior on opacity { NumberAnimation { duration: opacity > 0.5 ? 70 : 180 * window.host.motionScale; easing.type: Easing.InOutQuad } }
+    }
+
     // ---------------------------------------------------------------- notifications
     NotificationList {
       id: notificationList
@@ -671,40 +681,10 @@ PanelWindow {
     }
   }
 
-  // Dictée (voxtype) : pastille détachée sous l'île, sur l'écran actif : le
-  // micro et l'onde de la voix, puis les points de la transcription (VoxPill).
-  Rectangle {
-    id: voxDock
-    readonly property bool shown: window.host.voxActive && window.focusedScreen && !window.surfaceOpen
-    x: island.x + (island.width - width) / 2
-    y: island.y + window.host.restHeight + 8
-    height: window.host.restHeight
-    width: voxRow.implicitWidth + 28
-    radius: height / 2
-    color: window.host.colorIsland
-    opacity: shown ? 1 : 0
-    scale: shown ? 1 : 0.7
-    transformOrigin: Item.Top
-    visible: opacity > 0.01
-    Behavior on opacity { NumberAnimation { duration: voxDock.shown ? 180 : 140 } }
-    Behavior on scale { NumberAnimation { duration: voxDock.shown ? 360 * window.host.motionScale : 160; easing.type: voxDock.shown ? Easing.OutBack : Easing.InCubic; easing.overshoot: 1.3 } }
-    Behavior on width { NumberAnimation { duration: 220 * window.host.motionScale; easing.type: Easing.OutQuint } }
-    Row {
-      id: voxRow
-      x: 14
-      anchors.verticalCenter: parent.verticalCenter
-      spacing: 12
-      VoxPill {
-        anchors.verticalCenter: parent.verticalCenter
-        host: window.host
-      }
-    }
-  }
-
-
   // Activités en cours (ActivityStrip.qml), de part et d'autre de l'île : à
   // droite ce qui travaille en fond (minuteurs, IA), à gauche ce qui dure
-  // (musique, batterie). La dictée est dans l'île même.
+  // (musique, batterie). Elles s'effacent quand l'île montre une vue ou des
+  // notifications.
   ActivityStrip {
     id: activities
     host: window.host
@@ -714,7 +694,7 @@ PanelWindow {
     y: island.y
     screenWidth: window.width
     roomRight: Math.max(0, window.width - x - 12)
-    hidden: window.surfaceOpen || island.tucked
+    hidden: window.surfaceOpen || window.toastShown || island.tucked
     onOpenConversation: function(c) { askView.resume(c); window.view = "ask" }
     onOpenPlayer: if (window.host.player) window.view = "player"
   }
@@ -727,7 +707,7 @@ PanelWindow {
     y: island.y
     screenWidth: window.width
     roomRight: Math.max(0, island.x - 20)
-    hidden: window.surfaceOpen || island.tucked
+    hidden: window.surfaceOpen || window.toastShown || island.tucked
     onOpenConversation: function(c) { askView.resume(c); window.view = "ask" }
     onOpenPlayer: if (window.host.player) window.view = "player"
   }

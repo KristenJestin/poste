@@ -7,8 +7,8 @@ import Quickshell.Services.Pipewire
 import qs.Commons
 import "file:///usr/share/omarchy/shell/plugins/osd/OsdModel.js" as OsdModel
 
-// Le bandeau : tout ce qui passe en bas de l'écran (notifications, OSD, texte dicté), d'un
-// seul aspect, celui de l'île (fond plein, texte clair, icône à l'accent, arrondi en pilule).
+// Le bandeau : ce qui passe en bas de l'écran (OSD, dictée), d'un seul aspect, celui de l'île
+// (fond plein, texte clair, icône à l'accent, arrondi en pilule).
 //
 // Un seul objet pour tout le shell : poste.island l'importe par `import "bandeau"`,
 // poste.notifications et poste.osd par `import "../poste.island/bandeau"`. Les trois chemins
@@ -16,17 +16,21 @@ import "file:///usr/share/omarchy/shell/plugins/osd/OsdModel.js" as OsdModel
 // dossier lié et fichiers liés un par un comme sur la machine). Il tient l'état et dessine une
 // fenêtre par écran (BandeauWindow.qml), créée au premier usage.
 //
-// Du bas vers le haut : le texte dicté, l'OSD, puis les notifications (trois au plus à la fois).
+// Du bas vers le haut : la dictée, puis l'OSD. Les notifications, elles, sortent de l'île en
+// haut (components/NotificationToasts.qml) ; le singleton reste le point de rencontre entre le
+// service et l'île, seul objet commun aux plugins.
 //
 // Qui l'alimente :
 // - OSD : poste.osd (clone de omarchy.osd) appelle showOsdPayload(payload JSON d'Omarchy).
 // - Volume : le bandeau suit lui-même la sortie par défaut de PipeWire (voir « volume »).
-// - Dictée : poste.island pose dictationActive, dictationFinals, dictationPartial.
-// - Notifications : poste.notifications s'inscrit avec attachNotifications(service). Le service
-//   garde toute sa logique (serveur, ne pas déranger, historique, écran du toast) ; il doit
-//   offrir popupModel, popupScreensRev, popupKey(row), popupOnScreen(key, écran),
-//   durationFor(urgence, expireTimeout), present(row) (ce que montre la carte, voir
-//   NotificationView.qml), closePopup(i), invokePopupDefault(i), expirePopup(i).
+// - Dictée : poste.island pose dictationListening, dictationTranscribing, dictationLevel (niveau
+//   courant de la source qui dicte), dictationFinals, dictationPartial.
+// - Notifications (lues par l'île, pas dessinées ici) : poste.notifications s'inscrit avec
+//   attachNotifications(service). Le service garde toute sa logique (serveur, ne pas déranger,
+//   historique, écran du toast) ; il doit offrir popupModel, popupScreensRev, popupKey(row),
+//   popupOnScreen(key, écran), durationFor(urgence, expireTimeout), present(row) (ce que montre
+//   la carte, voir components/NotificationToasts.qml), closePopup(i), invokePopupDefault(i),
+//   expirePopup(i).
 Singleton {
   id: root
 
@@ -37,11 +41,9 @@ Singleton {
   // Gris opaque (texte mêlé au fond) : texte secondaire, phrase dictée en cours.
   readonly property color colorMuted: mix(colorText, colorSurface, 0.5)
   readonly property color colorAccent: Color.accent
-  readonly property color colorUrgent: Color.urgent
   readonly property string fontFamily: "JetBrainsMono Nerd Font"
   readonly property int bottomMargin: 56
   readonly property int gap: 10
-  readonly property int maxNotifications: 3
   // Plusieurs lignes : même arrondi partout.
   readonly property int blockRadius: 20
 
@@ -136,15 +138,40 @@ Singleton {
   onSinkReadyChanged: volumeMoved()
 
   // ---------------------------------------------------------------- dictée
-  property bool dictationActive: false
+  // Le micro et l'onde dès que la dictée écoute, les points pendant la transcription, et le
+  // texte dicté quand la source en donne un (Vocaline ; voxtype n'en donne pas).
+  property bool dictationListening: false
+  property bool dictationTranscribing: false
+  property real dictationLevel: 0
   property string dictationFinals: ""
   property string dictationPartial: ""
-  readonly property bool dictShown: demoDictation
-    || (dictationActive && (dictationFinals !== "" || dictationPartial !== ""))
+  readonly property bool dictListening: demoDictation || dictationListening
+  readonly property bool dictTranscribing: !demoDictation && dictationTranscribing
+  readonly property bool dictShown: dictListening || dictTranscribing
+  readonly property real dictLevel: demoDictation ? demoLevel : dictationLevel
   readonly property string dictFinals: demoDictation ? demoFinals : dictationFinals
   readonly property string dictPartial: demoDictation ? demoPartial : dictationPartial
 
+  // Une seule onde pour toutes les sources : chacune ne donne que son niveau courant,
+  // échantillonné ici à la cadence de voxtype (100 par seconde) dans l'historique des barres, le
+  // plus récent en dernier. L'onde bouge donc pareil quelle que soit la source ; elle repart de
+  // zéro à chaque dictée.
+  readonly property int dictBars: 14
+  property var dictLevels: []
+  Timer {
+    interval: 10
+    repeat: true
+    running: root.dictListening
+    onTriggered: {
+      var next = root.dictLevels.slice(Math.max(0, root.dictLevels.length - root.dictBars + 1))
+      next.push(root.dictLevel)
+      root.dictLevels = next
+    }
+  }
+  onDictListeningChanged: if (!dictListening) dictLevels = []
+
   // ---------------------------------------------------------------- notifications
+  // Le service s'inscrit ici, l'île le lit (Island.qml, notificationSource).
   property var notifications: null
   function attachNotifications(service) { notifications = service }
   function detachNotifications(service) { if (notifications === service) notifications = null }
@@ -165,11 +192,24 @@ Singleton {
 
   // ---------------------------------------------------------------- démo
   // omarchy-shell bandeau demo : un OSD de volume qui monte, un OSD de musique, deux
-  // notifications (dont une dont le texte s'allonge), une dictée qui passe sur deux lignes,
-  // puis le volume coupé, tout inventé, sur l'écran actif (la démo le suit). Rien n'est envoyé
-  // au serveur de notifications ni écrit dans l'historique.
+  // notifications dans l'île (dont une dont le texte s'allonge), une dictée (l'onde, puis un
+  // texte qui passe sur deux lignes), puis le volume coupé, tout inventé, sur l'écran actif (la
+  // démo le suit). Rien n'est envoyé au serveur de notifications ni écrit dans l'historique.
   property bool demoRunning: false
   property bool demoDictation: false
+  // Niveau inventé de la dictée de démo : une voix qui monte et retombe, 25 fois par seconde.
+  property real demoLevel: 0
+  property real demoPhase: 0
+  Timer {
+    interval: 40
+    repeat: true
+    running: root.demoDictation
+    onTriggered: {
+      root.demoPhase += 0.33
+      var voice = Math.max(0, Math.sin(root.demoPhase) * 0.5 + Math.sin(root.demoPhase * 2.7) * 0.3)
+      root.demoLevel = Math.min(1, voice + Math.random() * 0.15)
+    }
+  }
   property string demoFinals: ""
   property string demoPartial: ""
   property int demoStep: 0
@@ -210,7 +250,8 @@ Singleton {
     function() { root.demoNotify(1, "󰄬", "Compilation terminée", "exemple-api · 42 tests passés", 1) },
     function() {},
     function() { root.demoNotify(2, "󰃰", "Rappel", "Réunion d'exemple dans dix minutes, salle de démonstration", 2) },
-    function() { root.demoDictation = true; root.demoPartial = "Il faut que" },
+    function() { root.demoDictation = true },
+    function() { root.demoPartial = "Il faut que" },
     function() { root.demoPartial = "Il faut que je pense à renvoyer" },
     function() { root.demoFinals = "Il faut que je pense à renvoyer le devis demain matin"; root.demoPartial = "" },
     function() { root.demoBody(1, "exemple-api · 42 tests passés, trois avertissements à relire avant la mise en ligne") },
