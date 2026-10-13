@@ -22,6 +22,9 @@ require("hypr.bindings")
 require("hypr.looknfeel")
 require("hypr.autostart")
 
+-- Réglages propres à la machine, posés par son dépôt poste-data (facultatif).
+if package.searchpath("hypr.machine", package.path) then require("hypr.machine") end
+
 -- Morceaux de config des modules poste : chaque module installé peut fournir
 -- hypr/*.lua (installés par `poste sys setup` dans ~/.local/share/poste/modules/<nom>/hypr/).
 -- Hyprland ne connaît aucun module : un module absent ne laisse aucune trace. Une erreur dans
