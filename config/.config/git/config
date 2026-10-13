@@ -69,10 +69,10 @@
 	helper = /usr/lib/git-core/git-credential-libsecret
 [credential "https://github.com"]
 	helper = 
-	helper = !/usr/bin/gh auth git-credential
+	helper = !gh auth git-credential
 [credential "https://gist.github.com"]
 	helper = 
-	helper = !/usr/bin/gh auth git-credential
+	helper = !gh auth git-credential
 # L'identité ([user] : name, email, signingkey) est propre à chaque machine :
 # elle vit dans config.local (non versionné), avec les autres réglages locaux.
 [include]
