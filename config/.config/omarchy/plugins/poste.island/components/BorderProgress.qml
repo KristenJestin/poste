@@ -1,9 +1,8 @@
 import QtQuick
 
 // Progression qui fait le tour du bord d'une carte arrondie (minuteur
-// déplié, durée de vie des notifications) : une piste discrète (absente si sa
-// couleur est transparente), et la part restante qui part du milieu du haut, dans le sens
-// des aiguilles.
+// déplié) : une piste discrète, et la part restante qui part du milieu du
+// haut, dans le sens des aiguilles.
 Canvas {
   id: border
   property real progress: 0
@@ -51,10 +50,8 @@ Canvas {
     var w = width - lineWidth, h = height - lineWidth
     var r = Math.min(radius, w / 2, h / 2)
     var total = 2 * (w - 2 * r) + 2 * (h - 2 * r) + 2 * Math.PI * r
-    if (track.a > 0) {
-      ctx.strokeStyle = track
-      trace(ctx, total + 1)
-    }
+    ctx.strokeStyle = track
+    trace(ctx, total + 1)
     var p = Math.max(0, Math.min(1, progress))
     if (p > 0.001) { ctx.strokeStyle = color; trace(ctx, total * p) }
   }

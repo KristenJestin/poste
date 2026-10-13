@@ -400,21 +400,6 @@ Item {
               onClicked: view.act(slot.entryKey, "close")
             }
           }
-
-          // Durée de vie restante : le contour de la carte, un trait fin à la couleur du texte,
-          // très discret (22 %), sans piste. Il part du milieu du haut et se raccourcit dans le
-          // sens des aiguilles ; il suit la hauteur montrée de la carte. Rentré de 2 px pour ne pas
-          // toucher le liseré de la carte.
-          BorderProgress {
-            visible: slot.lifetime > 0
-            anchors.fill: parent
-            anchors.margins: 2
-            radius: card.oneLine ? height / 2 : view.bandeau.blockRadius - 2
-            progress: slot.remaining
-            color: view.bandeau.withAlpha(view.bandeau.colorText, 0.22)
-            track: "transparent"
-            lineWidth: 1.5
-          }
         }
       }
     }
