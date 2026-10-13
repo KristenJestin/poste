@@ -1,9 +1,10 @@
 import QtQuick
-import "../components"
 
-// Le texte dicté en direct (slot « dictation » de l'île) : le micro à l'accent, les phrases
-// figées en couleur normale, puis la phrase en cours en gris. Trois lignes au plus : trop long,
-// c'est la fin qui reste visible. Le dernier texte reste affiché pendant le fondu de sortie.
+// Le texte dicté en direct (Vocaline, ou toute source du slot « dictation » de l'île qui donne
+// du texte), en haut de la pile, juste sous l'île, sans icône : les phrases figées en
+// couleur normale, puis la phrase en cours en gris. Trois lignes au plus : trop long, c'est la
+// fin qui reste visible. Le dernier texte reste affiché pendant le fondu de sortie. La pastille
+// animée (micro, onde, points) est à part, en bas de l'écran (DictationPill.qml).
 //
 // Quand le texte s'allonge, la pilule grandit en douceur, en largeur puis en hauteur quand il
 // passe sur deux ou trois lignes. Le texte, lui, est posé tout de suite à sa taille finale
@@ -26,10 +27,22 @@ Item {
     }
     followActive()
   }
+  // Relu un tour de boucle plus tard, une fois toutes les valeurs de l'île posées : quand la
+  // dictée s'arrête, le texte se vide en même temps qu'elle se cache, et la pilule doit garder
+  // son dernier état pendant le fondu au lieu de rétrécir.
   Connections {
     target: view.bandeau
-    function onDictFinalsChanged() { if (view.active) view.keep() }
-    function onDictPartialChanged() { if (view.active) view.keep() }
+    function onDictFinalsChanged() { view.queueKeep() }
+    function onDictPartialChanged() { view.queueKeep() }
+  }
+  property bool keepQueued: false
+  function queueKeep() {
+    if (keepQueued) return
+    keepQueued = true
+    Qt.callLater(function() {
+      view.keepQueued = false
+      if (view.active && view.bandeau.dictTextShown) view.keep()
+    })
   }
   function keep() {
     finals = bandeau.dictFinals
@@ -47,8 +60,6 @@ Item {
   readonly property int lines: 3
   readonly property int padX: 20
   readonly property int padY: 11
-  readonly property int iconBox: 22
-  readonly property int gap: 12
 
   TextMetrics {
     id: oneLine
@@ -67,7 +78,7 @@ Item {
   readonly property bool multiLine: label.lineCount > 1
 
   // Taille finale, puis taille montrée (animée vers la finale).
-  readonly property real finalWidth: textWidth + iconBox + gap + 2 * padX
+  readonly property real finalWidth: textWidth + 2 * padX
   readonly property real finalHeight: textHeight + 2 * padY
   property real shownWidth: finalWidth
   property real shownHeight: finalHeight
@@ -90,8 +101,8 @@ Item {
   width: shownWidth
   height: shownHeight
 
-  // Ce que la pièce prend dans la pile (pour celles du dessus) : sa hauteur montrée, à la
-  // proportion de sa présence. Rien au-dessus ne peut donc la chevaucher.
+  // Ce que la pièce prend dans la pile (pour celles du dessous) : sa hauteur montrée, à la
+  // proportion de sa présence. Rien en dessous ne peut donc la chevaucher.
   property real presence: 0
   Component.onCompleted: presence = active ? 1 : 0
   function followActive() {
@@ -113,7 +124,7 @@ Item {
 
   opacity: shownIn ? 1 : 0
   scale: shownIn ? 1 : 0.94
-  property real drop: shownIn ? 0 : bandeau.gap
+  property real drop: shownIn ? 0 : -bandeau.gap
   transform: Translate { y: view.drop }
   Behavior on opacity { NumberAnimation { duration: view.shownIn ? 260 : 200; easing.type: view.shownIn ? Easing.OutCubic : Easing.InCubic } }
   Behavior on scale { NumberAnimation { duration: view.shownIn ? 340 : 220; easing.type: view.shownIn ? Easing.OutBack : Easing.InCubic; easing.overshoot: 1.2 } }
@@ -126,24 +137,10 @@ Item {
     radius: view.multiLine ? view.bandeau.blockRadius : height / 2
   }
 
-  Item {
-    x: view.padX
-    y: view.padY
-    width: view.iconBox
-    height: view.lineHeight
-    Glyph {
-      anchors.centerIn: parent
-      glyph: "󰍬"
-      color: view.bandeau.colorAccent
-      pixelSize: 17
-      fontFamily: view.bandeau.fontFamily
-    }
-  }
-
   // La zone visible du texte : la place qu'il a dans la pilule montrée.
   Item {
     id: clipper
-    x: view.padX + view.iconBox + view.gap
+    x: view.padX
     y: view.padY
     width: Math.max(0, view.shownWidth - x - view.padX)
     height: Math.max(0, view.shownHeight - 2 * view.padY)

@@ -5,9 +5,9 @@ import Quickshell.Io
 // Dictée Vocaline, lue sur le socket du démon (module vocaline), fournie au slot « dictation »
 // de l'île (island/island.json). Le flux donne un objet JSON par ligne : hello, state, level,
 // partial, final, silence, error ; ce qui est inconnu ou mal formé est ignoré. Vocaline colle
-// toute la dictée une seule fois, à l'arrêt : l'île est le seul endroit où le texte se voit
-// pendant qu'on parle. Démon absent ou flux coupé : rien n'est en cours, nouvel essai 5 s plus
-// tard, sans rien écrire au journal.
+// toute la dictée une seule fois, à l'arrêt : le bandeau, sous l'île, est le seul endroit où
+// le texte se voit pendant qu'on parle. Démon absent ou flux coupé : rien n'est en cours,
+// nouvel essai 5 s plus tard, sans rien écrire au journal.
 Item {
   id: voc
   readonly property string socketPath: (Quickshell.env("XDG_RUNTIME_DIR") || "/tmp") + "/vocaline.sock"
@@ -15,9 +15,9 @@ Item {
   property string phase: "idle"         // idle, loading, listening, stopping
   readonly property bool listening: phase === "loading" || phase === "listening"
   readonly property bool transcribing: phase === "stopping"
-  // Niveau courant de 0 à 1, à l'échelle de voxtype, que l'île échantillonne à cadence fixe. Le démon
-  // en envoie 10 par seconde (voxtype, 100) : entre deux évènements le niveau glisse vers le suivant
-  // au lieu de sauter, pour que l'onde ne fasse pas d'escalier.
+  // Niveau courant de 0 à 1, à l'échelle de voxtype, que le bandeau échantillonne à cadence fixe.
+  // Le démon en envoie 10 par seconde (voxtype, 100) : entre deux évènements le niveau glisse vers
+  // le suivant au lieu de sauter, pour que l'onde ne fasse pas d'escalier.
   property real level: 0
   Behavior on level { NumberAnimation { duration: 100; easing.type: Easing.InOutQuad } }
   // Le rms de Vocaline est le volume efficace des 100 dernières ms ; celui de voxtype est le pic de

@@ -970,9 +970,9 @@ Item {
 
   // -------------------------------------------------------------- popup UI
   //
-  // Kris : les toasts sont dessinés par le bandeau (poste.island/bandeau), en bas de l'écran,
-  // avec l'OSD et le texte dicté. Le service y inscrit son modèle et garde toute la logique :
-  // à quel écran va un toast, combien de temps il reste, ce que fait un clic.
+  // Kris : les toasts sont dessinés par le bandeau (poste.island/bandeau), empilés juste sous
+  // l'île, avec l'OSD et le texte dicté. Le service y inscrit son modèle et garde toute la
+  // logique : à quel écran va un toast, combien de temps il reste, ce que fait un clic.
 
   readonly property string focusedScreenName: Hyprland.focusedMonitor ? String(Hyprland.focusedMonitor.name) : ""
 

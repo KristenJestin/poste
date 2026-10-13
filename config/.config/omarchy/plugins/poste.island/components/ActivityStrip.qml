@@ -34,8 +34,6 @@ Item {
   readonly property var activities: {
     host.ai.stateRevision
     var out = []
-    // Dictée en cours : toujours en tête.
-    if (host.voxActive) out.push({ kind: "vox", key: "vox", rank: -1, order: 0 })
     // OBS : enregistrement ou diffusion en cours, toujours en tête.
     if (host.obs && host.obs.active) out.push({ kind: "obs", key: "obs", rank: -2, order: 0 })
     // Musique : pendant la lecture, et 30 s après une pause (puis elle part).
@@ -96,7 +94,6 @@ Item {
     else if (a.kind === "battery" || a.kind === "device") t = "100 %"
     else if (a.kind === "music") return 96
     else if (a.kind === "obs") return 120
-    else if (a.kind === "vox") return 130
     else if (a.conv) t = a.conv.busy ? "Searching the web…" : a.conv.unseen ? "Ready" : a.conv.question
     return 56 + Math.min(150, String(t).length * 7.6)
   }
@@ -228,13 +225,12 @@ Item {
           host: strip.host
           activity: slot.activity || { kind: "" }
           compact: strip.allCapsules || (slot.shownIndex === 0 && strip.capsuleFits)
-          onHoveredChanged: if (slot.key !== "vox") { hovered ? strip.hoverIn(slot.key, slot.x + width / 2) : strip.hoverOut(slot.key) }
+          onHoveredChanged: hovered ? strip.hoverIn(slot.key, slot.x + width / 2) : strip.hoverOut(slot.key)
           onClicked: {
             var a = slot.activity
             if (!a || slot.leaving) return
             if (a.kind === "ai") { strip.close(); strip.openConversation(a.conv) }
             else if (a.kind === "music") { strip.close(); strip.openPlayer() }
-            else if (a.kind === "vox") return
             else if (a.kind === "timer" && a.timer.done) strip.host.cancelTimer(a.timer.id)
             else strip.toggle(slot.key, slot.x + width / 2)
           }
@@ -347,7 +343,6 @@ Item {
             text: moreRow.modelData.kind === "timer" ? (moreRow.modelData.timer.label || "Timer") + "  ·  " + (moreRow.modelData.timer.done ? "Done" : strip.host.formatLeft(strip.host.timerLeft(moreRow.modelData.timer)))
               : moreRow.modelData.kind === "ai" ? moreRow.modelData.conv.question
               : moreRow.modelData.kind === "music" ? (strip.host.player ? String(strip.host.player.trackTitle || "Music") : "Music")
-              : moreRow.modelData.kind === "vox" ? "Dictation"
               : "Battery"
             color: strip.host.colorText
             font.family: strip.host.uiFont

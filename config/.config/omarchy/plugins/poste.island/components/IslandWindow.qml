@@ -76,7 +76,15 @@ PanelWindow {
   function report() { host.reportState(screenName, view, Math.max(host.restTop + host.restHeight, reportedBottom)) }
   onViewChanged: report()
   onReportedBottomChanged: report()
-  Component.onCompleted: report()
+  Component.onCompleted: {
+    report()
+    host.reportEdge(screenName, edge)
+  }
+
+  // Bord bas de l'île telle qu'elle est dessinée (ressort compris) : la pile du bandeau
+  // (notifications, OSD, texte dicté) se pose juste en dessous et le suit image par image.
+  readonly property real edge: island.y + island.height
+  onEdgeChanged: host.reportEdge(screenName, edge)
 
   // Tout l'écran, transparent : d'ordinaire seule la bulle prend la souris
   // (mask), mais une vue au clavier exclusif capte tout l'écran (voir catcher).
@@ -144,9 +152,8 @@ PanelWindow {
   // viennent après elle, plus à gauche. Survol de la partie OBS : sa carte.
   Item {
     id: capture
-    readonly property bool vox: false   // la dictée a sa pastille sous l'île (voxDock)
     readonly property bool rec: !!window.host.obs && window.host.obs.active
-    readonly property bool shown: (vox || rec) && !window.surfaceOpen && !island.tucked
+    readonly property bool shown: rec && !window.surfaceOpen && !island.tucked
     readonly property real overlap: 0
     x: island.x - width - (shown ? 8 : 0)
     y: island.y
@@ -173,17 +180,6 @@ PanelWindow {
       spacing: 10
       opacity: capture.shown ? 1 : 0
       Behavior on opacity { NumberAnimation { duration: 180 } }
-      VoxPill {
-        anchors.verticalCenter: parent.verticalCenter
-        visible: capture.vox
-        host: window.host
-      }
-      Rectangle {
-        anchors.verticalCenter: parent.verticalCenter
-        visible: capture.vox && capture.rec
-        width: 1; height: 14
-        color: window.host.withAlpha(window.host.colorText, 0.15)
-      }
       Row {
         id: recPart
         anchors.verticalCenter: parent.verticalCenter
@@ -243,8 +239,8 @@ PanelWindow {
     id: island
     x: (parent.width - width) / 2
     // Hidden (slid up) when the bar is toggled off, or over a fullscreen
-    // window on this screen, unless it has something transient to show.
-    readonly property bool tucked: window.restPill && !window.host.voxActive
+    // window on this screen, unless a view is open.
+    readonly property bool tucked: window.restPill
       && (window.host.barHidden || window.host.fullscreenScreens[window.screenName] === true)
     y: tucked ? -height - 12 : window.host.restTop
     opacity: tucked ? 0 : 1
@@ -393,7 +389,7 @@ PanelWindow {
         }
       }
 
-      // Dictée : pastille sous l'île (voxDock) ; OBS : pastille à gauche (capture). Musique et autres
+      // OBS : pastille à gauche (capture). Musique et autres
       // activités : de part et d'autre de l'île (ActivityStrip.qml).
     }
 
@@ -671,40 +667,9 @@ PanelWindow {
     }
   }
 
-  // Dictée (voxtype) : pastille détachée sous l'île, sur l'écran actif : le
-  // micro et l'onde de la voix, puis les points de la transcription (VoxPill).
-  Rectangle {
-    id: voxDock
-    readonly property bool shown: window.host.voxActive && window.focusedScreen && !window.surfaceOpen
-    x: island.x + (island.width - width) / 2
-    y: island.y + window.host.restHeight + 8
-    height: window.host.restHeight
-    width: voxRow.implicitWidth + 28
-    radius: height / 2
-    color: window.host.colorIsland
-    opacity: shown ? 1 : 0
-    scale: shown ? 1 : 0.7
-    transformOrigin: Item.Top
-    visible: opacity > 0.01
-    Behavior on opacity { NumberAnimation { duration: voxDock.shown ? 180 : 140 } }
-    Behavior on scale { NumberAnimation { duration: voxDock.shown ? 360 * window.host.motionScale : 160; easing.type: voxDock.shown ? Easing.OutBack : Easing.InCubic; easing.overshoot: 1.3 } }
-    Behavior on width { NumberAnimation { duration: 220 * window.host.motionScale; easing.type: Easing.OutQuint } }
-    Row {
-      id: voxRow
-      x: 14
-      anchors.verticalCenter: parent.verticalCenter
-      spacing: 12
-      VoxPill {
-        anchors.verticalCenter: parent.verticalCenter
-        host: window.host
-      }
-    }
-  }
-
-
   // Activités en cours (ActivityStrip.qml), de part et d'autre de l'île : à
   // droite ce qui travaille en fond (minuteurs, IA), à gauche ce qui dure
-  // (musique, batterie). La dictée est dans l'île même.
+  // (musique, batterie). Elles s'effacent quand l'île montre une vue.
   ActivityStrip {
     id: activities
     host: window.host

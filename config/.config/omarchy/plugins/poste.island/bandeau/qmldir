@@ -4,4 +4,5 @@ BandeauSurface 1.0 BandeauSurface.qml
 BandeauWindow 1.0 BandeauWindow.qml
 OsdView 1.0 OsdView.qml
 DictationView 1.0 DictationView.qml
+DictationPill 1.0 DictationPill.qml
 NotificationView 1.0 NotificationView.qml

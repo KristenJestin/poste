@@ -50,7 +50,7 @@ commands = [{ name = "status", description = "état du dépôt" }]   # facultati
 | [`sys`](modules/sys/README.md) | gère le dépôt : construction, installation, état, git. Toujours installé. |
 | [`music`](modules/music/README.md) | client Navidrome : connexion, copie locale, recherche, lecture, favoris, playlists, mixes. |
 | [`record`](modules/record/README.md) | enregistrement d'écran (gpu-screen-recorder) piloté par l'île : préréglages, fenêtres, écrans, zone. |
-| [`vocaline`](modules/vocaline/README.md) | dictée Vocaline : SUPER+Z, pastille de dictée de l'île et texte dicté en direct en bas de l'écran. |
+| [`vocaline`](modules/vocaline/README.md) | dictée Vocaline : SUPER+Z, pastille animée en bas de l'écran, texte dicté en direct sous l'île. |
 | [`power`](modules/power/README.md) | alertes batterie (faible, critique, branché mais ça se vide) et disque presque plein ; démon léger (portable). |
 
 Un module est une application à part, dans `modules/<nom>/`, avec son `README.md`,
@@ -75,8 +75,8 @@ connaître aucun module ; module absent, aucune trace) :
     `player-extra` (ajouts à la carte du lecteur : `detail`, `actionGlyph`/`actionOn`/`action()`,
     `launcherExt`, voir le commentaire dans `Island.qml`), `capture` (source d'enregistrement
     de même interface qu'`ObsState.qml`, pour la pastille de capture) et `dictation` (source de
-    dictée : `listening`, `transcribing`, `levels`, `finals`, `partial`, pour la pastille de dictée
-    et le texte en bas de l'écran).
+    dictée : `listening`, `transcribing`, `level`, `finals`, `partial`, pour la pastille de dictée
+    en bas de l'écran et le texte sous l'île).
   - Découverte au démarrage, puis rechargée à chaud (inotifywait sur le dossier des modules).
 - `hypr/*.lua` : morceaux de config Hyprland. `hyprland.lua` charge chaque
   `modules/*/hypr/*.lua` (`loadfile` + `pcall` : une erreur est isolée et notifiée, le reste de la

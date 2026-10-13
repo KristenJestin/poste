@@ -20,7 +20,7 @@ Item {
   readonly property int maxMessageWidth: osd.media ? 440 : 300
   readonly property int fontSize: 14
 
-  // Ce que la pièce prend dans la pile (pour celles du dessus) : sa hauteur, à la proportion
+  // Ce que la pièce prend dans la pile (pour celles du dessous) : sa hauteur, à la proportion
   // de sa présence.
   property real presence: 0
   Component.onCompleted: presence = active ? 1 : 0
@@ -61,11 +61,11 @@ Item {
   width: Math.ceil(contentWidth + 2 * padX)
   height: 44
 
-  // Entrée : monte d'un peu plus bas, grandit un peu, apparaît. Sortie : s'efface, rapetisse,
-  // descend un peu.
+  // Entrée : descend d'un peu plus haut, grandit un peu, apparaît. Sortie : s'efface,
+  // rapetisse, remonte un peu.
   opacity: shownIn ? 1 : 0
   scale: shownIn ? 1 : 0.94
-  property real drop: shownIn ? 0 : bandeau.gap
+  property real drop: shownIn ? 0 : -bandeau.gap
   transform: Translate { y: view.drop }
   Behavior on opacity { NumberAnimation { duration: view.shownIn ? 260 : 200; easing.type: view.shownIn ? Easing.OutCubic : Easing.InCubic } }
   Behavior on scale { NumberAnimation { duration: view.shownIn ? 340 : 220; easing.type: view.shownIn ? Easing.OutBack : Easing.InCubic; easing.overshoot: 1.2 } }

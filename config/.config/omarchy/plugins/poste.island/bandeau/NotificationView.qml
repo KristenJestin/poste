@@ -2,9 +2,9 @@ import QtQuick
 import QtQuick.Effects
 import "../components"
 
-// Les notifications du bandeau, empilées au-dessus de l'OSD : la plus récente en bas, les
-// autres montent. Trois au plus à la fois sur un écran ; les plus anciennes attendent, cachées
-// et sans décompte, qu'une place se libère.
+// Les notifications du bandeau, sous le texte dicté et l'OSD : la plus récente en haut (au
+// plus près de l'île), les autres descendent. Trois au plus à la fois sur un écran ; les plus
+// anciennes attendent, cachées et sans décompte, qu'une place se libère.
 //
 // Le service (voir Bandeau.qml) donne le modèle, l'écran de chaque toast et, par present(row),
 // ce que montre la carte : { title, body, icon (URL d'image ou ""), crop (image à recadrer),
@@ -16,8 +16,7 @@ import "../components"
 // cartes sont posées par une Column ; chacune y prend une place (`slot`) dont la hauteur est
 // animée. La place s'ouvre avant que la carte apparaisse, suit sa hauteur quand le contenu
 // change, et se referme une fois la carte effacée : deux cartes ne se chevauchent jamais, même
-// au milieu d'une animation. (Avant : une ListView et sa transition `displaced`, dont la cible
-// restait figée quand la carte du dessous grandissait juste après son arrivée.)
+// au milieu d'une animation.
 Item {
   id: view
   required property var bandeau
@@ -29,11 +28,11 @@ Item {
 
   // La fenêtre reste là tant qu'une carte est affichée ou en train de partir.
   readonly property bool live: cards.count > 0
-  // Hauteur occupée par les cartes, depuis le bas de la vue (zone qui prend la souris).
-  readonly property real cardsHeight: Math.min(height, stack.height)
+  // Hauteur occupée par les cartes, depuis le haut de la vue (zone qui prend la souris).
+  readonly property real cardsHeight: stack.height
 
   // ---------------------------------------------------------------- la liste affichée
-  // Du haut (la plus ancienne) vers le bas (la plus récente), comme la Column les pose.
+  // Du haut (la plus récente) vers le bas (la plus ancienne), comme la Column les pose.
   ListModel { id: cards }
   property int nextUid: 1
 
@@ -84,13 +83,13 @@ Item {
       for (var name in look)
         if (e[name] !== look[name]) cards.setProperty(c, name, look[name])
     }
-    // Les nouvelles entrent à leur rang : au-dessus de la première carte plus récente.
-    for (var k = want.length - 1; k >= 0; k--) {
+    // Les nouvelles entrent à leur rang : au-dessus de la première carte plus ancienne.
+    for (var k = 0; k < want.length; k++) {
       if (present[want[k].key]) continue
       var at = cards.count
       for (var j = 0; j < cards.count; j++) {
         var other = cards.get(j)
-        if (!other.leaving && rank[other.entryKey] !== undefined && rank[other.entryKey] < k) { at = j; break }
+        if (!other.leaving && rank[other.entryKey] !== undefined && rank[other.entryKey] > k) { at = j; break }
       }
       var entry = lookOf(want[k].row)
       entry.uid = nextUid++
@@ -152,7 +151,7 @@ Item {
   // ---------------------------------------------------------------- la pile
   Column {
     id: stack
-    anchors.bottom: parent.bottom
+    anchors.top: parent.top
     anchors.horizontalCenter: parent.horizontalCenter
     width: view.cardWidth
 
@@ -174,8 +173,8 @@ Item {
         required property bool critical
         required property double lifetime
 
-        width: view.cardWidth
-        // La place de la carte et de l'écart au-dessus, à la proportion de son ouverture.
+        width: stack.width
+        // La place de la carte et de l'écart en dessous, à la proportion de son ouverture.
         property real openness: 0
         property real collapse: 0
         height: (card.height + view.bandeau.gap) * openness * (1 - collapse)
@@ -226,11 +225,10 @@ Item {
 
         Item {
           id: card
-          width: view.cardWidth
-          anchors.bottom: parent.bottom
-          anchors.horizontalCenter: parent.horizontalCenter
+          width: parent.width
+          anchors.top: parent.top
           // Hauteur finale (le contenu y est posé tout de suite), puis hauteur montrée, animée
-          // quand le contenu change ; la place suit, la carte du dessus monte avec.
+          // quand le contenu change ; la place suit, les cartes du dessous descendent avec.
           readonly property real fullHeight: Math.max(52, content.implicitHeight + 2 * 12)
           height: fullHeight
           Behavior on height {
@@ -238,9 +236,9 @@ Item {
             NumberAnimation { duration: 260; easing.type: Easing.OutCubic }
           }
 
-          property real rise: slot.entered ? 0 : view.bandeau.gap
-          Behavior on rise { NumberAnimation { duration: 360; easing.type: Easing.OutQuint } }
-          transform: Translate { y: card.rise + slot.leave * 8 }
+          property real fall: slot.entered ? 0 : -view.bandeau.gap
+          Behavior on fall { NumberAnimation { duration: 360; easing.type: Easing.OutQuint } }
+          transform: Translate { y: card.fall - slot.leave * 8 }
           opacity: (slot.entered ? 1 : 0) * (1 - slot.leave)
           Behavior on opacity { enabled: slot.leave === 0; NumberAnimation { duration: 260; easing.type: Easing.OutCubic } }
           scale: (slot.entered ? (hover.hovered && !slot.leaving ? 1.012 : 1) : 0.94) - slot.leave * 0.05
@@ -400,32 +398,6 @@ Item {
               hoverEnabled: true
               cursorShape: Qt.PointingHandCursor
               onClicked: view.act(slot.entryKey, "close")
-            }
-          }
-
-          // Durée de vie restante : une piste fine sous le texte, de son bord gauche au bord
-          // droit du contenu, bouts arrondis ; ce qui reste est à l'accent, adouci. La piste
-          // entière reste visible (discrète, 13 %) : la barre se lit comme une jauge qui se vide,
-          // et non comme un trait égaré en bas à gauche.
-          Item {
-            id: lifeTrack
-            visible: slot.lifetime > 0
-            x: content.x + texts.x
-            width: texts.width
-            height: 3
-            anchors.bottom: parent.bottom
-            anchors.bottomMargin: 6
-            Rectangle {
-              anchors.fill: parent
-              radius: height / 2
-              color: view.bandeau.withAlpha(view.bandeau.colorText, 0.13)
-            }
-            Rectangle {
-              height: parent.height
-              radius: height / 2
-              width: Math.max(height, parent.width * Math.max(0, Math.min(1, slot.remaining)))
-              opacity: slot.remaining > 0.002 ? 1 : 0
-              color: view.bandeau.withAlpha(view.bandeau.colorAccent, 0.55)
             }
           }
         }

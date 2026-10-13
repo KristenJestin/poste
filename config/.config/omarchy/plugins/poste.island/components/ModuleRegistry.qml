@@ -9,7 +9,7 @@ import Quickshell.Io
 //   island.json    { "slots": [ { "slot": "<nom du slot>", "file": "Fichier.qml" } ] }
 // Slots que l'île charge (voir Island.qml) : « player-extra » (carte du lecteur), « capture »
 // (source d'enregistrement pour la pastille de capture), « dictation » (source de dictée pour
-// la pastille de dictée et le texte en bas de l'écran).
+// la pastille de dictée en bas de l'écran et le texte sous l'île).
 //
 // Exposé : launcherDocs [{ module, data }], slots { <slot>: [url de fichier, …] }.
 // Re-lecture au démarrage, puis à chaque changement sous le dossier des modules (inotifywait,
