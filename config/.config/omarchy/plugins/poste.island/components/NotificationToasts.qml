@@ -415,29 +415,19 @@ Item {
             }
           }
 
-          // Durée de vie restante : une piste fine sous le texte, de son bord gauche au bord
-          // droit du contenu, bouts arrondis ; ce qui reste est à l'accent, adouci. La piste
-          // entière reste visible (discrète, 13 %) : la barre se lit comme une jauge qui se vide.
-          Item {
-            id: lifeTrack
+          // Durée de vie restante : le contour de la carte, un trait fin à la couleur du texte,
+          // très discret (22 %), sans piste. Il part du milieu du haut et se raccourcit dans le
+          // sens des aiguilles ; il suit la hauteur montrée de la carte. Rentré de 2 px pour ne pas
+          // toucher le bord de la carte (et rester loin de celui de l'île).
+          BorderProgress {
             visible: slot.lifetime > 0
-            x: content.x + texts.x
-            width: texts.width
-            height: 3
-            anchors.bottom: parent.bottom
-            anchors.bottomMargin: 6
-            Rectangle {
-              anchors.fill: parent
-              radius: height / 2
-              color: view.host.withAlpha(view.host.colorText, 0.13)
-            }
-            Rectangle {
-              height: parent.height
-              radius: height / 2
-              width: Math.max(height, parent.width * Math.max(0, Math.min(1, slot.remaining)))
-              opacity: slot.remaining > 0.002 ? 1 : 0
-              color: view.host.withAlpha(view.host.colorAccent, 0.55)
-            }
+            anchors.fill: parent
+            anchors.margins: 2
+            radius: card.oneLine ? height / 2 : 20
+            progress: slot.remaining
+            color: view.host.withAlpha(view.host.colorText, 0.22)
+            track: "transparent"
+            lineWidth: 1.5
           }
         }
       }
