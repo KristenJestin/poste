@@ -61,11 +61,20 @@ pub fn find(
     manifest: &Manifest,
     items: &[Item],
 ) -> Result<Vec<Orphan>> {
-    let mut roots = vec![
-        repo.join("config"),
-        env.current_link().join("config"),
-        env.versions_dir(),
-    ];
+    let mut roots = vec![repo.join("config")];
+    // `current` cassé (version retirée, lien à refaire) : ses liens sont à refaire, pas
+    // orphelins. De même, seules les versions encore installées comptent comme racines.
+    if env.current_link().exists() {
+        roots.push(env.current_link().join("config"));
+    }
+    if let Ok(rd) = std::fs::read_dir(env.versions_dir()) {
+        roots.extend(
+            rd.flatten()
+                .filter(|e| !e.file_name().to_string_lossy().starts_with('.'))
+                .map(|e| e.path().join("config"))
+                .filter(|p| p.is_dir()),
+        );
+    }
     if let Some(c) = poste_core::Config::load(env)?.repo_path(env) {
         roots.push(c.join("config"));
     }
@@ -282,6 +291,45 @@ mod tests {
         assert!(home.join(".config/a/ordinaire").is_file());
         assert!(home.join(".config/a/etranger").is_symlink());
         assert!(m.files.is_empty());
+    }
+
+    #[test]
+    fn current_casse_ne_rend_pas_les_liens_orphelins() {
+        let d = tempfile::tempdir().unwrap();
+        let repo = d.path().join("repo");
+        let home = d.path().join("home");
+        fs::create_dir_all(repo.join("config/.config/a")).unwrap();
+        fs::create_dir_all(home.join(".config/a")).unwrap();
+        fs::write(repo.join("config/.config/a/x"), "x").unwrap();
+        let env = Env::with_home(&home);
+        // current désigne une version retirée ; un lien passe par current, un autre par
+        // une version qui n'est plus installée, un troisième par une version installée.
+        fs::create_dir_all(env.current_link().parent().unwrap()).unwrap();
+        symlink(env.versions_dir().join("retiree"), env.current_link()).unwrap();
+        let v = env.versions_dir().join("presente/config/.config/a");
+        fs::create_dir_all(&v).unwrap();
+        let links = [
+            ("par_current", env.current_link().join("config/.config/a/x")),
+            (
+                "version_retiree",
+                env.versions_dir().join("retiree/config/.config/a/x"),
+            ),
+            ("version_presente", v.join("disparu")),
+        ];
+        let mut m = Manifest::default();
+        for (name, target) in &links {
+            symlink(target, home.join(".config/a").join(name)).unwrap();
+            m.files.push(entry(
+                &home.join(".config/a").join(name),
+                "h",
+                config::MODULE,
+            ));
+        }
+        let layout = config::load(&repo, &env).unwrap().unwrap();
+        let o = find(&repo, &env, Some(&layout), &m, &[]).unwrap();
+        // Seul le lien vers un fichier disparu d'une version bien là est un orphelin.
+        assert_eq!(o.len(), 1, "{o:?}");
+        assert!(o[0].path.ends_with("version_presente"));
     }
 
     #[test]

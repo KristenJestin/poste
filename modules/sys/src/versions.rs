@@ -342,8 +342,12 @@ fn extract(env: &Env, archive: &Path, sum: &str) -> Result<Version> {
         std::fs::write(staging.join(SUM_FILE), format!("{sum}\n"))?;
         let dest = vdir.join(&v.commit);
         if dest.exists() {
-            // Même commit déjà là (archive reconstruite) : on garde l'installée.
+            // Même commit déjà là (archive reconstruite) : on garde l'installée, mais elle
+            // retient la nouvelle somme, sinon l'archive serait téléchargée à chaque sync.
             std::fs::remove_dir_all(&staging)?;
+            let tmp = dest.join(format!(".{SUM_FILE}-{}", std::process::id()));
+            std::fs::write(&tmp, format!("{sum}\n"))?;
+            std::fs::rename(&tmp, dest.join(SUM_FILE))?;
         } else {
             std::fs::rename(&staging, &dest)?;
         }
@@ -356,7 +360,8 @@ fn extract(env: &Env, archive: &Path, sum: &str) -> Result<Version> {
 }
 
 /// Retire les versions au-delà des `keep` plus récentes, jamais celle de `current`, et les
-/// restes d'extraction interrompue. Renvoie les versions retirées.
+/// restes d'extraction interrompue (`.extract-<pid>` dont le processus n'existe plus : celui
+/// d'un `sync` en cours n'est jamais touché). Renvoie les versions retirées.
 pub fn prune(env: &Env, keep: usize) -> Result<Vec<String>> {
     let cur = current_target(env);
     let mut removed = Vec::new();
@@ -370,7 +375,12 @@ pub fn prune(env: &Env, keep: usize) -> Result<Vec<String>> {
     }
     if let Ok(rd) = std::fs::read_dir(env.versions_dir()) {
         for e in rd.flatten() {
-            if e.file_name().to_string_lossy().starts_with(".extract-") {
+            let name = e.file_name().to_string_lossy().into_owned();
+            let Some(pid) = name.strip_prefix(".extract-") else {
+                continue;
+            };
+            // Un nom qui n'est pas un numéro de processus n'est pas de nous : laissé.
+            if pid.parse::<u32>().is_ok() && !Path::new("/proc").join(pid).exists() {
                 let _ = std::fs::remove_dir_all(e.path());
             }
         }
@@ -712,6 +722,42 @@ pub(crate) mod tests {
     }
 
     #[test]
+    fn archive_reconstruite_du_meme_commit_retient_la_nouvelle_somme() {
+        let d = tempfile::tempdir().unwrap();
+        let env = Env::with_home(d.path().join("home"));
+        let src = d.path().join("src");
+        make_root(&src, "aaaaaaa1", "2026-10-01T10:00:00Z", "{}");
+        let pubdir = d.path().join("pub");
+        let first = publish(&src, &pubdir);
+        let (curl, log) = fake_curl(d.path(), &pubdir);
+        let f = Fetcher::with(&curl, "https://example.com/r");
+        fetch(&env, &f, false).unwrap().unwrap();
+        // Même commit, archive refaite (contenu différent donc somme différente).
+        fs::write(src.join("config/.config/a/neuf"), "refait").unwrap();
+        let second = publish(&src, &pubdir);
+        assert_ne!(first, second);
+        let v = fetch(&env, &f, false).unwrap().unwrap();
+        assert_eq!(v.commit, "aaaaaaa1");
+        assert_eq!(
+            fs::read_to_string(v.dir.join(SUM_FILE)).unwrap().trim(),
+            second
+        );
+        assert_eq!(installed(&env).len(), 1);
+        // Le sync suivant ne télécharge plus l'archive : seule la somme est lue.
+        fs::write(&log, "").unwrap();
+        fetch(&env, &f, false).unwrap().unwrap();
+        assert_eq!(
+            fs::read_to_string(&log).unwrap().trim(),
+            format!("{ARCHIVE}.sha256")
+        );
+        // Aucun fichier temporaire ne reste dans la version.
+        assert!(fs::read_dir(&v.dir)
+            .unwrap()
+            .flatten()
+            .all(|e| !e.file_name().to_string_lossy().starts_with('.')));
+    }
+
+    #[test]
     fn somme_fausse_refusee_sans_rien_installer() {
         let d = tempfile::tempdir().unwrap();
         let env = Env::with_home(d.path().join("home"));
@@ -754,14 +800,24 @@ pub(crate) mod tests {
                 "{}",
             );
         }
-        fs::create_dir_all(vd.join(".extract-1")).unwrap();
+        // Reste d'un processus disparu : retiré. Celui d'un sync en cours (le nôtre) : laissé.
+        let mut done = Command::new("true").spawn().unwrap();
+        let dead = done.id();
+        done.wait().unwrap();
+        let (dead_dir, alive_dir) = (
+            vd.join(format!(".extract-{dead}")),
+            vd.join(format!(".extract-{}", std::process::id())),
+        );
+        fs::create_dir_all(&dead_dir).unwrap();
+        fs::create_dir_all(&alive_dir).unwrap();
         // current sur la plus ancienne (retour arrière) : jamais retirée.
         point_current(&env, &vd.join("1000000")).unwrap();
         let removed = prune(&env, 3).unwrap();
         assert_eq!(removed, ["2000000"]);
         let left: Vec<String> = installed(&env).into_iter().map(|v| v.commit).collect();
         assert_eq!(left, ["5000000", "4000000", "3000000", "1000000"]);
-        assert!(!vd.join(".extract-1").exists());
+        assert!(!dead_dir.exists());
+        assert!(alive_dir.exists());
         assert!(env.current_link().exists());
     }
 
