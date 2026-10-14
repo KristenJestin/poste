@@ -193,7 +193,7 @@ F024B	folder	0		md-folder	poste.island
 F024D	folder-down	0	folder-open	md-folder_download	poste.island
 F0256	folder	0	folder-open	md-folder_outline	poste.island
 F0297	device-gamepad-2	0		md-gamepad_variant	poste.island
-F029A	scale	0		md-gauge	panels/power
+F029A	scale	0		md-gauge	panels/power,poste.island
 F02AD	brand-google	0		md-google	menu
 F02AF	brand-chrome	0		md-google_chrome	menu
 F02B4	device-gamepad-2	0		md-google_controller	poste.island
@@ -206,7 +206,7 @@ F02E9	photo	0		md-image	io.github.honeyspoons.localsend,panels/dropbox,poste.isl
 F0306	key	0		md-key	bar,io.github.grichard99.omaproton-vpn
 F030B	key	0		md-key_variant	panels/dropbox
 F030C	keyboard	0		md-keyboard	menu,osd,poste.island
-F032A	leaf	0		md-leaf	panels/power
+F032A	leaf	0		md-leaf	panels/power,poste.island
 F033D	-	0		md-linux	panels/tailscale
 F033E	lock	0		md-lock	panels/network,poste.island
 F0342	login	0		md-login	poste.island

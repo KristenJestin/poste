@@ -245,5 +245,14 @@ Rectangle {
       font.weight: Font.DemiBold
       font.features: { "tnum": 1 }
     }
+    // Batterie sur secteur débranché : l'icône du profil d'alimentation en place.
+    Glyph {
+      anchors.verticalCenter: parent.verticalCenter
+      visible: bubble.kind === "battery" && bubble.battery.profileGlyph !== ""
+      glyph: bubble.battery.profileGlyph
+      color: bubble.host.colorMuted
+      fontFamily: bubble.host.fontFamily
+      pixelSize: 14
+    }
   }
 }

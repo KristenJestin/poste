@@ -18,9 +18,9 @@ Item {
   implicitHeight: column.implicitHeight
 
   readonly property var locale: Qt.locale("en_GB")
-  // Réseau / Bluetooth / Audio, plus VPN, Tailscale and Mail when present.
+  // Réseau / Bluetooth / Audio, plus VPN, Tailscale, Mail et le profil d'alimentation quand ils sont là.
   readonly property int tileCount: 3 + (host.mailAvailable ? 1 : 0) + ((host.vpnAvailable || host.vpnConnected) ? 1 : 0)
-    + (host.tsAvailable ? 1 : 0)
+    + (host.tsAvailable ? 1 : 0) + (host.powerProfile.present ? 1 : 0)
   readonly property real tileWidth: Math.min(74, Math.floor((width - 8 * (tileCount - 1)) / tileCount))
   property int monthOffset: 0
 
@@ -550,6 +550,14 @@ Item {
         markOn: cc.host.tsConnected
         label: "Tailscale"
         onActivated: cc.moduleRequested("tailscale")
+      }
+      // Profil d'alimentation (PowerProfileState.qml) : l'icône et le nom du profil en place ;
+      // un clic passe au suivant (Saver, Balanced, Performance), retenu pour la source en cours.
+      IconButton {
+        visible: cc.host.powerProfile.present
+        glyph: cc.host.powerProfile.glyph
+        label: cc.host.powerProfile.shortLabel(cc.host.powerProfile.active)
+        onActivated: cc.host.powerProfile.cycle()
       }
       IconButton {
         visible: cc.host.mailAvailable

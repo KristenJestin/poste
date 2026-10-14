@@ -3,12 +3,19 @@ import Quickshell.Services.UPower
 
 // La batterie, pour l'activité de l'île (Island.qml : root.battery). Rien sur
 // un PC sans batterie (UPower ne voit pas de batterie de portable). Sinon,
-// à côté de l'île seulement si elle est basse (sous 30 %, jaune ; sous 10 %,
-// rouge). Toujours dans le centre de contrôle. Pour tester ailleurs :
+// à côté de l'île si elle est basse (sous 30 %, jaune ; sous 10 %, rouge), et
+// 6 s au débranchement, avec l'icône du profil d'alimentation en place dans la
+// bulle. Toujours dans le centre de contrôle. Pour
+// tester ailleurs (« discharging 80 » joue le débranchement) :
 //   omarchy-shell poste.island batterySim "charging 75" | "low 15" | "critical 6" | "off"
 Item {
   id: battery
   readonly property var dev: UPower.displayDevice
+  // Le profil d'alimentation (PowerProfileState.qml), posé par Island.qml.
+  property var profile: null
+  // Juste après le débranchement, le profil à montrer avec elle (vide sinon, et sans
+  // power-profiles-daemon) ; la bulle basse ou critique qui reste ne le porte pas.
+  readonly property string profileGlyph: flash && !charging && profile && profile.present ? profile.glyph : ""
 
   // Simulation (commande batterySim).
   property bool simulated: false
@@ -34,12 +41,17 @@ Item {
   property bool flash: false
   Timer { id: flashTimer; interval: 6000; onTriggered: battery.flash = false }
   function pulse() { if (present) { flash = true; flashTimer.restart() } }
-  onChargingChanged: pulse()
+  // Au démarrage, UPower remplit onBattery après coup : ce premier passage n'est pas un
+  // débranchement, les premières secondes ne comptent pas.
+  property bool armed: false
+  Timer { interval: 3000; running: true; onTriggered: battery.armed = true }
+  onChargingChanged: if (armed) pulse()
   onLevelChanged: if (!charging && level !== "ok") pulse()
 
-  // À côté de l'île : seulement basse (sous 30 %). Au-dessus, elle n'est que
-  // dans le centre de contrôle (même pas au branchement).
-  readonly property bool showing: present && level !== "ok"
+  // À côté de l'île : basse (sous 30 %), ou juste après le débranchement (le
+  // temps de voir le profil pris sur batterie). Sinon, elle n'est que dans le
+  // centre de contrôle (même pas au branchement).
+  readonly property bool showing: present && (level !== "ok" || (flash && !charging))
 
   // Icône selon le niveau (onze crans), ou l'éclair en charge.
   readonly property string glyph: charging ? "󰂄"
