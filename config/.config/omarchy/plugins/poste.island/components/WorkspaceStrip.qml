@@ -1,11 +1,12 @@
 import QtQuick
+import "WorkspaceGroups.js" as WorkspaceGroups
 
-// This screen's workspaces, numbered 1-10 locally: 1-5 always, higher ones
-// while they exist. The shown workspace is an accent chip, occupied ones are
-// bright, empty ones dim. Click focuses that workspace on this screen.
-// After a thin bar: workspaces of an unplugged screen that Hyprland parked
-// here (host.visitingWorkspaces), with their own 1-10 number; they go back
-// to their screen when it is plugged in again.
+// Les workspaces de cet écran, numérotés 1-10 : 1-5 toujours, au-delà ceux
+// qui existent. Celui qui est affiché est une pastille d'accent, ceux qui ont
+// des fenêtres sont vifs, les vides atténués. Un clic l'affiche sur cet écran.
+// Après une barre fine : les workspaces d'un autre écran que Hyprland a posés
+// ici (host.visitingWorkspaces), avec leur numéro 1-10, un groupe par écran
+// d'origine (WorkspaceGroups.js) ; ils repartent sur leur écran quand il revient.
 Row {
   id: strip
   required property var host
@@ -14,22 +15,8 @@ Row {
   spacing: 2
 
   readonly property int activeId: host.activeWorkspaces[screenName] !== undefined ? host.activeWorkspaces[screenName] : -1
-  readonly property var ids: {
-    var list = [1, 2, 3, 4, 5]
-    for (var key in host.windowCounts) {
-      var local = Number(key) - offset
-      if (local > 0 && local <= 10 && list.indexOf(local) === -1) list.push(local)
-    }
-    if (activeId - offset > 0 && activeId - offset <= 10 && list.indexOf(activeId - offset) === -1) list.push(activeId - offset)
-    list.sort(function(a, b) { return a - b })
-    return list
-  }
-  readonly property var visiting: host.visitingWorkspaces[screenName] || []
-  // Global ids to draw, 0 standing for the bar before the visiting ones.
-  readonly property var cells: {
-    var list = ids.map(function(n) { return offset + n })
-    return visiting.length > 0 ? list.concat([0], visiting) : list
-  }
+  // Ids globaux à dessiner, 0 pour la barre avant chaque groupe de passage.
+  readonly property var cells: WorkspaceGroups.cells(host.windowCounts, activeId, offset, host.visitingWorkspaces[screenName])
 
   Repeater {
     model: strip.cells

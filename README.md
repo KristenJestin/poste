@@ -195,10 +195,13 @@ core/       poste-core : chemins XDG, config, découverte des modules, notificat
 poste/      l'aiguillage
 modules/    un dossier par module (sys, music, record, power, …)
 bootstrap/  paquets, étapes système/utilisateur/manuelles, patchs de plugins (lus par poste sys setup)
+tests/      tests QML de l'île (faux Hyprland, rendu hors écran)
 setup       premier lancement
 ```
 
-Vérifications avant commit : `cargo test` et `cargo clippy --all-targets -- -D warnings`.
+Vérifications avant commit : `cargo test` et `cargo clippy --all-targets -- -D warnings`. `cargo test` lance aussi
+les tests QML de `tests/island/` avec le `qmltestrunner` de Qt 6 (`QT_QPA_PLATFORM=offscreen`,
+aucune fenêtre ne s'ouvre) ; ils sont sautés si `qt6-declarative` n'est pas installé.
 
 ## La config
 
