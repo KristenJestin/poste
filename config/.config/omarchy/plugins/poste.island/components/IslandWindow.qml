@@ -323,6 +323,15 @@ PanelWindow {
       Row {
         anchors.verticalCenter: parent.verticalCenter
         spacing: 5
+      // Mode dev : poste tourne depuis le clone du dépôt (poste sys use release pour en sortir).
+      Glyph {
+        anchors.verticalCenter: parent.verticalCenter
+        visible: window.host.devMode
+        glyph: "\uf121"
+        color: window.host.withAlpha(window.host.colorAccent, 0.8)
+        fontFamily: window.host.fontFamily
+        pixelSize: 11
+      }
       // Only while a VPN tunnel is up.
       Glyph {
         anchors.verticalCenter: parent.verticalCenter

@@ -30,6 +30,7 @@ Un module inconnu donne une erreur claire, la liste des modules et le code de so
 
 ```toml
 repo = "/chemin/du/depot"          # écrit par ./setup
+source = "release"                  # écrit par poste sys use : version installée, ou "dev" (le clone, défaut)
 modules = ["~/mes-modules"]         # facultatif : dossiers de modules supplémentaires
 ```
 
@@ -118,17 +119,71 @@ chaque fois qu'il faut un droit root, il affiche la commande exacte à copier.
 5. Faire les étapes manuelles, en les marquant au fur et à mesure (`poste sys done <id>`, `poste sys done` pour la liste ; `--undo` pour annuler). `poste sys status` résume tout ce qui reste.
 6. Recharger : `omarchy restart shell` et `hyprctl reload`, ou redémarrer la session.
 
-Ensuite, `poste sys setup` (ou `poste sys sync` après un `git pull`) suffit pour réinstaller après une
+Ensuite, `poste sys setup` (ou `poste sys sync`, qui fait le `git pull`) suffit pour réinstaller après une
 modification. `--no-config` ne réinstalle que les binaires et saute toute la partie machine.
 
 Posé par `poste sys setup` :
 
 - `~/.local/bin/poste`
+- `~/.local/share/poste/current` : lien vers la racine dont tout est lu (le clone, ou une version installée : « Versions installées » plus bas) ; les liens de config passent par lui
 - `~/.local/share/poste/modules/<nom>/` : `poste-<nom>`, `module.toml`, et `island/`, `hypr/`, `bin/`, `systemd/` s'ils existent
 - les lignes que les modules ajoutent dans des fichiers sans inclusion (par exemple `~/.config/hypr/xdph.conf`)
 - la liste de ce qui a été posé : `~/.local/state/poste/installed.json`
 - les anciennes versions remplacées : `~/.local/state/poste/backup/`
 - les étapes manuelles marquées faites : `~/.local/state/poste/done/<id>`
+
+## Versions installées (release) ou clone (dev)
+
+Tout ce que `poste sys setup` pose se lit dans une seule racine, le lien
+`~/.local/share/poste/current` : les liens de `~` visent `current/config/…`, les fichiers de modules
+et les binaires viennent de `current/`. Deux sources possibles, clé `source` de `config.toml` :
+
+- `dev` (défaut, le fonctionnement d'avant) : `current` désigne le clone (`repo`), `setup` construit
+  avec cargo, `sync` fait `git pull`. L'île affiche un petit signe près de l'heure pour ne pas
+  l'oublier.
+- `release` : `current` désigne une version installée dans `~/.local/share/poste/versions/<commit>/`.
+  Ni clone ni Rust nécessaires. `sync` lit la somme de contrôle publiée, télécharge la dernière
+  archive si elle n'est pas déjà installée (`curl`), vérifie la somme avant d'extraire, fait pointer
+  `current` dessus, lance `setup`, recharge l'île et Hyprland si les fichiers qui les concernent
+  diffèrent entre l'ancienne et la nouvelle version, puis ne garde que les 3 versions les plus récentes
+  (jamais celle de `current`).
+
+```sh
+poste sys use release   # passe en release (télécharge la dernière version s'il n'y en a aucune)
+poste sys use dev       # revient au clone, pour essayer un changement en vrai
+poste sys use 1a2b3c4   # retour arrière : une version installée, par le début de son commit
+poste sys versions      # source, racine et versions installées
+```
+
+`use` écrit `source`, fait pointer `current`, lance `setup` puis propose de recharger l'île et
+Hyprland (`--yes` sans confirmation, `--dry-run` pour l'aperçu ; l'île n'est jamais redémarrée
+pendant un enregistrement d'écran). Après un retour arrière, le prochain `sync` revient à la
+dernière version.
+
+L'archive est construite par GitHub Actions (`.github/workflows/archive.yml`, conteneur Arch) à
+chaque push sur `main` et publiée dans la préversion `latest`, recréée à chaque fois : une adresse
+fixe, `…/releases/download/latest/poste-x86_64-linux.tar.gz`, et sa somme `….sha256`. Contenu
+(`.github/package.sh`) : la disposition du dépôt, réduite à ce que `setup` lit : `config/`,
+`bootstrap/`, de chaque module `module.toml`, `island/`, `hypr/`, `bin/`, `systemd/` et son programme
+s'il est un script, les binaires dans `target/release/`, et `VERSION` (commit, date). Pas de paquet
+pacman : un paquet ne peut pas poser de liens dans `~`, ce travail reste à `setup`.
+
+Passage d'une machine existante : rien ne change tant que `source` est absent, sinon que le premier
+`setup` pose `current` (vers le clone) et repasse par lui les liens de config qu'il avait posés vers
+le clone. Seuls les liens notés dans `installed.json` sont reposés, chacun sauvegardé d'abord dans
+`~/.local/state/poste/backup/` ; un lien posé à la main ou un fichier ordinaire n'est jamais touché.
+Ensuite `poste sys use release`.
+
+Machine sans clone ni Rust (non essayé de bout en bout) :
+
+```sh
+mkdir -p /tmp/poste && cd /tmp/poste
+curl -fsSLO https://github.com/KristenJestin/poste/releases/download/latest/poste-x86_64-linux.tar.gz
+tar -xzf poste-x86_64-linux.tar.gz && ./target/release/poste-sys use release
+```
+
+En release, la racine est en lecture seule : `poste sys add` et `setup --take-home` (qui écrivent
+dans le dépôt) demandent de passer en dev.
 
 ## Installer sur un autre PC
 
@@ -182,10 +237,10 @@ poste-data/
 - Les chemins relatifs de ses étapes (`line`, `source`, `patch`) partent de son `bootstrap/` ;
   `@DATA@` vaut son dossier.
 - Un fichier sous un dossier lié d'un bloc par poste (`link-dirs`) est refusé.
-- `poste sys sync` fait `git pull --ff-only` dans les deux dépôts, puis `setup`, puis recharge l'île et Hyprland si le pull les a touchés.
+- `poste sys sync` fait `git pull --ff-only` dans le dépôt de données dans les deux modes (et dans le clone en dev, ou la dernière version en release), puis `setup`, puis recharge l'île et Hyprland si le pull ou le changement de version les a touchés.
 - Le lanceur de l'île lit en plus `~/.config/poste-island/launcher/machine.json` (même format que
   `launcher.json`) : les entrées propres à la machine y vont, posées par `poste-data`.
-- `repo` et `data` restent dans `config.toml`, jamais dans `poste.toml`.
+- `repo`, `data` et `source` restent dans `config.toml`, jamais dans `poste.toml`.
 
 ## Organisation du dépôt
 
@@ -196,6 +251,7 @@ poste/      l'aiguillage
 modules/    un dossier par module (sys, music, record, power, …)
 bootstrap/  paquets, étapes système/utilisateur/manuelles, patchs de plugins (lus par poste sys setup)
 setup       premier lancement
+.github/    construction et publication de l'archive d'une version (package.sh, workflows/)
 ```
 
 Vérifications avant commit : `cargo test` et `cargo clippy --all-targets -- -D warnings`.

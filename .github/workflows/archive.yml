@@ -1,0 +1,58 @@
+# Archive d'une version de poste (binaires + config/ + bootstrap/ + fichiers des modules), que
+# `poste sys sync` installe sur les machines en mode release.
+# - sur une pull request : construite seulement (artefact), pour vérifier qu'elle se construit ;
+# - sur un push sur main : publiée dans la préversion `latest`, recréée à chaque fois sur le
+#   commit poussé (adresse fixe : .../releases/download/latest/<archive>), avec sa somme sha256.
+# Construite dans un conteneur Arch : la cible est Arch x86_64 (glibc et libmpv de la machine).
+name: archive
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: archive-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  archive:
+    runs-on: ubuntu-latest
+    container: archlinux:latest
+    steps:
+      - name: Paquets
+        run: pacman -Syu --noconfirm --needed base-devel git rust mpv github-cli
+
+      - uses: actions/checkout@v4
+
+      - name: Dépôt sûr pour git (conteneur)
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Construction
+        run: cargo build --release --locked
+
+      - name: Archive
+        run: .github/package.sh dist
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: poste-x86_64-linux
+          path: dist/
+
+      - name: Publication (main seulement)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete latest --cleanup-tag --yes --repo "$GITHUB_REPOSITORY" || true
+          gh release create latest dist/* \
+            --repo "$GITHUB_REPOSITORY" \
+            --prerelease \
+            --target "$GITHUB_SHA" \
+            --title "latest" \
+            --notes "Dernière version construite depuis main ($GITHUB_SHA). Installée par \`poste sys sync\` en mode release."
