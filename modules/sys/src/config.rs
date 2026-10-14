@@ -41,8 +41,11 @@ pub enum Kind {
 pub struct Entry {
     /// Chemin relatif à `~`, séparé par `/`.
     pub rel: String,
-    /// Dans le dépôt : `config/<rel>`.
+    /// Dans le dépôt : `config/<rel>`, d'où le contenu est lu.
     pub src: PathBuf,
+    /// Cible du lien posé dans `~` : `src`, sauf en simulation où la racine lue n'est pas encore
+    /// `current` (le lien réel passera par `current/config/<rel>`).
+    pub link: PathBuf,
     /// Dans `~`.
     pub dest: PathBuf,
     pub kind: Kind,
@@ -270,6 +273,16 @@ fn overlay(
 }
 
 impl Layout {
+    /// Simulation : les liens poseront `<link_root>/config/<rel>` (le lien `current`, pas encore
+    /// posé) alors que le contenu se lit dans la racine d'origine.
+    pub fn relink(&mut self, link_root: &Path) {
+        for e in self.entries.iter_mut().chain(self.local.iter_mut()) {
+            if let Ok(rest) = e.src.strip_prefix(&self.root) {
+                e.link = link_root.join("config").join(rest);
+            }
+        }
+    }
+
     /// Racine (`config/` du dépôt ou du dépôt de données) d'où vient cette entrée.
     pub fn root_of(&self, e: &Entry) -> &Path {
         match &self.data_root {
@@ -307,6 +320,7 @@ fn scan(
         let mk = |kind| Entry {
             rel: rel.clone(),
             src: src.clone(),
+            link: src.clone(),
             dest: env.home.join(&rel),
             kind,
         };
@@ -339,6 +353,9 @@ pub enum State {
     Differs,
     /// Lien qui pointe ailleurs (`broken` : la cible n'existe pas).
     OtherLink { target: PathBuf, broken: bool },
+    /// Lien vers le même chemin dans une autre racine de poste (le clone, une version
+    /// installée) : l'ancienne forme, avant `current`. Remplacé si `installed.json` le connaît.
+    Moved { target: PathBuf },
     /// Mauvais type (dossier à la place d'un fichier, etc.).
     WrongType(&'static str),
     /// Un dossier parent n'est pas un dossier.
@@ -380,6 +397,33 @@ fn tree(dir: &Path) -> Result<BTreeMap<String, Node>> {
     let mut out = BTreeMap::new();
     walk(dir, dir, &mut out)?;
     Ok(out)
+}
+
+/// `target` est-il `config/<rel>` d'une racine de poste (le lien `current`, une version
+/// installée, le clone de la clé `repo`) ?
+pub fn is_poste_target(env: &Env, target: &Path, rel: &str) -> bool {
+    let tail = Path::new("config").join(rel);
+    if target == env.current_link().join(&tail) {
+        return true;
+    }
+    if let Ok(rest) = target.strip_prefix(env.versions_dir()) {
+        let mut c = rest.components();
+        if c.next().is_some() && c.as_path() == tail {
+            return true;
+        }
+    }
+    poste_core::Config::load(env)
+        .ok()
+        .and_then(|c| c.repo_path(env))
+        .is_some_and(|r| target == r.join(&tail))
+}
+
+/// `installed.json` connaît-il ce fichier de `~` comme posé par `setup` ?
+fn placed_by_setup(env: &Env, dest: &Path) -> bool {
+    Manifest::load(&env.manifest_file())
+        .ok()
+        .and_then(|m| m.get(dest).map(|x| x.module == MODULE))
+        .unwrap_or(false)
 }
 
 fn same_target(a: &Path, b: &Path) -> bool {
@@ -437,9 +481,29 @@ pub fn state_of(e: &Entry, env: &Env) -> Result<State> {
     };
     if md.file_type().is_symlink() {
         let target = std::fs::read_link(&e.dest)?;
+        if target != e.link
+            && matches!(e.kind, Kind::File | Kind::Dir | Kind::Generated(_))
+            && is_poste_target(env, &target, &e.rel)
+        {
+            // Lien vers le fichier même que `current` désigne (le clone en dev), posé à la main :
+            // il convient tel quel, setup ne l'a pas posé et n'a rien à y reprendre.
+            if !matches!(e.kind, Kind::Generated(_))
+                && same_target(&target, &e.src)
+                && !placed_by_setup(env, &e.dest)
+            {
+                return Ok(State::Linked);
+            }
+            // L'ancienne forme d'un lien posé par poste : le fichier généré le remplace comme
+            // l'ancien lien vers le dépôt ; un lien est reposé vers `current`.
+            return Ok(if matches!(e.kind, Kind::Generated(_)) {
+                State::Identical
+            } else {
+                State::Moved { target }
+            });
+        }
         let ok = match &e.kind {
             Kind::Link(t) => *t == target,
-            Kind::File | Kind::Dir => same_target(&target, &e.src),
+            Kind::File | Kind::Dir => target == e.link || same_target(&target, &e.src),
             // L'ancien lien vers le dépôt : poste l'avait posé, on peut le remplacer sans risque.
             Kind::Generated(_) => {
                 if same_target(&target, &e.src) {
@@ -653,6 +717,7 @@ pub fn plan(layout: &Layout, env: &Env, decisions: &HashMap<String, Decision>) -
         bail!("« {k} » n'est pas une entrée de config/");
     }
     let mut p = Plan::default();
+    let manifest = Manifest::load(&env.manifest_file())?;
     for e in &layout.entries {
         let state = state_of(e, env)?;
         let decision = decisions.get(&e.rel).copied();
@@ -676,6 +741,12 @@ pub fn plan(layout: &Layout, env: &Env, decisions: &HashMap<String, Decision>) -
                     p.warnings
                         .push(format!("{} : identique au dépôt, rien à trancher", e.rel));
                 }
+                Op::Replace
+            }
+            // Posé par poste (installed.json) : reposé vers la nouvelle racine, ancien sauvegardé.
+            (State::Moved { .. }, None)
+                if manifest.get(&e.dest).is_some_and(|m| m.module == MODULE) =>
+            {
                 Op::Replace
             }
             (State::ParentBlocked(_), Some(_)) => bail!(
@@ -709,6 +780,7 @@ pub fn describe(st: &State) -> String {
         State::Missing => "absent".into(),
         State::Identical => "fichier ordinaire identique".into(),
         State::Differs => "différent du dépôt".into(),
+        State::Moved { target } => format!("lien vers {} (ancienne racine)", target.display()),
         State::OtherLink { target, broken } => format!(
             "lien vers {}{}",
             target.display(),
@@ -742,6 +814,9 @@ pub fn print_plan(env: &Env, plan: &Plan) {
                 println!("  régénéré    {d}  (dépôt + surcharges de la machine, ancien sauvegardé)")
             }
             Op::Create => println!("  lien créé   {d}{kind}"),
+            Op::Replace if matches!(s.state, State::Moved { .. }) => {
+                println!("  relié       {d}{kind}  (lien vers l'ancienne racine, reposé vers current, ancien sauvegardé)")
+            }
             Op::Replace => {
                 println!("  remplacé    {d}{kind}  (identique au dépôt, ancien sauvegardé)")
             }
@@ -803,7 +878,7 @@ pub fn print_conflicts(env: &Env, plan: &Plan) {
 fn link_target(e: &Entry) -> PathBuf {
     match &e.kind {
         Kind::Link(t) => t.clone(),
-        _ => e.src.clone(),
+        _ => e.link.clone(),
     }
 }
 
@@ -1302,6 +1377,7 @@ pub fn add(env: &Env, repo: &Path, arg: &str, dry_run: bool, manifest_file: &Pat
         }
         let e = Entry {
             rel: frel.clone(),
+            link: dest_repo.clone(),
             src: dest_repo,
             dest: f.clone(),
             kind: if md.file_type().is_symlink() {
@@ -1450,6 +1526,13 @@ pub fn print_status(layout: &Layout, env: &Env, manifest: &Manifest) -> Result<(
                     target.display()
                 ));
             }
+            State::Moved { target } if tracked(&s.entry) => {
+                missing += 1;
+                lines.push(format!(
+                    "  à relier     {d}  -> {}  (ancienne racine : poste sys setup le repose vers current)",
+                    target.display()
+                ));
+            }
             State::Identical if tracked(&s.entry) => {
                 replaced += 1;
                 lines.push(format!(
@@ -1571,6 +1654,51 @@ mod tests {
                 })
                 .unwrap_or_default()
         }
+    }
+
+    #[test]
+    fn lien_vers_le_clone_pose_a_la_main_en_dev_est_lie_sauf_si_setup_l_a_pose() {
+        let f = fx();
+        let src = f.cfg(".config/a/x", "1");
+        f.cfg(".config/a/y", "2");
+        // Mode dev : `current` désigne le clone (clé `repo`).
+        fs::create_dir_all(f.env.config_file().parent().unwrap()).unwrap();
+        fs::write(
+            f.env.config_file(),
+            format!("repo = \"{}\"\n", f.repo.display()),
+        )
+        .unwrap();
+        fs::create_dir_all(f.env.current_link().parent().unwrap()).unwrap();
+        symlink(&f.repo, f.env.current_link()).unwrap();
+        let state = |rel: &str| {
+            let l = load(&f.env.current_link(), &f.env).unwrap().unwrap();
+            state_of(l.entries.iter().find(|e| e.rel == rel).unwrap(), &f.env).unwrap()
+        };
+        for rel in [".config/a/x", ".config/a/y"] {
+            let d = f.home(rel);
+            fs::create_dir_all(d.parent().unwrap()).unwrap();
+            symlink(f.repo.join("config").join(rel), &d).unwrap();
+        }
+        // Posé à la main, inconnu de installed.json : déjà bon, ni reposé ni conflit.
+        assert_eq!(state(".config/a/x"), State::Linked);
+        // Posé par setup (noté) : reposé vers current, comme à la migration.
+        let mut m = Manifest::default();
+        m.upsert(ManifestEntry {
+            path: f.home(".config/a/y").to_string_lossy().into_owned(),
+            sha256: "x".into(),
+            module: MODULE.into(),
+            installed_at: "t".into(),
+        });
+        m.save(&f.env.manifest_file()).unwrap();
+        assert!(matches!(state(".config/a/y"), State::Moved { .. }));
+        // Un lien vers une autre version que celle de current reste un conflit.
+        let autre = f.repo.parent().unwrap().join("autre");
+        fs::create_dir_all(autre.join("config/.config/a")).unwrap();
+        fs::write(autre.join("config/.config/a/x"), "1").unwrap();
+        fs::remove_file(f.home(".config/a/x")).unwrap();
+        symlink(autre.join("config/.config/a/x"), f.home(".config/a/x")).unwrap();
+        assert!(matches!(state(".config/a/x"), State::OtherLink { .. }));
+        assert!(src.is_file());
     }
 
     #[test]

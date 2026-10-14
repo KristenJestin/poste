@@ -7,8 +7,10 @@ use std::io::Read;
 use std::os::unix::fs::symlink;
 use std::path::{Path, PathBuf};
 
-/// Emplacement du dépôt, lu dans config.toml (clé `repo`, écrite par `./setup`).
-pub fn repo(env: &Env, cfg: &Config) -> Result<PathBuf> {
+/// Emplacement du clone du dépôt, lu dans config.toml (clé `repo`, écrite par `./setup`). Pour
+/// ce qui travaille sur le dépôt lui-même (git, import) ; ce qui s'installe se lit dans la
+/// racine (`crate::versions::root`).
+pub fn clone(env: &Env, cfg: &Config) -> Result<PathBuf> {
     let Some(repo) = cfg.repo_path(env) else {
         bail!(
             "dépôt inconnu : la clé `repo` manque dans {}. Lancez ./setup depuis le dépôt.",

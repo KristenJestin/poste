@@ -91,9 +91,25 @@ fn git(repo: &Path, args: &[&str]) -> Option<String> {
         .then(|| String::from_utf8_lossy(&out.stdout).trim().to_string())
 }
 
-pub fn run(env: &Env, repo: &Path) -> Result<()> {
-    repo_section("Dépôt", repo);
-    if let Some(d) = poste_core::Config::load(env)?.data_path(env) {
+pub fn run(env: &Env, cfg: &poste_core::Config, repo: &Path) -> Result<()> {
+    println!("Source");
+    println!("  mode          {}", cfg.source.as_str());
+    println!("  racine        {}", crate::sync::describe_root(env, repo));
+    if !env.current_link().exists() {
+        println!(
+            "  current       absent (le prochain `poste sys setup` pose {})",
+            env.display(&env.current_link())
+        );
+    }
+    println!(
+        "  versions      {} installée(s) (poste sys versions)",
+        crate::versions::installed(env).len()
+    );
+    if let Some(clone) = cfg.repo_path(env).filter(|c| c.is_dir()) {
+        println!();
+        repo_section("Dépôt", &clone);
+    }
+    if let Some(d) = cfg.data_path(env) {
         println!();
         if d.is_dir() {
             repo_section("Dépôt de données de la machine (data)", &d);

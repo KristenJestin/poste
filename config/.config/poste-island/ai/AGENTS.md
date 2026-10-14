@@ -39,4 +39,4 @@ Lecteur de fond (démon, MPRIS « Musique »), lu aussi par l'île. Les commande
 ## Règles
 - Jamais de sudo : donner la commande à l'utilisateur.
 - Ne rien supprimer, écraser ni pousser sans demande claire.
-- Réglages du lanceur : `~/.config/poste-island/launcher/launcher.json`. Code de l'île : `~/.config/omarchy/plugins/poste.island/` (lien vers le dépôt `~/Projects/poste` : une modif est déjà dans le dépôt, il reste `poste sys git commit` puis `push`).
+- Réglages du lanceur : `~/.config/poste-island/launcher/launcher.json`. Code de l'île : `~/.config/omarchy/plugins/poste.island/` (lien vers `~/.local/share/poste/current` : en mode dev c'est le dépôt, une modif y est déjà, il reste `poste sys git commit` puis `push` ; en mode release c'est une version installée en lecture seule, `poste sys use dev` d'abord, `poste sys versions` pour savoir).

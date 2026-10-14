@@ -1,7 +1,8 @@
 //! Orphelins : ce que poste a posé et dont la source n'existe plus.
 //!
 //! - un lien de `~` qui pointe vers `<dépôt>/config/…` et dont la cible a disparu (fichier
-//!   renommé ou retiré du dépôt) ;
+//!   renommé ou retiré du dépôt) ; les racines de poste comptent toutes : `current`, le clone,
+//!   les versions installées, le dépôt de données ;
 //! - un fichier de module (`~/.local/share/poste/modules/…`) noté dans `installed.json`, que le
 //!   dépôt ne produit plus (module supprimé, fichier renommé) et qui est resté tel qu'installé ;
 //!   s'il a déjà disparu de `~`, il n'y a rien à retirer : son entrée sort du manifeste.
@@ -61,6 +62,22 @@ pub fn find(
     items: &[Item],
 ) -> Result<Vec<Orphan>> {
     let mut roots = vec![repo.join("config")];
+    // `current` cassé (version retirée, lien à refaire) : ses liens sont à refaire, pas
+    // orphelins. De même, seules les versions encore installées comptent comme racines.
+    if env.current_link().exists() {
+        roots.push(env.current_link().join("config"));
+    }
+    if let Ok(rd) = std::fs::read_dir(env.versions_dir()) {
+        roots.extend(
+            rd.flatten()
+                .filter(|e| !e.file_name().to_string_lossy().starts_with('.'))
+                .map(|e| e.path().join("config"))
+                .filter(|p| p.is_dir()),
+        );
+    }
+    if let Some(c) = poste_core::Config::load(env)?.repo_path(env) {
+        roots.push(c.join("config"));
+    }
     if let Some(d) = layout.and_then(|l| l.data_root.clone()) {
         roots.push(d);
     }
@@ -178,18 +195,21 @@ pub fn print(env: &Env, orphans: &[Orphan]) {
 /// Un fichier de module est d'abord sauvegardé ; ses dossiers devenus vides sont retirés.
 pub fn apply(
     env: &Env,
-    repo: &Path,
+    _repo: &Path,
     orphans: &[Orphan],
     stamp: &str,
     manifest: &mut Manifest,
 ) -> Result<usize> {
-    let config_root = repo.join("config");
     let mut n = 0;
     for o in orphans {
         match &o.kind {
-            Kind::Link { .. } => {
-                // Le lien doit toujours pointer vers une cible disparue du dépôt.
-                if dangling_config_link(&o.path, &config_root).is_none() {
+            Kind::Link { target } => {
+                // Le lien doit toujours pointer vers la même cible, toujours disparue.
+                let still = std::fs::symlink_metadata(&o.path)
+                    .is_ok_and(|m| m.file_type().is_symlink())
+                    && link_target(&o.path).as_ref() == Some(target)
+                    && std::fs::symlink_metadata(target).is_err();
+                if !still {
                     continue;
                 }
                 std::fs::remove_file(&o.path)?;
@@ -271,6 +291,45 @@ mod tests {
         assert!(home.join(".config/a/ordinaire").is_file());
         assert!(home.join(".config/a/etranger").is_symlink());
         assert!(m.files.is_empty());
+    }
+
+    #[test]
+    fn current_casse_ne_rend_pas_les_liens_orphelins() {
+        let d = tempfile::tempdir().unwrap();
+        let repo = d.path().join("repo");
+        let home = d.path().join("home");
+        fs::create_dir_all(repo.join("config/.config/a")).unwrap();
+        fs::create_dir_all(home.join(".config/a")).unwrap();
+        fs::write(repo.join("config/.config/a/x"), "x").unwrap();
+        let env = Env::with_home(&home);
+        // current désigne une version retirée ; un lien passe par current, un autre par
+        // une version qui n'est plus installée, un troisième par une version installée.
+        fs::create_dir_all(env.current_link().parent().unwrap()).unwrap();
+        symlink(env.versions_dir().join("retiree"), env.current_link()).unwrap();
+        let v = env.versions_dir().join("presente/config/.config/a");
+        fs::create_dir_all(&v).unwrap();
+        let links = [
+            ("par_current", env.current_link().join("config/.config/a/x")),
+            (
+                "version_retiree",
+                env.versions_dir().join("retiree/config/.config/a/x"),
+            ),
+            ("version_presente", v.join("disparu")),
+        ];
+        let mut m = Manifest::default();
+        for (name, target) in &links {
+            symlink(target, home.join(".config/a").join(name)).unwrap();
+            m.files.push(entry(
+                &home.join(".config/a").join(name),
+                "h",
+                config::MODULE,
+            ));
+        }
+        let layout = config::load(&repo, &env).unwrap().unwrap();
+        let o = find(&repo, &env, Some(&layout), &m, &[]).unwrap();
+        // Seul le lien vers un fichier disparu d'une version bien là est un orphelin.
+        assert_eq!(o.len(), 1, "{o:?}");
+        assert!(o[0].path.ends_with("version_presente"));
     }
 
     #[test]

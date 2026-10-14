@@ -9,7 +9,7 @@ use anyhow::{bail, Context, Result};
 use poste_core::{time, Env};
 use std::collections::HashMap;
 use std::io::{BufRead, Write};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode};
 
 /// Options de `poste sys setup`.
@@ -21,6 +21,9 @@ pub struct Opts {
     pub no_config: bool,
     /// Pour les tests : ne lance pas `cargo build`.
     pub skip_build: bool,
+    /// Simulation : la racine lue n'est pas encore `current` (lien pas posé) ; les liens de
+    /// config sont comparés à `<link_root>/config/<chemin>`, ceux que le vrai `setup` poserait.
+    pub link_root: Option<PathBuf>,
     pub take_repo: Vec<String>,
     pub take_home: Vec<String>,
 }
@@ -58,6 +61,15 @@ pub struct Outcome {
     pub config_changed: bool,
 }
 
+/// `config::load`, avec les liens vus comme le vrai `setup` les poserait.
+fn load_config(repo: &Path, env: &Env, o: &Opts) -> Result<Option<config::Layout>> {
+    let mut layout = config::load(repo, env)?;
+    if let (Some(l), Some(root)) = (&mut layout, &o.link_root) {
+        l.relink(root);
+    }
+    Ok(layout)
+}
+
 pub fn run(env: &Env, repo: &Path, o: &Opts) -> Result<Outcome> {
     let ph = install_phase(env, repo, o)?;
     if !ph.proceed || o.no_config {
@@ -76,7 +88,7 @@ pub fn run(env: &Env, repo: &Path, o: &Opts) -> Result<Outcome> {
     // `omarchy plugin add` peut toucher à des fichiers de config liés (shell.json) :
     // on replanifie la config et on remet les liens du dépôt.
     if !applied.done.is_empty() {
-        if let Some(l) = config::load(repo, env)? {
+        if let Some(l) = load_config(repo, env, o)? {
             let p = config::plan(&l, env, &decisions(env, o)?)?;
             if p.writes() > 0 || !p.conflicts().is_empty() {
                 println!("\nConfig à remettre après les étapes utilisateur :");
@@ -123,7 +135,7 @@ fn extras_phase(
 ) -> Result<Extras> {
     let manifest_file = env.manifest_file();
     let mut manifest = Manifest::load(&manifest_file)?;
-    let layout = config::load(repo, env)?;
+    let layout = load_config(repo, env, o)?;
     let items = plan::desired(repo, env)?;
     let orphan_list = orphans::find(repo, env, layout.as_ref(), &manifest, &items)?;
     let vanishing: std::collections::HashSet<std::path::PathBuf> =
@@ -205,7 +217,8 @@ fn install_phase(env: &Env, repo: &Path, o: &Opts) -> Result<Phase> {
     if o.no_config && !decisions.is_empty() {
         bail!("--take-repo/--take-home n'ont pas de sens avec --no-config");
     }
-    if !o.skip_build {
+    // Une version installée arrive construite (pas de Cargo.toml) ; le clone se construit.
+    if !o.skip_build && repo.join("Cargo.toml").is_file() {
         build(repo)?;
     }
 
@@ -256,7 +269,7 @@ fn install_phase(env: &Env, repo: &Path, o: &Opts) -> Result<Phase> {
     let layout = if o.no_config {
         None
     } else {
-        config::load(repo, env)?
+        load_config(repo, env, o)?
     };
     let cfg_plan = match &layout {
         Some(l) => {

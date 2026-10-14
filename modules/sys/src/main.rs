@@ -14,13 +14,16 @@ mod provision;
 mod reload;
 mod setup;
 mod status;
+mod sync;
 mod units;
 mod util;
+mod versions;
 
-use anyhow::{bail, Context, Result};
+use anyhow::{bail, Result};
 use clap::{Parser, Subcommand};
 use poste_core::{Config, Env};
 use std::process::{Command, ExitCode};
+use versions::Fetcher;
 
 #[derive(Parser)]
 #[command(
@@ -68,7 +71,7 @@ enum Cmd {
     },
     /// Remet un fichier ordinaire à la place du lien (le dépôt garde son fichier)
     Forget { path: String },
-    /// git pull --ff-only (dépôt et dépôt de données), puis setup (aperçu compris), puis recharge l'île et Hyprland si besoin
+    /// Met à jour selon la source : dev, git pull du clone ; release, dernière version publiée (vérifiée). Puis git pull du dépôt de données, setup (aperçu compris), rechargement de l'île et de Hyprland si besoin
     Sync {
         #[arg(short, long)]
         yes: bool,
@@ -118,6 +121,17 @@ enum Cmd {
         #[command(subcommand)]
         action: Option<SkipCmd>,
     },
+    /// Bascule la machine : dev (le clone), release (la dernière version installée), ou une version (début du commit)
+    Use {
+        /// dev, release, ou le début du commit d'une version installée
+        target: String,
+        #[arg(short, long)]
+        yes: bool,
+        #[arg(short = 'n', long)]
+        dry_run: bool,
+    },
+    /// Source, racine (current) et versions installées
+    Versions,
     /// Affiche le chemin du dépôt (cd "$(poste sys cd)")
     Cd,
 }
@@ -195,7 +209,10 @@ fn run(cli: Cli) -> Result<ExitCode> {
             take_repo,
             take_home,
         } => {
-            let repo = util::repo(&env, &cfg)?;
+            let repo = versions::ensure_current(&env, &cfg, dry_run)?;
+            if !take_home.is_empty() {
+                versions::ensure_writable(&env, &repo, "--take-home")?;
+            }
             let done = setup::run(
                 &env,
                 &repo,
@@ -204,6 +221,7 @@ fn run(cli: Cli) -> Result<ExitCode> {
                     dry_run,
                     no_config,
                     skip_build: false,
+                    link_root: versions::link_root(&env, &repo),
                     take_repo,
                     take_home,
                 },
@@ -216,7 +234,7 @@ fn run(cli: Cli) -> Result<ExitCode> {
             Ok(done.code)
         }
         Cmd::Diff { path } => {
-            let repo = util::repo(&env, &cfg)?;
+            let repo = versions::root(&env, &cfg)?;
             let Some(layout) = config::load(&repo, &env)? else {
                 bail!("pas de dossier config/ dans le dépôt");
             };
@@ -224,12 +242,13 @@ fn run(cli: Cli) -> Result<ExitCode> {
             Ok(ExitCode::SUCCESS)
         }
         Cmd::Add { path, dry_run } => {
-            let repo = util::repo(&env, &cfg)?;
+            let repo = versions::root(&env, &cfg)?;
+            versions::ensure_writable(&env, &repo, "add")?;
             config::add(&env, &repo, &path, dry_run, &env.manifest_file())?;
             Ok(ExitCode::SUCCESS)
         }
         Cmd::Forget { path } => {
-            let repo = util::repo(&env, &cfg)?;
+            let repo = versions::root(&env, &cfg)?;
             let Some(layout) = config::load(&repo, &env)? else {
                 bail!("pas de dossier config/ dans le dépôt");
             };
@@ -237,78 +256,50 @@ fn run(cli: Cli) -> Result<ExitCode> {
             Ok(ExitCode::SUCCESS)
         }
         Cmd::Sync { yes, dry_run } => {
-            let repo = util::repo(&env, &cfg)?;
-            // Le dépôt, puis le dépôt de données de la machine s'il est déclaré.
-            let mut dirs = vec![repo.clone()];
-            if let Some(d) = cfg.data_path(&env) {
-                if !d.join(".git").exists() {
-                    bail!(
-                        "data = {} : pas un dépôt git (./setup --data <adresse> le clone)",
-                        d.display()
-                    );
-                }
-                dirs.push(d);
-            }
-            // Commit de chaque dépôt avant le pull, pour savoir quoi recharger ensuite.
-            let mut before = Vec::new();
-            for dir in &dirs {
-                if dry_run {
-                    println!(
-                        "Simulation : git pull --ff-only non lancé ({}).",
-                        dir.display()
-                    );
-                    continue;
-                }
-                before.push((dir.clone(), reload::head(dir)?));
-                let st = Command::new("git")
-                    .arg("-C")
-                    .arg(dir)
-                    .args(["pull", "--ff-only"])
-                    .status()
-                    .context("impossible de lancer git")?;
-                if !st.success() {
-                    bail!(
-                        "git pull --ff-only a échoué dans {}, setup non lancé",
-                        dir.display()
-                    );
-                }
-            }
-            let done = setup::run(
+            let done = sync::run(&env, &cfg, &Fetcher::from_env(), yes, dry_run)?;
+            reload::apply(&done.need, yes, dry_run, &setup::confirm)?;
+            Ok(done.code)
+        }
+        Cmd::Use {
+            target,
+            yes,
+            dry_run,
+        } => {
+            let done = versions::use_target(
                 &env,
-                &repo,
+                &cfg,
+                &versions::Target::parse(&target),
+                &Fetcher::from_env(),
                 &setup::Opts {
                     yes,
                     dry_run,
                     ..Default::default()
                 },
             )?;
-            let mut need = reload::Need {
-                shell: done.config_changed,
-                hypr: done.config_changed,
-            };
-            for (dir, from) in &before {
-                reload::add_changes(&mut need, dir, from, &reload::head(dir)?)?;
-            }
-            reload::apply(&need, yes, dry_run, &setup::confirm)?;
+            reload::apply(&done.need, yes, dry_run, &setup::confirm)?;
             Ok(done.code)
         }
+        Cmd::Versions => {
+            versions::list(&env, &cfg)?;
+            Ok(ExitCode::SUCCESS)
+        }
         Cmd::ImportChezmoi { source, dry_run } => {
-            let repo = util::repo(&env, &cfg)?;
+            let repo = util::clone(&env, &cfg)?;
             import::run(&env, &repo, source.as_deref(), dry_run)?;
             Ok(ExitCode::SUCCESS)
         }
         Cmd::Done { id, undo } => {
-            let repo = util::repo(&env, &cfg)?;
+            let repo = versions::root(&env, &cfg)?;
             provision::done(&env, &repo, id.as_deref(), undo)?;
             Ok(ExitCode::SUCCESS)
         }
         Cmd::Status => {
-            let repo = util::repo(&env, &cfg)?;
-            status::run(&env, &repo)?;
+            let repo = versions::root(&env, &cfg)?;
+            status::run(&env, &cfg, &repo)?;
             Ok(ExitCode::SUCCESS)
         }
         Cmd::Git { args } => {
-            let repo = util::repo(&env, &cfg)?;
+            let repo = util::clone(&env, &cfg)?;
             let mut cmd = Command::new("git");
             cmd.arg("-C").arg(&repo).args(args);
             #[cfg(unix)]
@@ -323,7 +314,7 @@ fn run(cli: Cli) -> Result<ExitCode> {
             }
         }
         Cmd::Local { action } => {
-            let repo = util::repo(&env, &cfg)?;
+            let repo = versions::root(&env, &cfg)?;
             match action.unwrap_or(LocalCmd::List) {
                 LocalCmd::List => machine::local_list(&env, &repo)?,
                 LocalCmd::Add { path } => machine::local_add(&env, &repo, &path)?,
@@ -332,7 +323,7 @@ fn run(cli: Cli) -> Result<ExitCode> {
             Ok(ExitCode::SUCCESS)
         }
         Cmd::Override { action } => {
-            let repo = util::repo(&env, &cfg)?;
+            let repo = versions::root(&env, &cfg)?;
             match action.unwrap_or(OverrideCmd::List) {
                 OverrideCmd::List => machine::override_list(&env, &repo)?,
                 OverrideCmd::Set { path, key, value } => {
@@ -343,7 +334,7 @@ fn run(cli: Cli) -> Result<ExitCode> {
             Ok(ExitCode::SUCCESS)
         }
         Cmd::Module { action } => {
-            let repo = util::repo(&env, &cfg)?;
+            let repo = versions::root(&env, &cfg)?;
             match action.unwrap_or(ModuleCmd::List) {
                 ModuleCmd::List => machine::module_list(&env, &repo)?,
                 ModuleCmd::Enable { name } => machine::module_set(&env, &repo, &name, true)?,
@@ -352,7 +343,7 @@ fn run(cli: Cli) -> Result<ExitCode> {
             Ok(ExitCode::SUCCESS)
         }
         Cmd::Skip { action } => {
-            let repo = util::repo(&env, &cfg)?;
+            let repo = versions::root(&env, &cfg)?;
             match action.unwrap_or(SkipCmd::List) {
                 SkipCmd::List => machine::skip_list(&env, &repo)?,
                 SkipCmd::Add { ids } => machine::skip_add(&env, &repo, &ids)?,
@@ -361,7 +352,7 @@ fn run(cli: Cli) -> Result<ExitCode> {
             Ok(ExitCode::SUCCESS)
         }
         Cmd::Cd => {
-            println!("{}", util::repo(&env, &cfg)?.display());
+            println!("{}", util::clone(&env, &cfg)?.display());
             Ok(ExitCode::SUCCESS)
         }
     }

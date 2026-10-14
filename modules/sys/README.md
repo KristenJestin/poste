@@ -1,12 +1,16 @@
 # poste sys
 
-Module de gestion du dépôt `poste`. Toujours installé. Le dépôt est repéré par la clé
-`repo` de `~/.config/poste/config.toml` (écrite par `./setup`).
+Module de gestion du dépôt `poste`. Toujours installé. Le clone du dépôt est repéré par la clé
+`repo` de `~/.config/poste/config.toml` (écrite par `./setup`) ; ce que `setup` pose se lit dans la
+racine `~/.local/share/poste/current`, qui désigne le clone (mode dev) ou une version installée
+(mode release) : voir « Versions et racine ».
 
 ## Commandes
 
 - `poste sys setup [--yes] [--dry-run] [--no-config] [--take-repo <chemin>]… [--take-home <chemin>]…` :
-  lance `cargo build --release` dans le dépôt, installe `~/.local/bin/poste` et, pour chaque
+  pose `current` s'il est absent (dev : vers le clone ; release : vers la version installée la plus
+  récente), lance `cargo build --release` si la racine est le clone (une version installée arrive
+  construite), installe `~/.local/bin/poste` et, pour chaque
   `modules/*/` contenant un `module.toml`, `~/.local/share/poste/modules/<nom>/`
   (`poste-<nom>`, `module.toml`, `island/`, `hypr/`, `bin/`), puis pose la config, les lignes de
   module et retire les orphelins (voir plus bas). Le programme d'un module est le binaire construit
@@ -15,7 +19,7 @@ Module de gestion du dépôt `poste`. Toujours installé. Le dépôt est repér�
   « machine » (voir plus bas).
 - `poste sys done [<id>] [--undo]` : marque une étape manuelle (ou système non vérifiable) faite ;
   sans id, les liste. État dans `~/.local/state/poste/done/<id>`.
-- `poste sys status` : branche, modifications non commitées, commits non poussés ; modules
+- `poste sys status` : source (dev ou release) et racine lue ; branche du clone, modifications non commitées, commits non poussés ; modules
   installés (empreinte installée / dépôt) ; fichiers posés manquants ou modifiés à la main ;
   config (liés, manquants, liens cassés, liens remplacés par un fichier ordinaire, conflits) ;
   lignes de module (en place, conflits) ; orphelins ;
@@ -26,15 +30,53 @@ Module de gestion du dépôt `poste`. Toujours installé. Le dépôt est repér�
   `config/.poste/ignore` (secrets : `.ssh/**`, `.claude/.credentials.json`, `**/.env*`, `.npmrc`…).
 - `poste sys forget <chemin>` : remet un fichier ordinaire à la place du lien ; le fichier reste
   dans le dépôt jusqu'à votre `git rm` et votre commit.
-- `poste sys sync [--yes] [--dry-run]` : `git pull --ff-only` dans le dépôt et dans le dépôt de données de la machine (`data`, voir le README racine), puis `setup` (aperçu compris). Ensuite, selon les fichiers changés par le pull ou posés par `setup`, `omarchy restart shell` (île : `config/.config/omarchy/`, `poste-island/`, `fontconfig/`, `island/` des modules) et `hyprctl reload` (`config/.config/hypr/`, `hypr/` et `module.toml` des modules), après confirmation sauf avec `--yes`. L'île n'est pas redémarrée si `gpu-screen-recorder` tourne (le message dit de le faire plus tard).
+- `poste sys sync [--yes] [--dry-run]` : en dev, `git pull --ff-only` dans le clone et `current` remis sur le clone ; en release, la dernière version publiée, téléchargée et vérifiée si elle n'est pas déjà installée, et `current` dessus (voir « Versions et racine »). Dans les deux modes, `git pull --ff-only` dans le dépôt de données de la machine (`data`, voir le README racine), puis `setup` (aperçu compris), puis l'élagage des anciennes versions (release). Ensuite, selon les fichiers changés par le pull, par le changement de version (les deux racines comparées) ou posés par `setup`, `omarchy restart shell` (île : `config/.config/omarchy/`, `poste-island/`, `fontconfig/`, `island/` des modules) et `hyprctl reload` (`config/.config/hypr/`, `hypr/` et `module.toml` des modules), après confirmation sauf avec `--yes`. L'île n'est pas redémarrée si `gpu-screen-recorder` tourne (le message dit de le faire plus tard).
 - `poste sys import-chezmoi [--source <dossier>] [--dry-run]` : voir « Import depuis chezmoi ».
 - `poste sys local [list|add <chemin>|remove <chemin>]` : fichiers de `config/` que CETTE machine garde
   à elle (voir « Réglages propres à la machine »).
 - `poste sys module [list|enable <nom>|disable <nom>]` : modules du dépôt non installés ici.
 - `poste sys skip [list|add <id>…|remove <id>…]` : paquets et étapes du bootstrap ignorés ici.
 - `poste sys override [list|set <chemin> <clé> <valeur>|unset <chemin> <clé>]` : surcharges JSON par machine.
-- `poste sys git <args…>` : `git -C <dépôt> <args…>`.
-- `poste sys cd` : affiche le chemin du dépôt (`cd "$(poste sys cd)"`).
+- `poste sys use dev|release|<commit>` `[--yes] [--dry-run]` : bascule la machine (voir « Versions et racine »).
+- `poste sys versions` : source, racine (`current`) et versions installées (`*` : celle en place).
+- `poste sys git <args…>` : `git -C <clone> <args…>`.
+- `poste sys cd` : affiche le chemin du clone (`cd "$(poste sys cd)"`).
+
+## Versions et racine
+
+- Racine : le lien `~/.local/share/poste/current`. `config/`, `modules/`, `bootstrap/` et les binaires
+  (`target/release/`) s'y lisent ; les liens de config de `~` visent `current/config/<chemin>`, si
+  bien que changer `current` change la config sans reposer les liens. Une version a la disposition
+  du dépôt plus un fichier `VERSION` (`commit=…`, `date=…`) et `ARCHIVE_SHA256` (somme de l'archive
+  d'où elle vient) ; elle n'a pas de `Cargo.toml`.
+- Clé `source` de `config.toml` : `dev` (défaut quand elle manque) ou `release`. Écrite seulement par
+  `poste sys use` (toml_edit, le reste du fichier est gardé), jamais par `setup` ; propre à la
+  machine (ignorée dans le `poste.toml` du dépôt de données).
+- `poste sys use dev` : `source = "dev"`, `current` vers le clone, `setup` (qui construit).
+  `poste sys use release` : `source = "release"`, `current` vers la version installée la plus
+  récente (téléchargée s'il n'y en a aucune), `setup`. `poste sys use <début de commit>` : une
+  version installée précise (retour arrière ; le prochain `sync` revient à la dernière). Ensuite,
+  comme `sync` : rechargement de l'île et de Hyprland selon les fichiers qui diffèrent entre
+  l'ancienne et la nouvelle racine (l'île est aussi redémarrée au passage dev / release, pour son
+  signe), après confirmation sauf `--yes`, jamais l'île pendant un enregistrement d'écran.
+  `--dry-run` montre la bascule et le rechargement prévu sans rien écrire ni lancer `setup`.
+- Téléchargement (`sync` en release, `use release` sans version installée) : `curl` lit d'abord
+  `poste-x86_64-linux.tar.gz.sha256` à l'adresse publiée (`POSTE_SYS_RELEASE_URL` la remplace, par
+  exemple pour un fork) ; si une version installée vient de la même archive, rien n'est téléchargé.
+  Sinon l'archive va dans `~/.cache/poste/download/`, sa somme est vérifiée AVANT l'extraction
+  (différente : refusée, rien n'est installé), puis elle est extraite par `tar` dans un dossier
+  temporaire de `versions/`, renommé en `versions/<commit>/`. `--dry-run` ne lit que la somme.
+- Élagage : après un `sync` en release, seules les 3 versions les plus récentes (date de
+  construction) restent, plus celle de `current` si elle est plus ancienne ; jamais celle de
+  `current`.
+- Lecture seule en release : `add` et `setup --take-home` écrivent dans le dépôt, ils sont refusés
+  tant que `current` désigne une version (passer en dev). `import-chezmoi`, `git` et `cd` travaillent
+  toujours sur le clone.
+- Migration d'une machine existante : un lien de `~` vers `config/<chemin>` d'une autre racine de
+  poste (le clone, une version, `current` lui-même) au lieu de `current/config/<chemin>` est
+  « à relier ». `setup` le repose vers `current` (ancien lien sauvegardé dans `backup/`) seulement s'il
+  est noté dans `installed.json` ; sinon c'est un conflit comme un autre lien étranger, jamais touché.
+- L'île montre un petit signe près de l'heure quand `current/VERSION` manque (le clone : mode dev).
 
 ## Règles de `setup`
 
@@ -170,8 +212,9 @@ line = "screencopy:custom_picker_binary = {modules}/record/bin/poste-share-picke
 
 `setup` et `status` repèrent ce que poste avait posé et dont la source a disparu :
 
-- un lien de `~` qui pointe vers `<dépôt>/config/…` dont la cible n'existe plus (fichier renommé ou
-  retiré du dépôt) : seuls les liens, jamais un fichier ordinaire, jamais un lien étranger ;
+- un lien de `~` qui pointe vers `config/…` d'une racine de poste (`current`, le clone, une version
+  installée, le dépôt de données) dont la cible n'existe plus (fichier renommé ou retiré du dépôt) :
+  seuls les liens, jamais un fichier ordinaire, jamais un lien étranger ;
 - un fichier de module noté dans `installed.json` que le dépôt ne produit plus (module supprimé, fichier
   renommé) et resté tel qu'installé (un fichier modifié à la main est gardé). Il est sauvegardé avant
   retrait, et les dossiers de module devenus vides sont retirés.
@@ -183,7 +226,9 @@ line = "screencopy:custom_picker_binary = {modules}/record/bin/poste-share-picke
 
 Le dossier `config/` du dépôt reflète `~` avec les vrais noms (`config/.config/hypr/bindings.lua`
 pour `~/.config/hypr/bindings.lua`), sans préfixes. `setup` pose chaque entrée en lien
-symbolique vers le dépôt : modifier le fichier de `~` modifie le dépôt.
+symbolique vers la racine (`current/config/…`) : en dev, modifier le fichier de `~` modifie le
+clone ; en release, la version installée est en lecture seule (à ne pas modifier : le prochain
+`sync` la remplace).
 
 - Un lien symbolique de `config/` est recréé tel quel (même cible) dans `~`.
 - Le bit exécutable est porté par git. Les droits restreints (0600, 0700) sont listés dans
@@ -202,6 +247,7 @@ symbolique vers le dépôt : modifier le fichier de `~` modifie le dépôt.
 | absente | crée le lien |
 | fichier ordinaire identique au dépôt | sauvegarde dans `backup/`, puis lien |
 | fichier ordinaire différent | CONFLIT : rien n'est fait ; `poste sys diff <chemin>` pour voir |
+| lien vers le même chemin dans une autre racine de poste (clone, version), noté dans `installed.json` | sauvegarde dans `backup/`, puis lien vers `current` |
 | lien vers ailleurs, dossier à la place d'un fichier ou l'inverse, parent qui n'est pas un dossier | CONFLIT |
 
 Les conflits n'empêchent pas le reste ; ils sont listés en fin d'aperçu et le code de sortie est 2.
