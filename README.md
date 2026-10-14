@@ -139,8 +139,7 @@ Tout ce que `poste sys setup` pose se lit dans une seule racine, le lien
 et les binaires viennent de `current/`. Deux sources possibles, clé `source` de `config.toml` :
 
 - `dev` (défaut, le fonctionnement d'avant) : `current` désigne le clone (`repo`), `setup` construit
-  avec cargo, `sync` fait `git pull`. L'île affiche un petit signe près de l'heure pour ne pas
-  l'oublier.
+  avec cargo, `sync` fait `git pull`. `poste sys versions` dit dans quel mode on est.
 - `release` : `current` désigne une version installée dans `~/.local/share/poste/versions/<commit>/`.
   Ni clone ni Rust nécessaires. `sync` lit la somme de contrôle publiée, télécharge la dernière
   archive si elle n'est pas déjà installée (`curl`), vérifie la somme avant d'extraire, fait pointer

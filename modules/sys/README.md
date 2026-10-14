@@ -57,8 +57,7 @@ racine `~/.local/share/poste/current`, qui désigne le clone (mode dev) ou une v
   récente (téléchargée s'il n'y en a aucune), `setup`. `poste sys use <début de commit>` : une
   version installée précise (retour arrière ; le prochain `sync` revient à la dernière). Ensuite,
   comme `sync` : rechargement de l'île et de Hyprland selon les fichiers qui diffèrent entre
-  l'ancienne et la nouvelle racine (l'île est aussi redémarrée au passage dev / release, pour son
-  signe), après confirmation sauf `--yes`, jamais l'île pendant un enregistrement d'écran.
+  l'ancienne et la nouvelle racine, après confirmation sauf `--yes`, jamais l'île pendant un enregistrement d'écran.
   `--dry-run` montre la bascule et le rechargement prévu sans rien écrire ni lancer `setup`.
 - Téléchargement (`sync` en release, `use release` sans version installée) : `curl` lit d'abord
   `poste-x86_64-linux.tar.gz.sha256` à l'adresse publiée (`POSTE_SYS_RELEASE_URL` la remplace, par
@@ -76,7 +75,6 @@ racine `~/.local/share/poste/current`, qui désigne le clone (mode dev) ou une v
   poste (le clone, une version, `current` lui-même) au lieu de `current/config/<chemin>` est
   « à relier ». `setup` le repose vers `current` (ancien lien sauvegardé dans `backup/`) seulement s'il
   est noté dans `installed.json` ; sinon c'est un conflit comme un autre lien étranger, jamais touché.
-- L'île montre un petit signe près de l'heure quand `current/VERSION` manque (le clone : mode dev).
 
 ## Règles de `setup`
 

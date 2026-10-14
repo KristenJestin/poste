@@ -104,10 +104,6 @@ pub fn run(env: &Env, cfg: &Config, f: &Fetcher, yes: bool, dry_run: bool) -> Re
     // Changement de racine (nouvelle version, ou passage au clone) : fichiers comparés.
     if let Some(o) = &old {
         versions::add_root_changes(&mut need, Some(o), &root)?;
-        // Passage du clone à une version (ou l'inverse) : l'île relit son signe du mode dev.
-        if versions::is_release(env, o) != versions::is_release(env, &root) {
-            need.shell = true;
-        }
     }
     opts.link_root = versions::link_root(env, &root);
     let done = setup::run(env, &root, &opts)?;
