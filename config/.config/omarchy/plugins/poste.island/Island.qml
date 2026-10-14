@@ -399,8 +399,11 @@ Item {
   function run(command) { if (command) Util.execDetached(command) }
 
   property var nativeWidgets: []
+  // Un widget rechargé à la même place (registre des plugins relu) remplace l'ancien.
   function registerNativeWidget(id, screenName, item) {
-    nativeWidgets = nativeWidgets.filter(function(w) { return w.item !== item }).concat([{ id: id, screen: screenName, item: item }])
+    nativeWidgets = nativeWidgets.filter(function(w) {
+      return w.item !== item && !(w.id === id && w.screen === screenName)
+    }).concat([{ id: id, screen: screenName, item: item }])
   }
   function unregisterNativeWidget(item) {
     nativeWidgets = nativeWidgets.filter(function(w) { return w.item !== item })
@@ -444,7 +447,10 @@ Item {
   // VPN (OmaProton): its panel keeps the Proton CLI state in a child Service
   // object, found once the widget is mounted. The tile shows once the CLI is
   // installed (or a tunnel is up), the lock only while connected.
-  property var vpnService: null
+  // Lu dans la liste des widgets montés plutôt que tenu à la main : quand l'écran du
+  // milieu change (écran débranché, écrans de Navette), le widget du nouvel écran peut
+  // se charger avant que l'ancien soit détruit ; la liaison suit dans tous les ordres.
+  readonly property var vpnService: findVpnService(nativeWidgetOn(vpnId, primaryScreenName))
   function findVpnService(item) {
     var kids = item && item.data ? item.data : []
     for (var i = 0; i < kids.length; i++) {
@@ -458,7 +464,7 @@ Item {
 
   // Tailscale (Omarchy's own widget): same idea, its Service child holds the
   // CLI state. The tile shows once tailscale is installed.
-  property var tsService: null
+  readonly property var tsService: findTsService(nativeWidgetOn(tsId, primaryScreenName))
   function findTsService(item) {
     var kids = item && item.data ? item.data : []
     for (var i = 0; i < kids.length; i++) {
@@ -1238,21 +1244,8 @@ Item {
                   if ("moduleName" in item) item.moduleName = modelData
                   if ("settings" in item) item.settings = root.barEntrySettings(modelData)
                   root.registerNativeWidget(modelData, String(screenScope.modelData.name), item)
-                  if (modelData === root.vpnId) root.vpnService = root.findVpnService(item)
-                  if (modelData === root.tsId) root.tsService = root.findTsService(item)
                 }
-                // Quand les écrans changent (écran débranché, écrans de Navette),
-                // l'écran du milieu change aussi : le widget du nouvel écran peut
-                // se charger avant que celui de l'ancien soit détruit. On ne vide
-                // donc le service que s'il venait de ce widget, et on reprend
-                // celui d'un widget restant.
-                Component.onDestruction: if (item) {
-                  root.unregisterNativeWidget(item)
-                  if (modelData === root.vpnId && root.vpnService === root.findVpnService(item))
-                    root.vpnService = root.findVpnService(root.nativeWidgetOn(root.vpnId, root.primaryScreenName))
-                  if (modelData === root.tsId && root.tsService === root.findTsService(item))
-                    root.tsService = root.findTsService(root.nativeWidgetOn(root.tsId, root.primaryScreenName))
-                }
+                Component.onDestruction: if (item) root.unregisterNativeWidget(item)
               }
             }
           }
