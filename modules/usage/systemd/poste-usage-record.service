@@ -1,0 +1,11 @@
+[Unit]
+Description=poste usage : relevé des quotas des agents IA (historique)
+Documentation=file://%h/Projects/poste/modules/usage/README.md
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/share/poste/modules/usage/poste-usage record
+# omarchy-agent-usage-update (Omarchy 4 : /usr/share/omarchy/bin) doit être trouvable hors session.
+Environment=PATH=%h/.local/share/omarchy/bin:/usr/share/omarchy/bin:%h/.local/bin:/usr/local/bin:/usr/bin
+Nice=19
+TimeoutStartSec=2min
