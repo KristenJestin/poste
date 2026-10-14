@@ -1,9 +1,10 @@
 # Archive d'une version de poste (binaires + config/ + bootstrap/ + fichiers des modules), que
 # `poste sys sync` installe sur les machines en mode release.
 # - sur une pull request : construite seulement (artefact), pour vérifier qu'elle se construit ;
-# - sur un push sur main : publiée dans la préversion `latest`, recréée à chaque fois sur le
-#   commit poussé (adresse fixe : .../releases/download/latest/<archive>), avec sa somme sha256.
+# - sur un push sur main : publiée dans la préversion `latest` (adresse fixe :
+#   .../releases/download/latest/<archive>), avec sa somme sha256.
 # Construite dans un conteneur Arch : la cible est Arch x86_64 (glibc et libmpv de la machine).
+# Les actions tierces sont épinglées sur un commit (la version est en commentaire).
 name: archive
 
 on:
@@ -11,8 +12,9 @@ on:
     branches: [main]
   pull_request:
 
+# Le travail de construction ne fait que lire : le droit d'écrire n'est donné qu'à la publication.
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: archive-${{ github.ref }}
@@ -24,14 +26,14 @@ jobs:
     container: archlinux:latest
     steps:
       - name: Paquets
-        run: pacman -Syu --noconfirm --needed base-devel git rust mpv github-cli
+        run: pacman -Syu --noconfirm --needed base-devel git rust mpv
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Dépôt sûr pour git (conteneur)
         run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
 
       - name: Construction
         run: cargo build --release --locked
@@ -39,20 +41,45 @@ jobs:
       - name: Archive
         run: .github/package.sh dist
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: poste-x86_64-linux
           path: dist/
 
-      - name: Publication (main seulement)
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+  # Publication : seulement sur main, avec le droit d'écrire, et sans rien construire ici (elle ne
+  # fait que reprendre l'artefact du travail précédent).
+  publish:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: archive
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: poste-x86_64-linux
+          path: dist/
+
+      # Jamais de moment sans préversion : on ne supprime plus `latest` pour la recréer. Si elle
+      # existe, ses fichiers sont remplacés (--clobber) puis son étiquette est déplacée sur le
+      # commit construit ; sinon (premier passage) elle est créée. Pendant le remplacement des
+      # fichiers (quelques secondes) un `sync` peut lire une somme qui ne correspond pas à
+      # l'archive : il refuse alors l'archive sans rien installer et réussit au passage suivant.
+      - name: Publication dans la préversion latest
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release delete latest --cleanup-tag --yes --repo "$GITHUB_REPOSITORY" || true
-          gh release create latest dist/* \
-            --repo "$GITHUB_REPOSITORY" \
-            --prerelease \
-            --target "$GITHUB_SHA" \
-            --title "latest" \
-            --notes "Dernière version construite depuis main ($GITHUB_SHA). Installée par \`poste sys sync\` en mode release."
+          notes="Dernière version construite depuis main ($GITHUB_SHA). Installée par \`poste sys sync\` en mode release."
+          if gh release view latest --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload latest dist/* --clobber --repo "$GITHUB_REPOSITORY"
+            gh api --method PATCH "repos/$GITHUB_REPOSITORY/git/refs/tags/latest" \
+              -f sha="$GITHUB_SHA" -F force=true
+            gh release edit latest --notes "$notes" --repo "$GITHUB_REPOSITORY"
+          else
+            gh release create latest dist/* \
+              --repo "$GITHUB_REPOSITORY" \
+              --prerelease \
+              --target "$GITHUB_SHA" \
+              --title "latest" \
+              --notes "$notes"
+          fi

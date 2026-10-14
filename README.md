@@ -161,8 +161,8 @@ pendant un enregistrement d'écran). Après un retour arrière, le prochain `syn
 dernière version.
 
 L'archive est construite par GitHub Actions (`.github/workflows/archive.yml`, conteneur Arch) à
-chaque push sur `main` et publiée dans la préversion `latest`, recréée à chaque fois : une adresse
-fixe, `…/releases/download/latest/poste-x86_64-linux.tar.gz`, et sa somme `….sha256`. Contenu
+chaque push sur `main` et publiée dans la préversion `latest` (ses fichiers remplacés, son étiquette déplacée, jamais
+supprimée) : une adresse fixe, `…/releases/download/latest/poste-x86_64-linux.tar.gz`, et sa somme `….sha256`. Contenu
 (`.github/package.sh`) : la disposition du dépôt, réduite à ce que `setup` lit : `config/`,
 `bootstrap/`, de chaque module `module.toml`, `island/`, `hypr/`, `bin/`, `systemd/` et son programme
 s'il est un script, les binaires dans `target/release/`, et `VERSION` (commit, date). Pas de paquet
