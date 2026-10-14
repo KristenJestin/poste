@@ -4,8 +4,8 @@ import Quickshell.Services.UPower
 // La batterie, pour l'activité de l'île (Island.qml : root.battery). Rien sur
 // un PC sans batterie (UPower ne voit pas de batterie de portable). Sinon,
 // à côté de l'île si elle est basse (sous 30 %, jaune ; sous 10 %, rouge), et
-// 6 s au débranchement, avec le profil d'alimentation en place (son icône dans
-// la bulle, son nom dans la carte). Toujours dans le centre de contrôle. Pour
+// 6 s au débranchement, avec l'icône du profil d'alimentation en place dans la
+// bulle. Toujours dans le centre de contrôle. Pour
 // tester ailleurs (« discharging 80 » joue le débranchement) :
 //   omarchy-shell poste.island batterySim "charging 75" | "low 15" | "critical 6" | "off"
 Item {
@@ -15,7 +15,6 @@ Item {
   property var profile: null
   // Sur batterie, le profil à montrer avec elle (vide sans power-profiles-daemon).
   readonly property string profileGlyph: !charging && profile && profile.present ? profile.glyph : ""
-  readonly property string profileLabel: !charging && profile && profile.present ? profile.label(profile.active) : ""
 
   // Simulation (commande batterySim).
   property bool simulated: false

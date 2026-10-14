@@ -6,8 +6,7 @@ import Quickshell.Widgets
 //     la progression qui fait le tour du bord ;
 //   IA : la question, où elle en est (ou le début de la réponse), Ouvrir et
 //     arrêter / désépingler ;
-//   batterie : la jauge, le pourcentage, le temps estimé et, sur batterie, le
-//     profil d'alimentation en place ;
+//   batterie : la jauge, le pourcentage et le temps estimé ;
 //   musique : pochette, titre, artiste, progression, précédent / lecture / suivant.
 Rectangle {
   id: card
@@ -23,7 +22,7 @@ Rectangle {
   // Source du bloc « batterie » : la batterie du portable ou un périphérique.
   readonly property var batSrc: kind === "device" && device
     ? { percent: device.percent, charging: device.charging, color: device.color, glyph: device.glyph, label: device.name }
-    : { percent: battery.percent, charging: battery.charging, color: battery.color, glyph: battery.glyph, label: [battery.timeText() || (battery.charging ? "Charging" : ""), battery.profileLabel].filter(function(t) { return t !== "" }).join("  ·  ") }
+    : { percent: battery.percent, charging: battery.charging, color: battery.color, glyph: battery.glyph, label: battery.timeText() || (battery.charging ? "Charging" : "") }
   readonly property bool hovered: hover.hovered
   signal openConversation(var conv)
   signal openPlayer()

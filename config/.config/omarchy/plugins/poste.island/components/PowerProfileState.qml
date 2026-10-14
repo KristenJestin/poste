@@ -32,7 +32,7 @@ Item {
     if (name === "performance") return "󰓅"
     return "󰊚"
   }
-  // Libellé court (centre de contrôle) et complet (OSD).
+  // Libellé court (tuile du centre de contrôle) et complet (OSD).
   function shortLabel(name) { return name === "power-saver" ? "Saver" : name === "performance" ? "Performance" : "Balanced" }
   function label(name) { return name === "power-saver" ? "Power saver" : name === "performance" ? "Performance" : "Balanced" }
   readonly property string glyph: glyphOf(active)
@@ -59,6 +59,12 @@ Item {
     setProc.running = true
   }
   Process { id: setProc }
+  // Le profil suivant de la machine (après le dernier, le premier).
+  function cycle() {
+    var list = shownProfiles
+    if (list.length === 0) return
+    set(list[(list.indexOf(active) + 1) % list.length])
+  }
 
   function refresh() { if (!listProc.running) listProc.running = true }
   Process {
