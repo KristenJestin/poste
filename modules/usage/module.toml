@@ -1,0 +1,16 @@
+name = "usage"
+description = "Quotas des agents IA (Claude Code, Codex…), leur historique, et la consommation relue dans les journaux des agents"
+commands = [
+  { name = "[agent]", description = "quotas d'un agent (claude par défaut), actualisés s'ils datent de plus de 5 min" },
+  { name = "--all", description = "quotas de tous les agents relevés" },
+  { name = "--refresh", description = "force un nouveau relevé avant d'afficher" },
+  { name = "--json", description = "l'enregistrement brut du collecteur (JSON)" },
+  { name = "history [agent] [--since <date>] [--json]", description = "historique des relevés (24 dernières heures par défaut)" },
+  { name = "calls [--since <date>] [--until <date>] [--agent claude|codex] [--json]", description = "un appel par ligne, doublons retirés : modèle, effort, sous-agent, tokens (entrée, cache lu/écrit, sortie, raisonnement)" },
+  { name = "windows [--since <date>] [--agent …] [--json]", description = "fenêtres de 5 h : pic, temps jusqu'au plafond, appels, sessions en parallèle, parts d'effort et de modèle, tokens par point" },
+  { name = "compare <début>..<fin> <début>..<fin> [--json]", description = "les indicateurs des fenêtres de deux périodes, côte à côte" },
+  { name = "record", description = "relève les quotas et ajoute à l'historique ce qui a changé (le minuteur, toutes les 5 min)" },
+]
+
+# Minuteur posé et activé par `poste sys setup` (son service poste-usage-record.service est à côté dans systemd/).
+units = ["poste-usage-record.timer"]

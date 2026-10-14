@@ -178,6 +178,10 @@ son dossier `systemd/` (copié avec le reste dans `~/.local/share/poste/modules/
   rechargée et redémarrée (`daemon-reload`, `try-restart`).
 - Module retiré, désactivé (`disabled`) ou unité retirée de `module.toml` : `systemctl --user disable
   --now` AVANT le retrait des fichiers, puis l'entrée est oubliée.
+- Minuteur : `units = ["poste-<nom>.timer"]`, et le service qu'il déclenche (`poste-<nom>.service`,
+  même nom) à côté dans `systemd/` sans être déclaré. `setup` lie d'abord le service
+  (`systemctl --user link`, pour que systemd le trouve), puis active le minuteur ; au retrait, il
+  désactive le minuteur puis délie le service. Un lien du service qui n'est pas à nous est un conflit.
 - Une unité du même nom que nous n'avons pas posée (fichier ordinaire, lien ailleurs) est un conflit (code 2),
   jamais touchée. `--dry-run` n'active rien (seules des lectures `is-enabled`).
 - Test : `POSTE_SYS_TEST_SYSTEMCTL` (RÉSERVÉE AUX TESTS) remplace `systemctl`.
