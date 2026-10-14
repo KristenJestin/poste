@@ -83,9 +83,10 @@ hl.config({ decoration = { dim_around = 0.55 } })
 o.window({ tag = "default-opacity" }, { opacity = "0.97 0.9" })
 
 -- Bandeau (poste.island/bandeau : notifications, OSD, texte dicté sous l'île, pastille de
--- dictée en bas) : fond plein,
--- sans flou ; ses apparitions sont animées dans l'île, pas par le compositeur.
-hl.layer_rule({ match = { namespace = "^poste-bandeau$" }, no_anim = true })
+-- dictée en bas) : verre sombre, flou des fenêtres réellement derrière (xray off), seulement
+-- sous les pièces (ignore_alpha > alpha de l'ombre 0.38, < alpha du verre 0.86). Ses
+-- apparitions sont animées dans l'île, pas par le compositeur.
+hl.layer_rule({ match = { namespace = "^poste-bandeau$" }, no_anim = true, blur = true, ignore_alpha = 0.45, xray = false })
 
 -- Menu Omarchy (SUPER+ALT+ESPACE) : voile sombre derrière.
 hl.layer_rule({ match = { namespace = "^omarchy-menu$" }, dim_around = true })

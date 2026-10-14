@@ -38,8 +38,11 @@ Singleton {
   id: root
 
   // ---------------------------------------------------------------- style
-  // Les couleurs de l'île (Island.qml : colorIsland, colorText, colorAccent).
-  readonly property color colorSurface: Qt.darker(Color.background, 1.9)
+  // Texte et accent de l'île (Island.qml : colorText, colorAccent). Le fond est un verre sombre :
+  // le fond du thème teinté de 6 % vers le texte, opaque à 86 %, flouté par Hyprland
+  // (looknfeel.lua) pour se détacher même d'une fenêtre noire.
+  readonly property color colorSurface: Qt.tint(Color.background, withAlpha(Color.foreground, 0.06))
+  readonly property real surfaceOpacity: 0.86
   readonly property color colorText: Qt.lighter(Color.foreground, 1.08)
   // Gris opaque (texte mêlé au fond) : texte secondaire, phrase dictée en cours.
   readonly property color colorMuted: mix(colorText, colorSurface, 0.5)
