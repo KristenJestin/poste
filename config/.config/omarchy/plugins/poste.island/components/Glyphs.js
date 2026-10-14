@@ -73,6 +73,7 @@ var icons = {
   "󰉍": "folder-open",               // F024D md-folder_download
   "󰉖": "folder-open",               // F0256 md-folder_outline
   "󰊗": "device-gamepad-2",          // F0297 md-gamepad_variant
+  "󰊚": "scale",                     // F029A md-gauge
   "󰊴": "device-gamepad-2",          // F02B4 md-google_controller
   "󰋋": "headphones",                // F02CB md-headphones
   "󰋎": "headset",                   // F02CE md-headset
@@ -80,6 +81,7 @@ var icons = {
   "󰋕": "heart",                     // F02D5 md-heart_outline
   "󰋩": "photo",                     // F02E9 md-image
   "󰌌": "keyboard",                  // F030C md-keyboard
+  "󰌪": "leaf",                      // F032A md-leaf
   "󰌾": "lock",                      // F033E md-lock
   "󰍂": "login",                     // F0342 md-login
   "󰍉": "search",                    // F0349 md-magnify

@@ -753,8 +753,16 @@ Item {
   readonly property var devices: devicesState
 
   // La batterie (activité de l'île, portables seulement) : BatteryState.qml.
-  BatteryState { id: batteryState }
+  BatteryState { id: batteryState; profile: powerProfileState }
   readonly property var battery: batteryState
+
+  // Le profil d'alimentation (centre de contrôle, activité de la batterie) :
+  // PowerProfileState.qml. Chaque changement, d'où qu'il vienne, passe en OSD dans le bandeau.
+  PowerProfileState {
+    id: powerProfileState
+    onSwitched: function(name) { Bandeau.showOsd(glyphOf(name), label(name), "", "100", "", "1600") }
+  }
+  readonly property var powerProfile: powerProfileState
 
   // La conversation avec l'IA, commune à tous les écrans (AskService.qml).
   AskService { id: aiService }
@@ -1168,6 +1176,14 @@ Item {
     // omarchy-shell poste.island batterySim "charging 75" | "low 15" | "critical 6" | "off" :
     // simule une batterie (pour voir son activité sur un PC qui n'en a pas).
     function batterySim(spec: string): string { return root.battery.simulate(spec) }
+    // omarchy-shell poste.island profileSim "power-saver" | "balanced" | "performance" | "off" :
+    // simule le profil d'alimentation (un choix dans le centre de contrôle ne change alors que
+    // la simulation). profile : le profil en place et ceux de la machine (JSON).
+    function profileSim(spec: string): string { return root.powerProfile.simulate(spec) }
+    function profile(): string {
+      return JSON.stringify({ active: root.powerProfile.present ? root.powerProfile.active : "",
+        profiles: root.powerProfile.shownProfiles, simulated: root.powerProfile.simulated })
+    }
     // omarchy-shell poste.island obs <Requête OBS> : ToggleRecord, StopRecord,
     // ToggleRecordPause, SaveReplayBuffer… (pour un raccourci clavier).
     function obs(kind: string): string { root.obs.request(kind || "ToggleRecord"); return "ok" }

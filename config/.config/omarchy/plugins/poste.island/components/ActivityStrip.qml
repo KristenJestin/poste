@@ -41,7 +41,7 @@ Item {
     if (p && String(p.trackTitle || "") !== "" && (host.mediaPlaying || musicLinger))
       out.push({ kind: "music", key: "music", rank: host.mediaPlaying ? 3.5 : 6.5, order: 0 })
     var b = host.battery
-    // Batterie : seulement basse (sous 30 %) ou juste après un branchement ;
+    // Batterie : seulement basse (sous 30 %) ou juste après un débranchement ;
     // sinon elle est dans le centre de contrôle.
     if (b && b.showing) out.push({ kind: "battery", key: "battery", rank: 0, order: 0 })
     // Périphériques sans fil sous 15 % (DevicesState.qml).
@@ -91,6 +91,7 @@ Item {
   function capsuleWidthOf(a) {
     var t = ""
     if (a.kind === "timer") t = a.timer.done ? "Done" : host.formatLeft(a.timer.duration)
+    else if (a.kind === "battery" && host.battery.profileGlyph !== "") t = "100 %   "
     else if (a.kind === "battery" || a.kind === "device") t = "100 %"
     else if (a.kind === "music") return 96
     else if (a.kind === "obs") return 120

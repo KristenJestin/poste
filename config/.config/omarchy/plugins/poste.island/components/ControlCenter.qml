@@ -265,15 +265,19 @@ Item {
     }
 
     // ---------------------------------------------------------------- battery
-    // Portables seulement (BatteryState.qml) : niveau, état, temps restant.
+    // Portables seulement (BatteryState.qml) : niveau, état, temps restant. Dessous, le
+    // profil d'alimentation (PowerProfileState.qml) dès que power-profiles-daemon est là,
+    // même sans batterie (PC fixe) : la section n'a alors que lui.
     Column {
       id: batterySection
       readonly property var bat: cc.host.battery
+      readonly property var pp: cc.host.powerProfile
       width: parent.width
       spacing: 8
-      visible: bat.present
+      visible: bat.present || pp.present
       Rectangle { width: parent.width; height: 1; color: cc.host.withAlpha(cc.host.colorText, 0.08) }
       Item {
+        visible: batterySection.bat.present
         width: parent.width
         height: 20
         Glyph {
@@ -306,6 +310,7 @@ Item {
         }
       }
       Rectangle {
+        visible: batterySection.bat.present
         width: parent.width
         height: 4
         radius: 2
@@ -316,6 +321,71 @@ Item {
           radius: 2
           color: batterySection.bat.charging || batterySection.bat.level !== "ok" ? batterySection.bat.color : cc.host.withAlpha(cc.host.colorText, 0.55)
           Behavior on width { NumberAnimation { duration: 400; easing.type: Easing.OutCubic } }
+        }
+      }
+      // Profil d'alimentation : un choix à trois (deux si la machine n'a pas « performance »),
+      // le profil en place à l'accent. Un clic le retient pour la source en cours (secteur ou
+      // batterie), comme le panneau d'Omarchy.
+      Item { visible: batterySection.pp.present && batterySection.bat.present; width: 1; height: 2 }
+      Rectangle {
+        id: profileChoice
+        visible: batterySection.pp.present
+        readonly property var names: batterySection.pp.shownProfiles
+        // Chaque segment a la largeur de son contenu, plus une part égale de la place restante
+        // (« Performance » est bien plus long que « Saver »).
+        FontMetrics { id: segMetrics; font.family: cc.host.uiFont; font.pixelSize: 12; font.weight: Font.DemiBold }
+        function contentWidth(name) { return 14 + 6 + Math.ceil(segMetrics.advanceWidth(batterySection.pp.shortLabel(name))) }
+        readonly property real spare: {
+          var used = 0
+          for (var i = 0; i < names.length; i++) used += contentWidth(names[i])
+          return Math.max(0, width - 4 - used) / Math.max(1, names.length)
+        }
+        width: parent.width
+        height: 32
+        radius: 16
+        color: cc.host.withAlpha(cc.host.colorText, 0.05)
+        Row {
+          anchors.fill: parent
+          anchors.margins: 2
+          Repeater {
+            model: profileChoice.names
+            delegate: Rectangle {
+              id: segment
+              required property var modelData
+              readonly property bool on: batterySection.pp.active === modelData
+              width: profileChoice.contentWidth(modelData) + profileChoice.spare
+              height: profileChoice.height - 4
+              radius: height / 2
+              color: on ? cc.host.colorAccent : segMouse.containsMouse ? cc.host.withAlpha(cc.host.colorText, 0.08) : "transparent"
+              Behavior on color { ColorAnimation { duration: 160 } }
+              Row {
+                anchors.centerIn: parent
+                spacing: 6
+                Glyph {
+                  anchors.verticalCenter: parent.verticalCenter
+                  glyph: batterySection.pp.glyphOf(segment.modelData)
+                  color: segment.on ? cc.host.colorAccentText : cc.host.colorText
+                  fontFamily: cc.host.fontFamily
+                  pixelSize: 14
+                }
+                Text {
+                  anchors.verticalCenter: parent.verticalCenter
+                  text: batterySection.pp.shortLabel(segment.modelData)
+                  color: segment.on ? cc.host.colorAccentText : cc.host.withAlpha(cc.host.colorText, 0.7)
+                  font.family: cc.host.uiFont
+                  font.pixelSize: 12
+                  font.weight: segment.on ? Font.DemiBold : Font.Normal
+                }
+              }
+              MouseArea {
+                id: segMouse
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: segment.on ? Qt.ArrowCursor : Qt.PointingHandCursor
+                onClicked: batterySection.pp.set(segment.modelData)
+              }
+            }
+          }
         }
       }
     }
