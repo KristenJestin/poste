@@ -51,6 +51,7 @@ commands = [{ name = "status", description = "état du dépôt" }]   # facultati
 | [`music`](modules/music/README.md) | client Navidrome : connexion, copie locale, recherche, lecture, favoris, playlists, mixes. |
 | [`record`](modules/record/README.md) | enregistrement d'écran (gpu-screen-recorder) piloté par l'île : préréglages, fenêtres, écrans, zone. |
 | [`vocaline`](modules/vocaline/README.md) | dictée Vocaline : SUPER+Z, pastille animée en bas de l'écran, texte dicté en direct sous l'île. |
+| [`usage`](modules/usage/README.md) | quotas des agents IA (Claude Code, Codex…) : pourcentages et remises à zéro, lus dans le collecteur d'Omarchy. |
 | [`power`](modules/power/README.md) | alertes batterie (faible, critique, branché mais ça se vide) et disque presque plein ; démon léger (portable). |
 
 Un module est une application à part, dans `modules/<nom>/`, avec son `README.md`,

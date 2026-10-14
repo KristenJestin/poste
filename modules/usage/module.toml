@@ -1,0 +1,8 @@
+name = "usage"
+description = "Quotas des agents IA (Claude Code, Codex…) : pourcentages et remises à zéro, lus dans le collecteur d'Omarchy"
+commands = [
+  { name = "[agent]", description = "quotas d'un agent (claude par défaut), actualisés s'ils datent de plus de 5 min" },
+  { name = "--all", description = "quotas de tous les agents relevés" },
+  { name = "--refresh", description = "force un nouveau relevé avant d'afficher" },
+  { name = "--json", description = "l'enregistrement brut du collecteur (JSON)" },
+]

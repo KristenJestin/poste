@@ -1,6 +1,6 @@
 ---
 name: poste-desktop
-description: Commandes du bureau de Kris (île poste.island : minuteurs, IA, verrouillage, sons, musique poste music, fenêtres Hyprland). À charger quand on veut agir sur le bureau ou l'île.
+description: Commandes du bureau de Kris (île poste.island : minuteurs, IA, verrouillage, sons, musique poste music, fenêtres Hyprland, quotas des agents IA avec poste usage). À charger quand on veut agir sur le bureau ou l'île, ou quand Kris demande son quota ou sa consommation (Claude Code, Codex).
 ---
 
 Lis `~/.config/poste-island/ai/AGENTS.md` : c'est le mémo à jour des commandes

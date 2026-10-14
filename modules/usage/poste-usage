@@ -1,0 +1,90 @@
+#!/bin/bash
+# poste usage : quotas des agents IA, lus dans les fichiers du collecteur d'Omarchy
+# (omarchy-agent-usage-update, ~/.local/state/omarchy/agents/usage/<agent>.json),
+# la même source que le centre de contrôle de l'île. Un relevé de plus de 5 minutes
+# est refait avant d'afficher (--limits-only : seulement les limites, rapide).
+
+set -euo pipefail
+
+DIR="${XDG_STATE_HOME:-$HOME/.local/state}/omarchy/agents/usage"
+MAX_AGE=300
+
+usage() {
+  cat <<'H'
+Usage : poste usage [agent] [--all] [--refresh] [--json]
+  agent      claude (défaut), codex… : un fichier par agent dans le collecteur d'Omarchy
+  --all      tous les agents relevés
+  --refresh  refait le relevé avant d'afficher
+  --json     l'enregistrement brut du collecteur
+H
+}
+
+agents=() all=0 refresh=0 json=0
+for a in "$@"; do
+  case "$a" in
+  -h | --help | help) usage; exit 0 ;;
+  --all) all=1 ;;
+  --refresh) refresh=1 ;;
+  --json) json=1 ;;
+  -*) echo "poste usage : option inconnue $a" >&2; usage >&2; exit 2 ;;
+  *) agents+=("$a") ;;
+  esac
+done
+
+command -v jq >/dev/null || { echo "poste usage : jq manquant" >&2; exit 1; }
+
+if ((all)); then
+  agents=()
+  for f in "$DIR"/*.json; do [[ -e $f ]] && agents+=("$(basename "$f" .json)"); done
+elif ((${#agents[@]} == 0)); then
+  agents=(claude)
+fi
+
+# Relevé : s'il manque, s'il est vieux, ou sur demande.
+stale=()
+now=$(date +%s)
+for a in "${agents[@]}"; do
+  f="$DIR/$a.json"
+  if ((refresh)) || [[ ! -e $f ]] || ((now - $(stat -c %Y "$f") > MAX_AGE)); then stale+=("$a"); fi
+done
+if ((${#stale[@]})); then
+  if command -v omarchy-agent-usage-update >/dev/null; then
+    omarchy-agent-usage-update --limits-only "${stale[@]}" >/dev/null 2>&1 || true
+  else
+    echo "poste usage : omarchy-agent-usage-update introuvable, relevé non actualisé" >&2
+  fi
+fi
+
+code=0
+for a in "${agents[@]}"; do
+  f="$DIR/$a.json"
+  if [[ ! -e $f ]]; then
+    echo "$a : aucun relevé (agent inconnu du collecteur d'Omarchy ?)" >&2
+    code=1
+    continue
+  fi
+  if ((json)); then
+    jq -c . "$f"
+    continue
+  fi
+  age=$(((now - $(stat -c %Y "$f")) / 60))
+  name=$(jq -r '.name // .title // .id' "$f")
+  echo "$name (relevé il y a ${age} min)"
+  status=$(jq -r '.usageStatusText // ""' "$f")
+  if [[ -n $status ]]; then
+    echo "  $status"
+    hint=$(jq -r '.authHelpText // ""' "$f")
+    [[ -n $hint ]] && echo "  $hint"
+    code=1
+    continue
+  fi
+  # Une ligne par limite : libellé, pourcentage, remise à zéro à l'heure locale.
+  jq -r '.limits[]? | [(.title // .label), ((.percent // 0) * 100 | round | tostring), (.resetsAt // "")] | @tsv' "$f" |
+    while IFS=$'\t' read -r label pct reset; do
+      when=""
+      # +1 s : une remise annoncée à 17:59:59 s'affiche 18:00.
+      [[ -n $reset ]] && when=", remise à zéro le $(date -d "@$(($(date -d "$reset" +%s) + 1))" '+%d/%m à %H:%M')"
+      printf '  %-20s %3s %%%s\n' "$label" "$pct" "$when"
+    done
+done
+exit $code

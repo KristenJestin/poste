@@ -36,6 +36,10 @@ Lecteur de fond (démon, MPRIS « Musique »), lu aussi par l'île. Les commande
 ## Fichiers
 - `flea --gui <dossier>` : gestionnaire de fichiers. `flea shelf add <chemin>` : ajoute à l'étagère (SUPER+D).
 
+## Quotas des agents IA
+- `poste usage` : quotas de Claude Code (session de 5 h, semaine), en pourcentage, avec l'heure de remise à zéro. `poste usage codex`, `poste usage --all`, `--refresh` pour refaire le relevé, `--json` pour le brut.
+- La source est le collecteur d'Omarchy (`~/.local/state/omarchy/agents/usage/<agent>.json`, la même que le centre de contrôle), jamais `~/.claude` : les journaux de Claude Code ne disent rien des quotas.
+
 ## Règles
 - Jamais de sudo : donner la commande à l'utilisateur.
 - Ne rien supprimer, écraser ni pousser sans demande claire.
