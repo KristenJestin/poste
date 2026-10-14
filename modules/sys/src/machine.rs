@@ -50,6 +50,30 @@ pub fn edit_list(file: &Path, key: &str, value: &str, add: bool) -> Result<bool>
     Ok(true)
 }
 
+/// Fixe la clé de premier niveau `key = "value"` (chaîne) sans toucher au reste du fichier.
+/// Renvoie `true` si le fichier a changé. Le fichier est créé au besoin ; écriture atomique.
+pub fn set_key(file: &Path, key: &str, value: &str) -> Result<bool> {
+    let text = match std::fs::read_to_string(file) {
+        Ok(t) => t,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => String::new(),
+        Err(e) => return Err(e).with_context(|| format!("lecture de {}", file.display())),
+    };
+    let mut doc: DocumentMut = text
+        .parse()
+        .with_context(|| format!("{} invalide", file.display()))?;
+    if doc.get(key).and_then(|i| i.as_str()) == Some(value) {
+        return Ok(false);
+    }
+    doc[key] = toml_edit::value(value);
+    if let Some(dir) = file.parent() {
+        std::fs::create_dir_all(dir)?;
+    }
+    let tmp = file.with_extension("toml.tmp");
+    std::fs::write(&tmp, doc.to_string())?;
+    std::fs::rename(&tmp, file)?;
+    Ok(true)
+}
+
 // ---------------------------------------------------------------- local
 
 /// `poste sys local` : liste les fichiers locaux.
@@ -490,6 +514,28 @@ mod tests {
         assert!(!edit_list(&f, "disabled", "record", false).unwrap());
         let c = Config::parse(&fs::read_to_string(&f).unwrap()).unwrap();
         assert_eq!(c.disabled, ["power"]);
+    }
+
+    #[test]
+    fn cle_source_ecrite_sans_toucher_au_reste() {
+        let d = tempfile::tempdir().unwrap();
+        let f = d.path().join("poste/config.toml");
+        fs::create_dir_all(f.parent().unwrap()).unwrap();
+        fs::write(
+            &f,
+            "# ma config\nrepo = \"/r\"\n\n[[override]]\npath = \".x\"\n",
+        )
+        .unwrap();
+        assert!(set_key(&f, "source", "release").unwrap());
+        assert!(!set_key(&f, "source", "release").unwrap());
+        let t = fs::read_to_string(&f).unwrap();
+        assert!(t.contains("# ma config") && t.contains("[[override]]"));
+        let c = Config::parse(&t).unwrap();
+        assert_eq!(c.source, poste_core::Source::Release);
+        assert_eq!(c.overrides.len(), 1);
+        assert!(set_key(&f, "source", "dev").unwrap());
+        let c = Config::parse(&fs::read_to_string(&f).unwrap()).unwrap();
+        assert_eq!(c.source, poste_core::Source::Dev);
     }
 
     #[test]

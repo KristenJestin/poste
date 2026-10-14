@@ -7,6 +7,6 @@ pub mod modules;
 pub mod notify;
 pub mod time;
 
-pub use config::Config;
+pub use config::{Config, Source};
 pub use env::Env;
 pub use modules::{Card, Module, Origin};

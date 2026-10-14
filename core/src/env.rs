@@ -70,6 +70,17 @@ impl Env {
         self.data_home.join("poste/modules")
     }
 
+    /// `$XDG_DATA_HOME/poste/versions` : une version installée par dossier (`<commit>/`).
+    pub fn versions_dir(&self) -> PathBuf {
+        self.data_home.join("poste/versions")
+    }
+
+    /// `$XDG_DATA_HOME/poste/current` : lien vers la racine dont tout est lu (une version
+    /// installée, ou le clone du dépôt en mode dev).
+    pub fn current_link(&self) -> PathBuf {
+        self.data_home.join("poste/current")
+    }
+
     /// `$XDG_CONFIG_HOME/poste/config.toml`.
     pub fn config_file(&self) -> PathBuf {
         self.config_home.join("poste/config.toml")
@@ -136,6 +147,14 @@ mod tests {
             PathBuf::from("/h/.local/state/poste/installed.json")
         );
         assert_eq!(e.cache_dir(), PathBuf::from("/h/.cache/poste"));
+        assert_eq!(
+            e.current_link(),
+            PathBuf::from("/h/.local/share/poste/current")
+        );
+        assert_eq!(
+            e.versions_dir(),
+            PathBuf::from("/h/.local/share/poste/versions")
+        );
         assert_eq!(e.bin_dir(), PathBuf::from("/h/.local/bin"));
     }
 

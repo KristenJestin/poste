@@ -339,6 +339,9 @@ pub enum State {
     Differs,
     /// Lien qui pointe ailleurs (`broken` : la cible n'existe pas).
     OtherLink { target: PathBuf, broken: bool },
+    /// Lien vers le même chemin dans une autre racine de poste (le clone, une version
+    /// installée) : l'ancienne forme, avant `current`. Remplacé si `installed.json` le connaît.
+    Moved { target: PathBuf },
     /// Mauvais type (dossier à la place d'un fichier, etc.).
     WrongType(&'static str),
     /// Un dossier parent n'est pas un dossier.
@@ -380,6 +383,25 @@ fn tree(dir: &Path) -> Result<BTreeMap<String, Node>> {
     let mut out = BTreeMap::new();
     walk(dir, dir, &mut out)?;
     Ok(out)
+}
+
+/// `target` est-il `config/<rel>` d'une racine de poste (le lien `current`, une version
+/// installée, le clone de la clé `repo`) ?
+pub fn is_poste_target(env: &Env, target: &Path, rel: &str) -> bool {
+    let tail = Path::new("config").join(rel);
+    if target == env.current_link().join(&tail) {
+        return true;
+    }
+    if let Ok(rest) = target.strip_prefix(env.versions_dir()) {
+        let mut c = rest.components();
+        if c.next().is_some() && c.as_path() == tail {
+            return true;
+        }
+    }
+    poste_core::Config::load(env)
+        .ok()
+        .and_then(|c| c.repo_path(env))
+        .is_some_and(|r| target == r.join(&tail))
 }
 
 fn same_target(a: &Path, b: &Path) -> bool {
@@ -437,6 +459,18 @@ pub fn state_of(e: &Entry, env: &Env) -> Result<State> {
     };
     if md.file_type().is_symlink() {
         let target = std::fs::read_link(&e.dest)?;
+        if target != e.src
+            && matches!(e.kind, Kind::File | Kind::Dir | Kind::Generated(_))
+            && is_poste_target(env, &target, &e.rel)
+        {
+            // L'ancienne forme d'un lien posé par poste : le fichier généré le remplace comme
+            // l'ancien lien vers le dépôt ; un lien est reposé vers `current`.
+            return Ok(if matches!(e.kind, Kind::Generated(_)) {
+                State::Identical
+            } else {
+                State::Moved { target }
+            });
+        }
         let ok = match &e.kind {
             Kind::Link(t) => *t == target,
             Kind::File | Kind::Dir => same_target(&target, &e.src),
@@ -653,6 +687,7 @@ pub fn plan(layout: &Layout, env: &Env, decisions: &HashMap<String, Decision>) -
         bail!("« {k} » n'est pas une entrée de config/");
     }
     let mut p = Plan::default();
+    let manifest = Manifest::load(&env.manifest_file())?;
     for e in &layout.entries {
         let state = state_of(e, env)?;
         let decision = decisions.get(&e.rel).copied();
@@ -676,6 +711,12 @@ pub fn plan(layout: &Layout, env: &Env, decisions: &HashMap<String, Decision>) -
                     p.warnings
                         .push(format!("{} : identique au dépôt, rien à trancher", e.rel));
                 }
+                Op::Replace
+            }
+            // Posé par poste (installed.json) : reposé vers la nouvelle racine, ancien sauvegardé.
+            (State::Moved { .. }, None)
+                if manifest.get(&e.dest).is_some_and(|m| m.module == MODULE) =>
+            {
                 Op::Replace
             }
             (State::ParentBlocked(_), Some(_)) => bail!(
@@ -709,6 +750,7 @@ pub fn describe(st: &State) -> String {
         State::Missing => "absent".into(),
         State::Identical => "fichier ordinaire identique".into(),
         State::Differs => "différent du dépôt".into(),
+        State::Moved { target } => format!("lien vers {} (ancienne racine)", target.display()),
         State::OtherLink { target, broken } => format!(
             "lien vers {}{}",
             target.display(),
@@ -742,6 +784,9 @@ pub fn print_plan(env: &Env, plan: &Plan) {
                 println!("  régénéré    {d}  (dépôt + surcharges de la machine, ancien sauvegardé)")
             }
             Op::Create => println!("  lien créé   {d}{kind}"),
+            Op::Replace if matches!(s.state, State::Moved { .. }) => {
+                println!("  relié       {d}{kind}  (lien vers l'ancienne racine, reposé vers current, ancien sauvegardé)")
+            }
             Op::Replace => {
                 println!("  remplacé    {d}{kind}  (identique au dépôt, ancien sauvegardé)")
             }
@@ -1447,6 +1492,13 @@ pub fn print_status(layout: &Layout, env: &Env, manifest: &Manifest) -> Result<(
                 broken += 1;
                 lines.push(format!(
                     "  lien cassé   {d}  -> {}  (poste sys setup --take-repo {rel})",
+                    target.display()
+                ));
+            }
+            State::Moved { target } if tracked(&s.entry) => {
+                missing += 1;
+                lines.push(format!(
+                    "  à relier     {d}  -> {}  (ancienne racine : poste sys setup le repose vers current)",
                     target.display()
                 ));
             }

@@ -205,7 +205,8 @@ fn install_phase(env: &Env, repo: &Path, o: &Opts) -> Result<Phase> {
     if o.no_config && !decisions.is_empty() {
         bail!("--take-repo/--take-home n'ont pas de sens avec --no-config");
     }
-    if !o.skip_build {
+    // Une version installée arrive construite (pas de Cargo.toml) ; le clone se construit.
+    if !o.skip_build && repo.join("Cargo.toml").is_file() {
         build(repo)?;
     }
 

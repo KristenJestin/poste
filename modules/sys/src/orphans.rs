@@ -1,7 +1,8 @@
 //! Orphelins : ce que poste a posé et dont la source n'existe plus.
 //!
 //! - un lien de `~` qui pointe vers `<dépôt>/config/…` et dont la cible a disparu (fichier
-//!   renommé ou retiré du dépôt) ;
+//!   renommé ou retiré du dépôt) ; les racines de poste comptent toutes : `current`, le clone,
+//!   les versions installées, le dépôt de données ;
 //! - un fichier de module (`~/.local/share/poste/modules/…`) noté dans `installed.json`, que le
 //!   dépôt ne produit plus (module supprimé, fichier renommé) et qui est resté tel qu'installé ;
 //!   s'il a déjà disparu de `~`, il n'y a rien à retirer : son entrée sort du manifeste.
@@ -60,7 +61,14 @@ pub fn find(
     manifest: &Manifest,
     items: &[Item],
 ) -> Result<Vec<Orphan>> {
-    let mut roots = vec![repo.join("config")];
+    let mut roots = vec![
+        repo.join("config"),
+        env.current_link().join("config"),
+        env.versions_dir(),
+    ];
+    if let Some(c) = poste_core::Config::load(env)?.repo_path(env) {
+        roots.push(c.join("config"));
+    }
     if let Some(d) = layout.and_then(|l| l.data_root.clone()) {
         roots.push(d);
     }
@@ -178,18 +186,21 @@ pub fn print(env: &Env, orphans: &[Orphan]) {
 /// Un fichier de module est d'abord sauvegardé ; ses dossiers devenus vides sont retirés.
 pub fn apply(
     env: &Env,
-    repo: &Path,
+    _repo: &Path,
     orphans: &[Orphan],
     stamp: &str,
     manifest: &mut Manifest,
 ) -> Result<usize> {
-    let config_root = repo.join("config");
     let mut n = 0;
     for o in orphans {
         match &o.kind {
-            Kind::Link { .. } => {
-                // Le lien doit toujours pointer vers une cible disparue du dépôt.
-                if dangling_config_link(&o.path, &config_root).is_none() {
+            Kind::Link { target } => {
+                // Le lien doit toujours pointer vers la même cible, toujours disparue.
+                let still = std::fs::symlink_metadata(&o.path)
+                    .is_ok_and(|m| m.file_type().is_symlink())
+                    && link_target(&o.path).as_ref() == Some(target)
+                    && std::fs::symlink_metadata(target).is_err();
+                if !still {
                     continue;
                 }
                 std::fs::remove_file(&o.path)?;

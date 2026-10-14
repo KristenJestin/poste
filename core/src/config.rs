@@ -15,6 +15,10 @@ pub struct Config {
     /// Emplacement du dépôt poste (écrit par `./setup`).
     #[serde(default)]
     pub repo: Option<String>,
+    /// D'où cette machine fait tourner poste : une version installée (`release`) ou le clone
+    /// du dépôt (`dev`, défaut). Écrit par `poste sys use`, propre à la machine.
+    #[serde(default)]
+    pub source: Source,
     /// Dépôt des données de cette machine (`poste-data`, privé) : ses fichiers `config/` et ses
     /// étapes `bootstrap/` se posent par-dessus ceux du dépôt, et son `poste.toml` complète
     /// cette config (écrit par `./setup --data`).
@@ -37,6 +41,26 @@ pub struct Config {
     /// Surcharges JSON propres à cette machine (`[[override]]`).
     #[serde(default, rename = "override")]
     pub overrides: Vec<Override>,
+}
+
+/// Source de poste sur la machine (clé `source`).
+#[derive(Debug, Default, Clone, Copy, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum Source {
+    /// Une version installée par `poste sys sync` (`~/.local/share/poste/versions/`).
+    Release,
+    /// Le clone du dépôt (clé `repo`) : fonctionnement d'avant les versions.
+    #[default]
+    Dev,
+}
+
+impl Source {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Source::Release => "release",
+            Source::Dev => "dev",
+        }
+    }
 }
 
 /// `[[override]]` : un fichier JSON de `config/` qui n'est pas lié mais généré (contenu du dépôt
@@ -76,7 +100,7 @@ impl Config {
         }
     }
 
-    /// Ajoute les réglages du dépôt de données ; `repo` et `data` restent ceux de la machine.
+    /// Ajoute les réglages du dépôt de données ; `repo`, `data` et `source` restent ceux de la machine.
     fn merge(&mut self, more: Self) {
         fn extend(a: &mut Vec<String>, b: Vec<String>) {
             for v in b {
@@ -190,6 +214,16 @@ mod tests {
         assert_eq!(c.repo.as_deref(), Some("~/poste"));
         assert_eq!(c.disabled, ["power", "record"]);
         assert_eq!(c.local, [".x"]);
+    }
+
+    #[test]
+    fn source() {
+        assert_eq!(Config::parse("").unwrap().source, Source::Dev);
+        assert_eq!(
+            Config::parse("source = \"release\"\n").unwrap().source,
+            Source::Release
+        );
+        assert!(Config::parse("source = \"autre\"\n").is_err());
     }
 
     #[test]
