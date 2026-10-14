@@ -39,6 +39,11 @@ Lecteur de fond (démon, MPRIS « Musique »), lu aussi par l'île. Les commande
 ## Quotas des agents IA
 - `poste usage` : quotas de Claude Code (session de 5 h, semaine), en pourcentage, avec l'heure de remise à zéro. `poste usage codex`, `poste usage --all`, `--refresh` pour refaire le relevé, `--json` pour le brut.
 - La source est le collecteur d'Omarchy (`~/.local/state/omarchy/agents/usage/<agent>.json`, la même que le centre de contrôle), jamais `~/.claude` : les journaux de Claude Code ne disent rien des quotas.
+- Toute question de consommation (pourquoi le quota de 5 h part plus vite, quel modèle ou quel effort coûte, sous-agents, sessions en parallèle) : ces commandes, jamais une relecture à la main des journaux (doublons, sous-agents, raisonnement : déjà traités). Toutes ont `--json` (lisible avec `jq`) et `--agent claude|codex` ; dates : ISO ou ce que comprend `date -d`.
+  - `poste usage history [--since "3 days ago"]` : l'historique des quotas (relevé toutes les 5 min, une ligne quand ça change).
+  - `poste usage calls --since … [--until …]` : un appel par ligne, doublons retirés (modèle, effort, sous-agent, tokens d'entrée, de cache lu et écrit, de sortie, de raisonnement).
+  - `poste usage windows [--since …]` : chaque fenêtre de 5 h (pic, temps jusqu'au plafond, appels, sessions en parallèle, part de chaque effort et modèle, tokens par point de quota) ; `estimated` : fenêtre devinée d'après les appels, sans relevé.
+  - `poste usage compare "14 days ago..7 days ago" "7 days ago.."` : les mêmes indicateurs pour deux périodes, côte à côte.
 
 ## Règles
 - Jamais de sudo : donner la commande à l'utilisateur.
