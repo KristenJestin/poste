@@ -68,19 +68,6 @@ Item {
   function withAlpha(c, a) { return Qt.rgba(c.r, c.g, c.b, a) }
   function luminance(c) { return 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b }
 
-  // ---------------------------------------------------------------- source
-  // Mode dev (`poste sys use dev`) : poste tourne depuis le clone du dépôt. Une version installée
-  // a un fichier VERSION à sa racine (~/.local/share/poste/current) ; le clone n'en a pas. Un
-  // petit signe près de l'heure le rappelle (IslandWindow).
-  readonly property string dataHome: Quickshell.env("XDG_DATA_HOME") || (home + "/.local/share")
-  property bool devMode: false
-  FileView {
-    path: root.dataHome + "/poste/current/VERSION"
-    printErrors: false
-    onLoaded: root.devMode = false
-    onLoadFailed: root.devMode = true
-  }
-
   // ---------------------------------------------------------------- clock
   SystemClock { id: clock; precision: SystemClock.Minutes }
   readonly property var clockDate: clock.date

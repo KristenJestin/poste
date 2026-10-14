@@ -566,10 +566,6 @@ pub fn switch(env: &Env, source: Source, dir: &Path, o: &setup::Opts) -> Result<
     let old = current_target(env);
     let mut need = Need::default();
     add_root_changes(&mut need, old.as_deref(), dir)?;
-    // L'île montre le mode dev (pas de VERSION à la racine) : elle relit au redémarrage.
-    if old.as_deref().map(|p| is_release(env, p)) != Some(is_release(env, dir)) {
-        need.shell = true;
-    }
     if o.dry_run {
         println!(
             "Simulation : source = \"{}\" et {} -> {} non écrits, setup non lancé.",
