@@ -103,11 +103,13 @@ pub fn desired(repo: &Path, env: &Env) -> Result<Vec<Item>> {
         let base = env.modules_dir().join(&m.name);
         let prog = format!("poste-{}", m.name);
         // Module en Rust (Cargo.toml) : binaire construit. Module-script (python, shell…) :
-        // le programme `poste-<nom>` du dossier du module, copié tel quel.
-        let src = if m.dir.join("Cargo.toml").is_file() {
+        // le programme `poste-<nom>` du dossier du module, copié tel quel. Une version
+        // installée n'a plus de Cargo.toml : un module sans script y est un binaire construit.
+        let script = m.dir.join(&prog);
+        let src = if m.dir.join("Cargo.toml").is_file() || !script.is_file() {
             release.join(&prog)
         } else {
-            m.dir.join(&prog)
+            script
         };
         items.push(Item {
             module: m.name.clone(),
@@ -249,6 +251,44 @@ mod tests {
         assert!(dests.contains(&"~/.local/share/poste/modules/foo/island/sub/x.qml".to_string()));
         assert!(dests.contains(&"~/.local/share/poste/modules/foo/hypr/foo.conf".to_string()));
         assert_eq!(items.len(), 5);
+    }
+
+    #[test]
+    fn binaire_ou_script_selon_le_module() {
+        let d = tempfile::tempdir().unwrap();
+        let repo = d.path().join("repo");
+        // Module en Rust dans le clone, module-script, et module en Rust d'une version
+        // installée (l'archive n'a pas son Cargo.toml).
+        for (name, file) in [
+            ("crate", Some("Cargo.toml")),
+            ("script", Some("poste-script")),
+            ("installed", None),
+        ] {
+            let m = repo.join("modules").join(name);
+            fs::create_dir_all(&m).unwrap();
+            fs::write(m.join("module.toml"), format!("name = \"{name}\"\n")).unwrap();
+            if let Some(f) = file {
+                fs::write(m.join(f), "").unwrap();
+            }
+        }
+        let env = Env::with_home(d.path().join("home"));
+        let items = desired(&repo, &env).unwrap();
+        let src = |prog: &str| {
+            items
+                .iter()
+                .find(|i| i.dest.ends_with(prog))
+                .map(|i| i.src.strip_prefix(&repo).unwrap().to_path_buf())
+                .unwrap()
+        };
+        assert_eq!(src("poste-crate"), Path::new("target/release/poste-crate"));
+        assert_eq!(
+            src("poste-script"),
+            Path::new("modules/script/poste-script")
+        );
+        assert_eq!(
+            src("poste-installed"),
+            Path::new("target/release/poste-installed")
+        );
     }
 
     #[test]
