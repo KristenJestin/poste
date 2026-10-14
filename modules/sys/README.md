@@ -26,7 +26,7 @@ Module de gestion du dépôt `poste`. Toujours installé. Le dépôt est repér�
   `config/.poste/ignore` (secrets : `.ssh/**`, `.claude/.credentials.json`, `**/.env*`, `.npmrc`…).
 - `poste sys forget <chemin>` : remet un fichier ordinaire à la place du lien ; le fichier reste
   dans le dépôt jusqu'à votre `git rm` et votre commit.
-- `poste sys sync [--yes] [--dry-run]` : `git pull --ff-only` dans le dépôt et dans le dépôt de données de la machine (`data`, voir le README racine), puis `setup` (aperçu compris).
+- `poste sys sync [--yes] [--dry-run]` : `git pull --ff-only` dans le dépôt et dans le dépôt de données de la machine (`data`, voir le README racine), puis `setup` (aperçu compris). Ensuite, selon les fichiers changés par le pull ou posés par `setup`, `omarchy restart shell` (île : `config/.config/omarchy/`, `poste-island/`, `fontconfig/`, `island/` des modules) et `hyprctl reload` (`config/.config/hypr/`, `hypr/` et `module.toml` des modules), après confirmation sauf avec `--yes`. L'île n'est pas redémarrée si `gpu-screen-recorder` tourne (le message dit de le faire plus tard).
 - `poste sys import-chezmoi [--source <dossier>] [--dry-run]` : voir « Import depuis chezmoi ».
 - `poste sys local [list|add <chemin>|remove <chemin>]` : fichiers de `config/` que CETTE machine garde
   à elle (voir « Réglages propres à la machine »).

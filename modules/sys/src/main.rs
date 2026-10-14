@@ -11,6 +11,7 @@ mod orphans;
 mod overrides;
 mod plan;
 mod provision;
+mod reload;
 mod setup;
 mod status;
 mod units;
@@ -67,7 +68,7 @@ enum Cmd {
     },
     /// Remet un fichier ordinaire à la place du lien (le dépôt garde son fichier)
     Forget { path: String },
-    /// git pull --ff-only (dépôt et dépôt de données), puis setup (aperçu compris)
+    /// git pull --ff-only (dépôt et dépôt de données), puis setup (aperçu compris), puis recharge l'île et Hyprland si besoin
     Sync {
         #[arg(short, long)]
         yes: bool,
@@ -195,7 +196,7 @@ fn run(cli: Cli) -> Result<ExitCode> {
             take_home,
         } => {
             let repo = util::repo(&env, &cfg)?;
-            setup::run(
+            let done = setup::run(
                 &env,
                 &repo,
                 &setup::Opts {
@@ -206,7 +207,13 @@ fn run(cli: Cli) -> Result<ExitCode> {
                     take_repo,
                     take_home,
                 },
-            )
+            )?;
+            if done.config_changed {
+                println!(
+                    "\nConfig modifiée : pour la recharger, lancez vous-même `omarchy restart shell` et `hyprctl reload`."
+                );
+            }
+            Ok(done.code)
         }
         Cmd::Diff { path } => {
             let repo = util::repo(&env, &cfg)?;
@@ -242,6 +249,8 @@ fn run(cli: Cli) -> Result<ExitCode> {
                 }
                 dirs.push(d);
             }
+            // Commit de chaque dépôt avant le pull, pour savoir quoi recharger ensuite.
+            let mut before = Vec::new();
             for dir in &dirs {
                 if dry_run {
                     println!(
@@ -250,6 +259,7 @@ fn run(cli: Cli) -> Result<ExitCode> {
                     );
                     continue;
                 }
+                before.push((dir.clone(), reload::head(dir)?));
                 let st = Command::new("git")
                     .arg("-C")
                     .arg(dir)
@@ -263,7 +273,7 @@ fn run(cli: Cli) -> Result<ExitCode> {
                     );
                 }
             }
-            setup::run(
+            let done = setup::run(
                 &env,
                 &repo,
                 &setup::Opts {
@@ -271,7 +281,16 @@ fn run(cli: Cli) -> Result<ExitCode> {
                     dry_run,
                     ..Default::default()
                 },
-            )
+            )?;
+            let mut need = reload::Need {
+                shell: done.config_changed,
+                hypr: done.config_changed,
+            };
+            for (dir, from) in &before {
+                reload::add_changes(&mut need, dir, from, &reload::head(dir)?)?;
+            }
+            reload::apply(&need, yes, dry_run, &setup::confirm)?;
+            Ok(done.code)
         }
         Cmd::ImportChezmoi { source, dry_run } => {
             let repo = util::repo(&env, &cfg)?;

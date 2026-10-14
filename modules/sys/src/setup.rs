@@ -52,10 +52,19 @@ struct Phase {
     changed_modules: std::collections::HashSet<String>,
 }
 
-pub fn run(env: &Env, repo: &Path, o: &Opts) -> Result<ExitCode> {
+/// Ce que `run` a fait : code de sortie, et si la config posée a changé (île et Hyprland à recharger).
+pub struct Outcome {
+    pub code: ExitCode,
+    pub config_changed: bool,
+}
+
+pub fn run(env: &Env, repo: &Path, o: &Opts) -> Result<Outcome> {
     let ph = install_phase(env, repo, o)?;
     if !ph.proceed || o.no_config {
-        return Ok(ph.code);
+        return Ok(Outcome {
+            code: ph.code,
+            config_changed: false,
+        });
     }
     let extras = extras_phase(env, repo, o, &ph.changed_modules)?;
     println!("\n== Machine (bootstrap/) ==");
@@ -91,12 +100,10 @@ pub fn run(env: &Env, repo: &Path, o: &Opts) -> Result<ExitCode> {
         );
         code = ExitCode::from(1);
     }
-    if (ph.config_changed || extras.changed) && !o.dry_run {
-        println!(
-            "\nConfig modifiée : pour la recharger, lancez vous-même `omarchy restart shell` et `hyprctl reload`."
-        );
-    }
-    Ok(code)
+    Ok(Outcome {
+        code,
+        config_changed: (ph.config_changed || extras.changed) && !o.dry_run,
+    })
 }
 
 /// Résultat de la phase « lignes de module et orphelins ».
@@ -414,7 +421,7 @@ fn label_short(a: &Action) -> &'static str {
     }
 }
 
-fn confirm(prompt: &str) -> Result<bool> {
+pub(crate) fn confirm(prompt: &str) -> Result<bool> {
     print!("{prompt}");
     std::io::stdout().flush()?;
     let mut line = String::new();
@@ -454,6 +461,11 @@ mod tests {
     use super::*;
     use std::fs;
     use std::path::PathBuf;
+
+    /// Les tests ne regardent que le code de sortie.
+    fn run(env: &Env, repo: &Path, o: &Opts) -> Result<ExitCode> {
+        super::run(env, repo, o).map(|d| d.code)
+    }
 
     /// Faux dépôt (avec un « binaire » déjà construit) et HOME temporaire.
     fn fixture() -> (tempfile::TempDir, PathBuf, Env) {

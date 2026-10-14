@@ -182,7 +182,7 @@ poste-data/
 - Les chemins relatifs de ses étapes (`line`, `source`, `patch`) partent de son `bootstrap/` ;
   `@DATA@` vaut son dossier.
 - Un fichier sous un dossier lié d'un bloc par poste (`link-dirs`) est refusé.
-- `poste sys sync` fait `git pull --ff-only` dans les deux dépôts, puis `setup`.
+- `poste sys sync` fait `git pull --ff-only` dans les deux dépôts, puis `setup`, puis recharge l'île et Hyprland si le pull les a touchés.
 - Le lanceur de l'île lit en plus `~/.config/poste-island/launcher/machine.json` (même format que
   `launcher.json`) : les entrées propres à la machine y vont, posées par `poste-data`.
 - `repo` et `data` restent dans `config.toml`, jamais dans `poste.toml`.
