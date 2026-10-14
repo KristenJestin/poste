@@ -221,6 +221,7 @@ fn run(cli: Cli) -> Result<ExitCode> {
                     dry_run,
                     no_config,
                     skip_build: false,
+                    link_root: versions::link_root(&env, &repo),
                     take_repo,
                     take_home,
                 },

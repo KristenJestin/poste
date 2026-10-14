@@ -65,7 +65,7 @@ fn data_repo(env: &Env, cfg: &Config) -> Result<Option<PathBuf>> {
 }
 
 pub fn run(env: &Env, cfg: &Config, f: &Fetcher, yes: bool, dry_run: bool) -> Result<Synced> {
-    let opts = setup::Opts {
+    let mut opts = setup::Opts {
         yes,
         dry_run,
         ..Default::default()
@@ -109,6 +109,7 @@ pub fn run(env: &Env, cfg: &Config, f: &Fetcher, yes: bool, dry_run: bool) -> Re
             need.shell = true;
         }
     }
+    opts.link_root = versions::link_root(env, &root);
     let done = setup::run(env, &root, &opts)?;
     if done.config_changed {
         need.shell = true;
@@ -215,14 +216,33 @@ mod tests {
         fs::remove_file(&perso).unwrap();
         fs::write(&perso, "maison").unwrap();
 
-        // Aperçu : rien n'est écrit, ni current ni liens.
+        // Aperçu : le plan montre la vraie migration (lien noté reposé vers current, lien posé
+        // à la main laissé), et rien n'est écrit, ni current ni liens ni manifeste.
         let c = cfg(&m.env);
+        let manifest_before = fs::read_to_string(m.env.manifest_file()).unwrap();
         let root = versions::ensure_current(&m.env, &c, true).unwrap();
+        let link_root = versions::link_root(&m.env, &root);
+        assert_eq!(link_root, Some(m.env.current_link()));
+        let mut layout = crate::config::load(&root, &m.env).unwrap().unwrap();
+        layout.relink(&m.env.current_link());
+        let plan = crate::config::plan(&layout, &m.env, &Default::default()).unwrap();
+        let op = |rel: &str| {
+            plan.steps
+                .iter()
+                .find(|s| s.entry.rel == rel)
+                .unwrap()
+                .op
+                .clone()
+        };
+        assert_eq!(op(".config/a/neuf"), crate::config::Op::Replace);
+        assert_eq!(op(".config/a/autre"), crate::config::Op::Done);
+        assert_eq!(op(".config/a/perso"), crate::config::Op::Conflict);
         crate::setup::run(
             &m.env,
             &root,
             &setup::Opts {
                 dry_run: true,
+                link_root,
                 ..opts()
             },
         )
@@ -232,6 +252,11 @@ mod tests {
             fs::read_link(home.join(".config/a/neuf")).unwrap(),
             m.repo.join("config/.config/a/neuf")
         );
+        assert_eq!(
+            fs::read_to_string(m.env.manifest_file()).unwrap(),
+            manifest_before
+        );
+        assert!(!m.env.backup_dir().exists());
 
         // Pour de vrai : current -> clone, le lien noté repasse par current (ancien sauvegardé).
         let root = versions::ensure_current(&m.env, &c, false).unwrap();
@@ -296,6 +321,17 @@ mod tests {
             fs::read_to_string(m.env.bin_dir().join("poste")).unwrap(),
             "bin 1111111"
         );
+
+        // Aperçu d'une bascule en release : les liens passent déjà par current, rien à relier
+        // même si la racine lue est une autre version que celle que current désigne.
+        let mut layout = crate::config::load(&v1, &m.env).unwrap().unwrap();
+        layout.relink(&m.env.current_link());
+        let plan = crate::config::plan(&layout, &m.env, &Default::default()).unwrap();
+        assert!(plan
+            .steps
+            .iter()
+            .filter(|s| s.entry.rel == ".config/a/neuf")
+            .all(|s| s.op == crate::config::Op::Done));
 
         // Nouvelle version dont seule l'île d'un module change : île à recharger, pas Hyprland.
         let src2 = m.d.path().join("v2");

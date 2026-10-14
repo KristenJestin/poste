@@ -128,6 +128,12 @@ pub fn root(env: &Env, cfg: &Config) -> Result<PathBuf> {
     }
 }
 
+/// Simulation : la racine lue n'est pas `current` (pas encore posé ou pas encore basculé) ;
+/// `current` est alors la racine où les liens de config pointeront pour de vrai.
+pub fn link_root(env: &Env, root: &Path) -> Option<PathBuf> {
+    (root != env.current_link()).then(|| env.current_link())
+}
+
 /// Fait pointer `current` sur `target` (remplacement atomique). Refuse si `current` existe sans
 /// être un lien : poste ne l'a pas posé.
 pub fn point_current(env: &Env, target: &Path) -> Result<()> {
