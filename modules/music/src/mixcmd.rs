@@ -189,10 +189,7 @@ pub fn home(env: &Env) -> Result<Vec<Value>, Failure> {
 }
 
 pub fn home_in(conn: &rusqlite::Connection) -> Result<Vec<Value>, Failure> {
-    let mut out: Vec<Value> = crate::search::playlists(conn)?
-        .iter()
-        .map(|h| h.to_json())
-        .collect();
+    let mut out: Vec<Value> = crate::search::playlists(conn)?.iter().map(|h| h.to_json()).collect();
     out.extend(mixes_in(conn)?);
     Ok(out)
 }

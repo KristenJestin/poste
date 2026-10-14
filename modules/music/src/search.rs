@@ -504,11 +504,8 @@ mod tests {
             ("t4", "Rêve mieux", "Civilisation"),
             ("t5", "Rêve", "Plaisir Risque Dépendance"),
         ] {
-            db::insert_track(
-                &tx,
-                &json!({"id":id,"title":title,"artist":"X","album":album}),
-            )
-            .unwrap();
+            db::insert_track(&tx, &json!({"id":id,"title":title,"artist":"X","album":album}))
+                .unwrap();
         }
         tx.commit().unwrap();
         let names: Vec<_> = search(&conn, "Rêve")
@@ -542,10 +539,7 @@ mod tests {
         assert_eq!(pl["subtitle"], "Playlist · 42 tracks · 2 h 05");
         assert_eq!(pl["verb"], "Play");
         assert_eq!(pl["action"]["type"], "command");
-        assert_eq!(
-            pl["action"]["command"],
-            "poste music play playlist p1 --shuffle"
-        );
+        assert_eq!(pl["action"]["command"], "poste music play playlist p1 --shuffle");
         assert!(pl.get("_cover").is_none());
         let acts = pl["actions"].as_array().unwrap();
         let labels: Vec<_> = acts.iter().map(|a| a["label"].as_str().unwrap()).collect();
