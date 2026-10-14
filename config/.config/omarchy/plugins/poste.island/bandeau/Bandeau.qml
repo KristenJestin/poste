@@ -51,6 +51,9 @@ Singleton {
   readonly property string fontFamily: "JetBrainsMono Nerd Font"
   readonly property int bottomMargin: 56
   readonly property int gap: 10
+  // Sous l'île : plus que les marges des fenêtres de Hyprland (gaps_out 10), sinon la première
+  // pièce commence pile sur le bord haut des fenêtres.
+  readonly property int islandGap: 20
   readonly property int maxNotifications: 3
   // Plusieurs lignes : même arrondi partout.
   readonly property int blockRadius: 20

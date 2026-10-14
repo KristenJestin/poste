@@ -22,7 +22,7 @@ PanelWindow {
   readonly property bool focused: bandeau.focusedScreen === "" || bandeau.focusedScreen === screenName
 
   // Haut de la pile : un écart sous l'île de cet écran (le haut de l'écran sans île).
-  readonly property real stackTop: (bandeau.islandEdges[screenName] || 0) + bandeau.gap
+  readonly property real stackTop: (bandeau.islandEdges[screenName] || 0) + bandeau.islandGap
 
   visible: dictation.live || osdView.live || notifs.live || pill.live
   color: "transparent"
