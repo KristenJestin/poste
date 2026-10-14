@@ -7,6 +7,11 @@
 //! `installed.json` (`units`). Si le module disparaît, est désactivé ou ne déclare plus l'unité,
 //! `setup` la désactive (`disable --now`) AVANT de retirer les fichiers du module.
 //!
+//! Un minuteur (`x.timer`) déclenche le service du même nom (`x.service`), rangé à côté dans
+//! `systemd/` mais pas déclaré dans `units` : `setup` le lie d'abord (`systemctl --user link`,
+//! lien dans `~/.config/systemd/user/`) pour que systemd le trouve, puis active le minuteur. Au
+//! retrait, le service lié est délié (`disable`) après le minuteur.
+//!
 //! Jamais touché : une unité du même nom que nous n'avons pas posée (fichier ordinaire ou lien
 //! ailleurs dans `~/.config/systemd/user/`) : conflit signalé.
 
@@ -98,6 +103,11 @@ impl Step {
     }
 }
 
+/// Le service déclenché par un minuteur : `x.timer` → `x.service`.
+pub fn companion(unit: &str) -> Option<String> {
+    unit.strip_suffix(".timer").map(|n| format!("{n}.service"))
+}
+
 fn valid_unit(unit: &str) -> bool {
     !unit.contains('/')
         && !unit.starts_with('-')
@@ -120,6 +130,14 @@ pub fn desired(repo: &Path, env: &Env) -> Result<Vec<Spec>> {
             }
             if !m.dir.join("systemd").join(&unit).is_file() {
                 bail!("module {} : modules/{0}/systemd/{unit} est absent", m.name);
+            }
+            if let Some(svc) = companion(&unit) {
+                if !m.dir.join("systemd").join(&svc).is_file() {
+                    bail!(
+                        "module {} : le minuteur {unit} demande modules/{0}/systemd/{svc}",
+                        m.name
+                    );
+                }
             }
             out.push(Spec {
                 file: env.modules_dir().join(&m.name).join("systemd").join(&unit),
@@ -173,6 +191,27 @@ pub fn plan(
                 "{} existe et n'a pas été posé par poste sys",
                 env.display(&link)
             )),
+        };
+        let op = match companion(&s.unit) {
+            Some(svc) if !matches!(op, Op::Conflict(_)) => {
+                let svc_link = link_path(env, &svc);
+                let svc_file = s.file.with_file_name(&svc);
+                match std::fs::symlink_metadata(&svc_link) {
+                    Err(_) => Op::Enable,
+                    Ok(m)
+                        if m.file_type().is_symlink()
+                            && std::fs::read_link(&svc_link).ok().as_deref()
+                                == Some(svc_file.as_path()) =>
+                    {
+                        op
+                    }
+                    Ok(_) => Op::Conflict(format!(
+                        "{} existe et n'a pas été posé par poste sys",
+                        env.display(&svc_link)
+                    )),
+                }
+            }
+            _ => op,
         };
         steps.push(Step {
             op,
@@ -228,6 +267,12 @@ pub fn print_plan(env: &Env, steps: &[Step]) {
             println!("                {why}");
         }
         if s.op == Op::Enable {
+            if let Some(svc) = companion(&s.unit) {
+                println!(
+                    "                systemctl --user link {}",
+                    env.display(&s.file.with_file_name(svc))
+                );
+            }
             println!(
                 "                systemctl --user enable --now {}",
                 env.display(&s.file)
@@ -268,6 +313,17 @@ pub fn apply_removals(
             }
             reload = true;
         }
+        // Le service lié d'un minuteur, s'il est à nous.
+        if let Some(svc) = companion(&s.unit) {
+            let svc_link = link_path(env, &svc);
+            if link_is_ours(env, &svc_link) {
+                runner.run(&["disable", &svc]);
+                if link_is_ours(env, &svc_link) {
+                    let _ = std::fs::remove_file(&svc_link);
+                }
+                reload = true;
+            }
+        }
         manifest.units.retain(|u| u.unit != s.unit);
         n += 1;
     }
@@ -283,8 +339,15 @@ pub fn apply_additions(runner: &Runner, steps: &[Step], manifest: &mut Manifest)
     for s in steps {
         let ok = match s.op {
             Op::Enable => {
+                // Le service d'un minuteur d'abord, sinon systemd ne le trouve pas.
+                let linked = match companion(&s.unit) {
+                    Some(svc) => {
+                        runner.run(&["link", &s.file.with_file_name(svc).to_string_lossy()])
+                    }
+                    None => true,
+                };
                 runner.run(&["daemon-reload"]);
-                runner.run(&["enable", "--now", &s.file.to_string_lossy()])
+                linked && runner.run(&["enable", "--now", &s.file.to_string_lossy()])
             }
             Op::Restart => {
                 runner.run(&["daemon-reload"]);
@@ -338,9 +401,11 @@ pub(crate) mod tests {
                 r#"#!/bin/sh
 shift
 echo "$@" >> '{log}'
+for a; do last="$a"; done
 case "$1" in
   enable) f="$3"; u=$(basename "$f"); mkdir -p '{home}/.config/systemd/user'; ln -sfn "$f" "{home}/.config/systemd/user/$u"; touch '{marks}'/"$u" ;;
-  disable) rm -f '{home}/.config/systemd/user'/"$3" '{marks}'/"$3" ;;
+  link) f="$2"; mkdir -p '{home}/.config/systemd/user'; ln -sfn "$f" "{home}/.config/systemd/user/$(basename "$f")" ;;
+  disable) rm -f '{home}/.config/systemd/user'/"$last" '{marks}'/"$last" ;;
   is-enabled) [ -e '{marks}'/"$3" ] ;;
 esac
 "#,
@@ -446,7 +511,71 @@ esac
     }
 
     #[test]
+    fn minuteur_lie_son_service_puis_le_delie() {
+        let f = fx();
+        let t = spec(&f, "usage", "poste-usage-record.timer");
+        let svc = spec(&f, "usage", "poste-usage-record.service").file;
+        let mut m = Manifest::default();
+        let none = HashSet::new();
+
+        let st = plan(&f.env, &f.runner, std::slice::from_ref(&t), &m, &none);
+        assert_eq!(st[0].op, Op::Enable);
+        apply_additions(&f.runner, &st, &mut m).unwrap();
+        let c = calls(&f);
+        let link_at = c.find(&format!("link {}", svc.display())).unwrap();
+        let enable_at = c
+            .find(&format!("enable --now {}", t.file.display()))
+            .unwrap();
+        assert!(link_at < enable_at, "le service est lié avant le minuteur");
+        let svc_link = link_path(&f.env, "poste-usage-record.service");
+        assert_eq!(fs::read_link(&svc_link).unwrap(), svc);
+
+        let st = plan(&f.env, &f.runner, std::slice::from_ref(&t), &m, &none);
+        assert_eq!(st[0].op, Op::Unchanged);
+
+        // Le lien du service a disparu : on refait l'activation.
+        fs::remove_file(&svc_link).unwrap();
+        let st = plan(&f.env, &f.runner, std::slice::from_ref(&t), &m, &none);
+        assert_eq!(st[0].op, Op::Enable);
+        apply_additions(&f.runner, &st, &mut m).unwrap();
+        assert!(svc_link.is_symlink());
+
+        let st = plan(&f.env, &f.runner, &[], &m, &none);
+        assert_eq!(st[0].op, Op::Disable);
+        apply_removals(&f.env, &f.runner, &st, &mut m).unwrap();
+        assert!(calls(&f).contains("disable --now poste-usage-record.timer"));
+        assert!(calls(&f).contains("disable poste-usage-record.service"));
+        assert!(fs::symlink_metadata(&svc_link).is_err());
+        assert!(fs::symlink_metadata(link_path(&f.env, "poste-usage-record.timer")).is_err());
+        assert!(m.units.is_empty());
+    }
+
+    #[test]
+    fn service_d_un_minuteur_etranger_en_conflit() {
+        let f = fx();
+        let t = spec(&f, "usage", "poste-usage-record.timer");
+        spec(&f, "usage", "poste-usage-record.service");
+        let svc_link = link_path(&f.env, "poste-usage-record.service");
+        fs::create_dir_all(svc_link.parent().unwrap()).unwrap();
+        fs::write(&svc_link, "à moi").unwrap();
+        let st = plan(
+            &f.env,
+            &f.runner,
+            &[t],
+            &Manifest::default(),
+            &HashSet::new(),
+        );
+        assert!(matches!(st[0].op, Op::Conflict(_)));
+        assert_eq!(fs::read_to_string(&svc_link).unwrap(), "à moi");
+    }
+
+    #[test]
     fn noms_d_unite() {
+        assert_eq!(
+            companion("poste-usage-record.timer").as_deref(),
+            Some("poste-usage-record.service")
+        );
+        assert_eq!(companion("poste-power.service"), None);
         assert!(valid_unit("poste-power.service"));
         assert!(!valid_unit("../x.service"));
         assert!(!valid_unit("x"));
