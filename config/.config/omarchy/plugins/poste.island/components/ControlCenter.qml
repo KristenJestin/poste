@@ -18,7 +18,7 @@ Item {
   implicitHeight: column.implicitHeight
 
   readonly property var locale: Qt.locale("en_GB")
-  // Réseau / Bluetooth / Audio, plus VPN, Tailscale, Mail and the power profile when present.
+  // Réseau / Bluetooth / Audio, plus VPN, Tailscale, Mail et le profil d'alimentation quand ils sont là.
   readonly property int tileCount: 3 + (host.mailAvailable ? 1 : 0) + ((host.vpnAvailable || host.vpnConnected) ? 1 : 0)
     + (host.tsAvailable ? 1 : 0) + (host.powerProfile.present ? 1 : 0)
   readonly property real tileWidth: Math.min(74, Math.floor((width - 8 * (tileCount - 1)) / tileCount))

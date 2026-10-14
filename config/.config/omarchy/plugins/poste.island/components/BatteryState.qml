@@ -13,8 +13,9 @@ Item {
   readonly property var dev: UPower.displayDevice
   // Le profil d'alimentation (PowerProfileState.qml), posé par Island.qml.
   property var profile: null
-  // Sur batterie, le profil à montrer avec elle (vide sans power-profiles-daemon).
-  readonly property string profileGlyph: !charging && profile && profile.present ? profile.glyph : ""
+  // Juste après le débranchement, le profil à montrer avec elle (vide sinon, et sans
+  // power-profiles-daemon) ; la bulle basse ou critique qui reste ne le porte pas.
+  readonly property string profileGlyph: flash && !charging && profile && profile.present ? profile.glyph : ""
 
   // Simulation (commande batterySim).
   property bool simulated: false
@@ -40,7 +41,11 @@ Item {
   property bool flash: false
   Timer { id: flashTimer; interval: 6000; onTriggered: battery.flash = false }
   function pulse() { if (present) { flash = true; flashTimer.restart() } }
-  onChargingChanged: pulse()
+  // Au démarrage, UPower remplit onBattery après coup : ce premier passage n'est pas un
+  // débranchement, les premières secondes ne comptent pas.
+  property bool armed: false
+  Timer { interval: 3000; running: true; onTriggered: battery.armed = true }
+  onChargingChanged: if (armed) pulse()
   onLevelChanged: if (!charging && level !== "ok") pulse()
 
   // À côté de l'île : basse (sous 30 %), ou juste après le débranchement (le

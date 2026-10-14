@@ -760,7 +760,7 @@ Item {
   // PowerProfileState.qml. Chaque changement, d'où qu'il vienne, passe en OSD dans le bandeau.
   PowerProfileState {
     id: powerProfileState
-    onSwitched: function(name) { Bandeau.showOsd(glyphOf(name), label(name), "", "100", "", "1600") }
+    onSwitched: function(name) { Bandeau.showOsd(powerProfileState.glyphOf(name), powerProfileState.label(name), "", "100", "", "1600") }
   }
   readonly property var powerProfile: powerProfileState
 

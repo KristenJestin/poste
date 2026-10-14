@@ -33,7 +33,7 @@ Item {
     return "󰊚"
   }
   // Libellé court (tuile du centre de contrôle) et complet (OSD).
-  function shortLabel(name) { return name === "power-saver" ? "Saver" : name === "performance" ? "Performance" : "Balanced" }
+  function shortLabel(name) { return name === "power-saver" ? "Saver" : name === "performance" ? "Perf" : "Balanced" }
   function label(name) { return name === "power-saver" ? "Power saver" : name === "performance" ? "Performance" : "Balanced" }
   readonly property string glyph: glyphOf(active)
 
@@ -58,7 +58,10 @@ Item {
     setProc.command = ["omarchy-powerprofiles-set", UPower.onBattery ? "battery" : "ac", name]
     setProc.running = true
   }
-  Process { id: setProc }
+  Process {
+    id: setProc
+    onExited: function(code) { if (code !== 0) console.warn("omarchy-powerprofiles-set a échoué (" + code + ")") }
+  }
   // Le profil suivant de la machine (après le dernier, le premier).
   function cycle() {
     var list = shownProfiles
@@ -80,6 +83,8 @@ Item {
     }
   }
   Component.onCompleted: refresh()
+  // Le démon peut ne pas être prêt au démarrage de l'île : liste relue tant qu'elle est vide.
+  Timer { interval: 30000; repeat: true; running: state.profiles.length === 0; onTriggered: state.refresh() }
 
   // "power-saver", "balanced", "performance", "off"
   function simulate(spec) {
