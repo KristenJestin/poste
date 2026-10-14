@@ -347,7 +347,15 @@ pub fn apply_additions(runner: &Runner, steps: &[Step], manifest: &mut Manifest)
                     None => true,
                 };
                 runner.run(&["daemon-reload"]);
-                linked && runner.run(&["enable", "--now", &s.file.to_string_lossy()])
+                let enabled = linked && runner.run(&["enable", "--now", &s.file.to_string_lossy()]);
+                // Minuteur refusé : le lien du service ne doit pas rester, rien ne le retirerait
+                // (l'unité n'entre pas dans le manifeste).
+                if !enabled && linked {
+                    if let Some(svc) = companion(&s.unit) {
+                        runner.run(&["disable", &svc]);
+                    }
+                }
+                enabled
             }
             Op::Restart => {
                 runner.run(&["daemon-reload"]);

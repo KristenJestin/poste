@@ -80,6 +80,14 @@ pub fn history_windows(entries: &[Entry]) -> Vec<Window> {
         }
     }
     out.sort_by(|a, b| a.agent.cmp(&b.agent).then(a.start.cmp(&b.start)));
+    // Une remise qui glisse d'un relevé à l'autre de plus de SAME_RESET donne deux fenêtres
+    // qui se recouvrent : la suivante commence à la fin de la précédente, pour qu'un appel ne
+    // compte que dans une.
+    for i in 1..out.len() {
+        if out[i].agent == out[i - 1].agent && out[i].start < out[i - 1].end {
+            out[i].start = out[i - 1].end;
+        }
+    }
     out
 }
 

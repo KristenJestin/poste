@@ -262,9 +262,10 @@ fn show_calls(ctx: &Ctx, o: &Opts) -> Result<i32> {
         } else {
             let t = &c.tokens;
             buf.push_str(&format!(
-                "{}  {:<6} {:<20} {:<7} {:<4} {:<20} entrée {} cache lu {} écrit {} sortie {} (raisonnement {})",
+                "{}  {:<6} {:<8} {:<20} {:<7} {:<4} {:<20} entrée {} cache lu {} écrit {} sortie {} (raisonnement {})",
                 time::local(c.t, "%d/%m %H:%M:%S"),
                 c.agent,
+                c.session.get(..8).unwrap_or(&c.session),
                 c.model,
                 c.effort.as_deref().unwrap_or("?"),
                 if c.subagent { "sous" } else { "" },
@@ -285,11 +286,13 @@ fn show_calls(ctx: &Ctx, o: &Opts) -> Result<i32> {
 /// Fenêtres qui croisent [since, until), avec leurs indicateurs.
 fn window_stats(ctx: &Ctx, agent: Option<Agent>, since: i64, until: i64) -> Vec<stats::Stats> {
     let entries = history::load(&ctx.history_file());
-    // Une fenêtre commencée avant `since` compte entière : appels lus 5 h plus tôt.
+    // Une fenêtre commencée avant `since` compte entière, et une fenêtre estimée part du premier
+    // appel après un temps calme : appels lus un jour plus tôt, pour que le découpage ne dépende
+    // pas de `--since` (sauf activité continue de plus d'un jour).
     let calls = calls::load(
         &ctx.sources(),
         agent,
-        since - stats::FIVE_HOURS,
+        since - 24 * 3600,
         until + stats::FIVE_HOURS,
     );
     let ws = stats::windows(&entries, &calls, agent.map(Agent::name), since, until);

@@ -37,7 +37,7 @@ pub fn parse_iso(s: &str) -> Option<i64> {
                 _ => return None,
             };
             let r = rest[1..].replace(':', "");
-            if r.len() != 4 {
+            if r.len() != 4 || !r.bytes().all(|c| c.is_ascii_digit()) {
                 return None;
             }
             let oh: i64 = r[..2].parse().ok()?;
@@ -45,7 +45,31 @@ pub fn parse_iso(s: &str) -> Option<i64> {
             sign * (oh * 3600 + om * 60)
         }
     };
-    if !(1..=12).contains(&mo) || !(1..=31).contains(&d) {
+    let month_days = [
+        31,
+        if (y % 4 == 0 && y % 100 != 0) || y % 400 == 0 {
+            29
+        } else {
+            28
+        },
+        31,
+        30,
+        31,
+        30,
+        31,
+        31,
+        30,
+        31,
+        30,
+        31,
+    ];
+    if !(1..=12).contains(&mo)
+        || d < 1
+        || d > month_days[mo as usize - 1]
+        || !(0..24).contains(&h)
+        || !(0..60).contains(&mi)
+        || !(0..=60).contains(&se)
+    {
         return None;
     }
     Some(days_from_civil(y, mo as u32, d as u32) * 86_400 + h * 3600 + mi * 60 + se - offset)
@@ -126,6 +150,9 @@ mod tests {
         assert_eq!(parse_iso("2024-02-29T12:00:00Z"), Some(1_709_208_000));
         assert_eq!(parse_iso("demain"), None);
         assert_eq!(parse_iso(""), None);
+        assert_eq!(parse_iso("2026-10-14T25:00:00Z"), None);
+        assert_eq!(parse_iso("2026-02-31T00:00:00Z"), None);
+        assert_eq!(parse_iso("2026-10-14T10:00:00+0é0"), None);
         assert_eq!(iso(1_700_000_000), "2023-11-14T22:13:20Z");
     }
 
