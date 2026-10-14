@@ -1241,10 +1241,17 @@ Item {
                   if (modelData === root.vpnId) root.vpnService = root.findVpnService(item)
                   if (modelData === root.tsId) root.tsService = root.findTsService(item)
                 }
+                // Quand les écrans changent (écran débranché, écrans de Navette),
+                // l'écran du milieu change aussi : le widget du nouvel écran peut
+                // se charger avant que celui de l'ancien soit détruit. On ne vide
+                // donc le service que s'il venait de ce widget, et on reprend
+                // celui d'un widget restant.
                 Component.onDestruction: if (item) {
-                  if (modelData === root.vpnId) root.vpnService = null
-                  if (modelData === root.tsId) root.tsService = null
                   root.unregisterNativeWidget(item)
+                  if (modelData === root.vpnId && root.vpnService === root.findVpnService(item))
+                    root.vpnService = root.findVpnService(root.nativeWidgetOn(root.vpnId, root.primaryScreenName))
+                  if (modelData === root.tsId && root.tsService === root.findTsService(item))
+                    root.tsService = root.findTsService(root.nativeWidgetOn(root.tsId, root.primaryScreenName))
                 }
               }
             }
