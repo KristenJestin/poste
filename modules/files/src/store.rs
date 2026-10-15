@@ -111,8 +111,8 @@ pub fn refresh(env: &Env, force: bool) -> Result<Refresh> {
 fn scan(env: &Env) -> Result<Meta> {
     let cfg = Config::load(env)?;
     let roots = cfg.root_paths(env)?;
-    let user = Config::load_ignore(env)?;
-    let rules = Arc::new(Rules::new(&roots, &user, "files.ignore")?);
+    let layers = Config::load_ignores(env)?;
+    let rules = Arc::new(Rules::new(&roots, &layers)?);
     let start = Instant::now();
     let (present, missing): (Vec<PathBuf>, Vec<PathBuf>) =
         roots.into_iter().partition(|r| r.is_dir());

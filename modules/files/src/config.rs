@@ -7,7 +7,11 @@
 //!   limit = 30      # results given to the launcher
 //!   ```
 //!
-//! - `files.ignore`: exclusions in .gitignore syntax, read after `default.ignore`.
+//!
+//! The exclusions of a machine are data, not settings: `files/ignore` in the machine's data
+//! repository (`poste-data`, key `data` of `config.toml`), then
+//! `$XDG_DATA_HOME/poste/files/ignore` (local, not versioned), both in .gitignore syntax and
+//! read after `default.ignore`.
 
 use anyhow::{bail, Context, Result};
 use poste_core::Env;
@@ -55,8 +59,16 @@ impl Config {
         env.config_home.join("poste/files.toml")
     }
 
-    pub fn ignore_file(env: &Env) -> PathBuf {
-        env.config_home.join("poste/files.ignore")
+    /// Exclusion files of the machine, in reading order: the data repository's (when the
+    /// machine has one), then the local one. Each may be missing.
+    pub fn ignore_files(env: &Env) -> Vec<PathBuf> {
+        let data = poste_core::Config::load(env)
+            .ok()
+            .and_then(|c| c.data_path(env))
+            .map(|d| d.join("files/ignore"));
+        data.into_iter()
+            .chain([env.data_home.join("poste/files/ignore")])
+            .collect()
     }
 
     /// Loads files.toml; missing, the defaults.
@@ -68,9 +80,15 @@ impl Config {
         }
     }
 
-    /// Text of files.ignore (empty when it does not exist).
-    pub fn load_ignore(env: &Env) -> Result<String> {
-        Ok(read_optional(&Self::ignore_file(env))?.unwrap_or_default())
+    /// The exclusion files that exist: (name shown in errors, text).
+    pub fn load_ignores(env: &Env) -> Result<Vec<(String, String)>> {
+        let mut out = Vec::new();
+        for f in Self::ignore_files(env) {
+            if let Some(text) = read_optional(&f)? {
+                out.push((env.display(&f), text));
+            }
+        }
+        Ok(out)
     }
 
     /// Absolute roots, without duplicates. A root inside another is kept: the exclusions may
@@ -110,7 +128,7 @@ mod tests {
         assert!(Config::parse("roots = []\n").is_err());
         assert!(Config::parse("limit = 0\n").is_err());
         assert!(Config::parse("racines = [\"~\"]\n").is_err());
-        // Exclusions go in files.ignore.
+        // Exclusions are data: files/ignore, not a key here.
         assert!(Config::parse("exclude = [\"*.iso\"]\n").is_err());
     }
 

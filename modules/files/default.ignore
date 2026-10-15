@@ -1,6 +1,7 @@
 # Default exclusions of `poste files`, .gitignore syntax, anchored on each root.
-# ~/.config/poste/files.ignore is read after this file: the last matching line wins, so it can
-# add exclusions or lift them ("!build/").
+# The machine's exclusions (files/ignore of its data repository, then
+# ~/.local/share/poste/files/ignore) are read after this file: the last matching line wins, so
+# they can add exclusions or lift them ("!build/").
 # The .gitignore files met are not read.
 
 # Hidden files and folders ("!.config/" to keep one)
