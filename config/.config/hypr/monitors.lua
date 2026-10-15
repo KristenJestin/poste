@@ -16,13 +16,15 @@ hl.env("GDK_SCALE", "1")
 hl.monitor({ output = "", mode = "preferred", position = "auto", scale = 1 })
 
 -- --- Workspaces per screen ------------------------------------------------
--- Each screen of workspace_monitors has its own workspaces 1 to 10 (see
--- bindings.lua): internally, first screen = 1-10, second = 11-20, etc.
--- default_name shows 1 to 10 on each screen instead of 11-30.
--- Several sets of screens (laptop at the desk, alone…) fit in the same
--- list: an absent screen keeps its numbers. When unplugged, Hyprland puts its
--- workspaces on a remaining screen (the island shows them apart there) and gives them back
--- when it returns on the same port.
+-- Every screen has its own workspaces 1 to 10 (see bindings.lua). Inside,
+-- the screens of workspace_monitors hold fixed blocks in their order: first
+-- screen 1-10, second 11-20, etc. default_name shows 1 to 10 on each screen
+-- instead of 11-30. Any other screen (projector, dock, virtual output) takes
+-- the first free block after the list when it arrives.
+-- Several sets of screens (laptop at the office, alone...) fit in the same
+-- list: an absent screen keeps its numbers. Unplugged, its workspaces go to a
+-- remaining screen (the island shows them apart there) and come back to it
+-- when it returns.
 -- SUPER+CTRL+ALT+arrow sends the window to the screen in that arrow's direction (bindings.lua).
 screen_keys = {
   -- { key = "LEFT", monitor = "DP-1", name = "left screen" },

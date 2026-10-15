@@ -8,8 +8,9 @@ import qs.Ui
 
 // Clone of omarchy.workspaces, 'workspaces per screen' version: each screen
 // has its own 1 to 10, and each bar shows / targets those of its screen.
-// Same correspondence as workspace_monitors in ~/.config/hypr/monitors.lua
-// (left = 1-10, center = 11-20, right = 21-30, other screen = 31-40).
+// Same blocks of ten as ~/.config/hypr/bindings.lua: the screens of
+// workspace_monitors (monitors.lua) in their order (1-10, 11-20...), any
+// other screen the block Hyprland gave it when it arrived (screen-slots).
 BarWidget {
   id: root
   moduleName: "poste.workspaces"
@@ -35,6 +36,27 @@ BarWidget {
     onLoadFailed: root.workspaceMonitors = []
   }
 
+  // Block of this screen when it is outside the list, -1 if none: one
+  // "<name> <slot>" per line in the file Hyprland writes (bindings.lua).
+  property int givenSlot: -1
+  function parseGivenSlot(text) {
+    var lines = String(text || "").split("\n")
+    for (var i = 0; i < lines.length; i++) {
+      var m = /^(\S+)\s+(\d+)$/.exec(lines[i])
+      if (m && m[1] === screenName) return Number(m[2])
+    }
+    return -1
+  }
+  FileView {
+    id: slotsFile
+    path: Quickshell.env("XDG_RUNTIME_DIR") + "/poste/screen-slots"
+    watchChanges: true
+    printErrors: false
+    onFileChanged: reload()
+    onLoaded: root.givenSlot = root.parseGivenSlot(text())
+    onLoadFailed: root.givenSlot = -1
+  }
+
   // Screen of this bar. Read after the widget is installed in its bar: a
   // direct binding kept the screen of the first render for all the bars.
   property string screenName: ""
@@ -55,7 +77,7 @@ BarWidget {
         : entry === screenName
       if (hit) return i * 10
     }
-    return workspaceMonitors.length * 10
+    return (givenSlot >= 0 ? givenSlot : workspaceMonitors.length) * 10
   }
 
   // State read directly from hyprctl (the Quickshell.Hyprland objects did not
@@ -79,7 +101,10 @@ BarWidget {
   }
   onParentChanged: Qt.callLater(updateScreen)
   onVisibleChanged: Qt.callLater(updateScreen)
-  onScreenNameChanged: refresh()
+  onScreenNameChanged: {
+    slotsFile.reload()
+    refresh()
+  }
 
   Connections {
     target: Hyprland
@@ -87,6 +112,9 @@ BarWidget {
       // A re-wired monitors.lua (link to another file) does not trigger
       // watchChanges: it is read again when Hyprland reloads its config.
       if (event.name === "configreloaded") monitorsFile.reload()
+      // The file may not exist yet at start (no watch then), and Hyprland
+      // writes it before it renumbers the new screen's workspace.
+      if (/monitor|workspace/.test(event.name)) slotsFile.reload()
       if (/workspace|window|monitor|focus|openlayer|closelayer/.test(event.name)) root.refresh()
     }
   }

@@ -56,6 +56,26 @@ TestCase {
     compare(WorkspaceGroups.originSlot(25), 2)
   }
 
+  function test_parse_slots() {
+    compare(WorkspaceGroups.parseSlots("NAVETTE-1 3\nNAVETTE-2 4\n"), { "NAVETTE-1": 3, "NAVETTE-2": 4 })
+    compare(WorkspaceGroups.parseSlots(""), {})
+    compare(WorkspaceGroups.parseSlots("broken\nHDMI-A-1 5"), { "HDMI-A-1": 5 })
+  }
+
+  function test_screen_slot() {
+    var entries = ["desc:AOC A", "desc:AOC B", "eDP-1"]
+    var slots = { "NAVETTE-1": 3, "NAVETTE-2": 4 }
+    // A listed screen keeps its place, by EDID description or by port name.
+    compare(WorkspaceGroups.screenSlot(entries, slots, "DP-7", "AOC B 123"), 1)
+    compare(WorkspaceGroups.screenSlot(entries, slots, "eDP-1", "BOE"), 2)
+    // Each screen outside the list has the block Hyprland gave it.
+    compare(WorkspaceGroups.screenSlot(entries, slots, "NAVETTE-1", ""), 3)
+    compare(WorkspaceGroups.screenSlot(entries, slots, "NAVETTE-2", ""), 4)
+    // Not given one yet: the first block after the list.
+    compare(WorkspaceGroups.screenSlot(entries, slots, "HDMI-A-1", ""), 3)
+    compare(WorkspaceGroups.screenSlot(entries, {}, "HDMI-A-1", ""), 3)
+  }
+
   function test_no_visitors() {
     compare(shown(WorkspaceGroups.cells({ 1: 1, 7: 2 }, 1, 0, undefined)), "1 2 3 4 5 7")
     compare(shown(WorkspaceGroups.cells({}, 13, 10, [])), "1 2 3 4 5")
