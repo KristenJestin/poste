@@ -76,8 +76,8 @@ addons = ["melodie", "vocaline"]
 ```
 
 `poste sys setup` then runs the add-on's bootstrap steps (install the program, print the
-packages to install with sudo) and plugs the add-on in as soon as the program is there (a second
-`poste sys setup` the first time). Removing a name from the list unplugs it; the program itself
+packages to install with sudo) and plugs the add-on in as soon as the program is there, in the same run when one of its
+steps has just installed it (a package installed by hand with sudo: at the next run). Removing a name from the list unplugs it; the program itself
 stays installed. `poste sys addons` shows each add-on and its state on this machine.
 
 | Add-on | Plugs in |

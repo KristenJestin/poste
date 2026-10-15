@@ -70,7 +70,16 @@ fn load_config(repo: &Path, env: &Env, o: &Opts) -> Result<Option<config::Layout
     Ok(layout)
 }
 
+/// Names of the modules and add-ons plugged in on this machine, as the repository sees it now.
+fn plugged(repo: &Path, env: &Env) -> Result<std::collections::BTreeSet<String>> {
+    Ok(plan::enabled_modules(repo, env)?
+        .into_iter()
+        .map(|m| m.name)
+        .collect())
+}
+
 pub fn run(env: &Env, repo: &Path, o: &Opts) -> Result<Outcome> {
+    let before = plugged(repo, env)?;
     let ph = install_phase(env, repo, o)?;
     if !ph.proceed || o.no_config {
         return Ok(Outcome {
@@ -105,6 +114,36 @@ pub fn run(env: &Env, repo: &Path, o: &Opts) -> Result<Outcome> {
             }
         }
     }
+    // An add-on whose program a bootstrap step has just installed is plugged in now, so a
+    // single setup is enough the first time.
+    let mut plugged_now = false;
+    if !o.dry_run {
+        let new: Vec<String> = plugged(repo, env)?.difference(&before).cloned().collect();
+        if !new.is_empty() {
+            println!("\n== Now plugged in: {} ==", new.join(", "));
+            let again = Opts {
+                yes: o.yes,
+                dry_run: false,
+                no_config: false,
+                skip_build: true,
+                link_root: o.link_root.clone(),
+                take_repo: o.take_repo.clone(),
+                take_home: o.take_home.clone(),
+            };
+            let ph2 = install_phase(env, repo, &again)?;
+            if ph2.code != ExitCode::SUCCESS && code == ExitCode::SUCCESS {
+                code = ph2.code;
+            }
+            if ph2.proceed {
+                let extras2 = extras_phase(env, repo, &again, &ph2.changed_modules)?;
+                if extras2.conflicts > 0 {
+                    code = ExitCode::from(2);
+                }
+                plugged_now =
+                    ph2.config_changed || extras2.changed || !ph2.changed_modules.is_empty();
+            }
+        }
+    }
     if !applied.failed.is_empty() {
         eprintln!(
             "\nposte sys : étape(s) en échec : {}",
@@ -114,7 +153,7 @@ pub fn run(env: &Env, repo: &Path, o: &Opts) -> Result<Outcome> {
     }
     Ok(Outcome {
         code,
-        config_changed: (ph.config_changed || extras.changed) && !o.dry_run,
+        config_changed: (ph.config_changed || extras.changed || plugged_now) && !o.dry_run,
     })
 }
 
@@ -733,6 +772,36 @@ mod tests {
             .is_symlink());
         let man = Manifest::load(&env.manifest_file()).unwrap();
         assert_eq!(man.units.len(), 1);
+    }
+
+    #[test]
+    fn addon_plugged_in_by_the_setup_that_installs_its_program() {
+        let (_d, repo, env) = fixture();
+        let a = repo.join("addons/tool");
+        fs::create_dir_all(a.join("hypr")).unwrap();
+        fs::create_dir_all(a.join("bootstrap")).unwrap();
+        fs::write(a.join("module.toml"), "requires = \"tool-prog-xyz\"\n").unwrap();
+        fs::write(a.join("poste-tool"), "#!/bin/sh\n").unwrap();
+        fs::write(a.join("hypr/tool.lua"), "-- key\n").unwrap();
+        fs::write(
+            a.join("bootstrap/steps.toml"),
+            "[[user]]\nid = \"tool\"\ntitle = \"tool\"\ncheck = [\"test\", \"-x\", \"@HOME@/.local/bin/tool-prog-xyz\"]\nrun = [[\"sh\", \"-c\", \"mkdir -p @HOME@/.local/bin && printf '#!/bin/sh\\n' > @HOME@/.local/bin/tool-prog-xyz && chmod +x @HOME@/.local/bin/tool-prog-xyz\"]]\n",
+        )
+        .unwrap();
+        fs::create_dir_all(env.config_file().parent().unwrap()).unwrap();
+        fs::write(env.config_file(), "addons = [\"tool\"]\n").unwrap();
+        let o = Opts {
+            take_repo: vec![".config/a/conflit".into()],
+            ..opts(true, false)
+        };
+        run(&env, &repo, &o).unwrap();
+        assert!(env.bin_dir().join("tool-prog-xyz").is_file(), "step ran");
+        let base = env.modules_dir().join("tool");
+        assert!(
+            base.join("hypr/tool.lua").is_file(),
+            "plugged in by the same setup"
+        );
+        assert!(base.join("poste-tool").is_file());
     }
 
     const SJ: &str = "{\n  \"bar\": {\"x\": 1},\n  \"idle\": {\n    \"lock\": 5400,\n    \"screensaver\": 2700\n  }\n}\n";
