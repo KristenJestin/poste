@@ -1,6 +1,7 @@
 //! `poste-sys` : gestion du dépôt poste (construction, installation, état, git).
 
 mod config;
+mod handoff;
 mod ignore;
 mod import;
 mod lines;
@@ -132,6 +133,25 @@ enum Cmd {
     },
     /// Source, racine (current) et versions installées
     Versions,
+    /// Suite de sync et de use, lancée par un ancien poste-sys qui passe la main (voir handoff)
+    #[command(hide = true)]
+    Finish {
+        #[arg(short, long)]
+        yes: bool,
+        /// Retire les anciennes versions après setup
+        #[arg(long)]
+        prune: bool,
+        /// Le clone est déjà construit par celui qui passe la main
+        #[arg(long)]
+        skip_build: bool,
+        /// La racine d'avant : ce qu'il faut recharger est recalculé d'après les deux racines
+        #[arg(long)]
+        from: Option<std::path::PathBuf>,
+        #[arg(long)]
+        reload_shell: bool,
+        #[arg(long)]
+        reload_hypr: bool,
+    },
     /// Affiche le chemin du dépôt (cd "$(poste sys cd)")
     Cd,
 }
@@ -277,6 +297,31 @@ fn run(cli: Cli) -> Result<ExitCode> {
                 },
             )?;
             reload::apply(&done.need, yes, dry_run, &setup::confirm)?;
+            Ok(done.code)
+        }
+        Cmd::Finish {
+            yes,
+            prune,
+            skip_build,
+            from,
+            reload_shell,
+            reload_hypr,
+        } => {
+            let mut need = reload::Need {
+                shell: reload_shell,
+                hypr: reload_hypr,
+            };
+            let root = env.current_link();
+            if let Some(old) = &from {
+                versions::add_root_changes(&mut need, Some(old), &root)?;
+            }
+            let opts = setup::Opts {
+                yes,
+                skip_build,
+                ..Default::default()
+            };
+            let done = versions::finish(&env, &root, need, &opts, prune)?;
+            reload::apply(&done.need, yes, false, &setup::confirm)?;
             Ok(done.code)
         }
         Cmd::Versions => {

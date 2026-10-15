@@ -10,17 +10,14 @@
 
 use crate::reload::{self, Need};
 use crate::versions::{self, Fetcher};
-use crate::{setup, util};
+use crate::{handoff, setup, util};
 use anyhow::{bail, Context, Result};
 use poste_core::{Config, Env, Source};
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode};
 
 /// Ce que `run` a fait : code de sortie et ce qu'il faut recharger.
-pub struct Synced {
-    pub code: ExitCode,
-    pub need: Need,
-}
+pub use versions::Switched as Synced;
 
 /// `git pull --ff-only` dans chaque dépôt ; renvoie le commit de chacun avant le pull.
 fn pull(dirs: &[PathBuf], dry_run: bool) -> Result<Vec<(PathBuf, String)>> {
@@ -65,11 +62,6 @@ fn data_repo(env: &Env, cfg: &Config) -> Result<Option<PathBuf>> {
 }
 
 pub fn run(env: &Env, cfg: &Config, f: &Fetcher, yes: bool, dry_run: bool) -> Result<Synced> {
-    let mut opts = setup::Opts {
-        yes,
-        dry_run,
-        ..Default::default()
-    };
     let mut dirs = Vec::new();
     if cfg.source == Source::Dev {
         dirs.push(util::clone(env, cfg)?);
@@ -105,25 +97,20 @@ pub fn run(env: &Env, cfg: &Config, f: &Fetcher, yes: bool, dry_run: bool) -> Re
     if let Some(o) = &old {
         versions::add_root_changes(&mut need, Some(o), &root)?;
     }
-    opts.link_root = versions::link_root(env, &root);
-    let done = setup::run(env, &root, &opts)?;
-    if done.config_changed {
-        need.shell = true;
-        need.hypr = true;
-    }
     for (dir, from) in &before {
         reload::add_changes(&mut need, dir, from, &reload::head(dir)?)?;
     }
-    if cfg.source == Source::Release && !dry_run {
-        let removed = versions::prune(env, versions::KEEP)?;
-        if !removed.is_empty() {
-            println!("Anciennes versions retirées : {}.", removed.join(", "));
-        }
+    let prune = cfg.source == Source::Release;
+    if dry_run {
+        let opts = setup::Opts {
+            yes,
+            dry_run,
+            link_root: versions::link_root(env, &root),
+            ..Default::default()
+        };
+        return versions::finish(env, &root, need, &opts, false);
     }
-    Ok(Synced {
-        code: done.code,
-        need,
-    })
+    handoff::complete(env, old.as_deref(), need, yes, prune, false)
 }
 
 /// Pour les messages : la racine lue, en clair.

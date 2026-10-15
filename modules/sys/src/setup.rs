@@ -392,7 +392,7 @@ fn install_phase(env: &Env, repo: &Path, o: &Opts) -> Result<Phase> {
     })
 }
 
-fn build(repo: &Path) -> Result<()> {
+pub(crate) fn build(repo: &Path) -> Result<()> {
     println!("Construction : cargo build --release ({})", repo.display());
     let status = Command::new("cargo")
         .args(["build", "--release", "--quiet"])
