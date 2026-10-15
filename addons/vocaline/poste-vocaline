@@ -1,0 +1,3 @@
+#!/bin/sh
+# Add-on vocaline of poste: passes the command as is to Vocaline.
+exec vocaline "$@"

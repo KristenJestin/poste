@@ -1,0 +1,3 @@
+# Packages Mélodie needs (merged with bootstrap/packages.toml when the add-on is chosen).
+[packages]
+mpv = "libmpv: Mélodie's playback"

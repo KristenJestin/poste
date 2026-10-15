@@ -357,6 +357,15 @@ pub fn module_list(env: &Env, repo: &Path) -> Result<()> {
     for m in &mods {
         let off = m.name != "sys" && cfg.is_disabled(&m.name);
         let installed = env.modules_dir().join(&m.name).is_dir();
+        if let (false, Some(prog)) = (off, m.missing(env)) {
+            let more = if installed {
+                ", still installed (poste sys setup removes it)"
+            } else {
+                ""
+            };
+            println!("  {:<10} {prog} not found: left out{more}", m.name);
+            continue;
+        }
         let state = match (off, installed) {
             (true, true) => "désactivé, encore installé (poste sys setup le retire)",
             (true, false) => "désactivé",
@@ -371,6 +380,39 @@ pub fn module_list(env: &Env, repo: &Path) -> Result<()> {
         .filter(|d| !mods.iter().any(|m| &m.name == *d))
     {
         println!("  {d:<10} inconnu du dépôt (entrée inutile de disabled)");
+    }
+    Ok(())
+}
+
+/// `poste sys addons`: the add-ons of the repository, chosen or not, installed or not.
+pub fn addon_list(env: &Env, repo: &Path) -> Result<()> {
+    let cfg = Config::load(env)?;
+    let addons = plan::repo_addons(repo)?;
+    println!("Add-ons (key addons, in poste.toml of the data repository)");
+    for a in &addons {
+        let chosen = cfg.addons.contains(&a.name);
+        let installed = env.modules_dir().join(&a.name).is_dir();
+        let state = match (chosen, a.missing(env), installed) {
+            (false, _, true) => "not chosen, still installed (poste sys setup removes it)".into(),
+            (false, _, false) => "available".into(),
+            (true, Some(p), true) => {
+                format!("chosen, {p} not found: still plugged in (poste sys setup removes it)")
+            }
+            (true, Some(p), false) => format!("chosen, {p} not installed yet (poste sys setup)"),
+            (true, None, true) => "chosen, plugged in".into(),
+            (true, None, false) => "chosen, not plugged in yet (poste sys setup)".into(),
+        };
+        println!("  {:<10} {state}", a.name);
+        if !a.description.is_empty() {
+            println!("  {:<10} {}", "", a.description);
+        }
+    }
+    for name in cfg
+        .addons
+        .iter()
+        .filter(|n| !addons.iter().any(|a| &a.name == *n))
+    {
+        println!("  {name:<10} unknown to the repository (useless entry in addons)");
     }
     Ok(())
 }

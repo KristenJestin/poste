@@ -1,4 +1,5 @@
 name = "vocaline"
+requires = "vocaline"
 description = "Dictée Vocaline : SUPER+Z, pastille de dictée en bas de l'écran et texte dicté en direct sous l'île"
 commands = [
   { name = "press", description = "appui sur la touche de dictée (SUPER+Z) : ouvre le micro" },

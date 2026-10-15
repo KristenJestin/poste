@@ -1,0 +1,9 @@
+{
+  "player": {
+    "bus": "org.mpris.MediaPlayer2.melodie",
+    "quality": "melodie:quality",
+    "starred": "melodie:starred",
+    "like": ["melodie", "like", "--toggle"],
+    "launcher": "melodie"
+  }
+}

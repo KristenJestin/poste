@@ -26,9 +26,11 @@ impl Need {
                 self.shell = true
             }
             ["config", ".config", "hypr", ..] => self.hypr = true,
-            ["modules", _, "island", ..] => self.shell = true,
+            ["modules" | "addons", _, "island", ..] => self.shell = true,
             // module.toml : ses `[[line]]` peuvent viser la config de Hyprland.
-            ["modules", _, "hypr", ..] | ["modules", _, "module.toml"] => self.hypr = true,
+            ["modules" | "addons", _, "hypr", ..] | ["modules" | "addons", _, "module.toml"] => {
+                self.hypr = true
+            }
             _ => {}
         }
     }
@@ -136,7 +138,7 @@ mod tests {
     fn island_files_restart_the_shell() {
         let n = need(&[
             "config/.config/omarchy/plugins/poste.island/Island.qml",
-            "modules/vocaline/island/VocalineState.qml",
+            "addons/vocaline/island/VocalineState.qml",
         ]);
         assert_eq!(
             n,
@@ -173,10 +175,22 @@ mod tests {
     }
 
     #[test]
+    fn addon_files_and_data_choices() {
+        assert_eq!(
+            need(&["addons/vocaline/hypr/vocaline.lua"]),
+            Need {
+                shell: false,
+                hypr: true
+            }
+        );
+        assert!(!need(&["addons/melodie/README.md"]).any());
+    }
+
+    #[test]
     fn other_files_need_nothing() {
         let n = need(&[
             "README.md",
-            "modules/music/src/main.rs",
+            "modules/usage/src/main.rs",
             "config/.config/git/config",
             "modules/files/README.md",
         ]);

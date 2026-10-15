@@ -17,15 +17,18 @@ date="$(TZ=UTC0 git -C "$repo" show -s --date=format-local:%Y-%m-%dT%H:%M:%SZ --
 stage="$(mktemp -d)"
 trap 'rm -rf "$stage"' EXIT
 
-git -C "$repo" archive --format=tar HEAD config bootstrap modules | tar -x -C "$stage"
+git -C "$repo" archive --format=tar HEAD config bootstrap modules addons | tar -x -C "$stage"
 
 # D'un module, seulement ce que setup pose : module.toml, island/, hypr/, bin/, systemd/ et le
-# programme d'un module-script (poste-<nom>).
-for m in "$stage"/modules/*/; do
+# programme d'un module-script (poste-<nom>). An add-on also keeps its bootstrap/.
+for m in "$stage"/modules/*/ "$stage"/addons/*/; do
+  [[ -d $m ]] || continue
   n="$(basename "$m")"
+  keep=bootstrap
+  [[ $m == "$stage"/addons/* ]] || keep="poste-$n"
   find "$m" -mindepth 1 -maxdepth 1 \
-    ! -name module.toml ! -name island ! -name hypr ! -name bin ! -name systemd ! -name "poste-$n" \
-    -exec rm -rf {} +
+    ! -name module.toml ! -name island ! -name hypr ! -name bin ! -name systemd ! -name "$keep" \
+    ! -name "poste-$n" -exec rm -rf {} +
 done
 
 mkdir -p "$stage/target/release"

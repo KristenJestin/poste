@@ -35,6 +35,7 @@ racine `~/.local/share/poste/current`, qui désigne le clone (mode dev) ou une v
 - `poste sys local [list|add <chemin>|remove <chemin>]` : fichiers de `config/` que CETTE machine garde
   à elle (voir « Réglages propres à la machine »).
 - `poste sys module [list|enable <nom>|disable <nom>]` : modules du dépôt non installés ici.
+- `poste sys addons`: the add-ons of the repository, chosen here or not (key `addons`), program installed or not, plugged in or not.
 - `poste sys skip [list|add <id>…|remove <id>…]` : paquets et étapes du bootstrap ignorés ici.
 - `poste sys override [list|set <chemin> <clé> <valeur>|unset <chemin> <clé>]` : surcharges JSON par machine.
 - `poste sys use dev|release|<commit>` `[--yes] [--dry-run]` : bascule la machine (voir « Versions et racine »).

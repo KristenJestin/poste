@@ -23,16 +23,17 @@ Hyprland 0.56, shell Quickshell avec l'île perso `poste.island`.
 - Lancer une appli graphique détachée : `setsid -f uwsm-app -- <appli> >/dev/null 2>&1`.
 - Workspaces : 1-10 sur le premier écran de `workspace_monitors` (monitors.lua), 11-20 sur le deuxième, etc.
 
-## Musique (`poste music`, serveur Navidrome)
-Lecteur de fond (démon, MPRIS « Musique »), lu aussi par l'île. Les commandes de lecture agissent sur ce que l'utilisateur écoute : n'en lance une que s'il le demande.
-- Chercher : `poste music search daft punk --json` (artistes, albums, morceaux, playlists ; `id` de la forme `kind:id`). `poste music playlists`, `poste music mixes`.
-- Lire : `poste music play playlist|album|artist|track <id> [--shuffle]` (remplace la file). Ajouter à la file : `poste music queue album <id>`.
-- Mixes : `poste music mix me` (perso), `mix rediscover`, `mix artist "Daft Punk"`, `mix genre rock` ; `--print` pour voir la liste sans jouer.
-- Contrôles : `poste music toggle|pause|resume|next|prev|stop`, `poste music volume +5` (ou `30`).
-- État : `poste music now --json` (titre, artiste, position, qualité, `starred`).
-- Favoris et playlists : `poste music like` (morceau en cours, `--toggle` pour inverser), `unlike`, `poste music playlist add <playlistId> current`, `playlist create "Nom" current`.
-- Connexion : `poste music login` (terminal interactif, à lancer par l'utilisateur), `poste music status`.
-- Dans le lanceur de l'île : mot-clé `play` ou `music`.
+## Music (`melodie`, Navidrome server)
+Background player (MPRIS « Mélodie »), also shown by the island. Playback commands act on what the user is listening to: run one only when asked.
+- Search: `melodie search daft punk --json` (artists, albums, tracks, playlists; `id` is `kind:id`). `melodie playlists --json`, `melodie mixes --json`.
+- Play: `melodie play playlist|album|artist|track <id> [--shuffle]` (replaces the queue). Add to the queue: `melodie queue [--next] album <id>`.
+- Mixes: `melodie mix me`, `mix rediscover`, `mix artist "Daft Punk"`, `mix genre rock`; `--print` lists without playing.
+- Controls: `melodie toggle|pause|resume|next|prev|stop`, `melodie volume +5` (or `30`).
+- State: `melodie now --json` (title, artist, position, quality, `starred`). Without a player running, control commands answer « nothing playing », exit code 1.
+- Likes and playlists: `melodie like` (current track, `--toggle` to flip), `unlike`, `melodie playlist add <playlistId> current`, `playlist create "Name" current`.
+- Login: `melodie login` (interactive, for the user to run in a terminal), `melodie status`.
+- Rely on exit codes and JSON, never on message text.
+- In the island launcher: keyword `play` or `music`.
 
 ## Fichiers
 - `flea --gui <dossier>` : gestionnaire de fichiers. `flea shelf add <chemin>` : ajoute à l'étagère (SUPER+D).

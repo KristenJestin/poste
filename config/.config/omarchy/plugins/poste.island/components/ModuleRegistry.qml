@@ -1,17 +1,25 @@
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import "ModulePlayers.js" as ModulePlayers
 
 // Découverte des morceaux d'île fournis par les modules poste, sans connaître aucun module.
 //
 // Chaque module installé peut avoir, dans ~/.local/share/poste/modules/<nom>/island/ :
 //   launcher.json  entrées / extensions / moteurs du lanceur (même format que la config du lanceur)
-//   island.json    { "slots": [ { "slot": "<nom du slot>", "file": "Fichier.qml" } ] }
-// Slots que l'île charge (voir Island.qml) : « player-extra » (carte du lecteur), « capture »
+//   island.json    { "slots": [ { "slot": "<nom du slot>", "file": "Fichier.qml" } ],
+//                    "player": { … } }
+// "player" declares what the player card can show for one MPRIS player, without any QML
+// (see Island.qml): "bus" (its MPRIS bus name, required), "quality" (metadata key of a short
+// line under the artist), "starred" (boolean metadata key, the heart is lit when true),
+// "like" (command run by the heart), "launcher" (launcher extension opened by the sound
+// source pill, for a player without a window).
+// Slots que l'île charge (voir Island.qml) : « capture »
 // (source d'enregistrement pour la pastille de capture), « dictation » (source de dictée pour
 // la pastille de dictée en bas de l'écran et le texte sous l'île).
 //
-// Exposé : launcherDocs [{ module, data }], slots { <slot>: [url de fichier, …] }.
+// Exposé : launcherDocs [{ module, data }], slots { <slot>: [url de fichier, …] },
+// players [{ module, bus, quality, starred, like, launcher }].
 // Re-lecture au démarrage, puis à chaque changement sous le dossier des modules (inotifywait,
 // avec une courte temporisation). Module absent : rien n'est ajouté, aucune trace.
 Item {
@@ -20,6 +28,7 @@ Item {
 
   property var launcherDocs: []
   property var slots: ({})
+  property var players: []
   property string signature: ""
 
   // Lit les fichiers et les affiche en un seul document JSON (les erreurs de lecture sont ignorées).
@@ -52,10 +61,12 @@ Item {
     var sig = JSON.stringify(list)
     if (sig === signature) return
     signature = sig
-    var docs = [], map = {}
+    var docs = [], map = {}, players = []
     for (var i = 0; i < list.length; i++) {
       var m = list[i]
       if (m.launcher && typeof m.launcher === "object") docs.push({ module: m.module, data: m.launcher })
+      var pl = ModulePlayers.declaration(m.module, m.island && m.island.player)
+      if (pl) players.push(pl)
       var declared = m.island && Array.isArray(m.island.slots) ? m.island.slots : []
       for (var k = 0; k < declared.length; k++) {
         var s = declared[k]
@@ -66,6 +77,7 @@ Item {
       }
     }
     slots = map
+    reg.players = players
     launcherDocs = docs
   }
 

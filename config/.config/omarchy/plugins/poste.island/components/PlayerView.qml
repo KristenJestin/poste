@@ -129,7 +129,7 @@ Item {
           font.family: player.host.uiFont
           font.pixelSize: 15
         }
-        // Ligne de détail fournie par un module (slot « player-extra »), petite et discrète.
+        // Detail line declared by a module (`player` in its island.json), small and discreet.
         Text {
           Layout.fillWidth: true
           visible: text !== ""
@@ -143,8 +143,8 @@ Item {
         }
         // D'où vient le son : l'appli (icône et nom). Clic : sa fenêtre passe
         // au premier plan (celle de l'onglet qui joue pour un navigateur).
-        // Un lecteur sans fenêtre pris en charge par un module (slot « player-extra ») : le clic
-        // ouvre le lanceur sur l'extension qu'il indique (ce qui ferme cette vue).
+        // A player without a window, declared by a module (`player` in its island.json): the click
+        // opens the launcher on the extension it names (which closes this view).
         Item {
           id: sourceChip
           readonly property var entry: player.mpris && player.mpris.desktopEntry
@@ -210,7 +210,7 @@ Item {
           }
         }
       }
-      // Bouton d'action fourni par un module (cœur des favoris, slot « player-extra »).
+      // Action button declared by a module (the heart, `player` in its island.json).
       Glyph {
         id: heart
         visible: player.host.playerHasAction

@@ -1,0 +1,14 @@
+# Steps of the melodie add-on, merged with bootstrap/steps.toml when the add-on is chosen.
+
+# Pinned release: to update, change the version on both lines. install.sh puts melodie and
+# melodie-desktop in ~/.local/bin and never touches the config, the local copy nor the keyring.
+[[user]]
+id = "melodie"
+title = "Mélodie 0.1.0 (music player) in ~/.local/bin"
+requires = "gh"
+check = ["sh", "-c", "\"@HOME@/.local/bin/melodie\" --version 2>/dev/null | grep -qE '(^| )v?0\\.1\\.0$'"]
+run = [["sh", "-c", "set -e; v=0.1.0; d=$(mktemp -d); trap 'rm -rf \"$d\"' EXIT; cd \"$d\"; gh release download \"v$v\" -R KristenJestin/melodie --pattern \"melodie-$v-*\"; sha256sum --check \"melodie-$v-linux-x86_64.tar.gz.sha256\"; tar -xzf \"melodie-$v-linux-x86_64.tar.gz\"; cd \"melodie-$v-linux-x86_64\"; ./install.sh"]]
+
+[[manual]]
+id = "melodie-login"
+title = "Mélodie: melodie login in a terminal (Navidrome server), once"

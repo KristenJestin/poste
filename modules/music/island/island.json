@@ -1,8 +1,0 @@
-{
-  "slots": [
-    {
-      "slot": "player-extra",
-      "file": "PlayerExtra.qml"
-    }
-  ]
-}
