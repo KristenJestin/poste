@@ -525,13 +525,46 @@ Item {
     notificationList = []
     Quickshell.execDetached([ncScript, "clear"])
   }
-  // Same rule as the Notification Center's "Auto": open the picture a
-  // notification pointed at, otherwise focus the app that sent it. A stored
-  // notification's own command is never run.
+  // Open the picture a notification pointed at; otherwise run the click command
+  // its toast had (a Taildrop file: `xdg-open <file>`); otherwise focus the app
+  // that sent it. The Notification Center's archive keeps no command, so it is
+  // read back from poste.notifications' own files, named by the same key: the
+  // toast while it shows, then the history (its newest ten). Restored toasts
+  // run that same command; it is checked like theirs (parseExecArgv).
+  readonly property string toastStateDir: home + "/.local/state/omarchy/notifications"
+  property var pendingActivation: null
   function activateStoredNotification(n) {
     if (!n) return
-    if (n.file) Quickshell.execDetached(["xdg-open", String(n.file)])
-    else if (n.app) Quickshell.execDetached(["omarchy-hyprland-focus-app", String(n.app)])
+    if (n.file) { Quickshell.execDetached(["xdg-open", String(n.file)]); return }
+    if (!/^[0-9]+-[0-9]+$/.test(String(n.key || ""))) { focusNotificationApp(n); return }
+    pendingActivation = n
+    toastCommandProc.command = ["sh", "-c", "cat \"$1/$2.json\" 2>/dev/null || cat \"$1/history/$2.json\"",
+      "toast", toastStateDir, String(n.key)]
+    toastCommandProc.running = true
+  }
+  function focusNotificationApp(n) {
+    if (n && n.app) Quickshell.execDetached(["omarchy-hyprland-focus-app", String(n.app)])
+  }
+  // A JSON array of strings, the program first, not empty nor an option.
+  function storedExecArgv(text) {
+    var argv
+    try { argv = JSON.parse(JSON.parse(text).execArgv || "") } catch (e) { return null }
+    if (!Array.isArray(argv) || argv.length === 0) return null
+    for (var i = 0; i < argv.length; i++) if (typeof argv[i] !== "string") return null
+    return argv[0] && argv[0].charAt(0) !== "-" ? argv : null
+  }
+  Process {
+    id: toastCommandProc
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: {
+        var n = root.pendingActivation
+        root.pendingActivation = null
+        var argv = root.storedExecArgv(text)
+        if (argv) Quickshell.execDetached(argv)
+        else root.focusNotificationApp(n)
+      }
+    }
   }
   function relativeTime(ms) {
     var d = (Date.now() - Number(ms || 0)) / 1000

@@ -12,7 +12,7 @@ Hyprland 0.56, Quickshell shell with the personal island `poste.island`.
 - `devices`: batteries of wireless devices as JSON (keyboard, mouse, headset). `deviceSim "mouse 12"` / `batterySim "charging 75"`: simulations (`off` to stop).
 - Power profile (power-profiles-daemon): tile of the control center next to Network / Bluetooth / Sound (profile icon and name, a click goes to the next one, also on a desktop PC), profile icon in the battery bubble 6 s after unplugging, OSD in the banner at each change. `profile`: current profile and the machine's profiles (JSON). `profileSim "power-saver"`: simulation (`off` to stop). To change it: `omarchy-powerprofiles-set autodetect <profile>` (remembers it for mains or battery), only if the user asks; never `powerprofilesctl set`.
 - `usage` / `usageOf codex`: detail of Claude Code or Codex consumption (sessions, agents, models; script `bin/poste-agent-usage [session|week] [claude|codex]` as JSON).
-- `lock`: sound then lock. `launcher`, `menu`, `notifications`, `player`, `controls`, `close`.
+- `lock`: sound then lock. `launcher`, `menu`, `notifications` (a click on one opens its picture, else runs its toast's click command, such as opening a Taildrop file, else focuses its app), `player`, `controls`, `close`.
 - `module wifi|bluetooth|audio|vpn`: opens that panel. `unread`: number of unread notifications.
 
 ## Sounds
