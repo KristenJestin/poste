@@ -1,4 +1,4 @@
-//! `poste sys setup` : construit, montre le plan, demande confirmation, installe.
+//! `poste sys setup`: builds, shows the plan, asks for confirmation, installs.
 
 use crate::config::{self, Decision};
 use crate::manifest::{Entry, Manifest};
@@ -17,12 +17,12 @@ use std::process::{Command, ExitCode};
 pub struct Opts {
     pub yes: bool,
     pub dry_run: bool,
-    /// Ne s'occupe pas de la config (binaires seulement).
+    /// Does not deal with the config (binaries only).
     pub no_config: bool,
-    /// Pour les tests : ne lance pas `cargo build`.
+    /// For tests: does not run `cargo build`.
     pub skip_build: bool,
-    /// Simulation : la racine lue n'est pas encore `current` (lien pas posé) ; les liens de
-    /// config sont comparés à `<link_root>/config/<chemin>`, ceux que le vrai `setup` poserait.
+    /// Dry run: the root read is not yet `current` (link not put in place); the config
+    /// links are compared to `<link_root>/config/<path>`, the ones the real `setup` would put in place.
     pub link_root: Option<PathBuf>,
     pub take_repo: Vec<String>,
     pub take_home: Vec<String>,
@@ -37,31 +37,31 @@ fn decisions(env: &Env, o: &Opts) -> Result<HashMap<String, Decision>> {
         for a in list {
             let rel = config::rel_of(env, a)?;
             if map.insert(rel.clone(), d).is_some_and(|prev| prev != d) {
-                bail!("{rel} : --take-repo et --take-home ensemble, choisissez");
+                bail!("{rel}: --take-repo and --take-home together, choose one");
             }
         }
     }
     Ok(map)
 }
 
-/// Résultat de la phase binaires + config.
+/// Result of the binaries + config phase.
 struct Phase {
     code: ExitCode,
-    /// Faux si on s'arrête là (refus, annulation).
+    /// False if we stop there (refusal, cancellation).
     proceed: bool,
-    /// Vrai si des éléments de config ont été posés.
+    /// True if config elements were put in place.
     config_changed: bool,
-    /// Modules dont des fichiers sont posés ou mis à jour par ce setup (leurs unités redémarrent).
+    /// Modules whose files are put in place or updated by this setup (their units restart).
     changed_modules: std::collections::HashSet<String>,
 }
 
-/// Ce que `run` a fait : code de sortie, et si la config posée a changé (île et Hyprland à recharger).
+/// What `run` did: exit code, and whether the config put in place changed (island and Hyprland to reload).
 pub struct Outcome {
     pub code: ExitCode,
     pub config_changed: bool,
 }
 
-/// `config::load`, avec les liens vus comme le vrai `setup` les poserait.
+/// `config::load`, with the links seen as the real `setup` would put them in place.
 fn load_config(repo: &Path, env: &Env, o: &Opts) -> Result<Option<config::Layout>> {
     let mut layout = config::load(repo, env)?;
     if let (Some(l), Some(root)) = (&mut layout, &o.link_root) {
@@ -94,13 +94,13 @@ pub fn run(env: &Env, repo: &Path, o: &Opts) -> Result<Outcome> {
     if extras.conflicts > 0 {
         code = ExitCode::from(2);
     }
-    // `omarchy plugin add` peut toucher à des fichiers de config liés (shell.json) :
-    // on replanifie la config et on remet les liens du dépôt.
+    // `omarchy plugin add` may touch linked config files (shell.json):
+    // the config is planned again and the links of the repository are put back.
     if !applied.done.is_empty() {
         if let Some(l) = load_config(repo, env, o)? {
             let p = config::plan(&l, env, &decisions(env, o)?)?;
             if p.writes() > 0 || !p.conflicts().is_empty() {
-                println!("\nConfig à remettre après les étapes utilisateur :");
+                println!("\nConfig to put back after the user steps:");
                 config::print_plan(env, &p);
                 let mut manifest = Manifest::load(&env.manifest_file())?;
                 let stamp = time::now_compact();
@@ -146,7 +146,7 @@ pub fn run(env: &Env, repo: &Path, o: &Opts) -> Result<Outcome> {
     }
     if !applied.failed.is_empty() {
         eprintln!(
-            "\nposte sys : étape(s) en échec : {}",
+            "\nposte sys: step(s) failed: {}",
             applied.failed.join(", ")
         );
         code = ExitCode::from(1);
@@ -157,15 +157,15 @@ pub fn run(env: &Env, repo: &Path, o: &Opts) -> Result<Outcome> {
     })
 }
 
-/// Résultat de la phase « lignes de module et orphelins ».
+/// Result of the "module lines and orphans" phase.
 struct Extras {
     conflicts: usize,
     changed: bool,
 }
 
-/// Lignes posées dans des fichiers sans inclusion (`[[line]]` des modules) et retrait des
-/// orphelins (liens dont la source a disparu, fichiers de modules disparus). Un aperçu,
-/// puis une seule confirmation (sauf `--yes`) ; `--dry-run` n'écrit rien.
+/// Lines put in files without includes (`[[line]]` of the modules) and removal of
+/// orphans (links whose source is gone, module files that are gone). A preview,
+/// then a single confirmation (unless `--yes`); `--dry-run` writes nothing.
 fn extras_phase(
     env: &Env,
     repo: &Path,
@@ -198,32 +198,32 @@ fn extras_phase(
         });
     }
     if o.dry_run {
-        println!("\nSimulation (--dry-run) : orphelins et lignes non touchés.");
+        println!("\nDry run (--dry-run): orphans and lines not touched.");
         return Ok(Extras {
             conflicts,
             changed: false,
         });
     }
-    if !o.yes && !confirm(&format!("\nAppliquer ces {writes} changement(s) ? [o/N] "))? {
-        println!("Annulé.");
+    if !o.yes && !confirm(&format!("\nApply these {writes} change(s)? [y/N] "))? {
+        println!("Cancelled.");
         return Ok(Extras {
             conflicts,
             changed: false,
         });
     }
     let stamp = time::now_compact();
-    // Unités à retirer d'abord : leurs fichiers vont disparaître avec le module.
+    // Units to remove first: their files will disappear with the module.
     units::apply_removals(env, &runner, &unit_steps, &mut manifest)?;
     manifest.save(&manifest_file)?;
     orphans::apply(env, repo, &orphan_list, &stamp, &mut manifest)?;
     manifest.save(&manifest_file)?;
-    // Les liens retirés, on replanifie les lignes (un fichier lié disparu se recrée).
+    // The links removed, the lines are planned again (a linked file that is gone is recreated).
     let steps = lines::plan(&specs, &manifest, &std::collections::HashSet::new());
     let n = lines::apply(env, &steps, &stamp, &mut manifest)?;
     units::apply_additions(&runner, &unit_steps, &mut manifest)?;
     manifest.save(&manifest_file)?;
     println!(
-        "Terminé : {} orphelin(s) retiré(s), {n} ligne(s) traitée(s).",
+        "Done: {} orphan(s) removed, {n} line(s) handled.",
         orphan_list.len()
     );
     Ok(Extras {
@@ -232,7 +232,7 @@ fn extras_phase(
     })
 }
 
-/// Rappelle les modules que la config de la machine ne veut pas installer.
+/// Reminds of the modules that the machine's config does not want installed.
 fn print_disabled(env: &Env) -> Result<()> {
     let cfg = poste_core::Config::load(env)?;
     let off: Vec<&str> = cfg
@@ -243,7 +243,7 @@ fn print_disabled(env: &Env) -> Result<()> {
         .collect();
     if !off.is_empty() {
         println!(
-            "Modules désactivés sur cette machine (config.toml, disabled) : {}",
+            "Modules disabled on this machine (config.toml, disabled): {}",
             off.join(", ")
         );
     }
@@ -254,9 +254,9 @@ fn install_phase(env: &Env, repo: &Path, o: &Opts) -> Result<Phase> {
     let (yes, dry_run) = (o.yes, o.dry_run);
     let decisions = decisions(env, o)?;
     if o.no_config && !decisions.is_empty() {
-        bail!("--take-repo/--take-home n'ont pas de sens avec --no-config");
+        bail!("--take-repo/--take-home make no sense with --no-config");
     }
-    // Une version installée arrive construite (pas de Cargo.toml) ; le clone se construit.
+    // An installed version arrives built (no Cargo.toml); the clone is built.
     if !o.skip_build && repo.join("Cargo.toml").is_file() {
         build(repo)?;
     }
@@ -266,7 +266,7 @@ fn install_phase(env: &Env, repo: &Path, o: &Opts) -> Result<Phase> {
     let items = plan::desired(repo, env)?;
     for it in &items {
         if !it.src.is_file() {
-            bail!("binaire ou fichier source absent : {}", it.src.display());
+            bail!("binary or source file missing: {}", it.src.display());
         }
     }
     let mut steps: Vec<(Item, Action)> = Vec::new();
@@ -283,7 +283,7 @@ fn install_phase(env: &Env, repo: &Path, o: &Opts) -> Result<Phase> {
     print_disabled(env)?;
     print_plan(env, &steps);
 
-    // Refus net : on n'écrit rien du tout si un fichier étranger gêne un binaire.
+    // Clean refusal: nothing at all is written if a foreign file is in the way of a binary.
     let conflicts: Vec<_> = steps
         .iter()
         .filter(|(_, a)| *a == Action::Conflict)
@@ -292,7 +292,7 @@ fn install_phase(env: &Env, repo: &Path, o: &Opts) -> Result<Phase> {
         eprintln!();
         for (it, _) in &conflicts {
             eprintln!(
-                "poste sys : refus : {} existe et n'a pas été posé par poste sys. Déplacez-le ou supprimez-le vous-même, puis relancez.",
+                "poste sys: refused: {} exists and was not put in place by poste sys. Move or delete it yourself, then run again.",
                 env.display(&it.dest)
             );
         }
@@ -304,7 +304,7 @@ fn install_phase(env: &Env, repo: &Path, o: &Opts) -> Result<Phase> {
         });
     }
 
-    // La config : un plan à part, dont les conflits n'empêchent pas le reste.
+    // The config: a separate plan, whose conflicts do not stop the rest.
     let layout = if o.no_config {
         None
     } else {
@@ -332,7 +332,7 @@ fn install_phase(env: &Env, repo: &Path, o: &Opts) -> Result<Phase> {
         }
         if cfg_conflicts > 0 {
             println!(
-                "\n{msg} ({cfg_conflicts} conflit(s) de config à trancher, code de sortie 2)."
+                "\n{msg} ({cfg_conflicts} config conflict(s) to decide, exit code 2)."
             );
         } else {
             println!("\n{msg}");
@@ -363,7 +363,7 @@ fn install_phase(env: &Env, repo: &Path, o: &Opts) -> Result<Phase> {
                 manifest.save(&manifest_file)?;
             }
         }
-        end("Tout est à jour");
+        end("Everything is up to date");
         return Ok(Phase {
             code,
             proceed: true,
@@ -372,7 +372,7 @@ fn install_phase(env: &Env, repo: &Path, o: &Opts) -> Result<Phase> {
         });
     }
     if dry_run {
-        end("Simulation (--dry-run) : rien n'a été écrit");
+        end("Dry run (--dry-run): nothing was written");
         return Ok(Phase {
             code,
             proceed: true,
@@ -382,11 +382,11 @@ fn install_phase(env: &Env, repo: &Path, o: &Opts) -> Result<Phase> {
     }
     if !yes
         && !confirm(&format!(
-            "\nAppliquer ces {} changement(s) ? [o/N] ",
+            "\nApply these {} change(s)? [y/N] ",
             to_write + cfg_writes
         ))?
     {
-        println!("Annulé.");
+        println!("Cancelled.");
         return Ok(Phase {
             code: ExitCode::from(1),
             proceed: false,
@@ -401,7 +401,7 @@ fn install_phase(env: &Env, repo: &Path, o: &Opts) -> Result<Phase> {
             Action::Create | Action::Update { .. } => {
                 if matches!(action, Action::Update { .. }) {
                     let bak = crate::util::backup(env, &it.dest, &stamp)?;
-                    println!("  sauvegarde : {}", env.display(&bak));
+                    println!("  backup: {}", env.display(&bak));
                 }
                 install(&it.src, &it.dest)?;
                 record(&mut manifest, it)?;
@@ -421,7 +421,7 @@ fn install_phase(env: &Env, repo: &Path, o: &Opts) -> Result<Phase> {
         manifest.save(&manifest_file)?;
     }
     end(&format!(
-        "Terminé : {to_write} fichier(s) posé(s), {done_cfg} élément(s) de config traité(s)"
+        "Done: {to_write} file(s) put in place, {done_cfg} config element(s) handled"
     ));
     Ok(Phase {
         code,
@@ -432,27 +432,27 @@ fn install_phase(env: &Env, repo: &Path, o: &Opts) -> Result<Phase> {
 }
 
 pub(crate) fn build(repo: &Path) -> Result<()> {
-    println!("Construction : cargo build --release ({})", repo.display());
+    println!("Build: cargo build --release ({})", repo.display());
     let status = Command::new("cargo")
         .args(["build", "--release", "--quiet"])
         .current_dir(repo)
         .status()
-        .context("impossible de lancer cargo")?;
+        .context("cannot run cargo")?;
     if !status.success() {
-        bail!("la construction a échoué");
+        bail!("the build failed");
     }
     Ok(())
 }
 
 fn print_plan(env: &Env, steps: &[(Item, Action)]) {
-    println!("\nPlan :");
+    println!("\nPlan:");
     for (it, a) in steps {
         let note = match a {
             Action::Update { by_hand: true } => {
-                "  (écrase une retouche manuelle, ancien fichier sauvegardé)"
+                "  (overwrites a manual edit, old file backed up)"
             }
-            Action::Adopt => "  (déjà identique, désormais suivi)",
-            Action::Conflict => "  (fichier étranger, non posé par poste sys)",
+            Action::Adopt => "  (already identical, now tracked)",
+            Action::Conflict => "  (foreign file, not put in place by poste sys)",
             _ => "",
         };
         println!(
@@ -466,10 +466,10 @@ fn print_plan(env: &Env, steps: &[(Item, Action)]) {
 
 fn label_short(a: &Action) -> &'static str {
     match a {
-        Action::Create => "créé",
-        Action::Update { .. } => "modifié",
-        Action::Unchanged | Action::Adopt => "inchangé",
-        Action::Conflict => "REFUSÉ",
+        Action::Create => "created",
+        Action::Update { .. } => "changed",
+        Action::Unchanged | Action::Adopt => "unchanged",
+        Action::Conflict => "REFUSED",
     }
 }
 
@@ -484,13 +484,13 @@ pub(crate) fn confirm(prompt: &str) -> Result<bool> {
     ))
 }
 
-/// Copie atomique : fichier temporaire voisin puis renommage (fonctionne même si
-/// la destination est un binaire en cours d'exécution, y compris poste-sys lui-même).
+/// Atomic copy: neighbouring temporary file then rename (works even if
+/// the destination is a running binary, including poste-sys itself).
 fn install(src: &Path, dest: &Path) -> Result<()> {
-    let parent = dest.parent().context("destination sans dossier parent")?;
+    let parent = dest.parent().context("destination without a parent folder")?;
     std::fs::create_dir_all(parent)?;
     let tmp = parent.join(format!(".poste-tmp-{}", std::process::id()));
-    std::fs::copy(src, &tmp).with_context(|| format!("copie vers {}", tmp.display()))?;
+    std::fs::copy(src, &tmp).with_context(|| format!("copy to {}", tmp.display()))?;
     if let Err(e) = std::fs::rename(&tmp, dest) {
         let _ = std::fs::remove_file(&tmp);
         return Err(e).with_context(|| format!("installation de {}", dest.display()));
@@ -514,23 +514,23 @@ mod tests {
     use std::fs;
     use std::path::PathBuf;
 
-    /// Les tests ne regardent que le code de sortie.
+    /// The tests only look at the exit code.
     fn run(env: &Env, repo: &Path, o: &Opts) -> Result<ExitCode> {
         super::run(env, repo, o).map(|d| d.code)
     }
 
-    /// Faux dépôt (avec un « binaire » déjà construit) et HOME temporaire.
+    /// Fake repository (with an already built "binary") and temporary HOME.
     fn fixture() -> (tempfile::TempDir, PathBuf, Env) {
         let d = tempfile::tempdir().unwrap();
         let repo = d.path().join("repo");
         fs::create_dir_all(repo.join("target/release")).unwrap();
         fs::write(repo.join("target/release/poste"), "bin").unwrap();
         fs::create_dir_all(repo.join("config/.config/a")).unwrap();
-        fs::write(repo.join("config/.config/a/neuf"), "n").unwrap();
-        fs::write(repo.join("config/.config/a/conflit"), "dépôt").unwrap();
+        fs::write(repo.join("config/.config/a/fresh"), "n").unwrap();
+        fs::write(repo.join("config/.config/a/clash"), "repo text").unwrap();
         let home = d.path().join("home");
         fs::create_dir_all(home.join(".config/a")).unwrap();
-        fs::write(home.join(".config/a/conflit"), "maison").unwrap();
+        fs::write(home.join(".config/a/clash"), "home text").unwrap();
         let env = Env::with_home(&home);
         (d, repo, env)
     }
@@ -549,59 +549,59 @@ mod tests {
     }
 
     #[test]
-    fn dry_run_n_ecrit_rien() {
+    fn dry_run_writes_nothing() {
         let (_d, repo, env) = fixture();
         let c = run(&env, &repo, &opts(true, true)).unwrap();
-        assert_eq!(code(c), code(ExitCode::from(2)), "conflit : code non nul");
-        assert!(!env.home.join(".local").exists(), "rien dans .local");
-        assert!(!env.home.join(".config/a/neuf").exists());
+        assert_eq!(code(c), code(ExitCode::from(2)), "conflict: non-zero code");
+        assert!(!env.home.join(".local").exists(), "nothing in .local");
+        assert!(!env.home.join(".config/a/fresh").exists());
         assert_eq!(
-            fs::read_to_string(env.home.join(".config/a/conflit")).unwrap(),
-            "maison"
+            fs::read_to_string(env.home.join(".config/a/clash")).unwrap(),
+            "home text"
         );
     }
 
     #[test]
-    fn application_conflit_non_bloquant_puis_relance() {
+    fn application_non_blocking_conflict_then_rerun() {
         let (_d, repo, env) = fixture();
         let c = run(&env, &repo, &opts(true, false)).unwrap();
         assert_eq!(code(c), code(ExitCode::from(2)));
-        assert!(env.home.join(".config/a/neuf").is_symlink());
+        assert!(env.home.join(".config/a/fresh").is_symlink());
         assert!(env.bin_dir().join("poste").is_file());
-        assert!(!env.home.join(".config/a/conflit").is_symlink());
+        assert!(!env.home.join(".config/a/clash").is_symlink());
         let m = Manifest::load(&env.manifest_file()).unwrap();
         assert!(m
             .files
             .iter()
-            .any(|e| e.module == "config" && e.path.ends_with(".config/a/neuf")));
+            .any(|e| e.module == "config" && e.path.ends_with(".config/a/fresh")));
         assert!(m.files.iter().any(|e| e.module == "poste"));
-        // Trancher le conflit puis relancer : à jour, code 0, manifeste inchangé.
+        // Decide the conflict then run again: up to date, code 0, manifest unchanged.
         let o = Opts {
-            take_repo: vec![".config/a/conflit".into()],
+            take_repo: vec![".config/a/clash".into()],
             ..opts(true, false)
         };
         assert_eq!(code(run(&env, &repo, &o).unwrap()), code(ExitCode::SUCCESS));
-        assert!(env.home.join(".config/a/conflit").is_symlink());
+        assert!(env.home.join(".config/a/clash").is_symlink());
         let before = fs::read_to_string(env.manifest_file()).unwrap();
         assert_eq!(
             code(run(&env, &repo, &opts(true, false)).unwrap()),
             code(ExitCode::SUCCESS)
         );
         assert_eq!(fs::read_to_string(env.manifest_file()).unwrap(), before);
-        // L'ancienne version du conflit est sauvegardée.
+        // The old version of the conflict is backed up.
         let b: Vec<_> = fs::read_dir(env.backup_dir()).unwrap().flatten().collect();
         assert_eq!(b.len(), 1);
     }
 
     #[test]
-    fn sans_config_et_decisions_incoherentes() {
+    fn no_config_and_inconsistent_decisions() {
         let (_d, repo, env) = fixture();
         let o = Opts {
             no_config: true,
             ..opts(true, false)
         };
         assert_eq!(code(run(&env, &repo, &o).unwrap()), code(ExitCode::SUCCESS));
-        assert!(!env.home.join(".config/a/neuf").exists());
+        assert!(!env.home.join(".config/a/fresh").exists());
         let o = Opts {
             take_repo: vec!["x".into()],
             take_home: vec!["x".into()],
@@ -611,7 +611,7 @@ mod tests {
     }
 
     #[test]
-    fn module_script_lignes_et_disparition() {
+    fn script_module_lines_and_disappearance() {
         let (_d, repo, env) = fixture();
         let m = repo.join("modules/rec");
         fs::create_dir_all(m.join("hypr")).unwrap();
@@ -625,7 +625,7 @@ mod tests {
         let home = env.home.clone();
         fs::write(home.join(".config/x.conf"), "perso = 1\n").unwrap();
         let o = Opts {
-            take_repo: vec![".config/a/conflit".into()],
+            take_repo: vec![".config/a/clash".into()],
             ..opts(true, false)
         };
         assert_eq!(code(run(&env, &repo, &o).unwrap()), code(ExitCode::SUCCESS));
@@ -636,7 +636,7 @@ mod tests {
         let before = fs::read_to_string(env.manifest_file()).unwrap();
         run(&env, &repo, &opts(true, false)).unwrap();
         assert_eq!(fs::read_to_string(env.manifest_file()).unwrap(), before);
-        // Le module disparaît du dépôt : ses fichiers et sa ligne partent, le reste est intact.
+        // The module disappears from the repository: its files and its line go, the rest is intact.
         fs::remove_dir_all(&m).unwrap();
         run(&env, &repo, &opts(true, false)).unwrap();
         assert!(!env.modules_dir().join("rec").exists());
@@ -670,53 +670,53 @@ mod tests {
     }
 
     #[test]
-    fn fichiers_locaux_jamais_touches() {
+    fn local_files_never_touched() {
         let (_d, repo, env) = fixture();
         fs::create_dir_all(env.config_file().parent().unwrap()).unwrap();
-        fs::write(env.config_file(), "local = [\".config/a/conflit\"]\n").unwrap();
-        // Le fichier différent n'est plus un conflit : code 0, fichier intact, le reste est lié.
+        fs::write(env.config_file(), "local = [\".config/a/clash\"]\n").unwrap();
+        // The different file is no longer a conflict: code 0, file intact, the rest is linked.
         assert_eq!(
             code(run(&env, &repo, &opts(true, false)).unwrap()),
             code(ExitCode::SUCCESS)
         );
-        assert!(env.home.join(".config/a/neuf").is_symlink());
-        let loc = env.home.join(".config/a/conflit");
+        assert!(env.home.join(".config/a/fresh").is_symlink());
+        let loc = env.home.join(".config/a/clash");
         assert!(!loc.is_symlink());
-        assert_eq!(fs::read_to_string(&loc).unwrap(), "maison");
+        assert_eq!(fs::read_to_string(&loc).unwrap(), "home text");
         let m = Manifest::load(&env.manifest_file()).unwrap();
-        assert!(m.files.iter().all(|e| !e.path.ends_with("a/conflit")));
-        // Le diff d'un chemin local montre quand même l'écart.
+        assert!(m.files.iter().all(|e| !e.path.ends_with("a/clash")));
+        // The diff of a local path still shows the difference.
         let l = config::load(&repo, &env).unwrap().unwrap();
         assert_eq!(l.local.len(), 1);
-        assert!(config::diff(&l, &env, Some(".config/a/conflit")).unwrap());
-        // Sans diagnostic d'écart sans argument pour les locaux.
+        assert!(config::diff(&l, &env, Some(".config/a/clash")).unwrap());
+        // Without difference diagnostic with no argument for the local ones.
         assert!(!config::diff(&l, &env, None).unwrap());
     }
 
     #[test]
-    fn fichier_local_deja_lie_reste_tel_quel() {
+    fn local_file_already_linked_stays_as_is() {
         let (_d, repo, env) = fixture();
         run(
             &env,
             &repo,
             &Opts {
-                take_repo: vec![".config/a/conflit".into()],
+                take_repo: vec![".config/a/clash".into()],
                 ..opts(true, false)
             },
         )
         .unwrap();
-        assert!(env.home.join(".config/a/conflit").is_symlink());
+        assert!(env.home.join(".config/a/clash").is_symlink());
         fs::create_dir_all(env.config_file().parent().unwrap()).unwrap();
         fs::write(env.config_file(), "local = [\".config/a\"]\n").unwrap();
-        // Un dossier entier en local : plus rien n'est ni créé ni retiré.
+        // A whole folder as local: nothing is created or removed any more.
         let before = fs::read_to_string(env.manifest_file()).unwrap();
         run(&env, &repo, &opts(true, false)).unwrap();
-        assert!(env.home.join(".config/a/conflit").is_symlink());
+        assert!(env.home.join(".config/a/clash").is_symlink());
         assert_eq!(fs::read_to_string(env.manifest_file()).unwrap(), before);
     }
 
     #[test]
-    fn module_desactive_retire_puis_reactive() {
+    fn disabled_module_removed_then_enabled_again() {
         let (_d, repo, env) = fixture();
         let (fake, log) = crate::units::tests::fake_systemctl(_d.path(), &env.home);
         std::env::set_var("POSTE_SYS_TEST_SYSTEMCTL", &fake);
@@ -724,7 +724,7 @@ mod tests {
         let home = env.home.clone();
         fs::write(home.join(".config/x.conf"), "perso = 1\n").unwrap();
         let o = Opts {
-            take_repo: vec![".config/a/conflit".into()],
+            take_repo: vec![".config/a/clash".into()],
             ..opts(true, false)
         };
         run(&env, &repo, &o).unwrap();
@@ -739,7 +739,7 @@ mod tests {
             .unwrap()
             .contains("k:p"));
 
-        // Désactivé : l'aperçu seul ne retire rien.
+        // Disabled: the preview alone removes nothing.
         fs::create_dir_all(env.config_file().parent().unwrap()).unwrap();
         fs::write(env.config_file(), "disabled = [\"rec\"]\n").unwrap();
         run(&env, &repo, &opts(true, true)).unwrap();
@@ -747,7 +747,7 @@ mod tests {
         assert!(home
             .join(".config/systemd/user/poste-rec.service")
             .is_symlink());
-        // Pour de vrai : fichiers, hypr/, island/, unité et ligne partent ; le reste est intact.
+        // For real: files, hypr/, island/, unit and line go; the rest is intact.
         run(&env, &repo, &opts(true, false)).unwrap();
         assert!(!base.exists());
         assert!(fs::read_to_string(&log)
@@ -761,9 +761,9 @@ mod tests {
         let man = Manifest::load(&env.manifest_file()).unwrap();
         assert!(man.units.is_empty() && man.lines.is_empty());
         assert!(man.files.iter().all(|e| e.module != "rec"));
-        assert!(home.join(".config/a/neuf").is_symlink());
+        assert!(home.join(".config/a/fresh").is_symlink());
 
-        // Réactivé : tout revient.
+        // Enabled again: everything comes back.
         fs::write(env.config_file(), "disabled = []\n").unwrap();
         run(&env, &repo, &opts(true, false)).unwrap();
         assert!(base.join("island/launcher.json").is_file());
@@ -791,7 +791,7 @@ mod tests {
         fs::create_dir_all(env.config_file().parent().unwrap()).unwrap();
         fs::write(env.config_file(), "addons = [\"tool\"]\n").unwrap();
         let o = Opts {
-            take_repo: vec![".config/a/conflit".into()],
+            take_repo: vec![".config/a/clash".into()],
             ..opts(true, false)
         };
         run(&env, &repo, &o).unwrap();
@@ -818,15 +818,15 @@ mod tests {
     }
 
     #[test]
-    fn surcharge_json_generee_regeneree_et_conflit() {
+    fn generated_json_override_regenerated_and_conflict() {
         let (_d, repo, env) = fixture();
         let dest = with_override(&repo, &env);
         let o = Opts {
-            take_repo: vec![".config/a/conflit".into()],
+            take_repo: vec![".config/a/clash".into()],
             ..opts(true, false)
         };
         assert_eq!(code(run(&env, &repo, &o).unwrap()), code(ExitCode::SUCCESS));
-        // Fichier ordinaire (pas un lien), dépôt + surcharge, reste du fichier suit le dépôt.
+        // Ordinary file (not a link), repository + override, the rest of the file follows the repository.
         assert!(!dest.is_symlink() && dest.is_file());
         let t = fs::read_to_string(&dest).unwrap();
         assert!(t.contains("\"lock\": 3600") && t.contains("\"screensaver\": 2700"));
@@ -840,7 +840,7 @@ mod tests {
         run(&env, &repo, &opts(true, false)).unwrap();
         assert_eq!(fs::read_to_string(env.manifest_file()).unwrap(), before);
 
-        // Le dépôt change : régénéré sans conflit, surcharge conservée.
+        // The repository changes: regenerated without conflict, override kept.
         fs::write(
             repo.join("config/.config/a/s.json"),
             SJ.replace("\"x\": 1", "\"x\": 2"),
@@ -853,7 +853,7 @@ mod tests {
         let t = fs::read_to_string(&dest).unwrap();
         assert!(t.contains("\"x\": 2") && t.contains("\"lock\": 3600"));
 
-        // Modifié à la main : conflit (code 2), fichier intact, status le signale.
+        // Edited by hand: conflict (code 2), file intact, status reports it.
         fs::write(&dest, t.replace("\"x\": 2", "\"x\": 9")).unwrap();
         assert_eq!(
             code(run(&env, &repo, &opts(true, false)).unwrap()),
@@ -869,7 +869,7 @@ mod tests {
         assert_eq!(config::state_of(e, &env).unwrap(), config::State::Differs);
         assert!(config::diff(&l, &env, Some(".config/a/s.json")).unwrap());
 
-        // --take-repo régénère (ancien sauvegardé).
+        // --take-repo regenerates (old one backed up).
         let o = Opts {
             take_repo: vec![".config/a/s.json".into()],
             ..opts(true, false)
@@ -883,16 +883,16 @@ mod tests {
     }
 
     #[test]
-    fn surcharge_take_home_remet_les_valeurs_du_depot_ou_refuse() {
+    fn override_take_home_restores_repository_values_or_refuses() {
         let (_d, repo, env) = fixture();
         let dest = with_override(&repo, &env);
         let o = Opts {
-            take_repo: vec![".config/a/conflit".into()],
+            take_repo: vec![".config/a/clash".into()],
             ..opts(true, false)
         };
         run(&env, &repo, &o).unwrap();
         let t = fs::read_to_string(&dest).unwrap();
-        // Réglage fait à la main dans ~ : repris dans le dépôt, sans la valeur surchargée.
+        // Setting made by hand in ~: taken back into the repository, without the overridden value.
         fs::write(&dest, t.replace("\"x\": 1", "\"x\": 7")).unwrap();
         let o = Opts {
             take_home: vec![".config/a/s.json".into()],
@@ -906,7 +906,7 @@ mod tests {
         );
         let d = fs::read_to_string(&dest).unwrap();
         assert!(d.contains("\"x\": 7") && d.contains("\"lock\": 3600"));
-        // Valeur surchargée changée à la main : reprise ambiguë, refus, rien d'écrit.
+        // Overridden value changed by hand: ambiguous take-back, refusal, nothing written.
         fs::write(&dest, d.replace("3600", "1800")).unwrap();
         let repo_before = fs::read_to_string(repo.join("config/.config/a/s.json")).unwrap();
         assert!(run(&env, &repo, &o).is_err());
@@ -918,18 +918,18 @@ mod tests {
     }
 
     #[test]
-    fn surcharge_remplace_un_lien_et_adopte_un_fichier_equivalent() {
+    fn override_replaces_a_link_and_adopts_an_equivalent_file() {
         let (_d, repo, env) = fixture();
         let dest = with_override(&repo, &env);
-        // Ancien lien vers le dépôt (avant la surcharge) : remplacé par un fichier généré.
+        // Old link to the repository (before the override): replaced by a generated file.
         std::os::unix::fs::symlink(repo.join("config/.config/a/s.json"), &dest).unwrap();
         let o = Opts {
-            take_repo: vec![".config/a/conflit".into()],
+            take_repo: vec![".config/a/clash".into()],
             ..opts(true, false)
         };
         assert_eq!(code(run(&env, &repo, &o).unwrap()), code(ExitCode::SUCCESS));
         assert!(!dest.is_symlink());
-        // Le PC pro : mêmes valeurs écrites à la main, autre mise en forme : adopté sans conflit.
+        // The work PC: same values written by hand, other formatting: adopted without conflict.
         fs::write(
             &dest,
             "{\"bar\":{\"x\":1},\"idle\":{\"lock\":3600,\"screensaver\":2700}}",
@@ -940,7 +940,7 @@ mod tests {
             code(ExitCode::SUCCESS)
         );
         assert!(fs::read_to_string(&dest).unwrap().contains("  \"idle\": {"));
-        // Dry-run : rien n'est écrit.
+        // Dry run: nothing is written.
         fs::write(
             repo.join("config/.config/a/s.json"),
             SJ.replace("\"x\": 1", "\"x\": 3"),

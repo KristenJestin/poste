@@ -1,7 +1,7 @@
-//! Réglages propres à cette machine, dans `~/.config/poste/config.toml` (jamais dans le dépôt) :
-//! `local` (fichiers de `config/` gardés à la machine) et `disabled` (modules non installés).
-//! `poste sys local …` et `poste sys module …` éditent ces deux listes sans toucher au reste
-//! du fichier (commentaires et autres clés conservés).
+//! Settings specific to this machine, in `~/.config/poste/config.toml` (never in the repository):
+//! `local` (files of `config/` kept to the machine) and `disabled` (modules not installed).
+//! `poste sys local …` and `poste sys module …` edit these two lists without touching the rest
+//! of the file (comments and other keys kept).
 
 use crate::config;
 use crate::ojson::{self, J};
@@ -12,13 +12,13 @@ use poste_core::{Config, Env};
 use std::path::Path;
 use toml_edit::{Array, ArrayOfTables, DocumentMut, InlineTable, Item, Table, Value};
 
-/// Ajoute (`add = true`) ou retire `value` de la liste `key` du fichier. Renvoie `true` si le
-/// fichier a changé. Le fichier est créé au besoin ; écriture atomique.
+/// Adds (`add = true`) or removes `value` from the list `key` of the file. Returns `true` if the
+/// file changed. The file is created if needed; atomic write.
 pub fn edit_list(file: &Path, key: &str, value: &str, add: bool) -> Result<bool> {
     let text = match std::fs::read_to_string(file) {
         Ok(t) => t,
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => String::new(),
-        Err(e) => return Err(e).with_context(|| format!("lecture de {}", file.display())),
+        Err(e) => return Err(e).with_context(|| format!("reading {}", file.display())),
     };
     let mut doc: DocumentMut = text
         .parse()
@@ -35,7 +35,7 @@ pub fn edit_list(file: &Path, key: &str, value: &str, add: bool) -> Result<bool>
             doc[key] = Item::Value(Value::Array(Array::new()));
         }
         let Some(arr) = doc[key].as_array_mut() else {
-            bail!("{} : « {key} » n'est pas une liste", file.display());
+            bail!("{}: '{key}' is not a list", file.display());
         };
         arr.push(value);
     } else if let Some(arr) = doc[key].as_array_mut() {
@@ -50,13 +50,13 @@ pub fn edit_list(file: &Path, key: &str, value: &str, add: bool) -> Result<bool>
     Ok(true)
 }
 
-/// Fixe la clé de premier niveau `key = "value"` (chaîne) sans toucher au reste du fichier.
-/// Renvoie `true` si le fichier a changé. Le fichier est créé au besoin ; écriture atomique.
+/// Sets the top-level key `key = "value"` (string) without touching the rest of the file.
+/// Returns `true` if the file changed. The file is created if needed; atomic write.
 pub fn set_key(file: &Path, key: &str, value: &str) -> Result<bool> {
     let text = match std::fs::read_to_string(file) {
         Ok(t) => t,
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => String::new(),
-        Err(e) => return Err(e).with_context(|| format!("lecture de {}", file.display())),
+        Err(e) => return Err(e).with_context(|| format!("reading {}", file.display())),
     };
     let mut doc: DocumentMut = text
         .parse()
@@ -76,42 +76,42 @@ pub fn set_key(file: &Path, key: &str, value: &str) -> Result<bool> {
 
 // ---------------------------------------------------------------- local
 
-/// `poste sys local` : liste les fichiers locaux.
+/// `poste sys local`: lists the local files.
 pub fn local_list(env: &Env, repo: &Path) -> Result<()> {
     let Some(layout) = config::load(repo, env)? else {
-        bail!("pas de dossier config/ dans le dépôt");
+        bail!("no config/ folder in the repository");
     };
     if layout.local_paths.is_empty() {
-        println!("Aucun fichier local : tout config/ est lié (poste sys local add <chemin> pour en garder un à cette machine).");
+        println!("No local file: all of config/ is linked (poste sys local add <path> to keep one to this machine).");
         return Ok(());
     }
     config::print_local(&layout, env)
 }
 
-/// `poste sys local add <chemin>`.
+/// `poste sys local add <path>`.
 pub fn local_add(env: &Env, repo: &Path, arg: &str) -> Result<()> {
     let rel = config::rel_of(env, arg)?;
     let Some(all) = config::load_with(repo, env, &[], &[])? else {
-        bail!("pas de dossier config/ dans le dépôt");
+        bail!("no config/ folder in the repository");
     };
     if let Some(d) = all
         .link_dirs
         .iter()
         .find(|d| rel.starts_with(&format!("{d}/")))
     {
-        bail!("{rel} est dans le dossier lié d'un bloc « {d} » : déclarez ce dossier comme local");
+        bail!("{rel} is in the folder linked as a block '{d}': declare that folder as local");
     }
     if !all
         .entries
         .iter()
         .any(|e| config::is_local(&e.rel, std::slice::from_ref(&rel)))
     {
-        bail!("{rel} n'est pas une entrée de config/ du dépôt (rien à garder en local)");
+        bail!("{rel} is not an entry of the config/ of the repository (nothing to keep local)");
     }
     let changed = edit_list(&env.config_file(), "local", &rel, true)?;
-    let tag = if changed { "ajouté à" } else { "déjà dans" };
-    println!("{rel} : {tag} local ({}).", env.display(&env.config_file()));
-    // État actuel de la cible, pour dire quoi faire du lien existant.
+    let tag = if changed { "added to" } else { "already in" };
+    println!("{rel}: {tag} local ({}).", env.display(&env.config_file()));
+    // Current state of the target, to say what to do with the existing link.
     for e in all
         .entries
         .iter()
@@ -119,27 +119,27 @@ pub fn local_add(env: &Env, repo: &Path, arg: &str) -> Result<()> {
     {
         if config::state_of(e, env)? == config::State::Linked {
             println!(
-                "  {} est encore un lien vers le dépôt : poste n'y touchera plus, mais l'éditer modifierait le dépôt. Pour en faire un fichier ordinaire (copie), lancez `poste sys forget {}`.",
+                "  {} is still a link to the repository: poste will no longer touch it, but editing it would change the repository. To make it an ordinary file (copy), run `poste sys forget {}`.",
                 env.display(&e.dest),
                 e.rel
             );
         }
     }
-    println!("  setup ne le lie plus, ne le signale plus en conflit et ne le touche jamais.");
+    println!("  setup no longer links it, no longer reports it as a conflict and never touches it.");
     Ok(())
 }
 
-/// `poste sys local remove <chemin>`.
+/// `poste sys local remove <path>`.
 pub fn local_remove(env: &Env, arg: &str) -> Result<()> {
     let rel = config::rel_of(env, arg)?;
     if !edit_list(&env.config_file(), "local", &rel, false)? {
         bail!(
-            "{rel} n'est pas dans local ({})",
+            "{rel} is not in local ({})",
             env.display(&env.config_file())
         );
     }
-    println!("{rel} : retiré de local.");
-    println!("  Le prochain setup le liera au dépôt ; si le fichier de ~ est ordinaire et diffère, ce sera un conflit à trancher (poste sys diff {rel}).");
+    println!("{rel}: removed from local.");
+    println!("  The next setup will link it to the repository; if the file in ~ is ordinary and differs, it will be a conflict to decide (poste sys diff {rel}).");
     Ok(())
 }
 
@@ -160,9 +160,9 @@ fn j_to_toml(v: &J) -> Result<Value> {
             }
             Value::Array(out)
         }
-        J::Null => bail!("null ne peut pas être une surcharge (TOML n'a pas de null)"),
+        J::Null => bail!("null cannot be an override (TOML has no null)"),
         J::Obj(_) => {
-            bail!("donnez les clés une par une (idle.lock, idle.screensaver…) plutôt qu'un objet")
+            bail!("give the keys one by one (idle.lock, idle.screensaver…) rather than an object")
         }
     })
 }
@@ -192,7 +192,7 @@ fn read_doc(file: &Path) -> Result<DocumentMut> {
     let text = match std::fs::read_to_string(file) {
         Ok(t) => t,
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => String::new(),
-        Err(e) => return Err(e).with_context(|| format!("lecture de {}", file.display())),
+        Err(e) => return Err(e).with_context(|| format!("reading {}", file.display())),
     };
     text.parse()
         .with_context(|| format!("{} invalide", file.display()))
@@ -200,28 +200,28 @@ fn read_doc(file: &Path) -> Result<DocumentMut> {
 
 fn check_key(key: &str) -> Result<()> {
     if key.is_empty() || key.split('.').any(str::is_empty) {
-        bail!("clé invalide : « {key} » (attendu : a.b.c)");
+        bail!("invalid key: '{key}' (expected: a.b.c)");
     }
     Ok(())
 }
 
-/// `poste sys override set <chemin> <clé> <valeur>` : la valeur est du JSON (3600, true, "texte",
-/// [1,2]) ; ce qui n'en est pas devient une chaîne.
+/// `poste sys override set <path> <key> <value>`: the value is JSON (3600, true, "text",
+/// [1,2]); what is not JSON becomes a string.
 pub fn override_set(env: &Env, repo: &Path, arg: &str, key: &str, value: &str) -> Result<()> {
     check_key(key)?;
     let rel = config::rel_of(env, arg)?;
     let Some(all) = config::load_with(repo, env, &[], &[])? else {
-        bail!("pas de dossier config/ dans le dépôt");
+        bail!("no config/ folder in the repository");
     };
     let Some(e) = all.entries.iter().find(|e| e.rel == rel) else {
-        bail!("{rel} n'est pas un fichier de config/ du dépôt");
+        bail!("{rel} is not a config/ file of the repository");
     };
     let repo_text = std::fs::read_to_string(&e.src)?;
     ojson::parse(&repo_text)
-        .with_context(|| format!("{rel} n'est pas du JSON valide dans le dépôt"))?;
+        .with_context(|| format!("{rel} is not valid JSON in the repository"))?;
     let j = ojson::parse(value).unwrap_or_else(|_| J::Str(value.to_string()));
     let tv = j_to_toml(&j)?;
-    // Le résultat doit rester générable (clé qui traverse une valeur non objet : refus).
+    // The result must stay generable (key going through a non-object value: refused).
     let probe: crate::overrides::Sets = vec![(key.to_string(), j.clone())];
     crate::overrides::generate(&repo_text, &probe)?;
 
@@ -233,7 +233,7 @@ pub fn override_set(env: &Env, repo: &Path, arg: &str, key: &str, value: &str) -
     if find_override(&mut doc, &rel).is_none() {
         let Some(aot) = doc["override"].as_array_of_tables_mut() else {
             bail!(
-                "{} : « override » doit être une liste de [[override]]",
+                "{}: 'override' must be a list of [[override]]",
                 file.display()
             );
         };
@@ -242,7 +242,7 @@ pub fn override_set(env: &Env, repo: &Path, arg: &str, key: &str, value: &str) -
         t["set"] = Item::Value(Value::InlineTable(InlineTable::new()));
         aot.push(t);
     }
-    let t = find_override(&mut doc, &rel).expect("table ajoutée");
+    let t = find_override(&mut doc, &rel).expect("table added");
     if t.get("set").is_none() {
         t["set"] = Item::Value(Value::InlineTable(InlineTable::new()));
     }
@@ -253,19 +253,19 @@ pub fn override_set(env: &Env, repo: &Path, arg: &str, key: &str, value: &str) -
         Some(Item::Table(tb)) => {
             tb.insert(key, Item::Value(tv));
         }
-        _ => bail!("{} : « set » doit être une table", file.display()),
+        _ => bail!("{}: 'set' must be a table", file.display()),
     }
     write_doc(&file, &doc)?;
     println!(
-        "{rel} : {key} = {} (surcharge de cette machine, {}).",
+        "{rel}: {key} = {} (override of this machine, {}).",
         ojson::pretty(&j).trim(),
         env.display(&file)
     );
-    println!("  Le fichier sera généré (dépôt + surcharges) au prochain `poste sys setup` ; il n'est plus un lien.");
+    println!("  The file will be generated (repository + overrides) at the next `poste sys setup`; it is no longer a link.");
     Ok(())
 }
 
-/// `poste sys override unset <chemin> <clé>`.
+/// `poste sys override unset <path> <key>`.
 pub fn override_unset(env: &Env, arg: &str, key: &str) -> Result<()> {
     let rel = config::rel_of(env, arg)?;
     let file = env.config_file();
@@ -280,11 +280,11 @@ pub fn override_unset(env: &Env, arg: &str, key: &str) -> Result<()> {
     };
     if !removed {
         bail!(
-            "{rel} : pas de surcharge « {key} » ({})",
+            "{rel}: no override '{key}' ({})",
             env.display(&file)
         );
     }
-    // Plus aucune clé : la table disparaît et le fichier redevient un lien au prochain setup.
+    // No key left: the table disappears and the file becomes a link again at the next setup.
     let empty = find_override(&mut doc, &rel).is_some_and(|t| match t.get("set") {
         Some(Item::Value(Value::InlineTable(it))) => it.is_empty(),
         Some(Item::Table(tb)) => tb.is_empty(),
@@ -312,9 +312,9 @@ pub fn override_unset(env: &Env, arg: &str, key: &str) -> Result<()> {
     }
     write_doc(&file, &doc)?;
     println!(
-        "{rel} : surcharge « {key} » retirée.{}",
+        "{rel}: override '{key}' removed.{}",
         if empty {
-            " Plus aucune surcharge : le fichier sera relié au dépôt au prochain setup (un fichier généré qui diffère sera un conflit à trancher)."
+            " No override left: the file will be linked to the repository again at the next setup (a generated file that differs will be a conflict to decide)."
         } else {
             ""
         }
@@ -322,22 +322,22 @@ pub fn override_unset(env: &Env, arg: &str, key: &str) -> Result<()> {
     Ok(())
 }
 
-/// `poste sys override` : les surcharges et l'état des fichiers générés.
+/// `poste sys override`: the overrides and the state of the generated files.
 pub fn override_list(env: &Env, repo: &Path) -> Result<()> {
     let sets = config::override_sets(env)?;
     if sets.is_empty() {
-        println!("Aucune surcharge (poste sys override set <chemin> <clé> <valeur>).");
+        println!("No override (poste sys override set <path> <key> <value>).");
         return Ok(());
     }
     let layout = config::load(repo, env)?;
-    println!("Surcharges de cette machine (config.toml, [[override]])");
+    println!("Overrides of this machine (config.toml, [[override]])");
     for (rel, s) in &sets {
         let state = match layout
             .as_ref()
             .and_then(|l| l.entries.iter().find(|e| e.rel == *rel))
         {
             Some(e) => config::describe(&config::state_of(e, env)?),
-            None => "fichier local ou inconnu du dépôt".into(),
+            None => "local file or unknown to the repository".into(),
         };
         println!("  ~/{rel}  [{state}]");
         for (k, v) in s {
@@ -349,11 +349,11 @@ pub fn override_list(env: &Env, repo: &Path) -> Result<()> {
 
 // ---------------------------------------------------------------- modules
 
-/// `poste sys module` : modules du dépôt, activés ou non, installés ou non.
+/// `poste sys module`: modules of the repository, enabled or not, installed or not.
 pub fn module_list(env: &Env, repo: &Path) -> Result<()> {
     let cfg = Config::load(env)?;
     let mods = plan::repo_modules(repo)?;
-    println!("Modules du dépôt (config.toml, clé disabled : ceux qu'on n'installe pas ici)");
+    println!("Modules of the repository (config.toml, key disabled: the ones not installed here)");
     for m in &mods {
         let off = m.name != "sys" && cfg.is_disabled(&m.name);
         let installed = env.modules_dir().join(&m.name).is_dir();
@@ -367,10 +367,10 @@ pub fn module_list(env: &Env, repo: &Path) -> Result<()> {
             continue;
         }
         let state = match (off, installed) {
-            (true, true) => "désactivé, encore installé (poste sys setup le retire)",
-            (true, false) => "désactivé",
-            (false, true) => "activé, installé",
-            (false, false) => "activé, pas encore installé",
+            (true, true) => "disabled, still installed (poste sys setup removes it)",
+            (true, false) => "disabled",
+            (false, true) => "enabled, installed",
+            (false, false) => "enabled, not installed yet",
         };
         println!("  {:<10} {state}", m.name);
     }
@@ -379,7 +379,7 @@ pub fn module_list(env: &Env, repo: &Path) -> Result<()> {
         .iter()
         .filter(|d| !mods.iter().any(|m| &m.name == *d))
     {
-        println!("  {d:<10} inconnu du dépôt (entrée inutile de disabled)");
+        println!("  {d:<10} unknown to the repository (useless entry in disabled)");
     }
     Ok(())
 }
@@ -417,50 +417,50 @@ pub fn addon_list(env: &Env, repo: &Path) -> Result<()> {
     Ok(())
 }
 
-/// `poste sys module enable|disable <nom>`.
+/// `poste sys module enable|disable <name>`.
 pub fn module_set(env: &Env, repo: &Path, name: &str, enable: bool) -> Result<()> {
     let file = env.config_file();
     if enable {
         if !edit_list(&file, "disabled", name, false)? {
-            println!("{name} : n'était pas désactivé.");
+            println!("{name}: was not disabled.");
             return Ok(());
         }
-        println!("{name} : réactivé. Le prochain `poste sys setup` l'installe.");
+        println!("{name}: enabled again. The next `poste sys setup` installs it.");
         return Ok(());
     }
     if name == "sys" {
-        bail!("sys ne peut pas être désactivé : il gère l'installation");
+        bail!("sys cannot be disabled: it manages the installation");
     }
     if !plan::repo_modules(repo)?.iter().any(|m| m.name == name) {
-        bail!("{name} n'est pas un module du dépôt (poste sys module pour la liste)");
+        bail!("{name} is not a module of the repository (poste sys module for the list)");
     }
     let changed = edit_list(&file, "disabled", name, true)?;
     println!(
-        "{name} : {} désactivé ({}).",
-        if changed { "" } else { "déjà" },
+        "{name}: {} disabled ({}).",
+        if changed { "" } else { "already" },
         env.display(&file)
     );
     if env.modules_dir().join(name).is_dir() {
-        println!("  Il est installé : `poste sys setup` en montrera le retrait (fichiers, hypr/, island/, lignes posées, unités) avec aperçu, avant de demander confirmation.");
+        println!("  It is installed: `poste sys setup` will show its removal (files, hypr/, island/, lines put in place, units) with a preview, before asking for confirmation.");
     }
     Ok(())
 }
 
 // ---------------------------------------------------------------- skip
 
-/// `poste sys skip` : identifiants ignorés et ce qu'ils font sauter.
+/// `poste sys skip`: ignored identifiers and what they make skipped.
 pub fn skip_list(env: &Env, repo: &Path) -> Result<()> {
     let cfg = Config::load(env)?;
     if cfg.skip.is_empty() {
-        println!("Rien d'ignoré : tout le bootstrap s'applique (poste sys skip add <paquet ou id d'étape>…).");
+        println!("Nothing ignored: all the bootstrap applies (poste sys skip add <package or step id>…).");
         return Ok(());
     }
     let catalog = provision::skip_catalog(env, repo)?;
-    println!("Ignorés sur cette machine (config.toml, clé skip)");
+    println!("Ignored on this machine (config.toml, key skip)");
     for id in &cfg.skip {
         match catalog.get(id) {
             Some(kind) => println!("  {id:<40} {kind}"),
-            None => println!("  {id:<40} inconnu du bootstrap (faute de frappe ?)"),
+            None => println!("  {id:<40} unknown to the bootstrap (typo?)"),
         }
     }
     let eff = provision::skip_effect(env, repo, &cfg.skip)?;
@@ -471,7 +471,7 @@ pub fn skip_list(env: &Env, repo: &Path) -> Result<()> {
         .collect();
     if !deps.is_empty() {
         println!(
-            "  sautées avec eux (elles en dépendent) : {}",
+            "  skipped with them (they depend on them): {}",
             deps.iter()
                 .map(|d| d.as_str())
                 .collect::<Vec<_>>()
@@ -481,50 +481,50 @@ pub fn skip_list(env: &Env, repo: &Path) -> Result<()> {
     Ok(())
 }
 
-/// `poste sys skip add <id>…` : un identifiant inconnu est ajouté quand même, avec un avertissement.
+/// `poste sys skip add <id>…`: an unknown identifier is added anyway, with a warning.
 pub fn skip_add(env: &Env, repo: &Path, ids: &[String]) -> Result<()> {
     let file = env.config_file();
     let catalog = provision::skip_catalog(env, repo)?;
     for id in ids {
         let known = catalog.get(id);
         if known.is_none() {
-            eprintln!("avertissement : « {id} » n'est ni un paquet de packages.toml ni l'id d'une étape de steps.toml (faute de frappe ?)");
+            eprintln!("warning: '{id}' is neither a package of packages.toml nor the id of a step of steps.toml (typo?)");
         }
         let changed = edit_list(&file, "skip", id, true)?;
         let tag = if changed {
-            "ignoré ici"
+            "ignored here"
         } else {
-            "déjà ignoré"
+            "already ignored"
         };
         match known {
-            Some(kind) => println!("{id} : {tag} ({kind}, {}).", env.display(&file)),
-            None => println!("{id} : {tag} ({}).", env.display(&file)),
+            Some(kind) => println!("{id}: {tag} ({kind}, {}).", env.display(&file)),
+            None => println!("{id}: {tag} ({}).", env.display(&file)),
         }
     }
-    println!("  setup et status ne l'exigent, ne le proposent ni ne le comptent plus manquant. Rien n'est désinstallé.");
+    println!("  setup and status no longer require it, offer it or count it as missing. Nothing is uninstalled.");
     Ok(())
 }
 
-/// `poste sys skip remove <id>…` : les identifiants absents de `skip` font échouer la commande,
-/// après avoir retiré les autres.
+/// `poste sys skip remove <id>…`: identifiers absent from `skip` make the command fail,
+/// after removing the others.
 pub fn skip_remove(env: &Env, ids: &[String]) -> Result<()> {
     let file = env.config_file();
     let mut absent = Vec::new();
     for id in ids {
         if edit_list(&file, "skip", id, false)? {
-            println!("{id} : n'est plus ignoré.");
+            println!("{id}: no longer ignored.");
         } else {
             absent.push(id.as_str());
         }
     }
     if !absent.is_empty() {
         bail!(
-            "pas dans skip ({}) : {}",
+            "not in skip ({}): {}",
             env.display(&file),
             absent.join(", ")
         );
     }
-    println!("  Le prochain setup le remet au bootstrap.");
+    println!("  The next setup puts it back into the bootstrap.");
     Ok(())
 }
 
@@ -534,21 +534,21 @@ mod tests {
     use std::fs;
 
     #[test]
-    fn edition_conserve_le_reste() {
+    fn edit_keeps_the_rest() {
         let d = tempfile::tempdir().unwrap();
         let f = d.path().join("poste/config.toml");
-        // Fichier absent : créé.
+        // Missing file: created.
         assert!(edit_list(&f, "disabled", "record", true).unwrap());
         fs::write(
             &f,
-            "# ma config\nrepo = \"/r\"\n\ndisabled = [\"record\"]\n",
+            "# my config\nrepo = \"/r\"\n\ndisabled = [\"record\"]\n",
         )
         .unwrap();
         assert!(!edit_list(&f, "disabled", "record", true).unwrap());
         assert!(edit_list(&f, "disabled", "power", true).unwrap());
         assert!(edit_list(&f, "local", ".config/a", true).unwrap());
         let t = fs::read_to_string(&f).unwrap();
-        assert!(t.contains("# ma config") && t.contains("repo = \"/r\""));
+        assert!(t.contains("# my config") && t.contains("repo = \"/r\""));
         let c = Config::parse(&t).unwrap();
         assert_eq!(c.disabled, ["record", "power"]);
         assert_eq!(c.local, [".config/a"]);
@@ -559,19 +559,19 @@ mod tests {
     }
 
     #[test]
-    fn cle_source_ecrite_sans_toucher_au_reste() {
+    fn source_key_written_without_touching_the_rest() {
         let d = tempfile::tempdir().unwrap();
         let f = d.path().join("poste/config.toml");
         fs::create_dir_all(f.parent().unwrap()).unwrap();
         fs::write(
             &f,
-            "# ma config\nrepo = \"/r\"\n\n[[override]]\npath = \".x\"\n",
+            "# my config\nrepo = \"/r\"\n\n[[override]]\npath = \".x\"\n",
         )
         .unwrap();
         assert!(set_key(&f, "source", "release").unwrap());
         assert!(!set_key(&f, "source", "release").unwrap());
         let t = fs::read_to_string(&f).unwrap();
-        assert!(t.contains("# ma config") && t.contains("[[override]]"));
+        assert!(t.contains("# my config") && t.contains("[[override]]"));
         let c = Config::parse(&t).unwrap();
         assert_eq!(c.source, poste_core::Source::Release);
         assert_eq!(c.overrides.len(), 1);
@@ -581,14 +581,14 @@ mod tests {
     }
 
     #[test]
-    fn liste_invalide_refusee() {
+    fn invalid_list_refused() {
         let d = tempfile::tempdir().unwrap();
         let f = d.path().join("config.toml");
         fs::write(&f, "disabled = 3\n").unwrap();
         assert!(edit_list(&f, "disabled", "x", true).is_err());
     }
 
-    fn repo_et_home() -> (tempfile::TempDir, std::path::PathBuf, Env) {
+    fn repo_and_home() -> (tempfile::TempDir, std::path::PathBuf, Env) {
         let d = tempfile::tempdir().unwrap();
         let repo = d.path().join("repo");
         fs::create_dir_all(repo.join("config/.config/hypr")).unwrap();
@@ -608,20 +608,20 @@ mod tests {
 
     #[test]
     fn local_add_remove_validations() {
-        let (_d, repo, env) = repo_et_home();
+        let (_d, repo, env) = repo_and_home();
         assert!(local_add(&env, &repo, ".config/hypr/inconnu.lua").is_err());
         local_add(&env, &repo, "~/.config/hypr/monitors.lua").unwrap();
         local_add(&env, &repo, ".config/hypr/monitors.lua").unwrap(); // idempotent
         let c = Config::load(&env).unwrap();
         assert_eq!(c.local, [".config/hypr/monitors.lua"]);
-        assert!(local_remove(&env, ".config/hypr/autre").is_err());
+        assert!(local_remove(&env, ".config/hypr/other").is_err());
         local_remove(&env, ".config/hypr/monitors.lua").unwrap();
         assert!(Config::load(&env).unwrap().local.is_empty());
     }
 
     #[test]
     fn module_disable_validations() {
-        let (_d, repo, env) = repo_et_home();
+        let (_d, repo, env) = repo_and_home();
         assert!(module_set(&env, &repo, "sys", false).is_err());
         assert!(module_set(&env, &repo, "nope", false).is_err());
         module_set(&env, &repo, "record", false).unwrap();
@@ -632,7 +632,7 @@ mod tests {
 
     #[test]
     fn skip_add_remove_list() {
-        let (_d, repo, env) = repo_et_home();
+        let (_d, repo, env) = repo_and_home();
         fs::create_dir_all(repo.join("bootstrap")).unwrap();
         fs::write(
             repo.join("bootstrap/packages.toml"),
@@ -660,7 +660,7 @@ mod tests {
 
     #[test]
     fn override_set_unset_cycle() {
-        let (_d, repo, env) = repo_et_home();
+        let (_d, repo, env) = repo_and_home();
         fs::write(
             repo.join("config/.config/hypr/s.json"),
             "{\"idle\": {\"lock\": 5400}}",

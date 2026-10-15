@@ -120,7 +120,7 @@ pub fn parse_user(s: &str) -> Result<i64> {
     let out = Command::new("date")
         .args(["-d", s, "+%s"])
         .output()
-        .context("impossible de lancer date")?;
+        .context("cannot run date")?;
     if !out.status.success() {
         bail!("date illisible : {s}");
     }

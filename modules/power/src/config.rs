@@ -111,7 +111,7 @@ impl Config {
         match std::fs::read_to_string(&f) {
             Ok(t) => Self::parse(&t).with_context(|| f.display().to_string()),
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(Self::default()),
-            Err(e) => Err(e).with_context(|| format!("lecture de {}", f.display())),
+            Err(e) => Err(e).with_context(|| format!("reading {}", f.display())),
         }
     }
 }

@@ -119,7 +119,7 @@ fn read_meta(root: &Path, name: &str) -> Result<String> {
     match std::fs::read_to_string(&f) {
         Ok(t) => Ok(t),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(String::new()),
-        Err(e) => Err(e).with_context(|| format!("lecture de {}", f.display())),
+        Err(e) => Err(e).with_context(|| format!("reading {}", f.display())),
     }
 }
 
@@ -207,7 +207,7 @@ pub fn load_with(
             bail!("override : « {rel} » n'est pas un fichier ordinaire de config/");
         }
         let text = std::fs::read_to_string(&e.src)
-            .with_context(|| format!("override {rel} : lecture de {}", e.src.display()))?;
+            .with_context(|| format!("override {rel} : reading {}", e.src.display()))?;
         let gen =
             crate::overrides::generate(&text, sets).with_context(|| format!("override {rel}"))?;
         e.kind = Kind::Generated(gen);
@@ -300,7 +300,7 @@ fn scan(
     out: &mut Vec<Entry>,
 ) -> Result<()> {
     let mut children: Vec<_> = std::fs::read_dir(dir)
-        .with_context(|| format!("lecture de {}", dir.display()))?
+        .with_context(|| format!("reading {}", dir.display()))?
         .flatten()
         .map(|e| e.file_name())
         .collect();
@@ -477,7 +477,7 @@ pub fn state_of(e: &Entry, env: &Env) -> Result<State> {
             }
             return Ok(State::Missing);
         }
-        Err(err) => return Err(err).with_context(|| format!("lecture de {}", e.dest.display())),
+        Err(err) => return Err(err).with_context(|| format!("reading {}", e.dest.display())),
     };
     if md.file_type().is_symlink() {
         let target = std::fs::read_link(&e.dest)?;
@@ -1242,7 +1242,7 @@ pub fn diff(layout: &Layout, env: &Env, arg: Option<&str>) -> Result<bool> {
                 cmd.args(["-ru", "-x", PYCACHE, "--label", &format!("depot/{}", e.rel)]);
                 cmd.arg("--label").arg(format!("maison/{}", e.rel));
                 cmd.arg(gen_tmp.as_deref().unwrap_or(&e.src)).arg(&e.dest);
-                let status = cmd.status().context("impossible de lancer diff")?;
+                let status = cmd.status().context("cannot run diff")?;
                 if let Some(t) = &gen_tmp {
                     let _ = std::fs::remove_file(t);
                 }

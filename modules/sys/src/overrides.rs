@@ -1,18 +1,18 @@
-//! Surcharges JSON par machine : un fichier de `config/` (JSON) qui a des `[[override]]` dans
-//! `~/.config/poste/config.toml` n'est pas lié ; `setup` écrit un fichier ordinaire égal au
-//! contenu du dépôt plus les valeurs surchargées (clés pointées, `idle.lock`).
+//! Per-machine JSON overrides: a JSON file of `config/` that has `[[override]]` entries in
+//! `~/.config/poste/config.toml` is not linked; `setup` writes an ordinary file equal to the
+//! content of the repository plus the overridden values (dotted keys, `idle.lock`).
 //!
-//! `--take-home` sur un tel fichier : le fichier de `~` est repris dans le dépôt APRÈS avoir
-//! remis, pour chaque clé surchargée, la valeur du dépôt (ou retiré la clé si le dépôt ne
-//! l'avait pas). Refusé, sans rien écrire, si une valeur surchargée a été changée à la main dans
-//! `~` (ou si la clé a disparu) : on ne peut pas deviner si l'intention est de changer la
-//! surcharge ou le dépôt.
+//! `--take-home` on such a file: the file of `~` is taken back into the repository AFTER having
+//! put back, for each overridden key, the value of the repository (or removed the key if the repository
+//! did not have it). Refused, without writing anything, if an overridden value was changed by hand in
+//! `~` (or if the key has disappeared): we cannot guess whether the intention is to change the
+//! override or the repository.
 
 use crate::ojson::{self, J};
 use anyhow::{bail, Context, Result};
 use poste_core::config::Override;
 
-/// Une surcharge prête à appliquer : (clé pointée, valeur).
+/// An override ready to apply: (dotted key, value).
 pub type Sets = Vec<(String, J)>;
 
 fn toml_to_j(v: &toml::Value) -> Result<J> {
@@ -46,13 +46,13 @@ fn flatten(prefix: &str, t: &toml::Table, out: &mut Sets) -> Result<()> {
     Ok(())
 }
 
-/// Les surcharges d'un `[[override]]`, en clés pointées.
+/// The overrides of an `[[override]]`, as dotted keys.
 pub fn sets_of(o: &Override) -> Result<Sets> {
     let mut out = Vec::new();
     flatten("", &o.set, &mut out)?;
     for (k, _) in &out {
         if k.is_empty() || k.split('.').any(str::is_empty) {
-            bail!("override {} : clé invalide « {k} »", o.path);
+            bail!("override {}: invalid key '{k}'", o.path);
         }
     }
     Ok(out)
@@ -62,33 +62,33 @@ fn parts(k: &str) -> Vec<&str> {
     k.split('.').collect()
 }
 
-/// Contenu du dépôt plus les surcharges, JSON réécrit proprement (indentation 2).
+/// Content of the repository plus the overrides, JSON rewritten cleanly (indentation 2).
 pub fn generate(repo_text: &str, sets: &Sets) -> Result<String> {
-    let mut j = ojson::parse(repo_text).context("JSON du dépôt invalide")?;
+    let mut j = ojson::parse(repo_text).context("invalid JSON in the repository")?;
     for (k, v) in sets {
         j.set(&parts(k), v.clone())
-            .with_context(|| format!("surcharge « {k} »"))?;
+            .with_context(|| format!("override '{k}'"))?;
     }
     Ok(ojson::pretty(&j))
 }
 
-/// Le texte du dépôt à écrire pour un `--take-home` : `home_text` avec les clés surchargées
-/// remises comme dans le dépôt. Erreur si ambigu (voir l'en-tête du module).
+/// The repository text to write for a `--take-home`: `home_text` with the overridden keys
+/// put back as in the repository. Error if ambiguous (see the module header).
 pub fn take_home_text(home_text: &str, repo_text: &str, sets: &Sets) -> Result<String> {
-    let mut home = ojson::parse(home_text).context("le fichier de ~ n'est pas du JSON valide")?;
-    let repo = ojson::parse(repo_text).context("JSON du dépôt invalide")?;
+    let mut home = ojson::parse(home_text).context("the file of ~ is not valid JSON")?;
+    let repo = ojson::parse(repo_text).context("invalid JSON in the repository")?;
     let mut changed = Vec::new();
     for (k, v) in sets {
         match home.get(&parts(k)) {
             Some(cur) if cur.same(v) => {}
-            Some(_) => changed.push(format!("{k} a une autre valeur que la surcharge")),
-            None => changed.push(format!("{k} a disparu du fichier")),
+            Some(_) => changed.push(format!("{k} has another value than the override")),
+            None => changed.push(format!("{k} has disappeared from the file")),
         }
     }
     if !changed.is_empty() {
         bail!(
-            "reprise ambiguë : {}. Corrigez la surcharge (poste sys override set/unset) ou utilisez --take-repo",
-            changed.join(" ; ")
+            "ambiguous take-back: {}. Fix the override (poste sys override set/unset) or use --take-repo",
+            changed.join("; ")
         );
     }
     for (k, _) in sets {
@@ -142,23 +142,23 @@ mod tests {
     }
 
     #[test]
-    fn reprise_remet_les_valeurs_du_depot() {
+    fn take_back_restores_repository_values() {
         let s: Sets = vec![
             ("idle.lock".into(), J::Num("3600".into())),
-            ("neuf.cle".into(), J::Bool(true)),
+            ("fresh.key".into(), J::Bool(true)),
         ];
         let home = generate(REPO, &s).unwrap().replace("\"x\": 1", "\"x\": 2");
         let back = take_home_text(&home, REPO, &s).unwrap();
         assert!(back.contains("\"lock\": 5400") && back.contains("\"x\": 2"));
-        assert!(!back.contains("neuf"));
+        assert!(!back.contains("fresh"));
     }
 
     #[test]
-    fn reprise_ambigue_refusee() {
+    fn ambiguous_take_back_refused() {
         let s: Sets = vec![("idle.lock".into(), J::Num("3600".into()))];
         let home = generate(REPO, &s).unwrap().replace("3600", "7200");
         let e = take_home_text(&home, REPO, &s).unwrap_err().to_string();
-        assert!(e.contains("idle.lock") && e.contains("ambiguë"));
-        assert!(take_home_text("pas du json", REPO, &s).is_err());
+        assert!(e.contains("idle.lock") && e.contains("ambiguous"));
+        assert!(take_home_text("not json", REPO, &s).is_err());
     }
 }

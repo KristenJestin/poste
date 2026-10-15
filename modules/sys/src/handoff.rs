@@ -1,17 +1,17 @@
-//! Relais vers le `poste-sys` de la nouvelle racine.
+//! Hand-over to the `poste-sys` of the new root.
 //!
-//! `sync` et `use` font pointer `current` sur une autre racine (version publiée, clone tiré)
-//! puis lancent `setup`. Ce `setup` doit être celui de la nouvelle racine : une nouveauté de
-//! `poste sys` (une sorte d'unité systemd, une règle de pose) arrive avec la version qui s'en
-//! sert, et l'ancien programme la raterait. Une fois `current` posé, si le `poste-sys` de la
-//! nouvelle racine diffère de celui qui tourne et connaît la commande cachée `finish`, on lui
-//! passe la main (`exec`) : il lance `setup` depuis `current`, élague les anciennes versions si
-//! demandé, puis recharge l'île et Hyprland. `finish` ne repasse jamais la main.
+//! `sync` and `use` point `current` at another root (published version, pulled clone)
+//! then run `setup`. This `setup` must be the one of the new root: something new in
+//! `poste sys` (a kind of systemd unit, a placing rule) arrives with the version that
+//! uses it, and the old program would miss it. Once `current` is set, if the `poste-sys` of the
+//! new root differs from the running one and knows the hidden command `finish`, it is
+//! handed over to (`exec`): it runs `setup` from `current`, prunes the old versions if
+//! asked, then reloads the island and Hyprland. `finish` never hands over again.
 //!
-//! Sinon (même programme, version d'avant le relais, lancement impossible), la suite est faite
-//! ici, comme avant.
+//! Otherwise (same program, version from before the hand-over, launch impossible), the rest is done
+//! here, as before.
 //!
-//! `finish` est un contrat entre versions : ses options ne changent pas, on en ajoute seulement.
+//! `finish` is a contract between versions: its options do not change, they are only added to.
 
 use crate::reload::Need;
 use crate::setup;
@@ -23,12 +23,12 @@ use std::os::unix::process::CommandExt;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
-/// Le `poste-sys` d'une racine (construit par `cargo` dans le clone, livré dans une version).
+/// The `poste-sys` of a root (built by `cargo` in the clone, shipped in a version).
 pub fn binary(root: &Path) -> PathBuf {
     root.join("target/release/poste-sys")
 }
 
-/// Le programme qui tourne. Aucun relais dans les tests : le binaire de test n'est pas
+/// The running program. No hand-over in tests: the test binary is not
 /// `poste-sys`.
 fn running() -> Option<PathBuf> {
     if cfg!(test) {
@@ -38,7 +38,7 @@ fn running() -> Option<PathBuf> {
     }
 }
 
-/// Le `poste-sys` de `root`, s'il diffère de `running`.
+/// The `poste-sys` of `root`, if it differs from `running`.
 fn target(root: &Path, running: &Path) -> Option<PathBuf> {
     let bin = binary(root);
     if !bin.is_file() {
@@ -47,13 +47,13 @@ fn target(root: &Path, running: &Path) -> Option<PathBuf> {
     if std::fs::canonicalize(&bin).ok() == std::fs::canonicalize(running).ok() {
         return None;
     }
-    // Le programme qui tourne peut avoir été remplacé entre-temps (illisible) : différent.
+    // The running program may have been replaced in the meantime (unreadable): different.
     let same = sha256_file(running).is_ok_and(|h| sha256_file(&bin).is_ok_and(|b| b == h));
     (!same).then_some(bin)
 }
 
-/// Le programme connaît-il `finish` ? (une version d'avant le relais ne le connaît pas : retour
-/// arrière vers elle).
+/// Does the program know `finish`? (a version from before the hand-over does not know it: rollback
+/// to it).
 fn knows_finish(bin: &Path) -> bool {
     Command::new(bin)
         .args(["finish", "--help"])
@@ -64,8 +64,8 @@ fn knows_finish(bin: &Path) -> bool {
         .is_ok_and(|s| s.success())
 }
 
-/// La suite de `sync` et de `use` une fois `current` posé (`old` : la racine d'avant) : passe
-/// la main au `poste-sys` de `current` s'il le faut, sinon `versions::finish` ici.
+/// The rest of `sync` and `use` once `current` is set (`old`: the previous root): hands
+/// over to the `poste-sys` of `current` if needed, otherwise `versions::finish` here.
 pub fn complete(
     env: &Env,
     old: Option<&Path>,
@@ -75,19 +75,19 @@ pub fn complete(
     skip_build: bool,
 ) -> Result<Switched> {
     let root = env.current_link();
-    // Le clone se construit d'abord : son `poste-sys` est celui du code tiré.
+    // The clone is built first: its `poste-sys` is the one of the pulled code.
     if !skip_build && root.join("Cargo.toml").is_file() {
         setup::build(&root)?;
     }
     if let Some(bin) = running().and_then(|r| target(&root, &r)) {
         if knows_finish(&bin) {
             println!(
-                "\nNouveau poste-sys ({}) : c'est lui qui fait la suite.",
+                "\nNew poste-sys ({}): it does the rest.",
                 env.display(&bin)
             );
             let err = finish_command(&bin, old, &need, yes, prune).exec();
             eprintln!(
-                "poste sys : impossible de lancer {} ({err}) : suite faite par ce programme.",
+                "poste sys: cannot run {} ({err}): the rest is done by this program.",
                 env.display(&bin)
             );
         }
@@ -103,8 +103,8 @@ pub fn complete(
 fn finish_command(bin: &Path, old: Option<&Path>, need: &Need, yes: bool, prune: bool) -> Command {
     let mut c = Command::new(bin);
     c.args(["finish", "--skip-build"]);
-    // L'ancienne racine : le nouveau programme recompare les racines lui-même (il connaît
-    // peut-être plus de choses à recharger que celui qui passe la main).
+    // The previous root: the new program compares the roots again itself (it may know
+    // more things to reload than the one that hands over).
     if let Some(o) = old {
         c.arg("--from").arg(o);
     }
@@ -132,11 +132,11 @@ mod tests {
         let root = d.path().join("root");
         let running = d.path().join("poste-sys");
         fs::write(&running, "ancien").unwrap();
-        // Pas de poste-sys dans la racine : on reste.
+        // No poste-sys in the root: we stay.
         assert_eq!(target(&root, &running), None);
         fs::create_dir_all(binary(&root).parent().unwrap()).unwrap();
         fs::write(binary(&root), "ancien").unwrap();
-        // Le même (contenu, ou le même fichier) : on reste ; un autre : on passe la main.
+        // The same one (content, or the same file): we stay; another one: we hand over.
         assert_eq!(target(&root, &running), None);
         assert_eq!(target(&root, &binary(&root)), None);
         fs::write(binary(&root), "nouveau").unwrap();
@@ -147,7 +147,7 @@ mod tests {
     fn finish_inconnu_d_une_ancienne_version() {
         let d = tempfile::tempdir().unwrap();
         let bin = d.path().join("poste-sys");
-        // Une version d'avant le relais : clap refuse la sous-commande (code 2).
+        // A version from before the hand-over: clap refuses the subcommand (code 2).
         fs::write(&bin, "#!/bin/sh\nexit 2\n").unwrap();
         fs::set_permissions(&bin, std::os::unix::fs::PermissionsExt::from_mode(0o755)).unwrap();
         assert!(!knows_finish(&bin));

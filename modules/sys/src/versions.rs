@@ -1,10 +1,10 @@
-//! Versions installées et racine de poste.
+//! Installed versions and the poste root.
 //!
-//! Tout ce que `setup` pose se lit dans une seule racine, le lien `~/.local/share/poste/current` :
-//! une version installée (`~/.local/share/poste/versions/<commit>/`, archive construite par la CI)
-//! ou le clone du dépôt (mode dev, clé `repo`). Une version a la disposition du dépôt :
-//! `config/`, `modules/`, `bootstrap/`, les binaires dans `target/release/`, plus `VERSION`
-//! (`commit=…`, `date=…`) ; sans `Cargo.toml`, `setup` ne construit rien.
+//! Everything `setup` puts in place is read from a single root, the link `~/.local/share/poste/current`:
+//! an installed version (`~/.local/share/poste/versions/<commit>/`, archive built by the CI)
+//! or the clone of the repository (dev mode, key `repo`). A version has the layout of the repository:
+//! `config/`, `modules/`, `bootstrap/`, the binaries in `target/release/`, plus `VERSION`
+//! (`commit=…`, `date=…`); without `Cargo.toml`, `setup` builds nothing.
 
 use crate::reload::Need;
 use crate::util::{self, sha256_file};
@@ -15,28 +15,28 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode};
 
-/// Fichier d'identité d'une version, à sa racine (écrit par la CI).
+/// Identity file of a version, at its root (written by the CI).
 pub const VERSION_FILE: &str = "VERSION";
-/// Somme de contrôle de l'archive d'où vient une version (écrite à l'installation).
+/// Checksum of the archive a version comes from (written at install time).
 pub const SUM_FILE: &str = "ARCHIVE_SHA256";
-/// Nom de l'archive publiée, et de sa somme (`<archive>.sha256`).
+/// Name of the published archive, and of its checksum (`<archive>.sha256`).
 pub const ARCHIVE: &str = "poste-x86_64-linux.tar.gz";
-/// Où la CI publie l'archive : une seule préversion `latest`, remplacée à chaque push sur `main`.
+/// Where the CI publishes the archive: a single `latest` prerelease, replaced on each push to `main`.
 pub const DEFAULT_URL: &str = "https://github.com/KristenJestin/poste/releases/download/latest";
-/// Nombre de versions gardées (celle de `current` en plus si elle est plus ancienne).
+/// Number of versions kept (the one of `current` in addition if it is older).
 pub const KEEP: usize = 3;
 
-/// Une version installée.
+/// An installed version.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Version {
     pub dir: PathBuf,
     pub commit: String,
-    /// Date de construction (RFC 3339, UTC), pour l'ordre.
+    /// Build date (RFC 3339, UTC), for ordering.
     pub date: String,
 }
 
 impl Version {
-    /// Lit `VERSION` dans `dir` ; `None` si absent ou invalide.
+    /// Reads `VERSION` in `dir`; `None` if absent or invalid.
     pub fn read(dir: &Path) -> Option<Self> {
         let text = std::fs::read_to_string(dir.join(VERSION_FILE)).ok()?;
         let (mut commit, mut date) = (None, String::new());
@@ -64,7 +64,7 @@ fn valid_commit(c: &str) -> bool {
     (7..=40).contains(&c.len()) && c.chars().all(|c| c.is_ascii_hexdigit())
 }
 
-/// Versions installées, la plus récente d'abord (date de construction, puis commit).
+/// Installed versions, most recent first (build date, then commit).
 pub fn installed(env: &Env) -> Vec<Version> {
     let mut out: Vec<Version> = std::fs::read_dir(env.versions_dir())
         .map(|rd| {
@@ -78,12 +78,12 @@ pub fn installed(env: &Env) -> Vec<Version> {
     out
 }
 
-/// Chemin réel de ce que désigne `current`, s'il existe.
+/// Real path of what `current` designates, if it exists.
 pub fn current_target(env: &Env) -> Option<PathBuf> {
     std::fs::canonicalize(env.current_link()).ok()
 }
 
-/// `root` est-il une version installée (et non le clone) ?
+/// Is `root` an installed version (and not the clone)?
 pub fn is_release(env: &Env, root: &Path) -> bool {
     match (
         std::fs::canonicalize(root),
@@ -94,7 +94,7 @@ pub fn is_release(env: &Env, root: &Path) -> bool {
     }
 }
 
-/// La version installée qu'est `root`, si c'en est une.
+/// The installed version that `root` is, if it is one.
 pub fn version_of(env: &Env, root: &Path) -> Option<Version> {
     if !is_release(env, root) {
         return None;
@@ -102,18 +102,18 @@ pub fn version_of(env: &Env, root: &Path) -> Option<Version> {
     Version::read(&std::fs::canonicalize(root).ok()?)
 }
 
-/// Refuse une écriture dans le dépôt quand la racine est une version installée (lecture seule).
+/// Refuses a write into the repository when the root is an installed version (read-only).
 pub fn ensure_writable(env: &Env, root: &Path, what: &str) -> Result<()> {
     if is_release(env, root) {
         bail!(
-            "{what} écrit dans le dépôt, or poste tourne depuis une version installée (lecture seule) : passez en mode dev (`poste sys use dev`) puis relancez"
+            "{what} writes into the repository, but poste runs from an installed version (read-only): switch to dev mode (`poste sys use dev`) then run again"
         );
     }
     Ok(())
 }
 
-/// Racine dont tout est lu : `current` s'il désigne quelque chose ; sinon, en mode dev, le
-/// clone (machine pas encore passée à `current` : le prochain `setup` le pose).
+/// Root everything is read from: `current` if it designates something; otherwise, in dev mode, the
+/// clone (machine not yet moved to `current`: the next `setup` puts it in place).
 pub fn root(env: &Env, cfg: &Config) -> Result<PathBuf> {
     let cur = env.current_link();
     if cur.exists() {
@@ -122,37 +122,37 @@ pub fn root(env: &Env, cfg: &Config) -> Result<PathBuf> {
     match cfg.source {
         Source::Dev => util::clone(env, cfg),
         Source::Release => bail!(
-            "aucune version en place ({} absent ou cassé) : lancez `poste sys sync`",
+            "no version in place ({} absent or broken): run `poste sys sync`",
             env.display(&cur)
         ),
     }
 }
 
-/// Simulation : la racine lue n'est pas `current` (pas encore posé ou pas encore basculé) ;
-/// `current` est alors la racine où les liens de config pointeront pour de vrai.
+/// Dry run: the root read is not `current` (not put in place yet or not switched yet);
+/// `current` is then the root the config links will really point to.
 pub fn link_root(env: &Env, root: &Path) -> Option<PathBuf> {
     (root != env.current_link()).then(|| env.current_link())
 }
 
-/// Fait pointer `current` sur `target` (remplacement atomique). Refuse si `current` existe sans
-/// être un lien : poste ne l'a pas posé.
+/// Points `current` at `target` (atomic replacement). Refuses if `current` exists without
+/// being a link: poste did not put it in place.
 pub fn point_current(env: &Env, target: &Path) -> Result<()> {
     let cur = env.current_link();
     if let Ok(md) = std::fs::symlink_metadata(&cur) {
         if !md.file_type().is_symlink() {
             bail!(
-                "{} existe et n'est pas un lien : déplacez-le vous-même, puis relancez",
+                "{} exists and is not a link: move it yourself, then run again",
                 env.display(&cur)
             );
         }
     }
     util::replace_with_symlink(&cur, target)?;
-    println!("Racine : {} -> {}", env.display(&cur), env.display(target));
+    println!("Root: {} -> {}", env.display(&cur), env.display(target));
     Ok(())
 }
 
-/// Pour `setup` : `current` s'il désigne quelque chose ; sinon il est posé (dev : le clone ;
-/// release : la version installée la plus récente). `--dry-run` ne le pose pas et lit la cible.
+/// For `setup`: `current` if it designates something; otherwise it is put in place (dev: the clone;
+/// release: the most recent installed version). `--dry-run` does not put it in place and reads the target.
 pub fn ensure_current(env: &Env, cfg: &Config, dry_run: bool) -> Result<PathBuf> {
     let cur = env.current_link();
     if cur.exists() {
@@ -164,11 +164,11 @@ pub fn ensure_current(env: &Env, cfg: &Config, dry_run: bool) -> Result<PathBuf>
             .into_iter()
             .next()
             .map(|v| v.dir)
-            .context("aucune version installée : lancez `poste sys sync`")?,
+            .context("no installed version: run `poste sys sync`")?,
     };
     if dry_run {
         println!(
-            "Simulation : lien {} -> {} non posé.",
+            "Dry run: link {} -> {} not put in place.",
             env.display(&cur),
             env.display(&target)
         );
@@ -178,7 +178,7 @@ pub fn ensure_current(env: &Env, cfg: &Config, dry_run: bool) -> Result<PathBuf>
     Ok(cur)
 }
 
-/// En mode dev : `current` doit désigner le clone. Renvoie la racine à lire.
+/// In dev mode: `current` must designate the clone. Returns the root to read.
 pub fn dev_current(env: &Env, cfg: &Config, dry_run: bool) -> Result<PathBuf> {
     let clone = util::clone(env, cfg)?;
     if current_target(env) == std::fs::canonicalize(&clone).ok() {
@@ -186,7 +186,7 @@ pub fn dev_current(env: &Env, cfg: &Config, dry_run: bool) -> Result<PathBuf> {
     }
     if dry_run {
         println!(
-            "Simulation : lien {} -> {} non posé.",
+            "Dry run: link {} -> {} not put in place.",
             env.display(&env.current_link()),
             env.display(&clone)
         );
@@ -196,18 +196,18 @@ pub fn dev_current(env: &Env, cfg: &Config, dry_run: bool) -> Result<PathBuf> {
     Ok(env.current_link())
 }
 
-// ---------------------------------------------------------------- téléchargement
+// ---------------------------------------------------------------- download
 
-/// Téléchargement par `curl` (faux programme en test : `POSTE_SYS_TEST_CURL`).
+/// Download through `curl` (fake program in tests: `POSTE_SYS_TEST_CURL`).
 pub struct Fetcher {
     program: PathBuf,
-    /// Arguments placés avant ceux de `curl` (en test : le script lancé par `sh`).
+    /// Arguments placed before those of `curl` (in tests: the script run by `sh`).
     pre: Vec<PathBuf>,
     base: String,
 }
 
 impl Fetcher {
-    /// `curl` et l'adresse publiée ; `POSTE_SYS_RELEASE_URL` remplace l'adresse (fork, essai).
+    /// `curl` and the published address; `POSTE_SYS_RELEASE_URL` replaces the address (fork, trial).
     pub fn from_env() -> Self {
         Self {
             program: std::env::var_os("POSTE_SYS_TEST_CURL")
@@ -218,8 +218,8 @@ impl Fetcher {
         }
     }
 
-    /// Faux `curl` en test : un script lancé par `sh` (jamais exécuté directement : un fichier
-    /// tout juste écrit peut être « occupé » le temps qu'un autre test lance un processus).
+    /// Fake `curl` in tests: a script run by `sh` (never executed directly: a file
+    /// that was just written can be "busy" while another test starts a process).
     #[cfg(test)]
     pub fn with(script: &Path, base: &str) -> Self {
         Self {
@@ -233,7 +233,7 @@ impl Fetcher {
         format!("{}/{name}", self.base.trim_end_matches('/'))
     }
 
-    /// Contenu d'un petit fichier publié (la somme de contrôle), sans rien écrire.
+    /// Content of a small published file (the checksum), without writing anything.
     fn text(&self, name: &str) -> Result<String> {
         let url = self.url(name);
         let out = Command::new(&self.program)
@@ -241,9 +241,9 @@ impl Fetcher {
             .args(["-fsSL", "--retry", "2"])
             .arg(&url)
             .output()
-            .with_context(|| format!("impossible de lancer {}", self.program.display()))?;
+            .with_context(|| format!("cannot run {}", self.program.display()))?;
         if !out.status.success() {
-            bail!("téléchargement de {url} échoué");
+            bail!("download of {url} failed");
         }
         Ok(String::from_utf8_lossy(&out.stdout).into_owned())
     }
@@ -256,19 +256,19 @@ impl Fetcher {
             .arg(dest)
             .arg(&url)
             .status()
-            .with_context(|| format!("impossible de lancer {}", self.program.display()))?;
+            .with_context(|| format!("cannot run {}", self.program.display()))?;
         if !st.success() {
-            bail!("téléchargement de {url} échoué");
+            bail!("download of {url} failed");
         }
         Ok(())
     }
 }
 
-/// Somme sha256 d'un fichier `.sha256` (format de `sha256sum` : `<hex>  <nom>`).
+/// sha256 sum of a `.sha256` file (format of `sha256sum`: `<hex>  <name>`).
 pub fn parse_sum(text: &str) -> Result<String> {
     let hex = text.split_whitespace().next().unwrap_or("").to_lowercase();
     if hex.len() != 64 || !hex.chars().all(|c| c.is_ascii_hexdigit()) {
-        bail!("somme de contrôle illisible : « {} »", text.trim());
+        bail!("unreadable checksum: '{}'", text.trim());
     }
     Ok(hex)
 }
@@ -279,33 +279,33 @@ fn sum_of(v: &Version) -> Option<String> {
         .map(|s| s.trim().to_string())
 }
 
-/// La dernière version publiée, installée si besoin : somme lue d'abord (rien à télécharger si
-/// une version installée vient de la même archive), puis archive téléchargée, vérifiée et
-/// extraite dans `versions/<commit>/`. Ne touche pas à `current`. `None` en `--dry-run` quand
-/// il faudrait télécharger.
+/// The latest published version, installed if needed: checksum read first (nothing to download if
+/// an installed version comes from the same archive), then archive downloaded, verified and
+/// extracted into `versions/<commit>/`. Does not touch `current`. `None` in `--dry-run` when
+/// a download would be needed.
 pub fn fetch(env: &Env, f: &Fetcher, dry_run: bool) -> Result<Option<Version>> {
     let sum = parse_sum(&f.text(&format!("{ARCHIVE}.sha256"))?)?;
     if let Some(v) = installed(env)
         .into_iter()
         .find(|v| sum_of(v).as_deref() == Some(sum.as_str()))
     {
-        println!("Dernière version déjà installée : {}.", v.short());
+        println!("Latest version already installed: {}.", v.short());
         return Ok(Some(v));
     }
     if dry_run {
-        println!("Simulation : nouvelle version publiée, téléchargement non lancé.");
+        println!("Dry run: new published version, download not run.");
         return Ok(None);
     }
     let cache = env.cache_dir().join("download");
     std::fs::create_dir_all(&cache)?;
     let archive = cache.join(ARCHIVE);
-    println!("Téléchargement de {}…", f.url(ARCHIVE));
+    println!("Downloading {}…", f.url(ARCHIVE));
     f.file(ARCHIVE, &archive)?;
     let got = sha256_file(&archive)?;
     if got != sum {
         let _ = std::fs::remove_file(&archive);
         bail!(
-            "somme de contrôle différente (attendue {}, obtenue {}) : archive refusée, rien n'est installé",
+            "different checksum (expected {}, got {}): archive refused, nothing is installed",
             util::short(&sum),
             util::short(&got)
         );
@@ -313,11 +313,11 @@ pub fn fetch(env: &Env, f: &Fetcher, dry_run: bool) -> Result<Option<Version>> {
     let v = extract(env, &archive, &sum);
     let _ = std::fs::remove_file(&archive);
     let v = v?;
-    println!("Version {} installée ({}).", v.short(), env.display(&v.dir));
+    println!("Version {} installed ({}).", v.short(), env.display(&v.dir));
     Ok(Some(v))
 }
 
-/// Extrait une archive vérifiée dans `versions/<commit>/` (dossier temporaire puis renommage).
+/// Extracts a verified archive into `versions/<commit>/` (temporary folder then rename).
 fn extract(env: &Env, archive: &Path, sum: &str) -> Result<Version> {
     let vdir = env.versions_dir();
     std::fs::create_dir_all(&vdir)?;
@@ -334,16 +334,16 @@ fn extract(env: &Env, archive: &Path, sum: &str) -> Result<Version> {
             .arg(&staging)
             .arg("--no-same-owner")
             .status()
-            .context("impossible de lancer tar")?;
+            .context("cannot run tar")?;
         if !st.success() {
-            bail!("extraction de l'archive échouée");
+            bail!("extraction of the archive failed");
         }
-        let v = Version::read(&staging).context("archive sans fichier VERSION valide")?;
+        let v = Version::read(&staging).context("archive without a valid VERSION file")?;
         std::fs::write(staging.join(SUM_FILE), format!("{sum}\n"))?;
         let dest = vdir.join(&v.commit);
         if dest.exists() {
-            // Même commit déjà là (archive reconstruite) : on garde l'installée, mais elle
-            // retient la nouvelle somme, sinon l'archive serait téléchargée à chaque sync.
+            // Same commit already there (rebuilt archive): we keep the installed one, but it
+            // takes the new checksum, otherwise the archive would be downloaded on every sync.
             std::fs::remove_dir_all(&staging)?;
             let tmp = dest.join(format!(".{SUM_FILE}-{}", std::process::id()));
             std::fs::write(&tmp, format!("{sum}\n"))?;
@@ -351,7 +351,7 @@ fn extract(env: &Env, archive: &Path, sum: &str) -> Result<Version> {
         } else {
             std::fs::rename(&staging, &dest)?;
         }
-        Version::read(&dest).context("version installée illisible")
+        Version::read(&dest).context("installed version unreadable")
     })();
     if res.is_err() && staging.exists() {
         let _ = std::fs::remove_dir_all(&staging);
@@ -359,9 +359,9 @@ fn extract(env: &Env, archive: &Path, sum: &str) -> Result<Version> {
     res
 }
 
-/// Retire les versions au-delà des `keep` plus récentes, jamais celle de `current`, et les
-/// restes d'extraction interrompue (`.extract-<pid>` dont le processus n'existe plus : celui
-/// d'un `sync` en cours n'est jamais touché). Renvoie les versions retirées.
+/// Removes the versions beyond the `keep` most recent, never the one of `current`, and the
+/// leftovers of an interrupted extraction (`.extract-<pid>` whose process no longer exists: the one
+/// of a running `sync` is never touched). Returns the versions removed.
 pub fn prune(env: &Env, keep: usize) -> Result<Vec<String>> {
     let cur = current_target(env);
     let mut removed = Vec::new();
@@ -379,7 +379,7 @@ pub fn prune(env: &Env, keep: usize) -> Result<Vec<String>> {
             let Some(pid) = name.strip_prefix(".extract-") else {
                 continue;
             };
-            // Un nom qui n'est pas un numéro de processus n'est pas de nous : laissé.
+            // A name that is not a process number is not ours: left.
             if pid.parse::<u32>().is_ok() && !Path::new("/proc").join(pid).exists() {
                 let _ = std::fs::remove_dir_all(e.path());
             }
@@ -388,9 +388,9 @@ pub fn prune(env: &Env, keep: usize) -> Result<Vec<String>> {
     Ok(removed)
 }
 
-// ---------------------------------------------------------------- écarts entre racines
+// ---------------------------------------------------------------- differences between roots
 
-/// Empreinte de `config/` et `modules/` d'une racine (fichier : sha256 ; lien : sa cible).
+/// Fingerprint of `config/` and `modules/` of a root (file: sha256; link: its target).
 fn snapshot(root: &Path) -> Result<BTreeMap<String, String>> {
     fn walk(base: &Path, dir: &Path, out: &mut BTreeMap<String, String>) -> Result<()> {
         let Ok(rd) = std::fs::read_dir(dir) else {
@@ -404,13 +404,13 @@ fn snapshot(root: &Path) -> Result<BTreeMap<String, String>> {
             let p = e.path();
             let rel = p
                 .strip_prefix(base)
-                .expect("sous la racine")
+                .expect("under the root")
                 .to_string_lossy()
                 .into_owned();
             let ft = e.file_type()?;
             if ft.is_symlink() {
                 let t = std::fs::read_link(&p)?;
-                out.insert(rel, format!("lien:{}", t.display()));
+                out.insert(rel, format!("link:{}", t.display()));
             } else if ft.is_dir() {
                 walk(base, &p, out)?;
             } else {
@@ -426,7 +426,7 @@ fn snapshot(root: &Path) -> Result<BTreeMap<String, String>> {
     Ok(out)
 }
 
-/// Chemins (relatifs à la racine) qui diffèrent entre deux racines : ajoutés, retirés, changés.
+/// Paths (relative to the root) that differ between two roots: added, removed, changed.
 pub fn changed_paths(old: &Path, new: &Path) -> Result<BTreeSet<String>> {
     if std::fs::canonicalize(old).ok() == std::fs::canonicalize(new).ok() {
         return Ok(BTreeSet::new());
@@ -439,8 +439,8 @@ pub fn changed_paths(old: &Path, new: &Path) -> Result<BTreeSet<String>> {
         .collect())
 }
 
-/// Ajoute à `need` ce que demande le passage de `old` à `new` (rien sans ancienne racine connue :
-/// tout ce que la nouvelle porte compte alors).
+/// Adds to `need` what the move from `old` to `new` asks for (nothing without a known old root:
+/// everything the new one carries then counts).
 pub fn add_root_changes(need: &mut Need, old: Option<&Path>, new: &Path) -> Result<()> {
     let paths = match old {
         Some(o) => changed_paths(o, new)?,
@@ -454,22 +454,22 @@ pub fn add_root_changes(need: &mut Need, old: Option<&Path>, new: &Path) -> Resu
 
 // ---------------------------------------------------------------- poste sys versions / use
 
-/// `poste sys versions` : la source, la racine et les versions installées.
+/// `poste sys versions`: the source, the root and the installed versions.
 pub fn list(env: &Env, cfg: &Config) -> Result<()> {
     println!("Source        {}", cfg.source.as_str());
     match std::fs::read_link(env.current_link()) {
         Ok(t) => println!(
-            "Racine        {} -> {}{}",
+            "Root          {} -> {}{}",
             env.display(&env.current_link()),
             env.display(&t),
             if env.current_link().exists() {
                 ""
             } else {
-                "  (cassé)"
+                "  (broken)"
             }
         ),
         Err(_) => println!(
-            "Racine        {} absent (le prochain `poste sys setup` le pose)",
+            "Root          {} absent (the next `poste sys setup` puts it in place)",
             env.display(&env.current_link())
         ),
     }
@@ -477,12 +477,12 @@ pub fn list(env: &Env, cfg: &Config) -> Result<()> {
     let all = installed(env);
     if all.is_empty() {
         println!(
-            "\nAucune version installée (`poste sys use release` ou `poste sys sync` en release)."
+            "\nNo installed version (`poste sys use release` or `poste sys sync` in release)."
         );
         return Ok(());
     }
     println!(
-        "\nVersions installées ({}) :",
+        "\nInstalled versions ({}):",
         env.display(&env.versions_dir())
     );
     for v in &all {
@@ -496,12 +496,12 @@ pub fn list(env: &Env, cfg: &Config) -> Result<()> {
     Ok(())
 }
 
-/// Ce que demande `poste sys use <cible>`.
+/// What `poste sys use <target>` asks for.
 pub enum Target {
     Dev,
-    /// La plus récente installée (téléchargée si aucune).
+    /// The most recent installed (downloaded if none).
     Release,
-    /// Une version installée, par début de commit (retour arrière).
+    /// An installed version, by start of commit (rollback).
     Pinned(String),
 }
 
@@ -515,14 +515,14 @@ impl Target {
     }
 }
 
-/// Ce que `switch` a fait : code de sortie et ce qu'il faut recharger.
+/// What `switch` did: exit code and what must be reloaded.
 pub struct Switched {
     pub code: ExitCode,
     pub need: Need,
 }
 
-/// `poste sys use` : écrit `source`, fait pointer `current`, lance `setup` depuis la nouvelle
-/// racine. Le rechargement (île, Hyprland) est laissé à l'appelant, d'après `need`.
+/// `poste sys use`: writes `source`, points `current`, runs `setup` from the new
+/// root. The reload (island, Hyprland) is left to the caller, based on `need`.
 pub fn use_target(
     env: &Env,
     cfg: &Config,
@@ -552,23 +552,23 @@ pub fn use_target(
             match m.as_slice() {
                 [v] => (Source::Release, v.dir.clone()),
                 [] => bail!(
-                    "« {p} » : ni dev, ni release, ni le début d'une version installée (poste sys versions)"
+                    "'{p}': neither dev, nor release, nor the start of an installed version (poste sys versions)"
                 ),
-                _ => bail!("« {p} » désigne plusieurs versions : donnez plus de caractères"),
+                _ => bail!("'{p}' designates several versions: give more characters"),
             }
         }
     };
     switch(env, source, &dir, o)
 }
 
-/// Bascule la machine sur `dir` (source `source`) puis lance `setup` depuis `current`.
+/// Switches the machine to `dir` (source `source`) then runs `setup` from `current`.
 pub fn switch(env: &Env, source: Source, dir: &Path, o: &setup::Opts) -> Result<Switched> {
     let old = current_target(env);
     let mut need = Need::default();
     add_root_changes(&mut need, old.as_deref(), dir)?;
     if o.dry_run {
         println!(
-            "Simulation : source = \"{}\" et {} -> {} non écrits, setup non lancé.",
+            "Dry run: source = \"{}\" and {} -> {} not written, setup not run.",
             source.as_str(),
             env.display(&env.current_link()),
             env.display(dir)
@@ -581,7 +581,7 @@ pub fn switch(env: &Env, source: Source, dir: &Path, o: &setup::Opts) -> Result<
     let file = env.config_file();
     if machine::set_key(&file, "source", source.as_str())? {
         println!(
-            "Config : source = \"{}\" ({}).",
+            "Config: source = \"{}\" ({}).",
             source.as_str(),
             env.display(&file)
         );
@@ -590,9 +590,9 @@ pub fn switch(env: &Env, source: Source, dir: &Path, o: &setup::Opts) -> Result<
     handoff::complete(env, old.as_deref(), need, o.yes, false, o.skip_build)
 }
 
-/// La suite de `sync` et de `use` une fois `current` posé : `setup` depuis `root` (`current`,
-/// ou la racine lue en simulation), élagage des anciennes versions si `prune_old`. Lancée ici, ou par l'ancien `poste-sys` qui passe la main
-/// (`poste-sys finish`, voir `handoff`).
+/// The rest of `sync` and `use` once `current` is set: `setup` from `root` (`current`,
+/// or the root read in a dry run), pruning of the old versions if `prune_old`. Run here, or by the old `poste-sys` that hands over
+/// (`poste-sys finish`, see `handoff`).
 pub fn finish(
     env: &Env,
     root: &Path,
@@ -608,7 +608,7 @@ pub fn finish(
     if prune_old {
         let removed = prune(env, KEEP)?;
         if !removed.is_empty() {
-            println!("Anciennes versions retirées : {}.", removed.join(", "));
+            println!("Old versions removed: {}.", removed.join(", "));
         }
     }
     Ok(Switched {
@@ -623,7 +623,7 @@ pub(crate) mod tests {
     use std::fs;
     use std::os::unix::fs::PermissionsExt;
 
-    /// Une version dans `dir` : `VERSION`, une config, un module avec une île.
+    /// A version in `dir`: `VERSION`, a config, a module with an island.
     pub fn make_root(dir: &Path, commit: &str, date: &str, island: &str) {
         fs::create_dir_all(dir.join("config/.config/a")).unwrap();
         fs::write(dir.join("config/.config/a/neuf"), "n").unwrap();
@@ -642,7 +642,7 @@ pub(crate) mod tests {
         }
     }
 
-    /// Archive `tar.gz` d'une racine, et son fichier `.sha256`, dans `pubdir`.
+    /// `tar.gz` archive of a root, and its `.sha256` file, in `pubdir`.
     pub fn publish(src: &Path, pubdir: &Path) -> String {
         fs::create_dir_all(pubdir).unwrap();
         let archive = pubdir.join(ARCHIVE);
@@ -664,8 +664,8 @@ pub(crate) mod tests {
         sum
     }
 
-    /// Faux `curl` : copie `<pubdir>/<nom>` (dernier argument : l'adresse), vers `-o` ou la
-    /// sortie ; chaque appel est noté dans `log`.
+    /// Fake `curl`: copies `<pubdir>/<name>` (last argument: the address), to `-o` or the
+    /// output; each call is noted in `log`.
     pub fn fake_curl(dir: &Path, pubdir: &Path) -> (PathBuf, PathBuf) {
         let prog = dir.join("fake-curl");
         let log = dir.join("curl.log");
@@ -685,7 +685,7 @@ pub(crate) mod tests {
     }
 
     #[test]
-    fn lecture_de_version() {
+    fn reading_a_version() {
         let d = tempfile::tempdir().unwrap();
         fs::write(
             d.path().join(VERSION_FILE),
@@ -705,7 +705,7 @@ pub(crate) mod tests {
     }
 
     #[test]
-    fn telechargement_verifie_puis_deja_installe() {
+    fn verified_download_then_already_installed() {
         let d = tempfile::tempdir().unwrap();
         let env = Env::with_home(d.path().join("home"));
         let src = d.path().join("src");
@@ -715,7 +715,7 @@ pub(crate) mod tests {
         let (curl, log) = fake_curl(d.path(), &pubdir);
         let f = Fetcher::with(&curl, "https://example.com/r");
 
-        // Simulation : rien d'écrit.
+        // Dry run: nothing written.
         assert!(fetch(&env, &f, true).unwrap().is_none());
         assert!(!env.data_home.exists() && !env.cache_home.exists());
 
@@ -727,7 +727,7 @@ pub(crate) mod tests {
             sum
         );
         assert!(!env.cache_dir().join("download").join(ARCHIVE).exists());
-        // Deuxième fois : seule la somme est lue.
+        // Second time: only the checksum is read.
         fs::write(&log, "").unwrap();
         assert_eq!(fetch(&env, &f, false).unwrap().unwrap().commit, "aaaaaaa1");
         assert_eq!(
@@ -737,7 +737,7 @@ pub(crate) mod tests {
     }
 
     #[test]
-    fn archive_reconstruite_du_meme_commit_retient_la_nouvelle_somme() {
+    fn rebuilt_archive_of_same_commit_keeps_the_new_checksum() {
         let d = tempfile::tempdir().unwrap();
         let env = Env::with_home(d.path().join("home"));
         let src = d.path().join("src");
@@ -747,7 +747,7 @@ pub(crate) mod tests {
         let (curl, log) = fake_curl(d.path(), &pubdir);
         let f = Fetcher::with(&curl, "https://example.com/r");
         fetch(&env, &f, false).unwrap().unwrap();
-        // Même commit, archive refaite (contenu différent donc somme différente).
+        // Same commit, archive rebuilt (different content therefore different checksum).
         fs::write(src.join("config/.config/a/neuf"), "refait").unwrap();
         let second = publish(&src, &pubdir);
         assert_ne!(first, second);
@@ -758,14 +758,14 @@ pub(crate) mod tests {
             second
         );
         assert_eq!(installed(&env).len(), 1);
-        // Le sync suivant ne télécharge plus l'archive : seule la somme est lue.
+        // The next sync no longer downloads the archive: only the checksum is read.
         fs::write(&log, "").unwrap();
         fetch(&env, &f, false).unwrap().unwrap();
         assert_eq!(
             fs::read_to_string(&log).unwrap().trim(),
             format!("{ARCHIVE}.sha256")
         );
-        // Aucun fichier temporaire ne reste dans la version.
+        // No temporary file stays in the version.
         assert!(fs::read_dir(&v.dir)
             .unwrap()
             .flatten()
@@ -773,7 +773,7 @@ pub(crate) mod tests {
     }
 
     #[test]
-    fn somme_fausse_refusee_sans_rien_installer() {
+    fn wrong_checksum_refused_without_installing_anything() {
         let d = tempfile::tempdir().unwrap();
         let env = Env::with_home(d.path().join("home"));
         let src = d.path().join("src");
@@ -788,10 +788,10 @@ pub(crate) mod tests {
         let (curl, _) = fake_curl(d.path(), &pubdir);
         let f = Fetcher::with(&curl, "https://example.com/r");
         let e = fetch(&env, &f, false).unwrap_err();
-        assert!(format!("{e:#}").contains("somme de contrôle"));
+        assert!(format!("{e:#}").contains("checksum"));
         assert!(installed(&env).is_empty());
         assert!(!env.cache_dir().join("download").join(ARCHIVE).exists());
-        // Sans VERSION : refusée aussi, aucun reste.
+        // Without VERSION: refused too, no leftover.
         let src2 = d.path().join("src2");
         make_root(&src2, "", "", "{}");
         publish(&src2, &pubdir);
@@ -800,7 +800,7 @@ pub(crate) mod tests {
     }
 
     #[test]
-    fn elagage_garde_les_plus_recentes_et_current() {
+    fn pruning_keeps_the_most_recent_and_current() {
         let d = tempfile::tempdir().unwrap();
         let env = Env::with_home(d.path().join("home"));
         let vd = env.versions_dir();
@@ -815,7 +815,7 @@ pub(crate) mod tests {
                 "{}",
             );
         }
-        // Reste d'un processus disparu : retiré. Celui d'un sync en cours (le nôtre) : laissé.
+        // Leftover of a process that is gone: removed. The one of a running sync (ours): left.
         let mut done = Command::new("true").spawn().unwrap();
         let dead = done.id();
         done.wait().unwrap();
@@ -825,7 +825,7 @@ pub(crate) mod tests {
         );
         fs::create_dir_all(&dead_dir).unwrap();
         fs::create_dir_all(&alive_dir).unwrap();
-        // current sur la plus ancienne (retour arrière) : jamais retirée.
+        // current on the oldest (rollback): never removed.
         point_current(&env, &vd.join("1000000")).unwrap();
         let removed = prune(&env, 3).unwrap();
         assert_eq!(removed, ["2000000"]);
@@ -837,7 +837,7 @@ pub(crate) mod tests {
     }
 
     #[test]
-    fn current_jamais_pose_sur_un_fichier_ordinaire() {
+    fn current_never_put_on_an_ordinary_file() {
         let d = tempfile::tempdir().unwrap();
         let env = Env::with_home(d.path().join("home"));
         fs::create_dir_all(env.current_link()).unwrap();
@@ -846,12 +846,12 @@ pub(crate) mod tests {
     }
 
     #[test]
-    fn ecarts_entre_deux_racines() {
+    fn differences_between_two_roots() {
         let d = tempfile::tempdir().unwrap();
         let (a, b) = (d.path().join("a"), d.path().join("b"));
         make_root(&a, "aaaaaaa1", "x", "{}");
         make_root(&b, "aaaaaaa2", "y", "{}");
-        // Seul le binaire et VERSION diffèrent : rien à recharger.
+        // Only the binary and VERSION differ: nothing to reload.
         let mut n = Need::default();
         add_root_changes(&mut n, Some(&a), &b).unwrap();
         assert!(!n.any());
@@ -869,7 +869,7 @@ pub(crate) mod tests {
         let mut n = Need::default();
         add_root_changes(&mut n, Some(&a), &b).unwrap();
         assert!(n.shell && n.hypr);
-        // Même racine : rien.
+        // Same root: nothing.
         assert!(changed_paths(&b, &b).unwrap().is_empty());
     }
 }

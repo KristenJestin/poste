@@ -1,6 +1,6 @@
-//! JSON minimal qui garde l'ORDRE des clés et le texte exact des nombres : sert à générer un
-//! fichier de config (dépôt + surcharges) sans le réordonner ni le déformer. Pas de dépendance
-//! (`serde_json` trierait les clés, et l'activer ici changerait les autres modules du dépôt).
+//! Minimal JSON that keeps the ORDER of the keys and the exact text of numbers: used to generate a
+//! config file (repository + overrides) without reordering or distorting it. No dependency
+//! (`serde_json` would sort the keys, and enabling it here would change the other modules of the repository).
 
 use anyhow::{bail, Result};
 
@@ -8,7 +8,7 @@ use anyhow::{bail, Result};
 pub enum J {
     Null,
     Bool(bool),
-    /// Texte du nombre tel qu'écrit.
+    /// Text of the number as written.
     Num(String),
     Str(String),
     Arr(Vec<J>),
@@ -32,13 +32,13 @@ impl P<'_> {
             self.i += 1;
             Ok(())
         } else {
-            bail!("« {} » attendu à l'octet {}", c as char, self.i)
+            bail!("'{}' expected at byte {}", c as char, self.i)
         }
     }
     fn value(&mut self) -> Result<J> {
         self.ws();
         match self.s.get(self.i) {
-            None => bail!("fin inattendue"),
+            None => bail!("unexpected end"),
             Some(b'{') => {
                 self.i += 1;
                 let mut v = Vec::new();
@@ -60,7 +60,7 @@ impl P<'_> {
                             self.i += 1;
                             return Ok(J::Obj(v));
                         }
-                        _ => bail!("« , » ou « }} » attendu à l'octet {}", self.i),
+                        _ => bail!("',' or '}}' expected at byte {}", self.i),
                     }
                 }
             }
@@ -81,7 +81,7 @@ impl P<'_> {
                             self.i += 1;
                             return Ok(J::Arr(v));
                         }
-                        _ => bail!("« , » ou « ] » attendu à l'octet {}", self.i),
+                        _ => bail!("',' or ']' expected at byte {}", self.i),
                     }
                 }
             }
@@ -110,12 +110,12 @@ impl P<'_> {
                 }
                 let t = std::str::from_utf8(&self.s[st..self.i])?;
                 if t.parse::<f64>().is_err() {
-                    bail!("nombre invalide « {t} »");
+                    bail!("invalid number '{t}'");
                 }
                 Ok(J::Num(t.to_string()))
             }
             Some(c) => bail!(
-                "caractère inattendu « {} » à l'octet {}",
+                "unexpected character '{}' at byte {}",
                 *c as char,
                 self.i
             ),
@@ -123,20 +123,20 @@ impl P<'_> {
     }
     fn string(&mut self) -> Result<String> {
         if self.s.get(self.i) != Some(&b'"') {
-            bail!("chaîne attendue à l'octet {}", self.i);
+            bail!("string expected at byte {}", self.i);
         }
         self.i += 1;
         let mut out: Vec<u8> = Vec::new();
         loop {
             let Some(&c) = self.s.get(self.i) else {
-                bail!("chaîne non terminée")
+                bail!("unterminated string")
             };
             self.i += 1;
             match c {
                 b'"' => return Ok(String::from_utf8(out)?),
                 b'\\' => {
                     let Some(&e) = self.s.get(self.i) else {
-                        bail!("échappement incomplet")
+                        bail!("incomplete escape")
                     };
                     self.i += 1;
                     match e {
@@ -155,15 +155,15 @@ impl P<'_> {
                                     cp =
                                         0x10000 + ((cp - 0xD800) << 10) + (lo.wrapping_sub(0xDC00));
                                 } else {
-                                    bail!("paire de substitution incomplète");
+                                    bail!("incomplete surrogate pair");
                                 }
                             }
                             let ch = char::from_u32(cp)
-                                .ok_or_else(|| anyhow::anyhow!("\\u invalide"))?;
+                                .ok_or_else(|| anyhow::anyhow!("invalid \\u"))?;
                             let mut b = [0u8; 4];
                             out.extend_from_slice(ch.encode_utf8(&mut b).as_bytes());
                         }
-                        _ => bail!("échappement inconnu \\{}", e as char),
+                        _ => bail!("unknown escape \\{}", e as char),
                     }
                 }
                 _ => out.push(c),
@@ -188,7 +188,7 @@ pub fn parse(text: &str) -> Result<J> {
     let v = p.value()?;
     p.ws();
     if p.i != p.s.len() {
-        bail!("texte en trop à l'octet {}", p.i);
+        bail!("extra text at byte {}", p.i);
     }
     Ok(v)
 }
@@ -243,7 +243,7 @@ fn write(v: &J, depth: usize, out: &mut String) {
     }
 }
 
-/// Indentation de 2 espaces, retour à la ligne final.
+/// Indentation of 2 spaces, final line break.
 pub fn pretty(v: &J) -> String {
     let mut s = String::new();
     write(v, 0, &mut s);
@@ -252,7 +252,7 @@ pub fn pretty(v: &J) -> String {
 }
 
 impl J {
-    /// Égalité sémantique (les nombres se comparent par valeur, l'ordre des clés ne compte pas).
+    /// Semantic equality (numbers compare by value, the order of the keys does not matter).
     pub fn same(&self, o: &J) -> bool {
         match (self, o) {
             (J::Num(a), J::Num(b)) => a.parse::<f64>().ok() == b.parse::<f64>().ok(),
@@ -276,14 +276,14 @@ impl J {
         }
     }
 
-    /// Pose `val` au chemin (objets intermédiaires créés) ; erreur si un maillon n'est pas un objet.
+    /// Sets `val` at the path (intermediate objects created); error if a link of the chain is not an object.
     pub fn set(&mut self, path: &[&str], val: J) -> Result<()> {
         let Some((k, rest)) = path.split_first() else {
             *self = val;
             return Ok(());
         };
         let J::Obj(o) = self else {
-            bail!("« {k} » : le parent n'est pas un objet");
+            bail!("'{k}': the parent is not an object");
         };
         if let Some((_, v)) = o.iter_mut().find(|(n, _)| n == k) {
             return v.set(rest, val);
@@ -294,7 +294,7 @@ impl J {
         Ok(())
     }
 
-    /// Retire la clé et les objets parents devenus vides ; `true` si elle existait.
+    /// Removes the key and the parent objects that became empty; `true` if it existed.
     pub fn remove(&mut self, path: &[&str]) -> bool {
         let Some((k, rest)) = path.split_first() else {
             return false;
@@ -320,7 +320,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn ordre_nombres_et_unicode_conserves() {
+    fn order_numbers_and_unicode_kept() {
         let t = "{\n  \"z\": 1.50,\n  \"a\": [1, {\"k\": \"é ✓ \\n\"}],\n  \"e\": {},\n  \"n\": null\n}";
         let v = parse(t).unwrap();
         let out = pretty(&v);
@@ -345,7 +345,7 @@ mod tests {
         v.set(&["a", "b", "c"], J::Bool(true)).unwrap();
         assert!(v.set(&["idle", "lock", "x"], J::Null).is_err());
         assert!(v.remove(&["a", "b", "c"]));
-        assert!(v.get(&["a"]).is_none(), "parents vides retirés");
+        assert!(v.get(&["a"]).is_none(), "empty parents removed");
         assert!(!v.remove(&["nope"]));
         assert!(parse("1.0").unwrap().same(&parse("1").unwrap()));
     }

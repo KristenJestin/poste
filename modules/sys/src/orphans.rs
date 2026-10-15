@@ -1,14 +1,14 @@
-//! Orphelins : ce que poste a posé et dont la source n'existe plus.
+//! Orphans: what poste put in place and whose source no longer exists.
 //!
-//! - un lien de `~` qui pointe vers `<dépôt>/config/…` et dont la cible a disparu (fichier
-//!   renommé ou retiré du dépôt) ; les racines de poste comptent toutes : `current`, le clone,
-//!   les versions installées, le dépôt de données ;
-//! - un fichier de module (`~/.local/share/poste/modules/…`) noté dans `installed.json`, que le
-//!   dépôt ne produit plus (module supprimé, fichier renommé) et qui est resté tel qu'installé ;
-//!   s'il a déjà disparu de `~`, il n'y a rien à retirer : son entrée sort du manifeste.
+//! - a link of `~` that points to `<repository>/config/…` and whose target is gone (file
+//!   renamed or removed from the repository); all the poste roots count: `current`, the clone,
+//!   the installed versions, the data repository;
+//! - a module file (`~/.local/share/poste/modules/…`) noted in `installed.json`, that the
+//!   repository no longer produces (module deleted, file renamed) and that was left as installed;
+//!   if it has already disappeared from `~`, there is nothing to remove: its entry leaves the manifest.
 //!
-//! Jamais un fichier ordinaire qui n'est pas dans `installed.json`, jamais un fichier de module
-//! modifié à la main. Le retrait passe par un aperçu et une confirmation.
+//! Never an ordinary file that is not in `installed.json`, never a module file
+//! edited by hand. Removal goes through a preview and a confirmation.
 
 use crate::config::{self, Layout};
 use crate::manifest::Manifest;
@@ -21,9 +21,9 @@ use std::path::{Path, PathBuf};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Kind {
-    /// Lien de config dont la source du dépôt a disparu.
+    /// Config link whose source in the repository is gone.
     Link { target: PathBuf },
-    /// Fichier de module que le dépôt ne produit plus.
+    /// Module file that the repository no longer produces.
     ModuleFile { module: String },
 }
 
@@ -33,7 +33,7 @@ pub struct Orphan {
     pub kind: Kind,
 }
 
-/// Cible réelle (chemin absolu) d'un lien, sans exiger qu'elle existe.
+/// Real target (absolute path) of a link, without requiring it to exist.
 fn link_target(link: &Path) -> Option<PathBuf> {
     let raw = std::fs::read_link(link).ok()?;
     Some(if raw.is_absolute() {
@@ -43,7 +43,7 @@ fn link_target(link: &Path) -> Option<PathBuf> {
     })
 }
 
-/// Un lien de config orphelin : il pointe sous `<dépôt>/config/` et rien n'existe là.
+/// An orphan config link: it points under `<repository>/config/` and nothing exists there.
 fn dangling_config_link(link: &Path, config_root: &Path) -> Option<PathBuf> {
     let md = std::fs::symlink_metadata(link).ok()?;
     if !md.file_type().is_symlink() {
@@ -62,8 +62,8 @@ pub fn find(
     items: &[Item],
 ) -> Result<Vec<Orphan>> {
     let mut roots = vec![repo.join("config")];
-    // `current` cassé (version retirée, lien à refaire) : ses liens sont à refaire, pas
-    // orphelins. De même, seules les versions encore installées comptent comme racines.
+    // Broken `current` (version removed, link to redo): its links are to be redone, not
+    // orphans. Likewise, only the versions still installed count as roots.
     if env.current_link().exists() {
         roots.push(env.current_link().join("config"));
     }
@@ -93,7 +93,7 @@ pub fn find(
         })
         .unwrap_or_default();
 
-    // Liens de config : chemins notés dans le manifeste + enfants des dossiers gérés.
+    // Config links: paths noted in the manifest + children of the managed folders.
     let mut candidates: BTreeSet<PathBuf> = manifest
         .files
         .iter()
@@ -114,7 +114,7 @@ pub fn find(
         }
     }
     for d in dirs {
-        // Un dossier réel de ~ seulement (pas l'intérieur d'un dossier lié vers le dépôt).
+        // A real folder of ~ only (not the inside of a folder linked to the repository).
         let Ok(md) = std::fs::symlink_metadata(&d) else {
             continue;
         };
@@ -139,7 +139,7 @@ pub fn find(
         }
     }
 
-    // Fichiers de module que le dépôt ne produit plus.
+    // Module files that the repository no longer produces.
     let produced: HashSet<&Path> = items.iter().map(|i| i.dest.as_path()).collect();
     let modules_dir = env.modules_dir();
     for e in &manifest.files {
@@ -168,21 +168,21 @@ pub fn print(env: &Env, orphans: &[Orphan]) {
     let off = poste_core::Config::load(env)
         .map(|c| c.disabled)
         .unwrap_or_default();
-    println!("\nOrphelins (à retirer, poste les avait posés) :");
+    println!("\nOrphans (to remove, poste had put them in place):");
     for o in orphans {
         match &o.kind {
             Kind::Link { target } => println!(
-                "  lien orphelin    {}  -> {}  (source disparue du dépôt)",
+                "  orphan link {}  -> {}  (source gone from the repository)",
                 env.display(&o.path),
                 target.display()
             ),
             Kind::ModuleFile { module } => println!(
-                "  fichier orphelin {}  [{module}]  ({})",
+                "  orphan file {}  [{module}]  ({})",
                 env.display(&o.path),
                 if o.path.symlink_metadata().is_err() {
-                    "déjà disparu, oublié du manifeste"
+                    "already gone, forgotten from the manifest"
                 } else if off.contains(module) {
-                    "module désactivé sur cette machine"
+                    "module disabled on this machine"
                 } else {
                     "no longer installed here: gone from the repository, add-on not chosen, or its program missing"
                 }
@@ -191,8 +191,8 @@ pub fn print(env: &Env, orphans: &[Orphan]) {
     }
 }
 
-/// Retire les orphelins (revérifiés au dernier moment) et les oublie dans le manifeste.
-/// Un fichier de module est d'abord sauvegardé ; ses dossiers devenus vides sont retirés.
+/// Removes the orphans (checked again at the last moment) and forgets them in the manifest.
+/// A module file is backed up first; its folders that became empty are removed.
 pub fn apply(
     env: &Env,
     _repo: &Path,
@@ -204,7 +204,7 @@ pub fn apply(
     for o in orphans {
         match &o.kind {
             Kind::Link { target } => {
-                // Le lien doit toujours pointer vers la même cible, toujours disparue.
+                // The link must still point to the same target, still gone.
                 let still = std::fs::symlink_metadata(&o.path)
                     .is_ok_and(|m| m.file_type().is_symlink())
                     && link_target(&o.path).as_ref() == Some(target)
@@ -257,23 +257,23 @@ mod tests {
     }
 
     #[test]
-    fn lien_orphelin_apres_renommage_et_rien_d_autre() {
+    fn orphan_link_after_rename_and_nothing_else() {
         let d = tempfile::tempdir().unwrap();
         let repo = d.path().join("repo");
         let home = d.path().join("home");
         fs::create_dir_all(repo.join("config/.config/a")).unwrap();
         fs::create_dir_all(home.join(".config/a")).unwrap();
-        fs::write(repo.join("config/.config/a/nouveau"), "x").unwrap();
+        fs::write(repo.join("config/.config/a/fresh"), "x").unwrap();
         let env = Env::with_home(&home);
-        // Ancien lien (source renommée), nouveau lien, fichier ordinaire, lien étranger cassé.
+        // Old link (renamed source), new link, ordinary file, broken foreign link.
         symlink(
-            repo.join("config/.config/a/ancien"),
-            home.join(".config/a/ancien"),
+            repo.join("config/.config/a/old"),
+            home.join(".config/a/old"),
         )
         .unwrap();
         symlink(
-            repo.join("config/.config/a/nouveau"),
-            home.join(".config/a/nouveau"),
+            repo.join("config/.config/a/fresh"),
+            home.join(".config/a/fresh"),
         )
         .unwrap();
         fs::write(home.join(".config/a/ordinaire"), "perso").unwrap();
@@ -281,20 +281,20 @@ mod tests {
         let layout = config::load(&repo, &env).unwrap().unwrap();
         let mut m = Manifest::default();
         m.files
-            .push(entry(&home.join(".config/a/ancien"), "h", config::MODULE));
+            .push(entry(&home.join(".config/a/old"), "h", config::MODULE));
         let o = find(&repo, &env, Some(&layout), &m, &[]).unwrap();
         assert_eq!(o.len(), 1, "{o:?}");
-        assert!(o[0].path.ends_with(".config/a/ancien"));
+        assert!(o[0].path.ends_with(".config/a/old"));
         assert_eq!(apply(&env, &repo, &o, "t", &mut m).unwrap(), 1);
-        assert!(!home.join(".config/a/ancien").is_symlink());
-        assert!(home.join(".config/a/nouveau").is_symlink());
+        assert!(!home.join(".config/a/old").is_symlink());
+        assert!(home.join(".config/a/fresh").is_symlink());
         assert!(home.join(".config/a/ordinaire").is_file());
         assert!(home.join(".config/a/etranger").is_symlink());
         assert!(m.files.is_empty());
     }
 
     #[test]
-    fn current_casse_ne_rend_pas_les_liens_orphelins() {
+    fn broken_current_does_not_make_links_orphans() {
         let d = tempfile::tempdir().unwrap();
         let repo = d.path().join("repo");
         let home = d.path().join("home");
@@ -302,8 +302,8 @@ mod tests {
         fs::create_dir_all(home.join(".config/a")).unwrap();
         fs::write(repo.join("config/.config/a/x"), "x").unwrap();
         let env = Env::with_home(&home);
-        // current désigne une version retirée ; un lien passe par current, un autre par
-        // une version qui n'est plus installée, un troisième par une version installée.
+        // current points to a removed version; one link goes through current, another through
+        // a version that is no longer installed, a third through an installed version.
         fs::create_dir_all(env.current_link().parent().unwrap()).unwrap();
         symlink(env.versions_dir().join("retiree"), env.current_link()).unwrap();
         let v = env.versions_dir().join("presente/config/.config/a");
@@ -327,13 +327,13 @@ mod tests {
         }
         let layout = config::load(&repo, &env).unwrap().unwrap();
         let o = find(&repo, &env, Some(&layout), &m, &[]).unwrap();
-        // Seul le lien vers un fichier disparu d'une version bien là est un orphelin.
+        // Only the link to a file gone from a version that is really there is an orphan.
         assert_eq!(o.len(), 1, "{o:?}");
         assert!(o[0].path.ends_with("version_presente"));
     }
 
     #[test]
-    fn fichier_de_module_disparu_retire_seulement_s_il_est_intact() {
+    fn vanished_module_file_removed_only_if_intact() {
         let d = tempfile::tempdir().unwrap();
         let repo = d.path().join("repo");
         fs::create_dir_all(&repo).unwrap();
@@ -345,13 +345,13 @@ mod tests {
         fs::write(&b, "b").unwrap();
         let mut m = Manifest::default();
         m.files.push(entry(&a, &sha256_file(&a).unwrap(), "rec"));
-        m.files.push(entry(&b, "autre-empreinte", "rec")); // modifié à la main
+        m.files.push(entry(&b, "other-fingerprint", "rec")); // edited by hand
         let o = find(&repo, &env, None, &m, &[]).unwrap();
         assert_eq!(o.len(), 1);
         assert_eq!(o[0].path, a);
         apply(&env, &repo, &o, "t", &mut m).unwrap();
         assert!(!a.exists() && b.exists());
-        // Un module encore produit par le dépôt n'est pas orphelin.
+        // A module still produced by the repository is not an orphan.
         let item = Item {
             module: "rec".into(),
             src: a.clone(),
@@ -362,14 +362,14 @@ mod tests {
     }
 
     #[test]
-    fn fichier_de_module_deja_disparu_oublie_du_manifeste() {
+    fn module_file_already_gone_forgotten_from_manifest() {
         let d = tempfile::tempdir().unwrap();
         let repo = d.path().join("repo");
         fs::create_dir_all(&repo).unwrap();
         let env = Env::with_home(d.path().join("home"));
-        let gone = env.modules_dir().join("ancien/poste-ancien");
+        let gone = env.modules_dir().join("old/poste-old");
         let mut m = Manifest::default();
-        m.files.push(entry(&gone, "empreinte", "ancien"));
+        m.files.push(entry(&gone, "fingerprint", "old"));
         let o = find(&repo, &env, None, &m, &[]).unwrap();
         assert_eq!(o.len(), 1);
         assert_eq!(apply(&env, &repo, &o, "t", &mut m).unwrap(), 1);
