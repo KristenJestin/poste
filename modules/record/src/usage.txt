@@ -1,33 +1,33 @@
-Module record de poste : enregistrement d'écran avec gpu-screen-recorder, piloté par l'île.
-Se lance par `poste record <commande>`.
+Record module of poste: screen recording with gpu-screen-recorder, driven by the island.
+Run with `poste record <command>`.
 
-  poste record start --preset ID            un préréglage de record.json
-  poste record start --window ADDR [--audio A]   une fenêtre (adresse Hyprland)
-  poste record start --monitor NAME [--audio A]  un écran entier
-  poste record start --region [--audio A]        une zone choisie à la souris
-  poste record stop | pause | toggle            arrêter, pause / reprise, l'un ou l'autre
-  poste record status                           l'état en JSON
-  poste record watch                            une ligne JSON par changement d'état
-  poste record items                            la liste du lanceur (extension « Record »)
-  poste record open-dir | open-last [--preset ID]   le dossier, ou le dernier enregistrement
-  poste record hotkey                           SHIFT+PRINT : arrête l'enregistrement en cours,
-                                                sinon ouvre le lanceur de l'île sur « Record »
+  poste record start --preset ID            a preset of record.json
+  poste record start --window ADDR [--audio A]   a window (Hyprland address)
+  poste record start --monitor NAME [--audio A]  a whole screen
+  poste record start --region [--audio A]        a region picked with the mouse
+  poste record stop | pause | toggle            stop, pause / resume, one or the other
+  poste record status                           the state as JSON
+  poste record watch                            one JSON line per state change
+  poste record items                            the launcher list ("Record" extension)
+  poste record open-dir | open-last [--preset ID]   the folder, or the last recording
+  poste record hotkey                           SHIFT+PRINT: stops the recording in progress,
+                                                otherwise opens the island's launcher on "Record"
 
-Son (--audio) : none, app (le son de l'appli de la fenêtre), desktop, mic,
-desktop+mic, app+mic ; ou des sources gpu-screen-recorder brutes séparées
-par « | » (app:Unity|default_input).
+Sound (--audio): none, app (the sound of the window's app), desktop, mic,
+desktop+mic, app+mic; or raw gpu-screen-recorder sources separated
+by "|" (app:Unity|default_input).
 
-Préréglages : ~/.config/poste/record/presets.json (voir DEFAULT_CONFIG). Un
-préréglage choisit son son avec « audioSource » (mêmes valeurs que --audio) et,
-avec « app », peut donner « audioAppName » : le nom de l'appli dans PipeWire
-quand il diffère de sa classe de fenêtre (Unity s'annonce « FMOD Ex App »).
-« cursor » (true / false) montre ou cache la souris dans la vidéo.
-Une fenêtre passe par le portail de capture : le choix de la fenêtre est
-transmis au sélecteur par bin/poste-share-picker du module (fichier « pick » dans
-$XDG_RUNTIME_DIR/poste-record), donc sans clic. Un écran ou une zone passent
-directement par KMS, sans portail.
+Presets: ~/.config/poste/record/presets.json (see DEFAULT_CONFIG). A
+preset chooses its sound with "audioSource" (same values as --audio) and,
+with "app", can give "audioAppName": the name of the app in PipeWire
+when it differs from its window class (Unity announces itself as "FMOD Ex App").
+"cursor" (true / false) shows or hides the mouse in the video.
+A window goes through the capture portal: the choice of the window is
+passed to the picker by the module's bin/poste-share-picker ("pick" file in
+$XDG_RUNTIME_DIR/poste-record), so without a click. A screen or a region go
+directly through KMS, without the portal.
 
-Un processus surveillant (start --supervise) lance gpu-screen-recorder,
-attend sa fin, efface l'état et notifie : « Recording saved » (un clic ouvre
-le dossier) ou l'erreur. stop envoie SIGINT (gpu-screen-recorder finit le
-fichier), pause SIGUSR2.
+A watching process (start --supervise) runs gpu-screen-recorder,
+waits for it to end, clears the state and notifies: "Recording saved" (a click opens
+the folder) or the error. stop sends SIGINT (gpu-screen-recorder finishes the
+file), pause SIGUSR2.

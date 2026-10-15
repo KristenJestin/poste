@@ -1,6 +1,6 @@
-//! Cycle complet avec un faux gpu-screen-recorder : start, pause, resume, toggle, stop,
-//! notification, open-last, hotkey. Rien n'est enregistré ; le faux journalise ses arguments
-//! et les signaux reçus.
+//! Full cycle with a fake gpu-screen-recorder: start, pause, resume, toggle, stop,
+//! notification, open-last, hotkey. Nothing is recorded; the fake logs its arguments
+//! and the signals received.
 
 mod common;
 use common::*;
@@ -26,7 +26,7 @@ fn start_monitor(b: &Bench) {
         .output()
         .unwrap();
     assert_eq!(o.status.code(), Some(0));
-    b.wait_for("l'état d'enregistrement", || b.state_file().exists());
+    b.wait_for("the recording state", || b.state_file().exists());
     b.wait_gsr_ready();
 }
 
@@ -46,7 +46,7 @@ fn cycle_start_pause_resume_stop_open_last() {
         assert_eq!(
             b.rust(&[cmd]).output().unwrap().status.code(),
             Some(1),
-            "{cmd} au repos"
+            "{cmd} at rest"
         );
     }
 
@@ -59,7 +59,7 @@ fn cycle_start_pause_resume_stop_open_last() {
     assert!(file.contains("/Videos/Rec/Screen DP-1 "), "{file}");
     assert!(file.ends_with(".mp4"));
 
-    // Les arguments donnés au faux gsr.
+    // The arguments given to the fake gsr.
     let j = b.journal();
     let line = j
         .lines()
@@ -91,7 +91,7 @@ fn cycle_start_pause_resume_stop_open_last() {
         [file.as_str(), "-ac", "aac", "-a", "default_output"]
     );
 
-    // Un second start est refusé, sans toucher à l'enregistrement.
+    // A second start is refused, without touching the recording.
     b.clear_journal();
     let o = b.rust(&["start", "--monitor", "DP-1"]).output().unwrap();
     assert_eq!(o.status.code(), Some(1));
@@ -99,22 +99,22 @@ fn cycle_start_pause_resume_stop_open_last() {
     assert!(status(&b)["recording"] == true);
     assert!(!b.journal().contains("gpu-screen-recorder"));
 
-    // Pause (SIGUSR2), idempotente, puis reprise.
+    // Pause (SIGUSR2), idempotent, then resume.
     assert_eq!(b.rust(&["pause"]).output().unwrap().status.code(), Some(0));
     b.wait_for("SIGUSR2", || signals(&b) == ["USR2"]);
     let paused = status(&b);
     assert_eq!(paused["paused"], true);
     assert_eq!(b.rust(&["pause"]).output().unwrap().status.code(), Some(0));
     std::thread::sleep(std::time::Duration::from_millis(150));
-    assert_eq!(signals(&b), ["USR2"], "une seconde pause ne signale pas");
+    assert_eq!(signals(&b), ["USR2"], "a second pause does not signal");
     let frozen = status(&b)["recordMs"].as_i64().unwrap();
     std::thread::sleep(std::time::Duration::from_millis(250));
     assert_eq!(
         status(&b)["recordMs"].as_i64().unwrap(),
         frozen,
-        "chrono figé en pause"
+        "timer frozen while paused"
     );
-    // Le menu ne propose plus que Stop / Resume.
+    // The menu now only offers Stop / Resume.
     let items: Value = serde_json::from_str(&text(&b.rust(&["items"]).output().unwrap())).unwrap();
     let ids: Vec<&str> = items
         .as_array()
@@ -129,15 +129,15 @@ fn cycle_start_pause_resume_stop_open_last() {
     b.wait_for("second SIGUSR2", || signals(&b).len() == 2);
     assert_eq!(status(&b)["paused"], false);
     assert!(status(&b)["recordMs"].as_i64().unwrap() >= frozen);
-    // toggle : pause puis reprise.
+    // toggle: pause then resume.
     assert_eq!(b.rust(&["toggle"]).output().unwrap().status.code(), Some(0));
-    b.wait_for("troisième SIGUSR2", || signals(&b).len() == 3);
+    b.wait_for("third SIGUSR2", || signals(&b).len() == 3);
     assert_eq!(status(&b)["paused"], true);
     assert_eq!(b.rust(&["toggle"]).output().unwrap().status.code(), Some(0));
-    b.wait_for("quatrième SIGUSR2", || signals(&b).len() == 4);
+    b.wait_for("fourth SIGUSR2", || signals(&b).len() == 4);
     assert_eq!(status(&b)["paused"], false);
 
-    // watch : une ligne d'état en cours.
+    // watch: a state line in progress.
     let mut w = b
         .rust(&["watch"])
         .stdout(std::process::Stdio::piped())
@@ -153,7 +153,7 @@ fn cycle_start_pause_resume_stop_open_last() {
     assert_eq!(v["t"], "status");
     assert_eq!(v["recording"], true);
 
-    // open-last pendant l'enregistrement : le fichier en cours est exclu.
+    // open-last during the recording: the file in progress is excluded.
     b.clear_journal();
     assert_eq!(
         b.rust(&["open-last"]).output().unwrap().status.code(),
@@ -165,7 +165,7 @@ fn cycle_start_pause_resume_stop_open_last() {
         b.journal()
     );
 
-    // Stop (SIGINT) : le superviseur nettoie et notifie.
+    // Stop (SIGINT): the supervisor cleans up and notifies.
     b.clear_journal();
     assert_eq!(b.rust(&["stop"]).output().unwrap().status.code(), Some(0));
     b.wait_notification();
@@ -201,7 +201,7 @@ fn cycle_start_pause_resume_stop_open_last() {
     assert!(!b.run.join("poste-record/pick.json").exists());
     assert_eq!(std::fs::read_to_string(&file).unwrap(), "video");
 
-    // open-last ouvre maintenant le fichier terminé.
+    // open-last now opens the finished file.
     b.clear_journal();
     assert_eq!(
         b.rust(&["open-last"]).output().unwrap().status.code(),
@@ -219,7 +219,7 @@ fn cycle_start_pause_resume_stop_open_last() {
 }
 
 #[test]
-fn hotkey_arrete_l_enregistrement_en_cours() {
+fn hotkey_stops_the_recording_in_progress() {
     let b = Bench::new();
     b.fake("gsr_mode", "hold");
     start_monitor(&b);
@@ -231,11 +231,11 @@ fn hotkey_arrete_l_enregistrement_en_cours() {
         j.contains("gsr-signal\tINT") && j.contains("Recording saved"),
         "{j}"
     );
-    assert!(!j.contains("omarchy-shell"), "le lanceur ne s'ouvre pas");
+    assert!(!j.contains("omarchy-shell"), "the launcher does not open");
 }
 
 #[test]
-fn fenetre_choisie_ecrit_pick_json_pour_le_selecteur() {
+fn chosen_window_writes_pick_json_for_the_picker() {
     let b = Bench::new();
     b.fake("gsr_mode", "hold");
     b.fake(
@@ -247,7 +247,7 @@ fn fenetre_choisie_ecrit_pick_json_pour_le_selecteur() {
         .output()
         .unwrap();
     assert_eq!(o.status.code(), Some(0));
-    b.wait_for("l'état", || b.state_file().exists());
+    b.wait_for("the state", || b.state_file().exists());
     b.wait_gsr_ready();
     let pick: Value = serde_json::from_str(
         &std::fs::read_to_string(b.run.join("poste-record/pick.json")).unwrap(),
@@ -259,9 +259,9 @@ fn fenetre_choisie_ecrit_pick_json_pour_le_selecteur() {
     assert!(j.contains("-w\tportal\t-restore-portal-session\tno"));
     assert!(
         j.contains("-a\tapp:Unity"),
-        "classe de la fenêtre faute de son déjà émis : {j}"
+        "window class for lack of sound already emitted: {j}"
     );
-    // Le sélecteur répond avec cette fenêtre, sans rien afficher.
+    // The picker answers with this window, showing nothing.
     let mut c = b.rust(&["share-picker"]);
     c.env("XDPH_WINDOW_SHARING_LIST", "7[HC>]Unity[HT>]T[HE>]abc[HA>]");
     let o = c.output().unwrap();
@@ -273,7 +273,7 @@ fn fenetre_choisie_ecrit_pick_json_pour_le_selecteur() {
 }
 
 #[test]
-fn echec_de_gsr_notifie_la_derniere_ligne_du_journal() {
+fn gsr_failure_notifies_the_last_log_line() {
     let b = Bench::new();
     b.fake("gsr_mode", "fail");
     let o = b.rust(&["start", "--monitor", "DP-1"]).output().unwrap();
@@ -295,8 +295,8 @@ fn echec_de_gsr_notifie_la_derniere_ligne_du_journal() {
 }
 
 #[test]
-fn le_script_shim_du_selecteur_passe_par_le_binaire() {
-    // bin/poste-share-picker (chemin de xdph.conf) appelle ../poste-record share-picker.
+fn the_picker_shim_script_goes_through_the_binary() {
+    // bin/poste-share-picker (path of xdph.conf) calls ../poste-record share-picker.
     let b = Bench::new();
     let module = b.tmp.path().join("modules/record");
     std::fs::create_dir_all(module.join("bin")).unwrap();
@@ -318,7 +318,7 @@ fn le_script_shim_du_selecteur_passe_par_le_binaire() {
         .env("FAKE_DIR", &b.work)
         .env("XDPH_WINDOW_SHARING_LIST", "7[HC>]Unity[HT>]T[HE>]abc[HA>]")
         .env("PATH", format!("{}:/usr/bin:/bin", b.fakes.display()));
-    // Avec un pick.json frais : le binaire répond seul.
+    // With a fresh pick.json: the binary answers alone.
     std::fs::create_dir_all(b.run.join("poste-record")).unwrap();
     let at = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -331,13 +331,13 @@ fn le_script_shim_du_selecteur_passe_par_le_binaire() {
     .unwrap();
     assert_eq!(text(&c.output().unwrap()), "[SELECTION]r/window:7\n");
     assert_eq!(b.journal(), "");
-    // Sans pick.json : repli sur le sélecteur habituel (faux), avec les mêmes arguments.
+    // Without pick.json: fallback to the usual picker (fake), with the same arguments.
     assert!(c.output().unwrap().status.success());
     assert_eq!(
         b.journal().trim_end(),
         "hyprland-preview-share-picker\t--flag"
     );
-    // Sans binaire installé : repli aussi.
+    // Without an installed binary: fallback too.
     std::fs::remove_file(module.join("poste-record")).unwrap();
     b.clear_journal();
     assert!(c.output().unwrap().status.success());

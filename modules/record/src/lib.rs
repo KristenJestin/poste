@@ -1,5 +1,5 @@
-//! Module record de poste : enregistrement d'écran avec gpu-screen-recorder, piloté par l'île.
-//! Se lance par `poste record <commande>` (aide : voir `usage.txt`).
+//! Record module of poste: screen recording with gpu-screen-recorder, driven by the island.
+//! Run with `poste record <command>` (help: see `usage.txt`).
 
 pub mod audio;
 pub mod commands;
@@ -13,7 +13,7 @@ pub mod state;
 
 use env::Env;
 
-/// Valeur de `--preset` dans `rest`, `Err` si le drapeau est le dernier argument.
+/// Value of `--preset` in `rest`, `Err` if the flag is the last argument.
 fn preset_arg(rest: &[String]) -> Result<Option<String>, ()> {
     match rest.iter().position(|a| a == "--preset") {
         None => Ok(None),
@@ -29,7 +29,7 @@ pub fn run(argv: &[String]) -> i32 {
     };
     let rest = &argv[1..];
     match cmd.as_str() {
-        // Superviseur interne (lancé par `start`).
+        // Internal supervisor (launched by `start`).
         "--supervise" => match rest.first() {
             Some(spec) => {
                 commands::supervise(&env, spec);
@@ -37,7 +37,7 @@ pub fn run(argv: &[String]) -> i32 {
             }
             None => 2,
         },
-        // Sélecteur de partage d'écran de xdph (appelé par bin/poste-share-picker).
+        // xdph screen-share picker (called by bin/poste-share-picker).
         "share-picker" => picker::run(&env, rest),
         "start" => commands::start(&env, rest),
         "stop" => commands::stop(&env),
@@ -54,7 +54,7 @@ pub fn run(argv: &[String]) -> i32 {
         "watch" => commands::watch(&env),
         "open-dir" | "open-last" => {
             let Ok(preset) = preset_arg(rest) else {
-                eprintln!("poste-record : --preset demande une valeur");
+                eprintln!("poste-record: --preset needs a value");
                 return 1;
             };
             if cmd == "open-dir" {

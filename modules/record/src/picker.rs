@@ -1,14 +1,14 @@
-//! Sélecteur de partage d'écran pour xdg-desktop-portal-hyprland (sous-commande cachée
-//! `share-picker`, appelée par `bin/poste-share-picker`).
+//! Screen-share picker for xdg-desktop-portal-hyprland (hidden subcommand
+//! `share-picker`, called by `bin/poste-share-picker`).
 //!
-//! Si `poste record` vient de demander une fenêtre (fichier `pick.json` de moins de 20 s dans
-//! `$XDG_RUNTIME_DIR/poste-record`), répond directement avec cette fenêtre, sans rien afficher.
-//! Sinon (partage d'écran d'un navigateur, d'OBS…), passe la main à
+//! If `poste record` has just requested a window (file `pick.json` less than 20 s old in
+//! `$XDG_RUNTIME_DIR/poste-record`), answers directly with that window, showing nothing.
+//! Otherwise (screen share of a browser, of OBS…), hands over to
 //! `hyprland-preview-share-picker`.
 //!
-//! Protocole xdph : la liste des fenêtres arrive dans `XDPH_WINDOW_SHARING_LIST`,
-//! « handle[HC>]classe[HT>]titre[HE>]adresse[HA>] » à la suite ; la réponse est
-//! `[SELECTION]r/window:<handle>` sur la sortie standard.
+//! xdph protocol: the list of windows arrives in `XDPH_WINDOW_SHARING_LIST`,
+//! "handle[HC>]class[HT>]title[HE>]address[HA>]" one after the other; the answer is
+//! `[SELECTION]r/window:<handle>` on the standard output.
 
 use crate::env::Env;
 use crate::pyval::py_str;
@@ -18,7 +18,7 @@ use std::process::Command;
 
 const FALLBACK: &str = "hyprland-preview-share-picker";
 
-/// `int(texte, 0)` puis `int(texte, 16)` de Python.
+/// Python's `int(text, 0)` then `int(text, 16)`.
 pub fn as_int(text: &str) -> Option<i128> {
     let t = text.trim();
     let (neg, body) = match t.strip_prefix('-') {
@@ -33,7 +33,7 @@ pub fn as_int(text: &str) -> Option<i128> {
     } else if let Some(b) = lower.strip_prefix("0b") {
         i128::from_str_radix(b, 2).ok()
     } else if lower.len() > 1 && lower.starts_with('0') && lower.chars().any(|c| c != '0') {
-        None // « 0123 » est invalide en base 0
+        None // "0123" is invalid in base 0
     } else if !lower.is_empty() && lower.chars().all(|c| c.is_ascii_digit()) {
         lower.parse::<i128>().ok()
     } else {
@@ -46,7 +46,7 @@ pub fn as_int(text: &str) -> Option<i128> {
     Some(if neg { -v } else { v })
 }
 
-/// Cherche la fenêtre voulue dans la liste xdph : la réponse `[SELECTION]r/window:<handle>`.
+/// Looks for the wanted window in the xdph list: the answer `[SELECTION]r/window:<handle>`.
 pub fn select(list: &str, want: Option<i128>) -> Option<String> {
     for entry in list.split("[HA>]") {
         if !entry.contains("[HE>]") {
@@ -63,7 +63,7 @@ pub fn select(list: &str, want: Option<i128>) -> Option<String> {
 
 fn fallback(args: &[String]) -> ! {
     let err = Command::new(FALLBACK).args(args).exec();
-    eprintln!("poste-share-picker : {FALLBACK} : {err}");
+    eprintln!("poste-share-picker: {FALLBACK}: {err}");
     std::process::exit(127);
 }
 
@@ -86,7 +86,7 @@ pub fn run(env: &Env, args: &[String]) -> ! {
         Some(a) => as_int(&py_str(a)),
     };
     let list = std::env::var("XDPH_WINDOW_SHARING_LIST").unwrap_or_default();
-    // Trace du dernier choix (titres de fenêtres seulement), pour le dépannage.
+    // Trace of the last choice (window titles only), for troubleshooting.
     let want_text = pick
         .get("address")
         .map(py_str)
@@ -112,7 +112,7 @@ mod tests {
     fn entiers_comme_python() {
         assert_eq!(as_int("0x1f"), Some(31));
         assert_eq!(as_int(" 42 "), Some(42));
-        assert_eq!(as_int("0123"), Some(0x123)); // repli en hexadécimal
+        assert_eq!(as_int("0123"), Some(0x123)); // fallback to hexadecimal
         assert_eq!(as_int("abc"), Some(0xabc));
         assert_eq!(as_int("zz"), None);
         assert_eq!(as_int(""), None);

@@ -1,4 +1,4 @@
-//! Chemins et configuration (préréglages), comme les constantes du script d'origine.
+//! Paths and configuration (presets), like the constants of the original script.
 
 use crate::pyval::py_str;
 use serde_json::{json, Map, Value};
@@ -7,10 +7,10 @@ use std::path::PathBuf;
 pub struct Env {
     /// `os.path.expanduser("~")`.
     pub home: String,
-    /// `$XDG_RUNTIME_DIR/poste-record` (état, pick.json, last.log).
+    /// `$XDG_RUNTIME_DIR/poste-record` (state, pick.json, last.log).
     pub run: PathBuf,
     pub config: PathBuf,
-    /// `$XDG_VIDEOS_DIR` ou `~/Videos`.
+    /// `$XDG_VIDEOS_DIR` or `~/Videos`.
     pub videos: String,
 }
 
@@ -56,7 +56,7 @@ impl Env {
         self.run.join("last.log")
     }
 
-    /// `os.path.expanduser` (forme `~` et `~/…` seulement).
+    /// `os.path.expanduser` (form `~` and `~/…` only).
     pub fn expanduser(&self, p: &str) -> String {
         if !p.starts_with('~') {
             return p.to_string();
@@ -74,14 +74,14 @@ impl Env {
     }
 }
 
-/// Valeurs par défaut de `defaults` (DEFAULT_CONFIG du script).
+/// Default values of `defaults` (DEFAULT_CONFIG of the script).
 fn default_defaults() -> Map<String, Value> {
     let v = json!({"dir": "~/Videos", "fps": 60, "quality": "very_high", "codec": "auto", "container": "mp4", "cursor": true});
     v.as_object().cloned().unwrap_or_default()
 }
 
-/// `load_config()` : (defaults fusionnés, préréglages activés).
-/// Fichier absent ou JSON invalide : configuration par défaut, sans préréglage.
+/// `load_config()`: (merged defaults, enabled presets).
+/// Missing file or invalid JSON: default configuration, without presets.
 pub fn load_config(env: &Env) -> (Map<String, Value>, Vec<Map<String, Value>>) {
     let cfg: Value = std::fs::read_to_string(&env.config)
         .ok()
@@ -106,7 +106,7 @@ pub fn load_config(env: &Env) -> (Map<String, Value>, Vec<Map<String, Value>>) {
     (d, presets)
 }
 
-/// Le préréglage d'identifiant `id`.
+/// The preset with identifier `id`.
 pub fn find_preset<'a>(
     presets: &'a [Map<String, Value>],
     id: &str,
@@ -117,7 +117,7 @@ pub fn find_preset<'a>(
     })
 }
 
-/// `out_dir_for(preset_id)` : dossier des vidéos (celui du préréglage, sinon `defaults.dir`).
+/// `out_dir_for(preset_id)`: videos folder (the preset's, otherwise `defaults.dir`).
 pub fn out_dir_for(env: &Env, preset_id: Option<&str>) -> String {
     let (d, presets) = load_config(env);
     let p = preset_id.and_then(|id| find_preset(&presets, id));

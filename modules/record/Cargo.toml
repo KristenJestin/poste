@@ -1,6 +1,6 @@
 [package]
 name = "poste-record"
-description = "Module record de poste : enregistrement d'écran (gpu-screen-recorder) piloté par l'île"
+description = "Record module of poste: screen recording (gpu-screen-recorder) driven by the island"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

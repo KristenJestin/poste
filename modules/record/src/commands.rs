@@ -1,4 +1,4 @@
-//! Les sous-commandes : start, superviseur, stop, pause, watch, open-dir, open-last, hotkey.
+//! The subcommands: start, supervisor, stop, pause, watch, open-dir, open-last, hotkey.
 
 use crate::audio::{app_audio_for, audio_sources, slug};
 use crate::env::{find_preset, load_config, out_dir_for, Env};
@@ -15,14 +15,14 @@ use std::time::Duration;
 
 pub const USAGE: &str = include_str!("usage.txt");
 
-/// Cible d'un enregistrement.
+/// Target of a recording.
 pub enum Target {
     Window(Obj),
     Monitor(String),
     Region,
 }
 
-/// Ce que le superviseur reçoit : la commande de gpu-screen-recorder, le fichier, l'étiquette.
+/// What the supervisor receives: the gpu-screen-recorder command, the file, the label.
 #[derive(Serialize, Deserialize)]
 pub struct Spec {
     pub cmd: Vec<String>,
@@ -30,7 +30,7 @@ pub struct Spec {
     pub label: String,
 }
 
-/// La valeur qui suit `flag` dans `args`. `Err` si le drapeau est le dernier argument.
+/// The value that follows `flag` in `args`. `Err` if the flag is the last argument.
 fn flag_value(args: &[String], flag: &str) -> Result<Option<String>, String> {
     match args.iter().position(|a| a == flag) {
         None => Ok(None),
@@ -38,11 +38,11 @@ fn flag_value(args: &[String], flag: &str) -> Result<Option<String>, String> {
             .get(i + 1)
             .cloned()
             .map(Some)
-            .ok_or_else(|| format!("{flag} demande une valeur")),
+            .ok_or_else(|| format!("{flag} needs a value")),
     }
 }
 
-/// Options gpu-screen-recorder communes (après la cible), dans l'ordre du script d'origine.
+/// Common gpu-screen-recorder options (after the target), in the order of the original script.
 pub fn gsr_args(
     head: Vec<String>,
     opts: &Map<String, Value>,
@@ -72,7 +72,7 @@ pub fn gsr_args(
         out.to_string(),
     ]);
     if matches!(get("container", Value::from("mp4")), Value::String(ref s) if s == "mp4") {
-        // Lisible par les logiciels de montage (l'Opus en MP4 l'est mal).
+        // Readable by editing software (Opus in MP4 is poorly supported).
         cmd.extend(["-ac".to_string(), "aac".into()]);
     }
     if let Some(r) = opts.get("resolution").filter(|r| truthy(r)) {
@@ -89,7 +89,7 @@ fn wants_app(audio: &Value) -> bool {
     py_str(audio).split('+').any(|w| w == "app")
 }
 
-/// Choisit la zone avec `slurp -d` : `WxH+X+Y`. `None` si annulé.
+/// Picks the region with `slurp -d`: `WxH+X+Y`. `None` if cancelled.
 fn pick_region() -> Option<String> {
     let geo = capture(
         &prog(("POSTE_RECORD_SLURP", "slurp")),
@@ -115,7 +115,7 @@ pub fn start(env: &Env, args: &[String]) -> i32 {
     match start_inner(env, args) {
         Ok(code) => code,
         Err(e) => {
-            eprintln!("poste-record : {e}");
+            eprintln!("poste-record: {e}");
             1
         }
     }
@@ -220,9 +220,9 @@ fn start_inner(env: &Env, args: &[String]) -> Result<i32, String> {
         if want_app {
             audio_app = app_audio_for(win);
         }
-        // Une appli qui ne joue rien encore n'est pas listée : on vise le nom donné par le
-        // préréglage (« audioAppName » : Unity s'annonce « FMOD Ex App »), sinon sa classe ;
-        // gpu-screen-recorder la prend dès qu'elle émet du son.
+        // An app that is not playing anything yet is not listed: we aim at the name given by the
+        // preset ("audioAppName": Unity announces itself as "FMOD Ex App"), otherwise its class;
+        // gpu-screen-recorder takes it as soon as it emits sound.
         if let Some(n) = opts.get("audioAppName").filter(|n| truthy(n)) {
             audio_app = Some(py_str(n));
         } else if audio_app.is_none() && want_app {
@@ -247,7 +247,7 @@ fn start_inner(env: &Env, args: &[String]) -> Result<i32, String> {
         Target::Monitor(name) => head.extend(["-w".to_string(), name.clone()]),
         Target::Region => {
             let Some(region) = pick_region() else {
-                return Ok(0); // choix annulé
+                return Ok(0); // choice cancelled
             };
             head.extend(["-w".to_string(), "region".into(), "-region".into(), region]);
         }
@@ -265,9 +265,9 @@ fn start_inner(env: &Env, args: &[String]) -> Result<i32, String> {
         parent
     };
     if !std::path::Path::new(&parent).is_dir() {
-        out_dir = env.videos.clone(); // disque absent : dossier Vidéos
+        out_dir = env.videos.clone(); // disk absent: Videos folder
     }
-    std::fs::create_dir_all(&out_dir).map_err(|e| format!("{out_dir} : {e}"))?;
+    std::fs::create_dir_all(&out_dir).map_err(|e| format!("{out_dir}: {e}"))?;
     let container = opts
         .get("container")
         .map(py_str)
@@ -279,7 +279,7 @@ fn start_inner(env: &Env, args: &[String]) -> Result<i32, String> {
     let sources = audio_sources(&py_str(&opts["audio"]), audio_app.as_deref());
     let cmd = gsr_args(head, &opts, &out, &sources);
 
-    // Le surveillant tourne détaché : il garde gpu-screen-recorder et nettoie à la fin.
+    // The supervisor runs detached: it keeps gpu-screen-recorder and cleans up at the end.
     let spec = dumps(&Spec {
         cmd,
         file: out,
@@ -300,17 +300,17 @@ struct Pick {
     at: f64,
 }
 
-/// Le superviseur : lance gpu-screen-recorder, écrit l'état, attend la fin, nettoie et notifie.
+/// The supervisor: runs gpu-screen-recorder, writes the state, waits for the end, cleans up and notifies.
 pub fn supervise(env: &Env, spec: &str) -> i32 {
     let Ok(spec) = serde_json::from_str::<Spec>(spec) else {
-        eprintln!("poste-record : spécification du superviseur invalide");
+        eprintln!("poste-record: invalid supervisor specification");
         return 1;
     };
     let _ = std::fs::create_dir_all(&env.run);
     let log = match std::fs::File::create(env.log_file()) {
         Ok(f) => f,
         Err(e) => {
-            eprintln!("poste-record : {e}");
+            eprintln!("poste-record: {e}");
             return 1;
         }
     };
@@ -327,7 +327,7 @@ pub fn supervise(env: &Env, spec: &str) -> i32 {
     let mut child = match spawned {
         Ok(c) => c,
         Err(e) => {
-            // Le script d'origine s'arrêtait ici sans rien dire ; on prévient.
+            // The original script stopped here without saying anything; we warn.
             let _ = std::fs::write(env.log_file(), format!("{}: {e}\n", spec.cmd[0]));
             notify(
                 "Recording failed",
@@ -387,12 +387,12 @@ pub fn supervise(env: &Env, spec: &str) -> i32 {
     0
 }
 
-/// `stop` : SIGINT à gpu-screen-recorder, qui termine le fichier proprement.
+/// `stop`: SIGINT to gpu-screen-recorder, which finishes the file cleanly.
 pub fn stop(env: &Env) -> i32 {
     let Some(st) = read_state(env) else {
         return 1;
     };
-    // SAFETY : signal envoyé à un pid vérifié vivant par `read_state`.
+    // SAFETY: signal sent to a pid checked alive by `read_state`.
     let sent = unsafe { libc::kill(st.pid as libc::pid_t, libc::SIGINT) };
     if sent == 0 {
         0
@@ -401,7 +401,7 @@ pub fn stop(env: &Env) -> i32 {
     }
 }
 
-/// `pause` (`want = Some(true)`), `resume` (`Some(false)`) ou `toggle` (`None`).
+/// `pause` (`want = Some(true)`), `resume` (`Some(false)`) or `toggle` (`None`).
 pub fn pause(env: &Env, want: Option<bool>) -> i32 {
     let Some(mut st) = read_state(env) else {
         return 1;
@@ -410,7 +410,7 @@ pub fn pause(env: &Env, want: Option<bool>) -> i32 {
     if want == Some(paused) {
         return 0;
     }
-    // SAFETY : signal envoyé à un pid vérifié vivant par `read_state`.
+    // SAFETY: signal sent to a pid checked alive by `read_state`.
     if unsafe { libc::kill(st.pid as libc::pid_t, libc::SIGUSR2) } != 0 {
         return 1;
     }
@@ -424,13 +424,13 @@ pub fn pause(env: &Env, want: Option<bool>) -> i32 {
     match write_state(env, &st) {
         Ok(()) => 0,
         Err(e) => {
-            eprintln!("poste-record : {e}");
+            eprintln!("poste-record: {e}");
             1
         }
     }
 }
 
-/// `watch` : une ligne JSON par changement d'état, et une par seconde pendant l'enregistrement.
+/// `watch`: one JSON line per state change, and one per second during the recording.
 pub fn watch(env: &Env) -> i32 {
     type Key = (bool, Option<bool>, Option<String>);
     let mut last: Option<Key> = None;
@@ -438,7 +438,7 @@ pub fn watch(env: &Env) -> i32 {
         let cur = public(read_state(env).as_ref());
         let key: Key = (cur.recording, cur.paused, cur.label.clone());
         if last.as_ref() != Some(&key) || cur.recording {
-            // En cours : une ligne par seconde, pour recaler le chrono de l'île.
+            // In progress: one line per second, to resynchronize the island's timer.
             let mut out = std::io::stdout().lock();
             if writeln!(out, "{}", dumps(&cur))
                 .and_then(|_| out.flush())
@@ -460,7 +460,7 @@ fn open_detached(target: &str) -> i32 {
     match spawn_detached(&OsString::from("xdg-open"), &[OsString::from(target)]) {
         Ok(_) => 0,
         Err(e) => {
-            eprintln!("poste-record : xdg-open : {e}");
+            eprintln!("poste-record: xdg-open: {e}");
             1
         }
     }
@@ -471,7 +471,7 @@ pub fn open_dir(env: &Env, preset: Option<&str>) -> i32 {
     open_detached(&out_dir_for(env, preset))
 }
 
-/// Vidéos terminées d'un dossier (pas celle en cours d'enregistrement), dans l'ordre du disque.
+/// Finished videos of a folder (not the one being recorded), in disk order.
 pub fn finished_videos(env: &Env, d: &str) -> Vec<String> {
     let busy = read_state(env).map(|s| s.file);
     let Ok(rd) = std::fs::read_dir(d) else {
@@ -499,7 +499,7 @@ pub fn open_last(env: &Env, preset: Option<&str>) -> i32 {
         let Ok(m) = std::fs::metadata(&f).and_then(|m| m.modified()) else {
             continue;
         };
-        // Égalité : le premier trouvé gagne, comme `max()`.
+        // Tie: the first one found wins, like `max()`.
         if best.as_ref().is_none_or(|(t, _)| m > *t) {
             best = Some((m, f));
         }
@@ -516,7 +516,7 @@ pub fn open_last(env: &Env, preset: Option<&str>) -> i32 {
     open_detached(&last)
 }
 
-/// SHIFT+PRINT : arrête l'enregistrement en cours, sinon ouvre le lanceur sur « Record ».
+/// SHIFT+PRINT: stops the recording in progress, otherwise opens the launcher on "Record".
 pub fn hotkey(env: &Env) -> i32 {
     if read_state(env).is_some() {
         return stop(env);
@@ -527,7 +527,7 @@ pub fn hotkey(env: &Env) -> i32 {
     {
         Ok(s) => s.code().unwrap_or(1),
         Err(e) => {
-            eprintln!("poste-record : omarchy-shell : {e}");
+            eprintln!("poste-record: omarchy-shell: {e}");
             1
         }
     }

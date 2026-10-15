@@ -1,25 +1,25 @@
-# Règles du module record
+# Rules of the record module
 
-- Ne JAMAIS arrêter, mettre en pause ni perturber un enregistrement en cours. Avant toute
-  manipulation (test, installation, redémarrage de l'île ou du portail), lancer
-  `poste record status` : si `"recording": true`, ne rien appliquer et attendre.
-- Ne jamais lancer `poste record start` pour tester (il enregistre vraiment l'écran) ; tester la
-  lecture de config, `items` et `status` seulement. Les tests automatiques n'utilisent jamais le vrai
-  gpu-screen-recorder : `POSTE_RECORD_GSR`, `POSTE_RECORD_HYPRCTL` et `POSTE_RECORD_NOTIFY` (réservées
-  aux tests) le remplacent par `tests/fakes/fake.sh`, avec HOME, `XDG_RUNTIME_DIR` et PATH temporaires.
-  Ne jamais écrire dans le vrai `$XDG_RUNTIME_DIR/poste-record` depuis un test.
-- C'est une caisse Rust (`poste-record`, binaire et bibliothèque, dans les `members` racine), comme `music`.
-  `poste-record.py` et `poste-share-picker.py` sont l'ancienne version Python, gardés seulement comme
-  référence des tests de parité (`tests/parity.rs`, `tests/calc.rs`) et pour revenir en arrière ; ils ne
-  sont pas installés. Les supprimer une fois la version Rust validée en vrai (et les tests de parité avec).
-- Toute modification de format (`status`, `watch`, `items`, `state.json`, `pick.json`) doit rester lisible
-  par l'île (`island/RecordState.qml`, `island/launcher.json`) : les tests de parité comparent les sorties
-  à l'octet près avec le Python, ne pas les « corriger » sans décision.
-- `bin/poste-share-picker` reste un script shell minimal : c'est le chemin stable de la ligne `xdph.conf`,
-  le travail est dans `poste-record share-picker`. Pas de tokio ; dépendances minimales (serde, serde_json,
+- NEVER stop, pause or disturb a recording in progress. Before any
+  handling (test, install, restart of the island or of the portal), run
+  `poste record status`: if `"recording": true`, apply nothing and wait.
+- Never run `poste record start` to test (it really records the screen); only test the
+  config reading, `items` and `status`. The automatic tests never use the real
+  gpu-screen-recorder: `POSTE_RECORD_GSR`, `POSTE_RECORD_HYPRCTL` and `POSTE_RECORD_NOTIFY` (reserved
+  for tests) replace it with `tests/fakes/fake.sh`, with a temporary HOME, `XDG_RUNTIME_DIR` and PATH.
+  Never write into the real `$XDG_RUNTIME_DIR/poste-record` from a test.
+- It is a Rust crate (`poste-record`, binary and library, in the root `members`), like `music`.
+  `poste-record.py` and `poste-share-picker.py` are the old Python version, kept only as a
+  reference for the parity tests (`tests/parity.rs`, `tests/calc.rs`) and to be able to go back; they are not
+  installed. Delete them once the Rust version is validated for real (and the parity tests with them).
+- Any change of format (`status`, `watch`, `items`, `state.json`, `pick.json`) must stay readable
+  by the island (`island/RecordState.qml`, `island/launcher.json`): the parity tests compare the outputs
+  byte for byte with the Python, do not "fix" them without a decision.
+- `bin/poste-share-picker` stays a minimal shell script: it is the stable path of the `xdph.conf` line,
+  the work is in `poste-record share-picker`. No tokio; minimal dependencies (serde, serde_json,
   libc, regex).
-- Le module ne connaît pas l'île autrement que par ses fichiers `island/` (slot `capture`,
-  extension du lanceur) et la commande `omarchy-shell poste.island launcherIn record`.
-- Rien du module ne vit hors de lui : raccourcis dans `hypr/record.lua`, ligne `xdph.conf` dans
-  `module.toml` ; ne rien remettre dans `config/` (bindings.lua, xdph.conf, launcher.json).
-- Les préréglages sont de la config utilisateur (`~/.config/poste/record/presets.json`) : ne jamais les écraser.
+- The module only knows the island through its `island/` files (slot `capture`,
+  launcher extension) and the command `omarchy-shell poste.island launcherIn record`.
+- Nothing of the module lives outside it: shortcuts in `hypr/record.lua`, `xdph.conf` line in
+  `module.toml`; put nothing back in `config/` (bindings.lua, xdph.conf, launcher.json).
+- The presets are user config (`~/.config/poste/record/presets.json`): never overwrite them.

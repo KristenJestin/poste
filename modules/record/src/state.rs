@@ -1,4 +1,4 @@
-//! `state.json` (enregistrement en cours) et sa forme publique (`status`, `watch`).
+//! `state.json` (recording in progress) and its public form (`status`, `watch`).
 
 use crate::env::Env;
 use crate::proc::now_ms;
@@ -6,12 +6,12 @@ use crate::pyval::{dumps, truthy};
 use serde::Serialize;
 use serde_json::Value;
 
-/// Contenu de `state.json`, dans l'ordre d'écriture du script d'origine.
+/// Content of `state.json`, in the writing order of the original script.
 #[derive(Clone, Debug, Serialize, PartialEq)]
 pub struct State {
     /// pid de gpu-screen-recorder.
     pub pid: i64,
-    /// Début, en millisecondes depuis l'époque.
+    /// Start, in milliseconds since the epoch.
     pub started: f64,
     #[serde(rename = "pausedAt")]
     pub paused_at: Option<f64>,
@@ -21,7 +21,7 @@ pub struct State {
     pub label: String,
 }
 
-/// État public : `{"t": "status", "recording": false}` au repos.
+/// Public state: `{"t": "status", "recording": false}` at rest.
 #[derive(Debug, Serialize, PartialEq)]
 pub struct Status {
     pub t: &'static str,
@@ -44,7 +44,7 @@ fn num(v: Option<&Value>) -> Option<f64> {
     }
 }
 
-/// `int(st.get("pid"))` : nombre ou texte numérique.
+/// `int(st.get("pid"))`: number or numeric text.
 fn pid_of(v: Option<&Value>) -> Option<i64> {
     match v? {
         Value::Number(n) => n.as_i64().or_else(|| n.as_f64().map(|f| f as i64)),
@@ -53,13 +53,13 @@ fn pid_of(v: Option<&Value>) -> Option<i64> {
     }
 }
 
-/// Le pid existe-t-il (`os.kill(pid, 0)`) ?
+/// Does the pid exist (`os.kill(pid, 0)`)?
 fn alive(pid: i64) -> bool {
-    // Un pid nul ou négatif viserait un groupe de processus : jamais un enregistreur (écart voulu).
+    // A zero or negative pid would target a process group: never a recorder (deliberate difference).
     pid > 0 && unsafe { libc::kill(pid as libc::pid_t, 0) } == 0
 }
 
-/// `read_state()` : l'enregistrement en cours, si `state.json` existe et que son processus vit.
+/// `read_state()`: the recording in progress, if `state.json` exists and its process is alive.
 pub fn read_state(env: &Env) -> Option<State> {
     let text = std::fs::read_to_string(env.state_file()).ok()?;
     let v: Value = serde_json::from_str(&text).ok()?;
@@ -86,7 +86,7 @@ pub fn read_state(env: &Env) -> Option<State> {
     })
 }
 
-/// `write_state(st)` : écriture dans un fichier temporaire puis renommage.
+/// `write_state(st)`: write to a temporary file then rename.
 pub fn write_state(env: &Env, st: &State) -> std::io::Result<()> {
     std::fs::create_dir_all(&env.run)?;
     let file = env.state_file();
@@ -95,7 +95,7 @@ pub fn write_state(env: &Env, st: &State) -> std::io::Result<()> {
     std::fs::rename(tmp, file)
 }
 
-/// `public(st)` avec l'heure `now` (millisecondes) injectée pour les tests.
+/// `public(st)` with the time `now` (milliseconds) injected for the tests.
 pub fn public_at(st: Option<&State>, now: f64) -> Status {
     let Some(st) = st else {
         return Status {
@@ -151,12 +151,12 @@ mod tests {
             dumps(&public_at(Some(&st(None)), 11_000.0)),
             r#"{"t": "status", "recording": true, "paused": false, "recordMs": 9500, "label": "Unity", "file": "/v/a.mp4"}"#
         );
-        // En pause, le temps est figé à l'instant de la pause.
+        // Paused, the time is frozen at the instant of the pause.
         assert_eq!(
             public_at(Some(&st(Some(3000.0))), 99_999.0).record_ms,
             Some(1500)
         );
-        // Jamais négatif.
+        // Never negative.
         assert_eq!(public_at(Some(&st(Some(1200.0))), 0.0).record_ms, Some(0));
     }
 }

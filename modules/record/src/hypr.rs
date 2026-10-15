@@ -1,4 +1,4 @@
-//! Fenêtres et écrans d'après `hyprctl … -j`, et rectangles de surbrillance.
+//! Windows and screens from `hyprctl … -j`, and highlight rectangles.
 
 use crate::proc::{capture, prog, HYPRCTL};
 use crate::pyval::{py_eq, py_round, py_str_opt, truthy};
@@ -36,7 +36,7 @@ pub fn monitors() -> Vec<Obj> {
     hyprctl_list("monitors")
 }
 
-/// `str(c.get(clé, ""))`.
+/// `str(c.get(key, ""))`.
 pub fn text(c: &Obj, key: &str) -> String {
     py_str_opt(c.get(key), "")
 }
@@ -46,7 +46,7 @@ pub fn mapped(c: &Obj) -> bool {
     c.get("mapped").is_none_or(truthy)
 }
 
-/// Nombre d'un champ (0 par défaut), pour la taille.
+/// Number of a field (0 by default), for the size.
 fn pair(c: &Obj, key: &str) -> (Value, Value) {
     match c.get(key) {
         Some(Value::Array(a)) if a.len() >= 2 => (a[0].clone(), a[1].clone()),
@@ -54,8 +54,8 @@ fn pair(c: &Obj, key: &str) -> (Value, Value) {
     }
 }
 
-/// `find_window(match)` : la plus grande fenêtre ouverte qui correspond à `class` et `title`
-/// (expressions régulières, insensibles à la casse). Une expression invalide ne correspond à rien.
+/// `find_window(match)`: the largest open window that matches `class` and `title`
+/// (regular expressions, case-insensitive). An invalid expression matches nothing.
 pub fn find_window(m: &Value, all: &[Obj]) -> Option<Obj> {
     let get = |k: &str| m.get(k).filter(|v| truthy(v)).map(crate::pyval::py_str);
     let (cls, title) = (get("class"), get("title"));
@@ -86,7 +86,7 @@ pub fn find_window(m: &Value, all: &[Obj]) -> Option<Obj> {
                 .is_none_or(|r| r.is_match(&text(c, "title")))
         })
         .collect();
-    // La plus grande : la fenêtre principale plutôt qu'une boîte de dialogue.
+    // The largest: the main window rather than a dialog box.
     let area = |c: &Obj| {
         let (w, h) = pair(c, "size");
         -(w.as_f64().unwrap_or(0.0) * h.as_f64().unwrap_or(0.0))
@@ -95,7 +95,7 @@ pub fn find_window(m: &Value, all: &[Obj]) -> Option<Obj> {
     found.first().map(|c| (*c).clone())
 }
 
-/// Rectangle de surbrillance : `x, y, w, h` (et `window: true` pour une fenêtre).
+/// Highlight rectangle: `x, y, w, h` (and `window: true` for a window).
 #[derive(Clone, Debug, Serialize, PartialEq)]
 pub struct Rect {
     pub x: Value,
@@ -106,7 +106,7 @@ pub struct Rect {
     pub window: Option<bool>,
 }
 
-/// Rectangle logique d'un écran (rotation et échelle comprises).
+/// Logical rectangle of a screen (rotation and scale included).
 pub fn monitor_rect(m: &Obj) -> Rect {
     let scale = m
         .get("scale")
@@ -131,7 +131,7 @@ pub fn monitor_rect(m: &Obj) -> Rect {
     }
 }
 
-/// Rectangle d'une fenêtre, seulement si son bureau est affiché quelque part.
+/// Rectangle of a window, only if its workspace is shown somewhere.
 pub fn window_rect(c: &Obj, mons: &[Obj]) -> Option<Rect> {
     let id_of = |v: Option<&Value>| -> Option<Value> {
         match v {
@@ -180,7 +180,7 @@ mod tests {
         );
         let r = monitor_rect(&m);
         assert_eq!((r.w, r.h), (json!(1440), json!(2560)));
-        // Transform négatif ou renversé (>= 4) : seule la parité compte, comme en Python.
+        // Negative or flipped transform (>= 4): only the parity counts, as in Python.
         let m = obj(json!({"width": 1000, "height": 500, "scale": 0, "transform": 3}));
         let r = monitor_rect(&m);
         assert_eq!((r.w, r.h), (json!(500), json!(1000)));

@@ -1,16 +1,16 @@
 #!/bin/sh
-# Faux programmes extérieurs pour les tests de poste-record (hyprctl, gpu-screen-recorder, slurp,
-# omarchy-notification-send, xdg-open, omarchy-shell). Copié sous chacun de ces noms ; le
-# comportement dépend du nom d'appel. Rien n'est jamais réellement enregistré.
+# Fake outside programs for the poste-record tests (hyprctl, gpu-screen-recorder, slurp,
+# omarchy-notification-send, xdg-open, omarchy-shell). Copied under each of these names; the
+# behaviour depends on the call name. Nothing is ever really recorded.
 #
-# Variables : FAKE_DIR (dossier de travail du test). Fichiers lus dans FAKE_DIR :
-#   clients.json, monitors.json  réponses de `hyprctl clients|monitors -j`
-#   app_audio                    réponse de `gpu-screen-recorder --list-application-audio`
-#   slurp                        réponse de `slurp -d` (absent : choix annulé)
-#   gsr_mode                     quick (défaut) : écrit le fichier et sort ; hold : attend SIGINT
-#                                (SIGUSR2 journalisé, « gsr-ready » une fois les signaux pris en charge) ;
-#                                fail : erreur sans fichier ; nofile : sort sans fichier
-# Journal : FAKE_DIR/journal, une ligne « nom<TAB>arg<TAB>arg… » par appel.
+# Variables: FAKE_DIR (work folder of the test). Files read in FAKE_DIR:
+#   clients.json, monitors.json  answers of `hyprctl clients|monitors -j`
+#   app_audio                    answer of `gpu-screen-recorder --list-application-audio`
+#   slurp                        answer of `slurp -d` (absent: choice cancelled)
+#   gsr_mode                     quick (default): writes the file and exits; hold: waits for SIGINT
+#                                (SIGUSR2 logged, "gsr-ready" once the signals are taken over);
+#                                fail: error without a file; nofile: exits without a file
+# Journal: FAKE_DIR/journal, one line "name<TAB>arg<TAB>arg…" per call.
 name=$(basename "$0")
 J="$FAKE_DIR/journal"
 

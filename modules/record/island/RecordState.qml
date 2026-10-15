@@ -2,11 +2,11 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 
-// Enregistrement d'écran (gpu-screen-recorder) via « poste record watch » (module record).
-// Fourni au slot « capture » de l'île (island/island.json). Même interface qu'ObsState (recording, paused, recordElapsed, request…),
-// pour que la pastille de capture et sa carte servent aux deux. Le temps est
-// relu chaque seconde et interpolé ici ; la notification « Recording saved »
-// vient de poste-record lui-même.
+// Screen recording (gpu-screen-recorder) through "poste record watch" (record module).
+// Provided to the island's "capture" slot (island/island.json). Same interface as ObsState (recording, paused, recordElapsed, request…),
+// so that the capture pill and its card serve both. The time is
+// read again every second and interpolated here; the "Recording saved" notification
+// comes from poste-record itself.
 Item {
   id: rec
   readonly property var bin: ["poste", "record"]
@@ -16,7 +16,7 @@ Item {
   property bool paused: false
   readonly property bool streaming: false
   readonly property bool replay: false
-  property string scene: ""            // le préréglage ou la cible (« Unity », « Screen DP-1 »)
+  property string scene: ""            // the preset or the target ("Unity", "Screen DP-1")
   property real recordMs: 0
   readonly property real streamMs: 0
   property double stampedAt: 0
@@ -48,7 +48,7 @@ Item {
   }
   Timer { id: restartTimer; interval: 5000; onTriggered: watcher.running = true }
 
-  // Requêtes au format OBS, traduites pour poste-record.
+  // Requests in the OBS format, translated for poste-record.
   function request(kind) {
     var map = { StopRecord: "stop", ToggleRecord: "stop", PauseRecord: "pause", ResumeRecord: "resume", ToggleRecordPause: "toggle" }
     var cmd = map[kind]

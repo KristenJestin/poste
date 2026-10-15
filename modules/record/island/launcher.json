@@ -1,5 +1,5 @@
 {
-  "//": "Extensions du lanceur de l'île fournies par ce module (même format que ~/.config/poste-island/launcher/launcher.json : items, extensions, engines). Fusionné par l'île depuis ~/.local/share/poste/modules/<nom>/island/launcher.json.",
+  "//": "Launcher extensions of the island provided by this module (same format as ~/.config/poste-island/launcher/launcher.json: items, extensions, engines). Merged by the island from ~/.local/share/poste/modules/<name>/island/launcher.json.",
   "extensions": [
     {
       "id": "record",
