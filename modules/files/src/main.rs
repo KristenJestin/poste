@@ -225,7 +225,10 @@ fn run(env: &Env, cmd: Cmd) -> Result<()> {
             }
             println!("File: {}", env.display(&store::index_path(env)));
             println!("Settings: {}", env.display(&Config::file(env)));
-            println!("Exclusions: {}", env.display(&Config::ignore_file(env)));
+            for f in Config::ignore_files(env) {
+                let state = if f.exists() { "" } else { " (none)" };
+                println!("Exclusions: {}{state}", env.display(&f));
+            }
         }
     }
     Ok(())

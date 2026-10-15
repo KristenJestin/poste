@@ -74,13 +74,19 @@ Files of the module for the machine: [`island/launcher.json`](island/launcher.js
 
 ## Exclusions
 
-In .gitignore syntax, anchored on each root, in two layers read in order; the last matching line
+In .gitignore syntax, anchored on each root, in layers read in order; the last matching line
 wins:
 
 1. [`default.ignore`](default.ignore), shipped with the module: hidden files and folders (`.*`),
    `.git`, `.cache`, node_modules, Unity's Library, target, dist, build, node, .venv,
    `__pycache__`, .next, .svelte-kit;
-2. `~/.config/poste/files.ignore`, the user's (optional).
+2. `files/ignore` in the machine's data repository (`poste-data`, key `data` of
+   `~/.config/poste/config.toml`), when there is one;
+3. `~/.local/share/poste/files/ignore` (`XDG_DATA_HOME`), local and not versioned, for a machine
+   without data repository or a trial.
+
+The exclusions of a machine describe its folders: they are data, kept in the data repository
+and read there, with no copy or link in `~/.config/poste/`. Both files are optional.
 
 ```gitignore
 # This folder, at any depth
@@ -110,15 +116,9 @@ limit = 30                      # results given to the launcher
 A root inside another one is walked too, with its own anchoring: that is how a folder under an
 excluded one (`.local` under `~`) gets indexed.
 
-### From the machine's data repository
-
-`files.toml` and `files.ignore` are files of `~/.config/poste/` like any other: for a machine to
-keep its own, put them in its `poste-data` repository, which `poste sys setup` places in `~`:
-
-```text
-poste-data/config/.config/poste/files.ignore
-poste-data/config/.config/poste/files.toml
-```
+`files.toml` is a settings file of `~/.config/poste/` like any other: a machine keeps its own in
+its `poste-data` repository, under `config/.config/poste/files.toml`, which `poste sys setup`
+places in `~`.
 
 ## Known limits
 
@@ -130,4 +130,5 @@ poste-data/config/.config/poste/files.toml
 
 Disable or delete the module: `poste sys setup` removes the program, `island/` and `hypr/`
 (SUPER+D goes with it), then `hyprctl reload`. `~/.cache/poste/files.idx` and
-`~/.local/state/poste/files-recent` can be deleted; `files.toml` and `files.ignore` stay the user's.
+`~/.local/state/poste/files-recent` can be deleted; `files.toml` and the exclusion files stay the
+user's.

@@ -1,5 +1,5 @@
 //! The real binary, end to end, on a temporary home folder: index built by the first search,
-//! answer in the launcher's format, files.ignore, refresh, recent files. Nothing touches the
+//! answer in the launcher's format, exclusion files, refresh, recent files. Nothing touches the
 //! real `$HOME`, the D-Bus bus or the clipboard; `xdg-open` is a fake that only writes down
 //! what it was given, and no process is left after the test.
 
@@ -175,13 +175,20 @@ fn end_to_end() {
     });
     assert_eq!(ids(&s.json(&["home", "--json"])), [id(&new)]);
 
-    // files.ignore: lifts build/, excludes notes/.
+    // Exclusions of the machine, in its data repository (lifts build/) then local (excludes
+    // notes/).
+    let data = s.home.join("data-repo");
+    fs::create_dir_all(data.join("files")).unwrap();
+    fs::write(data.join("files/ignore"), "!build/\n").unwrap();
     fs::create_dir_all(s.home.join(".config/poste")).unwrap();
     fs::write(
-        s.home.join(".config/poste/files.ignore"),
-        "!build/\n/notes/\n",
+        s.home.join(".config/poste/config.toml"),
+        format!("data = \"{}\"\n", data.display()),
     )
     .unwrap();
+    let local = s.home.join(".local/share/poste/files/ignore");
+    fs::create_dir_all(local.parent().unwrap()).unwrap();
+    fs::write(&local, "/notes/\n").unwrap();
     s.age_index();
     // In the background: the command returns, the walk replaces the index afterwards.
     assert!(s.cmd(&["refresh", "--background"]).status.success());
@@ -204,11 +211,14 @@ fn end_to_end() {
 
     // Invalid pattern: one error entry for the launcher, exit code 0.
     s.wait_idle();
-    fs::write(s.home.join(".config/poste/files.ignore"), "[z-a]\n").unwrap();
+    fs::write(data.join("files/ignore"), "[z-a]\n").unwrap();
     fs::remove_file(s.index()).unwrap();
     let v = s.search("player");
     assert_eq!(v[0]["id"], "files-error");
-    assert!(v[0]["subtitle"].as_str().unwrap().contains("line 1"));
+    assert!(v[0]["subtitle"]
+        .as_str()
+        .unwrap()
+        .contains("data-repo/files/ignore, line 1"));
 
     let out = s.cmd(&["status"]);
     let text = String::from_utf8_lossy(&out.stdout);

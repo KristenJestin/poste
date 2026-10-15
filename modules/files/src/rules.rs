@@ -1,6 +1,6 @@
 //! What gets indexed: walk of the roots with the `ignore` crate (the one of ripgrep and fff),
-//! filtered by our own rules only, in .gitignore syntax: the module's `default.ignore`, then
-//! `~/.config/poste/files.ignore`. The `.gitignore` and `.ignore` files met are not read. An
+//! filtered by our own rules only, in .gitignore syntax: the module's `default.ignore`, then the
+//! machine's exclusion files (see `config.rs`). The `.gitignore` and `.ignore` files met are not read. An
 //! excluded folder is never opened: `filter_entry` drops it before going down.
 
 use anyhow::{Context, Result};
@@ -19,8 +19,9 @@ pub struct Rules {
 }
 
 impl Rules {
-    /// `user`: text of files.ignore (`source`: its name, for errors).
-    pub fn new(roots: &[PathBuf], user: &str, source: &str) -> Result<Self> {
+    /// `layers`: the machine's exclusion files after `default.ignore`, in order: (name, for
+    /// errors; text).
+    pub fn new(roots: &[PathBuf], layers: &[(String, String)]) -> Result<Self> {
         let mut out = Vec::new();
         for root in roots {
             let mut b = GitignoreBuilder::new(root);
@@ -28,7 +29,11 @@ impl Rules {
                 .lines()
                 .enumerate()
                 .map(|(n, l)| ("default.ignore", n, l))
-                .chain(user.lines().enumerate().map(|(n, l)| (source, n, l)));
+                .chain(layers.iter().flat_map(|(name, text)| {
+                    text.lines()
+                        .enumerate()
+                        .map(move |(n, l)| (name.as_str(), n, l))
+                }));
             for (file, n, line) in lines {
                 b.add_line(None, line)
                     .with_context(|| format!("{file}, line {}: invalid pattern", n + 1))?;
@@ -146,7 +151,8 @@ pub mod tests {
     }
 
     pub fn rules(root: &Path, user: &str) -> Arc<Rules> {
-        Arc::new(Rules::new(&[root.to_path_buf()], user, "files.ignore").unwrap())
+        let layers = [("files/ignore".to_string(), user.to_string())];
+        Arc::new(Rules::new(&[root.to_path_buf()], &layers).unwrap())
     }
 
     #[test]
@@ -244,8 +250,12 @@ Pictures/
 
     #[test]
     fn invalid_pattern_reported_with_its_line() {
-        let e = Rules::new(&[PathBuf::from("/h")], "ok/\n[z-a]\n", "files.ignore").unwrap_err();
-        assert!(format!("{e:#}").contains("files.ignore, line 2"), "{e:#}");
+        let layers = [
+            ("~/a".to_string(), "ok/\n".to_string()),
+            ("~/b".to_string(), "ok/\n[z-a]\n".to_string()),
+        ];
+        let e = Rules::new(&[PathBuf::from("/h")], &layers).unwrap_err();
+        assert!(format!("{e:#}").contains("~/b, line 2"), "{e:#}");
     }
 
     #[test]
@@ -258,7 +268,7 @@ Pictures/
         fs::write(notes.join("idea.md"), "x").unwrap();
         fs::write(notes.join(".trash/old.md"), "x").unwrap();
         let roots = [root.clone(), notes.clone()];
-        let rules = Arc::new(Rules::new(&roots, "", "files.ignore").unwrap());
+        let rules = Arc::new(Rules::new(&roots, &[]).unwrap());
         let entries = rel(&root, &walk(&rules, &roots, 2));
         // `.local` is excluded under `~`, the inner root is walked all the same, with its rules.
         assert!(entries.iter().any(|e| e == ".local/share/notes/idea.md"));

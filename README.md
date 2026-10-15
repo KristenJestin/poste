@@ -264,11 +264,16 @@ poste-data/
   bootstrap/
     steps.toml         # added steps; same id: replaces poste's
     packages.toml      # added packages
+  <module>/            # data of a module for this machine, read in place by the module
+    ...                # (files/ignore: exclusions of the file search)
 ```
 
 - The relative paths of its steps (`line`, `source`, `patch`) start from its `bootstrap/`;
   `@DATA@` is its folder.
 - A file under a folder that poste links as a block (`link-dirs`) is refused.
+- A module's data (what describes the machine rather than how the module works: the folders it
+  excludes, for instance) goes in `<module>/` at the root of the data repository; the module
+  reads it there through the `data` key, nothing is linked in `~`. Settings stay in `config/`.
 - `poste sys sync` does `git pull --ff-only` in the data repository in both modes (and in the clone in dev, or the latest version in release), then `setup`, then reloads the island and Hyprland if the pull or the version change touched them.
 - The island's launcher also reads `~/.config/poste-island/launcher/machine.json` (same format as
   `launcher.json`): the machine's own entries go there, put in place by `poste-data`.
