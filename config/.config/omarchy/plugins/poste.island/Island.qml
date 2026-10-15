@@ -525,44 +525,60 @@ Item {
     notificationList = []
     Quickshell.execDetached([ncScript, "clear"])
   }
-  // Open the picture a notification pointed at; otherwise run the click command
-  // its toast had (a Taildrop file: `xdg-open <file>`); otherwise focus the app
-  // that sent it. The Notification Center's archive keeps no command, so it is
-  // read back from poste.notifications' own files, named by the same key: the
-  // toast while it shows, then the history (its newest ten). Restored toasts
-  // run that same command; it is checked like theirs (parseExecArgv).
+  // Open the picture a notification pointed at; otherwise the file its toast
+  // opened on click (a Taildrop file: `xdg-open <file>`); otherwise focus the
+  // app that sent it. Any other stored command is never run: an old toast's
+  // action (restart the shell, install) must not fire again from the list.
+  // The Notification Center's archive keeps no command, so it is read back
+  // from poste.notifications' own files, named by the same key: the toast
+  // while it shows, then the history (its newest ten).
   readonly property string toastStateDir: home + "/.local/state/omarchy/notifications"
-  property var pendingActivation: null
   function activateStoredNotification(n) {
     if (!n) return
     if (n.file) { Quickshell.execDetached(["xdg-open", String(n.file)]); return }
     if (!/^[0-9]+-[0-9]+$/.test(String(n.key || ""))) { focusNotificationApp(n); return }
-    pendingActivation = n
-    toastCommandProc.command = ["sh", "-c", "cat \"$1/$2.json\" 2>/dev/null || cat \"$1/history/$2.json\"",
-      "toast", toastStateDir, String(n.key)]
-    toastCommandProc.running = true
+    var reader = toastFileComponent.createObject(root, { note: n })
+    reader.path = toastStateDir + "/" + n.key + ".json"
   }
   function focusNotificationApp(n) {
     if (n && n.app) Quickshell.execDetached(["omarchy-hyprland-focus-app", String(n.app)])
   }
-  // A JSON array of strings, the program first, not empty nor an option.
-  function storedExecArgv(text) {
+  // The file a stored toast opened: `xdg-open` and one absolute path (or file://
+  // URI), nothing else. Not NotificationLogic.parseExecArgv: importing another
+  // plugin's file would take the whole island down if it were missing.
+  function openedFileOf(text) {
     var argv
-    try { argv = JSON.parse(JSON.parse(text).execArgv || "") } catch (e) { return null }
-    if (!Array.isArray(argv) || argv.length === 0) return null
-    for (var i = 0; i < argv.length; i++) if (typeof argv[i] !== "string") return null
-    return argv[0] && argv[0].charAt(0) !== "-" ? argv : null
+    try { argv = JSON.parse(JSON.parse(text).execArgv || "") } catch (e) { return "" }
+    if (!Array.isArray(argv) || argv.length !== 2 || argv[0] !== "xdg-open") return ""
+    var target = typeof argv[1] === "string" ? argv[1] : ""
+    if (target.indexOf("file:///") === 0) target = decodeURIComponent(target.slice(7))
+    return target.charAt(0) === "/" ? target : ""
   }
-  Process {
-    id: toastCommandProc
-    stdout: StdioCollector {
-      waitForEnd: true
-      onStreamFinished: {
-        var n = root.pendingActivation
-        root.pendingActivation = null
-        var argv = root.storedExecArgv(text)
-        if (argv) Quickshell.execDetached(argv)
-        else root.focusNotificationApp(n)
+  // One reader per click, so two quick clicks never mix their answers. The toast's
+  // file first; the history copy when it is gone or unreadable (moved there as it ends).
+  Component {
+    id: toastFileComponent
+    FileView {
+      property var note
+      property bool triedHistory: false
+      printErrors: false
+      function tryHistory() {
+        if (triedHistory) return false
+        triedHistory = true
+        path = root.toastStateDir + "/history/" + note.key + ".json"
+        return true
+      }
+      onLoaded: {
+        var file = root.openedFileOf(text())
+        if (!file && tryHistory()) return
+        if (file) Quickshell.execDetached(["xdg-open", file])
+        else root.focusNotificationApp(note)
+        destroy()
+      }
+      onLoadFailed: {
+        if (tryHistory()) return
+        root.focusNotificationApp(note)
+        destroy()
       }
     }
   }

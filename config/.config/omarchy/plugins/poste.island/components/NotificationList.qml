@@ -5,7 +5,7 @@ import "AgentBrand.js" as AgentBrand
 
 // Recent notifications, opened from the unread dot: newest first, relative
 // time, app tile; hover shows a cross to drop one, "Tout effacer" drops all,
-// clicking one opens its picture, runs its toast's click command or focuses
+// clicking one opens its picture, the file its toast opened or focuses
 // the app that sent it (Island.qml, activateStoredNotification).
 Item {
   id: list
