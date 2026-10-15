@@ -1,5 +1,5 @@
 {
-  "//": "poste.island launcher — hot-reloaded. Action types: url, command, terminal, app, copy. Set \"enabled\": false to disable an entry.",
+  "//": "poste.island launcher, hot-reloaded. Action types: url, command, terminal, app, copy. Set \"enabled\": false to disable an entry.",
   "items": [
     {
       "enabled": false,
@@ -152,7 +152,7 @@
     }
   ],
   "ai": {
-    "//": "Question rapide à l'IA (« ai » + espace). default = fournisseur ; providers = réglages en plus de ceux de bin/poste-ask (claude, codex) ; Tab change de fournisseur. Claude : permissionMode (auto = le classifieur décide, comme le mode auto du terminal), allow = acceptés d'office, deny = refusés d'office. Ex. allow \"Bash(git status*)\", deny \"Bash(curl *)\".",
+    "//": "Quick question to the AI ('ai' + space). default = provider; providers = settings on top of those of bin/poste-ask (claude, codex); Tab switches provider. Claude: permissionMode (auto = the classifier decides, like the terminal's auto mode), allow = accepted outright, deny = refused outright. E.g. allow \"Bash(git status*)\", deny \"Bash(curl *)\".",
     "default": "claude",
     "providers": {},
     "permissionMode": "auto",

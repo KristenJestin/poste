@@ -26,7 +26,7 @@
 @define-color secondary_sidebar_bg_color {{ dark_background }};
 @define-color secondary_sidebar_fg_color {{ foreground }};
 
-/* Cartes, popovers, dialogues : surfaces un peu plus claires. */
+/* Cards, popovers, dialogs: slightly lighter surfaces. */
 @define-color card_bg_color {{ lighter_background }};
 @define-color card_fg_color {{ foreground }};
 @define-color card_shade_color rgba(0, 0, 0, 0.36);

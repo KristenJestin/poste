@@ -375,7 +375,7 @@ Item {
             }
           }
 
-          // Fermer, au survol.
+          // Close, on hover.
           Rectangle {
             anchors.right: parent.right
             anchors.rightMargin: 11

@@ -4,11 +4,11 @@ import Quickshell.Io
 import "file:///usr/share/omarchy/shell/plugins/clipboard/ClipboardHistory.js" as ClipboardHistory
 
 // The island's launcher (SUPER+SPACE). Two tabs, switched with Tab:
-//   Apps — pinned apps first, fuzzy app search ranked by use, an inline
-//          calculator (qalc) when the query is an expression, "Ouvrir <url>"
+//   Apps: pinned apps first, fuzzy app search ranked by use, an inline
+//          calculator (qalc) when the query is an expression, "Open <url>"
 //          when it looks like an address, system commands, and a web search
 //          as the last row.
-//   Presse-papier — clipboard history (text and images); Enter pastes it
+//   Clipboard: clipboard history (text and images); Enter pastes it
 //          the same way Omarchy's clipboard panel does.
 // Up/Down move, Enter runs, Ctrl+B opens the selected row's actions, Esc
 // closes the actions then the launcher (a click outside closes too).

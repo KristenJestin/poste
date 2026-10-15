@@ -9,7 +9,7 @@ import QtQuick
 WheelHandler {
   id: wheel
 
-  // Pixels par cran (angleDelta de 120).
+  // Pixels per notch (angleDelta of 120).
   property real step: 50
 
   // The ListView or the Flickable: put inside it, the handler ends up on

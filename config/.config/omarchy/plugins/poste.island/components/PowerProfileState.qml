@@ -19,7 +19,7 @@ Item {
   readonly property bool present: simulated || profiles.length > 0
   readonly property var shownProfiles: simulated ? ["power-saver", "balanced", "performance"] : profiles
 
-  // Simulation (commande profileSim).
+  // Simulation (profileSim command).
   property bool simulated: false
   property string simProfile: "balanced"
 

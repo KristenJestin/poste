@@ -14,7 +14,7 @@ Rectangle {
   required property var activity
   readonly property string kind: activity ? activity.kind : ""
   readonly property var timer: activity ? activity.timer || null : null
-  readonly property bool isReminder: !!timer && timer.omarchy === true   // rappel d'Omarchy (Island.qml)
+  readonly property bool isReminder: !!timer && timer.omarchy === true   // Omarchy reminder (Island.qml)
   readonly property var conv: activity ? activity.conv || null : null
   readonly property var battery: host.battery
   readonly property var device: activity ? activity.device || null : null
@@ -70,7 +70,7 @@ Rectangle {
     MouseArea { id: chipMouse; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: chip.activated() }
   }
 
-  // ================================================ minuteur
+  // ================================================ timer
   Item {
     anchors.fill: parent
     visible: card.kind === "timer"
@@ -309,7 +309,7 @@ Rectangle {
     }
   }
 
-  // ================================================ musique
+  // ================================================ music
   Item {
     id: musicCard
     anchors.fill: parent
@@ -459,7 +459,7 @@ Rectangle {
     }
   }
 
-  // ================================================ batterie
+  // ================================================ battery
   Item {
     anchors.fill: parent
     visible: card.kind === "battery" || card.kind === "device"

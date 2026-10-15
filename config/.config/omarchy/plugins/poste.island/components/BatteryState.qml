@@ -17,7 +17,7 @@ Item {
   // power-profiles-daemon); the low or critical bubble that remains does not carry it.
   readonly property string profileGlyph: flash && !charging && profile && profile.present ? profile.glyph : ""
 
-  // Simulation (commande batterySim).
+  // Simulation (batterySim command).
   property bool simulated: false
   property real simPercent: 0.75
   property bool simCharging: true

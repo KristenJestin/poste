@@ -300,7 +300,7 @@ def main():
     grand = collections.Counter()
     source = codex_sessions(start, now) if provider == "codex" else claude_sessions(start, now)
     for sid, cwd, title, rows, meta, agents in source:
-        ctx = [r[2]["input"] + r[2]["write"] + r[2]["read"] for r in rows]   # conversation principale
+        ctx = [r[2]["input"] + r[2]["write"] + r[2]["read"] for r in rows]   # main conversation
         main_rows = list(rows)
         for a in agents:
             rows = rows + a.pop("_rows")
