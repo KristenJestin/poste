@@ -1,6 +1,6 @@
 [package]
 name = "poste"
-description = "Aiguillage de poste : poste <module> exécute poste-<module>"
+description = "Dispatcher of poste: poste <module> runs poste-<module>"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
