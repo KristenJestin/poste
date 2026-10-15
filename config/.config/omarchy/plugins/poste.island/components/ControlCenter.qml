@@ -18,9 +18,9 @@ Item {
   implicitHeight: column.implicitHeight
 
   readonly property var locale: Qt.locale("en_GB")
-  // Network / Bluetooth / Audio, plus VPN, Tailscale, Mail and the power profile when they are there.
+  // Network / Bluetooth / Audio, plus VPN, Tailscale, Mail, the power profile and Silence when they are there.
   readonly property int tileCount: 3 + (host.mailAvailable ? 1 : 0) + ((host.vpnAvailable || host.vpnConnected) ? 1 : 0)
-    + (host.tsAvailable ? 1 : 0) + (host.powerProfile.present ? 1 : 0)
+    + (host.tsAvailable ? 1 : 0) + (host.powerProfile.present ? 1 : 0) + (host.dndAvailable ? 1 : 0)
   readonly property real tileWidth: Math.min(74, Math.floor((width - 8 * (tileCount - 1)) / tileCount))
   property int monthOffset: 0
 
@@ -108,13 +108,15 @@ Item {
     property int badge: 0
     property bool tailscaleMark: false   // Tailscale's own mark instead of a glyph
     property bool markOn: false
+    property bool lit: false             // a mode that is on (Silence): the tile stays lit
     signal activated()
     width: label ? cc.tileWidth : 28
     height: label ? 56 : 28
     Rectangle {
       anchors.fill: parent
       radius: button.label ? 14 : 14
-      color: mouse.containsMouse ? cc.host.withAlpha(cc.host.colorText, 0.1)
+      color: button.lit ? cc.host.withAlpha(cc.host.colorText, mouse.containsMouse ? 0.24 : 0.18)
+        : mouse.containsMouse ? cc.host.withAlpha(cc.host.colorText, 0.1)
         : button.label ? cc.host.withAlpha(cc.host.colorText, 0.05) : "transparent"
       Behavior on color { ColorAnimation { duration: 120 } }
     }
@@ -558,6 +560,14 @@ Item {
         glyph: cc.host.powerProfile.glyph
         label: cc.host.powerProfile.shortLabel(cc.host.powerProfile.active)
         onActivated: cc.host.powerProfile.cycle()
+      }
+      // Do not disturb (Island.qml): lit while notifications are silenced; a click switches it.
+      IconButton {
+        visible: cc.host.dndAvailable
+        glyph: cc.host.dndGlyph
+        label: "Silence"
+        lit: cc.host.dnd
+        onActivated: cc.host.toggleDnd()
       }
       IconButton {
         visible: cc.host.mailAvailable

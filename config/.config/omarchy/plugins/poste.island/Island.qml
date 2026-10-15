@@ -745,6 +745,26 @@ Item {
   }
   Timer { interval: 50; running: true; onTriggered: agentRead.running = true }
 
+  // ---------------------------------------------------------------- do not disturb
+  // The notification service (poste.notifications, attached to the bandeau) holds the mode.
+  // It can be switched by SUPER+CTRL+comma, by a right-click on the bar's bell or by the
+  // control center's tile: every switch shows in the OSD, so it never stays on unnoticed.
+  readonly property bool dndAvailable: !!Bandeau.notifications
+  readonly property bool dnd: !!Bandeau.notifications && !!Bandeau.notifications.doNotDisturb
+  readonly property string dndGlyph: dnd ? "󰂛" : "󰂚"
+  function toggleDnd() {
+    if (Bandeau.notifications) Bandeau.notifications.setDoNotDisturb(!Bandeau.notifications.doNotDisturb)
+  }
+  Connections {
+    target: Bandeau.notifications
+    ignoreUnknownSignals: true
+    // Not while the service reads the saved mode at startup (settingsLoaded still false).
+    function onDoNotDisturbChanged() {
+      if (!Bandeau.notifications || !Bandeau.notifications.settingsLoaded) return
+      Bandeau.showOsd(root.dndGlyph, root.dnd ? "Notifications silenced" : "Notifications back on", "", "100", "", "1600")
+    }
+  }
+
   // ---------------------------------------------------------------- mail (Omamail)
   // Omamail publishes a detached, credential-free snapshot through its
   // bar/Bridge.js library for replacement bars. It is loaded at runtime so the
