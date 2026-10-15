@@ -1,22 +1,22 @@
 #!/usr/bin/env python3
-"""Pont entre OBS (son serveur WebSocket, protocole v5) et l'île.
+"""Bridge between OBS (its WebSocket server, protocol v5) and the island.
 
-  poste-obs watch            une ligne JSON par changement, reconnexion seule
-  poste-obs <Requête>        envoie une requête OBS (StartRecord, StopRecord,
+  poste-obs watch            one JSON line per change, reconnects by itself
+  poste-obs <Request>        sends an OBS request (StartRecord, StopRecord,
                             ToggleRecord, ToggleRecordPause, SaveReplayBuffer…)
 
-Lignes de `watch` :
+Lines of `watch`:
   {"t": "status", "connected": true, "recording": true, "paused": false,
    "recordMs": 75000, "streaming": false, "streamMs": 0, "replay": false,
-   "scene": "Écran"}
+   "scene": "Screen"}
   {"t": "saved", "path": "/home/…/2026-10-05 10-00-00.mkv"}
   {"t": "status", "connected": false, "error": "…"}
 
-Connexion et mot de passe : lus dans la config d'OBS
-(~/.config/obs-studio/plugin_config/obs-websocket/config.json), jamais
-affichés. Il faut activer le serveur dans OBS (Outils → Paramètres du
-serveur WebSocket). Aucune dépendance : le client WebSocket minimal est
-écrit ici (OBS est local, sans chiffrement)."""
+Connection and password: read from OBS's config
+(~/.config/obs-studio/plugin_config/obs-websocket/config.json), never
+shown. The server must be enabled in OBS (Tools → WebSocket Server
+Settings). No dependency: the minimal WebSocket client is
+written here (OBS is local, without encryption)."""
 import base64, hashlib, json, os, socket, struct, sys, time, uuid
 
 CONFIG = os.path.expanduser("~/.config/obs-studio/plugin_config/obs-websocket/config.json")
@@ -28,7 +28,7 @@ class Timeout(Exception):
 
 
 class MiniWS:
-    """Client WebSocket minimal (RFC 6455) : texte seulement, en local."""
+    """Minimal WebSocket client (RFC 6455): text only, local."""
     def __init__(self, port, timeout=3):
         self.sock = socket.create_connection(("127.0.0.1", port), timeout=timeout)
         key = base64.b64encode(os.urandom(16)).decode()
@@ -191,7 +191,7 @@ def watch():
                     if kind in ("RecordStateChanged", "StreamStateChanged", "ReplayBufferStateChanged",
                                 "CurrentProgramSceneChanged"):
                         changed = True
-                # Pendant un enregistrement ou une diffusion : le temps, chaque seconde.
+                # During a recording or a stream: the time, every second.
                 if changed or st["recording"] or st["streaming"]:
                     obs.ws.settimeout(3)
                     st = obs.status()
@@ -205,13 +205,13 @@ def watch():
 
 def main():
     if len(sys.argv) < 2:
-        sys.exit("usage: poste-obs watch | <Requête>")
+        sys.exit("usage: poste-obs watch | <Request>")
     if sys.argv[1] == "watch":
         watch()
         return
     s = settings()
     if not s:
-        sys.exit("serveur WebSocket d'OBS désactivé")
+        sys.exit("OBS WebSocket server disabled")
     obs = Obs.connect(s)
     res = obs.request(sys.argv[1])
     print(json.dumps({"ok": res is not None}))

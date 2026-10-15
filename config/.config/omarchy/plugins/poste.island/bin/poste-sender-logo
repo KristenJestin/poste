@@ -1,37 +1,37 @@
 #!/usr/bin/env python3
-"""Logo d'un expéditeur de mail, pour Omamail (patch local de Kris).
+"""Logo of a mail sender, for Omamail (Kris's local patch).
 
-  poste-sender-logo DOMAINE [NOM]   affiche le chemin d'un PNG, ou rien
+  poste-sender-logo DOMAIN [NAME]   prints the path of a PNG, or nothing
 
-Ordre de recherche, du plus fiable au moins fiable :
-  1. BIMI : le logo officiel publié dans les DNS (default._bimi.<domaine>)
-  2. les icônes que la page d'accueil déclare (<link rel="icon">,
-     apple-touch-icon), comme le ferait un navigateur
-  3. /favicon.ico, seulement si la page n'en déclare aucune
-On ne devine jamais /apple-touch-icon.png : ce sont souvent de vieux fichiers
-oubliés (l'ancien logo de Steam, celui de Pôle emploi…).
+Search order, from the most to the least reliable:
+  1. BIMI: the official logo published in the DNS (default._bimi.<domain>)
+  2. the icons the home page declares (<link rel="icon">,
+     apple-touch-icon), as a browser would
+  3. /favicon.ico, only if the page declares none
+/apple-touch-icon.png is never guessed: these are often old forgotten
+files (the former logo of a game store, of an employment agency…).
 
-On remonte les sous-domaines (email.francetravail.fr → francetravail.fr),
-sans aller jusqu'aux suffixes publics (gouv.fr, co.uk…). Rien pour les
-messageries personnelles (Gmail, Proton…), sauf si le NOM affiché est celui du
-service lui-même (« Proton », « Google »). Omamail ne le lance jamais pour
-les spams. HTTPS uniquement,
-redirections HTTPS uniquement, tailles et délais bornés. Les sites contactés
-voient l'adresse IP, jamais le mail. Cache : ~/.cache/poste-island/sender-logos/
-(<domaine>.png, ou <domaine>.none pendant 7 jours si rien n'a été trouvé ;
-un logo trouvé est gardé 30 jours)."""
+Subdomains are climbed (email.example.fr → example.fr),
+without going as far as public suffixes (gouv.fr, co.uk…). Nothing for
+personal mail services (Gmail, Proton…), unless the displayed NAME is that of the
+service itself ('Proton', 'Google'). Omamail never runs it for
+spam. HTTPS only,
+HTTPS redirects only, sizes and delays bounded. The sites contacted
+see the IP address, never the mail. Cache: ~/.cache/poste-island/sender-logos/
+(<domain>.png, or <domain>.none for 7 days if nothing was found;
+a logo found is kept 30 days)."""
 import html.parser, os, re, subprocess, sys, tempfile, time, urllib.parse, urllib.request
 
 CACHE = os.path.expanduser("~/.cache/poste-island/sender-logos")
 KEEP_FOUND, KEEP_NONE = 30 * 86400, 7 * 86400
 UA = "Mozilla/5.0 (X11; Linux x86_64; rv:140.0) Gecko/20100101 Firefox/140.0"
 PUBLIC_SECOND = {"gouv", "gov", "co", "com", "org", "net", "ac", "edu", "ne", "or"}
-# Messageries personnelles : le logo serait celui de Gmail, pas de la personne.
+# Personal mail services: the logo would be Gmail's, not the person's.
 PERSONAL = {"gmail.com", "googlemail.com", "outlook.com", "outlook.fr", "hotmail.com", "hotmail.fr",
             "live.com", "live.fr", "msn.com", "yahoo.com", "yahoo.fr", "icloud.com", "me.com", "mac.com",
             "proton.me", "pm.me", "protonmail.com", "protonmail.ch", "gmx.com", "gmx.fr", "aol.com",
             "free.fr", "orange.fr", "wanadoo.fr", "sfr.fr", "laposte.net", "bbox.fr", "neuf.fr", "tutanota.com"}
-# Le service lui-même, reconnu à son nom affiché.
+# The service itself, recognized by its displayed name.
 BRANDS = {"gmail.com": "google gmail", "googlemail.com": "google gmail", "outlook.com": "microsoft outlook",
           "outlook.fr": "microsoft outlook", "hotmail.com": "microsoft outlook", "hotmail.fr": "microsoft outlook",
           "live.com": "microsoft", "live.fr": "microsoft", "msn.com": "microsoft", "yahoo.com": "yahoo",
@@ -54,10 +54,10 @@ OPENER = urllib.request.build_opener(HttpsOnly)
 
 
 def fetch(url, limit, truncate=False):
-    """truncate : une page trop longue est lue jusqu'à la limite (les icônes
-    sont déclarées dans <head>, au début) au lieu d'être refusée."""
+    """truncate: a page that is too long is read up to the limit (the icons
+    are declared in <head>, at the start) instead of being refused."""
     if url.startswith("data:"):
-        with urllib.request.urlopen(url) as r:   # icône écrite dans la page
+        with urllib.request.urlopen(url) as r:   # icon written in the page
             data = r.read(limit + 1)
             if len(data) > limit:
                 raise ValueError("too big")
@@ -100,9 +100,9 @@ def icon_rank(a):
 
 
 def to_png(data, out):
-    """Écrit un PNG carré de 128 px (la plus grande image d'un .ico)."""
+    """Writes a square 128 px PNG (the largest image of an .ico)."""
     with tempfile.TemporaryDirectory() as tmp:
-        # ImageMagick reconnaît l'ICO à son extension, pas à son contenu.
+        # ImageMagick recognizes ICO by its extension, not by its content.
         head = data[:16].lstrip()
         ext = (".ico" if data[:4] == b"\x00\x00\x01\x00" else ".png" if data[:8] == b"\x89PNG\r\n\x1a\n"
                else ".svg" if head[:5] in (b"<?xml", b"<svg ") else ".img")
@@ -124,7 +124,7 @@ def to_png(data, out):
         else:
             best = max(range(len(frames)), key=lambda i: int(frames[i][1]) if frames[i][1].isdigit() else 0)
             if int(frames[best][1] or 0) < 32:
-                return False   # trop petit pour être lisible : l'initiale fera mieux
+                return False   # too small to be readable: the initial will do better
             frame = "[%d]" % best
         tmp_out = out + ".tmp"
         ok = subprocess.run(["magick", src + frame, "-background", "none", "-resize", "128x128",
@@ -137,8 +137,8 @@ def to_png(data, out):
 
 
 def lighten_if_dark(path):
-    """Logo détouré, sombre et sans couleur (GitHub, Unity…) : passé en blanc,
-    sinon il disparaît sur le fond sombre d'Omamail."""
+    """Cut-out, dark, colorless logo (GitHub, Unity…): turned white,
+    otherwise it vanishes on Omamail's dark background."""
     r = subprocess.run(["magick", path, "-resize", "24x24!", "txt:-"], capture_output=True, text=True, timeout=10)
     clear, lum, sat, n = 0, 0.0, 0.0, 0
     for line in r.stdout.splitlines()[1:]:

@@ -1,7 +1,7 @@
 #!/bin/bash
-# Ids des entrées .desktop dont le programme n'existe plus (TryExec ou Exec
-# introuvable) : le lanceur de l'île les masque. Ex. Alacritty désinstallé
-# dont Omarchy a laissé une copie dans ~/.local/share/applications.
+# Ids of the .desktop entries whose program no longer exists (TryExec or Exec
+# not found): the island's launcher hides them. E.g. uninstalled Alacritty,
+# of which Omarchy left a copy in ~/.local/share/applications.
 IFS=: read -ra dirs <<< "${XDG_DATA_HOME:-$HOME/.local/share}:${XDG_DATA_DIRS:-/usr/local/share:/usr/share}"
 found() {
   local cmd=$1

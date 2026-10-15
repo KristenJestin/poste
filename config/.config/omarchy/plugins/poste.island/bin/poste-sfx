@@ -1,24 +1,24 @@
 #!/usr/bin/env python3
-"""Joue le son d'un événement de l'île : poste-sfx EVENT [--app NAME --urgency U]
+"""Plays the sound of an island event: poste-sfx EVENT [--app NAME --urgency U]
 
-Réglages dans ~/.config/poste-island/sounds/sounds.json :
-  enabled   : false coupe tous les sons
-  volume    : multiplicateur global (1.0 = volumes du site uisfx)
-  gains     : multiplicateur par jeu de sons, ex. { "zen": 1.6 }
-  events    : { "timer-done": "cinematic/complete", ... } (chemin sans .ogg,
-              relatif à ~/.config/poste-island/sounds ; "" = muet), ou
-              { "sound": "...", "volume": 0.2 } pour régler un son à part
+Settings in ~/.config/poste-island/sounds/sounds.json:
+  enabled   : false turns all sounds off
+  volume    : global multiplier (1.0 = volumes of the uisfx site)
+  gains     : multiplier per sound set, e.g. { "zen": 1.6 }
+  events    : { "timer-done": "cinematic/complete", ... } (path without .ogg,
+              relative to ~/.config/poste-island/sounds; "" = mute), or
+              { "sound": "...", "volume": 0.2 } to tune one sound apart
   notifications : { "apps": [...], "urgency": ["critical"], "appSounds": {...} }
-              — une notification ne sonne que si son appli est listée
-              (insensible à la casse, "*" = toutes) ou si son urgence est
-              listée ; "appSounds" donne à une appli son propre son (elle
-              sonne alors toujours).
-Sons : uisfx (CC0), voir sounds/SOURCE.txt. Bloque le temps du son."""
+              a notification only rings if its app is listed
+              (case-insensitive, "*" = all) or if its urgency is
+              listed; "appSounds" gives an app its own sound (it
+              then always rings).
+Sounds: uisfx (CC0), see sounds/SOURCE.txt. Blocks for the duration of the sound."""
 import json, os, subprocess, sys
 
 HOME = os.path.expanduser("~")
 DIR = os.path.join(HOME, ".config/poste-island/sounds")
-# Volume propre à chaque son, repris d'uisfx (defaultVolume), sinon trop fort.
+# Volume of each sound, taken from uisfx (defaultVolume), otherwise too loud.
 LEVELS = {"complete": .24, "recording": .09, "stop": .19, "paste": .17, "snap": .2,
           "lock": .2, "unlock": .2, "queued": .14, "notification": .2}
 DEFAULT = {

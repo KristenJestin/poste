@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
-"""Met au premier plan la fenêtre d'où vient le son (lecteur de l'île).
+"""Brings to the front the window the sound comes from (island's player).
 
-  poste-focus-player APPLI TITRE [URL]
+  poste-focus-player APP TITLE [URL]
 
-APPLI : desktopEntry ou identity du lecteur MPRIS (« zen », « spotify »…).
-Parmi les fenêtres de cette appli, on préfère celle dont le titre contient
-TITRE (un navigateur met l'onglet qui joue dans son titre), puis celle dont
-le titre contient le nom du site de URL (« YouTube »), sinon la plus
-récemment utilisée. Hyprland 0.56 : dispatch en Lua, adresse vérifiée.
-Code de sortie 3 : l'appli n'a aucune fenêtre (réduite dans la barre des
-tâches) ; le lecteur de l'île la fait alors réapparaître (MPRIS Raise, ou en
-relançant l'appli)."""
+APP: desktopEntry or identity of the MPRIS player ('zen', 'spotify'…).
+Among the windows of that app, the one whose title contains TITLE is
+preferred (a browser puts the playing tab in its title), then the one whose
+title contains the site name of URL ('YouTube'), otherwise the most
+recently used. Hyprland 0.56: dispatch in Lua, address checked.
+Exit code 3: the app has no window (minimized to the task bar);
+the island's player then makes it reappear (MPRIS Raise, or by
+relaunching the app)."""
 import json, re, subprocess, sys
 
 
@@ -20,7 +20,7 @@ def norm(s):
 
 def main():
     if len(sys.argv) not in (3, 4):
-        sys.exit("usage: poste-focus-player APPLI TITRE [URL]")
+        sys.exit("usage: poste-focus-player APP TITLE [URL]")
     app, title = norm(sys.argv[1]), sys.argv[2].strip().lower()
     host = re.sub(r"^https?://([^/:]+).*$", r"\1", sys.argv[3].lower()) if len(sys.argv) == 4 else ""
     labels = [l for l in host.split(".") if l not in ("www", "m", "music", "open")]
@@ -32,7 +32,7 @@ def main():
             (app in norm(c.get("class")) or norm(c.get("class")) in app or app in norm(c.get("initialClass")))
             and norm(c.get("class"))]
     if not mine:
-        sys.exit(3)   # aucune fenêtre (appli réduite dans la barre des tâches)
+        sys.exit(3)   # no window (app minimized to the task bar)
     def rank(c):
         t = str(c.get("title", "")).lower()
         return (0 if title and title in t else 1 if site and site in t else 2, c.get("focusHistoryID", 999))

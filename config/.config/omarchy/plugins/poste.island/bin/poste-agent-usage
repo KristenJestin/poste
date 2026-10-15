@@ -1,18 +1,18 @@
 #!/usr/bin/env python3
-"""Détail de la consommation de Claude Code, pour la vue « Usage » de l'île.
+"""Detail of Claude Code consumption, for the island's 'Usage' view.
 
-  poste-agent-usage [session|week] [claude|codex]     une ligne JSON sur la sortie
+  poste-agent-usage [session|week] [claude|codex]     one JSON line on the output
 
-Fenêtre : celle de la limite Claude (5 h ou 7 jours), calculée depuis sa
-remise à zéro dans ~/.local/state/omarchy/agents/usage/claude.json (écrit par
-omarchy-agent-usage-update) ; à défaut, les 5 dernières heures ou 7 derniers
-jours. Les chiffres viennent des journaux de Claude Code
-(~/.claude/projects/*/*.jsonl et leurs sous-agents) : chaque réponse y note
-ses tokens. « tokens » additionne entrée, écriture et lecture du cache, et
-sortie ; une relecture du cache coûte moins cher qu'une entrée neuve, mais
-c'est elle qui grossit avec un long contexte. Lecture seule ; rien n'est
-écrit, aucun contenu de conversation n'est sorti à part le titre de session
-et la description des agents."""
+Window: that of the Claude limit (5 h or 7 days), computed from its
+reset in ~/.local/state/omarchy/agents/usage/claude.json (written by
+omarchy-agent-usage-update); failing that, the last 5 hours or 7
+days. The figures come from Claude Code's logs
+(~/.claude/projects/*/*.jsonl and their sub-agents): each answer records
+its tokens there. 'tokens' adds input, cache write and read, and
+output; a cache read costs less than a fresh input, but
+it is the one that grows with a long context. Read-only; nothing is
+written, no conversation content comes out except the session title
+and the description of the agents."""
 import collections, datetime, glob, json, os, re, sys
 
 HOME = os.path.expanduser("~")
@@ -22,8 +22,8 @@ ISLAND_AI = os.path.join(HOME, ".config/poste-island/ai")
 PROJECTS = os.path.join(HOME, ".claude/projects")
 SPAN = {"session": datetime.timedelta(hours=5), "week": datetime.timedelta(days=7)}
 UTC = datetime.timezone.utc
-RUNNING = datetime.timedelta(minutes=2)   # actif depuis moins de 2 min : « en cours »
-SLOTS = 48   # frise : la fenêtre découpée en 48 cases (6 min sur 5 h, 3 h 30 sur 7 jours)
+RUNNING = datetime.timedelta(minutes=2)   # active for less than 2 min: 'running'
+SLOTS = 48   # timeline: the window cut into 48 cells (6 min over 5 h, 3 h 30 over 7 days)
 
 
 def parse_time(text):
@@ -52,8 +52,8 @@ def window(kind, provider="claude"):
 
 
 def model_name(model):
-    """« claude-opus-5-5 » → « Opus », « claude-croute-6-1[1m] » → « Croute » :
-    la famille, sans « claude- » ni numéros de version."""
+    """'claude-opus-5-5' → 'Opus', 'claude-croute-6-1[1m]' → 'Croute':
+    the family, without 'claude-' or version numbers."""
     m = str(model or "").lower().split("[")[0]
     words = [w for w in re.split(r"[-_.]", m) if w and not w.isdigit() and w not in ("claude", "gpt", "latest", "preview")]
     words = [w for w in words if not re.fullmatch(r"\d{6,}|v\d+", w)]
@@ -61,7 +61,7 @@ def model_name(model):
 
 
 def tool_summary(block):
-    """« Bash · pnpm test », « Read · src/app.tsx »… pour le dernier outil."""
+    """'Bash · pnpm test', 'Read · src/app.tsx'… for the last tool."""
     if block.get("name") == "SubagentHandback":
         return "Handed its result back"
     inp = block.get("input") or {}
@@ -83,9 +83,9 @@ def text_of(content):
 
 
 def read(path, start):
-    """Réponses de ce journal depuis `start` : liste de (heure, modèle, usage),
-    et ce qu'on sait du journal : titres, dossier, première consigne, dernier
-    outil, dernière activité."""
+    """Answers of this log since `start`: list of (time, model, usage),
+    and what is known about the log: titles, folder, first instruction, last
+    tool, last activity."""
     out, seen = [], set()
     meta = {"title": "", "customTitle": "", "lastPrompt": "", "cwd": "", "prompt": "", "lastTool": "",
             "firstAt": None, "lastAt": None}
@@ -118,12 +118,12 @@ def read(path, start):
                 meta["prompt"] = text_of(m.get("content"))[:2500]
             if kind != "assistant":
                 continue
-            meta["cwd"] = meta["cwd"] or d.get("cwd") or ""   # dossier de départ de la session
+            meta["cwd"] = meta["cwd"] or d.get("cwd") or ""   # starting folder of the session
             for block in m.get("content") or []:
                 if isinstance(block, dict) and block.get("type") == "tool_use":
                     meta["lastTool"] = tool_summary(block)
             if not t or t < start or m.get("id") in seen or str(m.get("model", "")).startswith("<"):
-                continue   # « <synthetic> » : message de Claude Code lui-même, sans modèle
+                continue   # '<synthetic>': message from Claude Code itself, without a model
             seen.add(m.get("id"))
             u = m.get("usage") or {}
             out.append((t, model_name(m.get("model")), {
@@ -136,14 +136,14 @@ def read(path, start):
 
 
 def tree(agents):
-    """Ordre d'affichage : chaque agent suivi des agents qu'il a lancés."""
+    """Display order: each agent followed by the agents it started."""
     ids = {a["id"] for a in agents}
     kids = collections.defaultdict(list)
     for a in agents:
         kids[a["parentId"] if a["parentId"] in ids else None].append(a)
     out = []
-    # rails : pour chaque niveau au-dessus, le trait vertical continue-t-il
-    # (un frère plus bas reste à venir) ; lastSibling : dernier de ses frères.
+    # rails: for each level above, does the vertical line continue
+    # (a sibling further down is still to come); lastSibling: last of its siblings.
     def walk(parent, depth, rails):
         children = sorted(kids.get(parent, []), key=lambda a: -a["tokens"])
         for i, a in enumerate(children):
@@ -174,7 +174,7 @@ def agent_entry(aid, parent_id, description, rows, meta, now, kind="", backgroun
 
 
 def claude_sessions(start, now):
-    """(id, dossier, titre, réponses de la conversation, infos, agents) par session."""
+    """(id, folder, title, answers of the conversation, info, agents) per session."""
     for path in glob.glob(os.path.join(PROJECTS, "*", "*.jsonl")):
         if os.path.getmtime(path) < start.timestamp():
             continue
@@ -197,13 +197,13 @@ def claude_sessions(start, now):
                                       str(am.get("description") or "Agent"), arows, ameta, now,
                                       str(am.get("agentType") or ""), am.get("requestShape") == "background",
                                       str(am.get("model") or "")))
-        # Nom donné avec /rename, sinon la dernière demande, sinon le titre automatique.
+        # Name given with /rename, otherwise the last request, otherwise the automatic title.
         title = meta["customTitle"] or meta["lastPrompt"][:160] or meta["title"]
         yield sid, meta["cwd"], title, rows, meta, agents
 
 
 def codex_read(path, start):
-    """Réponses d'un fil Codex (rollout) depuis `start`, et ses infos."""
+    """Answers of a Codex thread (rollout) since `start`, and its info."""
     out, meta = [], {"firstAt": None, "lastAt": None, "lastTool": "", "prompt": "", "model": ""}
     try:
         f = open(path, errors="replace")
@@ -232,7 +232,7 @@ def codex_read(path, start):
                 u = pl.get("usage") or {}
                 cached = u.get("cached_input_tokens") or 0
                 out.append((t, meta["model"] or "?", {
-                    "input": max(0, (u.get("input_tokens") or 0) - cached),   # Codex compte le cache dans l'entrée
+                    "input": max(0, (u.get("input_tokens") or 0) - cached),   # Codex counts the cache in the input
                     "write": u.get("cache_write_input_tokens") or 0,
                     "read": cached,
                     "output": u.get("output_tokens") or 0,
@@ -241,7 +241,7 @@ def codex_read(path, start):
 
 
 def codex_sessions(start, now):
-    """Les fils Codex : un fil lancé par un autre (thread_spawn_edges) est son agent."""
+    """Codex threads: a thread started by another (thread_spawn_edges) is its agent."""
     import sqlite3
     try:
         db = sqlite3.connect("file:%s?mode=ro" % os.path.join(CODEX, "state_5.sqlite"), uri=True, timeout=2)
@@ -283,7 +283,7 @@ def codex_sessions(start, now):
 
 
 def merged_timeline(group):
-    """La frise de plusieurs sessions additionnées (modèle de la plus grosse part)."""
+    """The timeline of several sessions added up (model of the biggest share)."""
     cells = collections.defaultdict(collections.Counter)
     for x in group:
         for i, n, m in x.get("timeline", []):
@@ -312,12 +312,12 @@ def main():
             hours[t.astimezone().strftime("%Y-%m-%dT%H")] += n
             grand.update(u)
             grand["req"] += 1
-        # Qui a lancé qui : sans parent, c'est la conversation principale.
+        # Who started whom: without a parent, it is the main conversation.
         names = {a["id"]: a["description"] for a in agents}
         for a in agents:
             a["parent"] = names.get(a["parentId"], "Main conversation" if not a["parentId"] else "an agent outside this window")
         agents = tree(agents)
-        if main_rows:   # la conversation elle-même, en tête de ses agents
+        if main_rows:   # the conversation itself, at the head of its agents
             agents.insert(0, {"description": "Main conversation", "model": main_rows[-1][1], "req": len(main_rows),
                               "tokens": sum(total(r[2]) for r in main_rows),
                               "avgContext": int(sum(ctx) / len(ctx)), "main": True, "depth": 0,
@@ -325,7 +325,7 @@ def main():
                               "running": bool(meta.get("lastAt") and now - meta["lastAt"] < RUNNING),
                               "lastTool": meta.get("lastTool", ""), "first": "",
                               "last": meta["lastAt"].isoformat() if meta.get("lastAt") else ""})
-        # Frise : tokens par case de la fenêtre, avec le modèle qui domine la case.
+        # Timeline: tokens per cell of the window, with the model that dominates the cell.
         slot_len = (end - start).total_seconds() / SLOTS
         cells = collections.defaultdict(collections.Counter)
         for t, m, u in rows:
@@ -341,9 +341,9 @@ def main():
             "models": dict(collections.Counter(r[1] for r in rows)),
             "last": max(r[0] for r in rows).isoformat(),
         })
-    # Les conversations de l'IA de l'île (une session chacune, lancées depuis
-    # ~/.config/poste-island/ai) : une seule ligne « Island AI », chaque
-    # conversation dessous comme un agent.
+    # The conversations of the island's AI (one session each, started from
+    # ~/.config/poste-island/ai): a single 'Island AI' line, each
+    # conversation below it as an agent.
     island = [x for x in sessions if x.get("_cwd", "").rstrip("/") == ISLAND_AI]
     if len(island) > 1:
         sessions = [x for x in sessions if x not in island]

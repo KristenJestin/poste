@@ -1,21 +1,21 @@
 #!/usr/bin/env python3
-"""Pont IA de l'île : lance la CLI d'un fournisseur (Claude, Codex…) et
-traduit sa sortie en un format commun, une ligne JSON par événement :
+"""AI bridge of the island: runs a provider's CLI (Claude, Codex…) and
+translates its output into a common format, one JSON line per event:
 
   {"t": "session", "id": "...", "provider": "claude", "name": "Claude"}
-  {"t": "delta", "text": "..."}        texte de la réponse, au fil de l'eau
-  {"t": "tool", "name": "WebSearch"}    outil en cours (recherche, lecture…)
+  {"t": "delta", "text": "..."}        text of the answer, as it comes
+  {"t": "tool", "name": "WebSearch"}    tool in progress (search, reading…)
   {"t": "done", "text": "...", "error": false}
 
   poste-ask [--provider P] [--session ID] QUESTION
 
-Les fournisseurs se déclarent dans ~/.config/poste-island/launcher/launcher.json, clé
-"ai" : { "default": "claude", "providers": { "<id>": { name, format,
-command: [...], resume: [...] } } }. Dans command / resume, "{prompt}" et
-"{session}" sont remplacés. « format » dit comment lire la sortie : claude
-(stream-json) ou codex (exec --json). Changer de fournisseur = changer
-"default". Lancé depuis ~/.config/poste-island/ai, dont l'AGENTS.md (mémo
-des commandes du bureau) n'est lu que par cette IA ; rien n'est écrit ici."""
+Providers are declared in ~/.config/poste-island/launcher/launcher.json, key
+"ai": { "default": "claude", "providers": { "<id>": { name, format,
+command: [...], resume: [...] } } }. In command / resume, "{prompt}" and
+"{session}" are replaced. 'format' says how to read the output: claude
+(stream-json) or codex (exec --json). Changing provider = changing
+"default". Run from ~/.config/poste-island/ai, whose AGENTS.md (memo of the
+desktop commands) is read only by this AI; nothing is written here."""
 import json, os, subprocess, sys
 
 CONFIG = os.path.expanduser("~/.config/poste-island/launcher/launcher.json")
@@ -28,12 +28,12 @@ SYSTEM = ("You answer inside a small launcher panel on the user's Linux desktop 
           "(or `setsid -f <cmd> >/dev/null 2>&1`); for a terminal program use "
           "`setsid -f xdg-terminal-exec --dir=<dir> <cmd>`. Never use sudo; ask the user instead. "
           "Do not delete, overwrite or push anything unless the user clearly asked for it.")
-# Outils et permissions de Claude (réglables dans launcher.json, clé "ai") :
-#   permissionMode : "auto" par défaut (le classifieur de Claude Code décide,
-#                    comme le mode auto du terminal ; ce qu'il voudrait
-#                    demander est refusé, rien ne peut être confirmé ici)
-#   allow          : outils / commandes acceptés d'office
-#   deny           : refusés d'office, quel que soit le mode
+# Claude's tools and permissions (adjustable in launcher.json, key "ai"):
+#   permissionMode : "auto" by default (Claude Code's classifier decides,
+#                    like the terminal's auto mode; what it would like to
+#                    ask is refused, nothing can be confirmed here)
+#   allow          : tools / commands accepted outright
+#   deny           : refused outright, whatever the mode
 TOOLS = "Read,Glob,Grep,WebSearch,WebFetch,Bash,Edit,Write"
 ALLOW = ["Read", "Glob", "Grep", "WebSearch", "WebFetch"]
 DENIED = ["Bash(sudo *)", "Bash(rm -r*)", "Bash(rm -fr*)", "Bash(git push*)", "Bash(dd *)", "Bash(mkfs*)",
