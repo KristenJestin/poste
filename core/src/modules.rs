@@ -27,6 +27,10 @@ pub struct Card {
     /// `poste sys setup` et désactivées au retrait du module.
     #[serde(default)]
     pub units: Vec<String>,
+    /// Program the module plugs into the desktop (looked up in the `PATH`): without it,
+    /// `poste sys setup` leaves the module out.
+    #[serde(default)]
+    pub requires: Option<String>,
 }
 
 /// `[[line]]` d'une fiche : une ligne qu'un module veut voir dans un fichier de `~`.

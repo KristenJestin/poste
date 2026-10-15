@@ -1,0 +1,3 @@
+#!/bin/sh
+# Module melodie of poste: passes the command as is to Mélodie.
+exec melodie "$@"

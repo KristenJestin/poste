@@ -124,10 +124,6 @@ id = "zen-theme"
 title = "Zen : Réglages, Apparence : choisir le thème interne sombre voulu"
 
 [[manual]]
-id = "music-login"
-title = "Musique : poste music login (serveur Navidrome)"
-
-[[manual]]
 id = "unity-login"
 title = "Unity Hub : se connecter (puis unity auth login pour la CLI si besoin)"
 

@@ -1,0 +1,36 @@
+{
+  "//": "Launcher extension of this module (same format as ~/.config/poste-island/launcher/launcher.json: items, extensions, engines). Merged by the island from ~/.local/share/poste/modules/<name>/island/launcher.json.",
+  "extensions": [
+    {
+      "id": "melodie",
+      "name": "Music",
+      "subtitle": "Mélodie · search, playlists, mixes",
+      "icon": "󰝚",
+      "keywords": [
+        "musique",
+        "music",
+        "melodie",
+        "mélodie",
+        "navidrome",
+        "playlist",
+        "playlists",
+        "artist",
+        "artiste",
+        "album",
+        "morceau",
+        "track"
+      ],
+      "ttl": 30,
+      "source": {
+        "type": "script",
+        "command": "melodie home --json",
+        "search": "melodie search --json"
+      },
+      "keyword": [
+        "play",
+        "music"
+      ],
+      "rootItems": false
+    }
+  ]
+}

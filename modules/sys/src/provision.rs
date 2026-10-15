@@ -388,7 +388,7 @@ fn succeeds(cmd: &[String]) -> bool {
         .unwrap_or(false)
 }
 
-fn have(env: &Env, bin: &str) -> bool {
+pub fn have(env: &Env, bin: &str) -> bool {
     let in_dirs = |dirs: &[PathBuf]| dirs.iter().any(|d| d.join(bin).is_file());
     in_dirs(&env.path)
         || std::env::var_os("PATH")

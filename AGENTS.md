@@ -1,6 +1,6 @@
 # Règles pour les agents (dépôt poste)
 
-- Documentation et commentaires en français ; code et identifiants en anglais. Pas de tiret cadratin.
+- Everything in English: code, identifiers, documentation, comments, program messages and commit messages (the older French text is being translated). No em dash.
 - Chaque module est une application à part, avec son `README.md` et son `AGENTS.md` (ses propres règles). Ce qui est propre à un module (entrées de lanceur, QML de l'île, raccourcis Hyprland, lignes de fichiers sans inclusion) vit dans le module (`island/`, `hypr/`, `[[line]]`), jamais dans `config/` : l'île et Hyprland ne connaissent aucun module.
 - `poste` (l'aiguillage) ne code aucun module en dur : il cherche `poste-<nom>`, c'est tout.
 - `poste sys setup` ne doit jamais écraser ni supprimer ce qu'il n'a pas posé ; avant de remplacer un fichier posé par lui, il garde une copie dans `~/.local/state/poste/backup/`.

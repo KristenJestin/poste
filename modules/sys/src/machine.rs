@@ -357,6 +357,15 @@ pub fn module_list(env: &Env, repo: &Path) -> Result<()> {
     for m in &mods {
         let off = m.name != "sys" && cfg.is_disabled(&m.name);
         let installed = env.modules_dir().join(&m.name).is_dir();
+        if let (false, Some(prog)) = (off, m.missing(env)) {
+            let more = if installed {
+                ", still installed (poste sys setup removes it)"
+            } else {
+                ""
+            };
+            println!("  {:<10} {prog} not found: left out{more}", m.name);
+            continue;
+        }
         let state = match (off, installed) {
             (true, true) => "désactivé, encore installé (poste sys setup le retire)",
             (true, false) => "désactivé",

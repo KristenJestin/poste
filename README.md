@@ -49,7 +49,7 @@ commands = [{ name = "status", description = "état du dépôt" }]   # facultati
 | Module | Rôle |
 | --- | --- |
 | [`sys`](modules/sys/README.md) | gère le dépôt : construction, installation, état, git. Toujours installé. |
-| [`music`](modules/music/README.md) | client Navidrome : connexion, copie locale, recherche, lecture, favoris, playlists, mixes. |
+| [`melodie`](modules/melodie/README.md) | plugs the [Mélodie](https://github.com/KristenJestin/melodie) music player into the desktop: launcher search, quality and heart on the player card. Needs `melodie`. |
 | [`record`](modules/record/README.md) | enregistrement d'écran (gpu-screen-recorder) piloté par l'île : préréglages, fenêtres, écrans, zone. |
 | [`vocaline`](modules/vocaline/README.md) | dictée Vocaline : SUPER+Z, pastille animée en bas de l'écran, texte dicté en direct sous l'île. |
 | [`usage`](modules/usage/README.md) | quotas des agents IA (Claude Code, Codex…) lus dans le collecteur d'Omarchy, leur historique, et la consommation relue dans les journaux des agents (appels, fenêtres de 5 h, comparaisons). |
@@ -62,6 +62,12 @@ release), soit un script (`poste-<nom>` exécutable à la racine du module, en P
 copié tel quel : pas de `Cargo.toml`, pas dans `members`). `poste` ne fait pas la différence : il
 exécute `~/.local/share/poste/modules/<nom>/poste-<nom>`.
 
+A module that plugs an outside program into the desktop (Vocaline, Mélodie) says so with
+`requires = "<program>"` in its `module.toml`: when that program is not in the `PATH`,
+`poste sys setup` leaves the module out (and removes it if it was installed), so a machine
+without it gets no dead shortcut, launcher entry or island part. Installing the program itself
+is a choice of the machine: it belongs in its data repository, not here.
+
 ### Ce que les modules apportent à la machine
 
 Un module peut fournir, à côté de son programme, des dossiers facultatifs copiés tels quels par
@@ -73,9 +79,12 @@ connaître aucun module ; module absent, aucune trace) :
     `~/.config/poste-island/launcher/launcher.json` (fusionné avec lui ; la config de l'utilisateur
     gagne en cas d'id identique). Une extension peut avoir `"highlight": true` : l'île encadre à
     l'écran la cible (`highlight: {x,y,w,h,window}`) de la ligne sélectionnée.
-  - `island.json` : `{"slots": [{"slot": "<nom>", "file": "Fichier.qml"}]}`. Slots chargés par l'île :
-    `player-extra` (ajouts à la carte du lecteur : `detail`, `actionGlyph`/`actionOn`/`action()`,
-    `launcherExt`, voir le commentaire dans `Island.qml`), `capture` (source d'enregistrement
+  - `island.json` : `{"slots": [{"slot": "<nom>", "file": "Fichier.qml"}], "player": {…}}`.
+    `player` declares, without any QML, what the player card shows for one MPRIS player:
+    `bus` (its MPRIS bus name), `quality` (metadata key of the line under the artist), `starred`
+    (boolean metadata key of the heart), `like` (command run by the heart), `launcher` (launcher
+    extension opened by the sound source pill). Example: `modules/melodie/island/island.json`.
+    Slots chargés par l'île : `capture` (source d'enregistrement
     de même interface qu'`ObsState.qml`, pour la pastille de capture) et `dictation` (source de
     dictée : `listening`, `transcribing`, `level`, `finals`, `partial`, pour la pastille de dictée
     en bas de l'écran et le texte sous l'île).

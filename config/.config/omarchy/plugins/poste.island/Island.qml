@@ -19,6 +19,7 @@ import Quickshell.Services.Pipewire
 import Quickshell.Wayland
 import qs.Commons
 import "components"
+import "components/ModulePlayers.js" as ModulePlayers
 import "bandeau"
 import "file:///usr/share/flea/shelf" as Flea
 
@@ -110,47 +111,16 @@ Item {
   }
   function mediaAction(name) { if (media) media.runAction(name, false, "") }
 
-  // Slot « player-extra » : un module peut ajouter à la carte du lecteur ce qui est propre à
-  // son lecteur (qualité du flux, cœur…) par un QML déclaré dans son island/island.json.
-  // Contrat de l'élément chargé : propriété injectée `player` (lecteur MPRIS courant) ;
-  // propriétés lues `active` (bool, ce module prend en charge ce lecteur), `detail` (ligne
-  // discrète sous l'artiste), `actionGlyph` / `actionOn` (bouton en haut à droite) avec la
-  // fonction `action()`, et `launcherExt` (extension du lanceur ouverte par la pastille de la
-  // source du son). Sans module (ou lecteur non pris en charge), rien de tout cela ne s'affiche.
-  property var playerExtraItems: []
-  function collectPlayerExtras() {
-    var list = []
-    for (var i = 0; i < playerExtraLoaders.count; i++) {
-      var ld = playerExtraLoaders.itemAt(i)
-      if (ld && ld.item) list.push(ld.item)
-    }
-    playerExtraItems = list
-  }
-  Repeater {
-    id: playerExtraLoaders
-    model: moduleRegistry.slots["player-extra"] || []
-    delegate: Loader {
-      required property string modelData
-      source: modelData
-      onLoaded: {
-        if (item && "player" in item) item.player = Qt.binding(function() { return root.player })
-        root.collectPlayerExtras()
-      }
-    }
-    onItemAdded: Qt.callLater(root.collectPlayerExtras)
-    onItemRemoved: Qt.callLater(root.collectPlayerExtras)
-  }
-  readonly property var playerExtra: {
-    var list = playerExtraItems
-    for (var i = 0; i < list.length; i++) if (list[i].active) return list[i]
-    return null
-  }
-  readonly property string playerDetail: playerExtra ? String(playerExtra.detail || "") : ""
-  readonly property bool playerHasAction: !!playerExtra && String(playerExtra.actionGlyph || "") !== ""
-  readonly property string playerActionGlyph: playerHasAction ? String(playerExtra.actionGlyph) : ""
-  readonly property bool playerActionOn: playerHasAction && !!playerExtra.actionOn
-  readonly property string playerSourceExt: playerExtra ? String(playerExtra.launcherExt || "") : ""
-  function playerAction() { if (playerExtra && playerExtra.action) playerExtra.action() }
+  // Player card extras declared by a module (`player` in its island/island.json, see
+  // components/ModuleRegistry.qml): the quality line, the heart and the launcher extension of
+  // the player whose MPRIS bus name matches. Without such a module, the card stays generic.
+  readonly property var playerExtras: ModulePlayers.extras(moduleRegistry.players, player ? String(player.dbusName || "") : "", player ? player.metadata : null)
+  readonly property string playerDetail: playerExtras.detail
+  readonly property bool playerHasAction: playerExtras.hasAction
+  readonly property bool playerActionOn: playerExtras.actionOn
+  readonly property string playerActionGlyph: playerHasAction ? (playerActionOn ? "󰋑" : "󰋕") : ""
+  readonly property string playerSourceExt: playerExtras.launcher
+  function playerAction() { if (playerHasAction) Quickshell.execDetached(playerExtras.like) }
 
   // ---------------------------------------------------------------- volume du lecteur
   // Volume de l'application du lecteur courant : son ou ses flux PipeWire

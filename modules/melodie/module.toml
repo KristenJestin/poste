@@ -1,0 +1,6 @@
+name = "melodie"
+requires = "melodie"
+description = "Plugs the Mélodie music player into the desktop: launcher search and player card"
+commands = [
+  { name = "<command>", description = "any Mélodie command, passed as is (see melodie --help)" },
+]

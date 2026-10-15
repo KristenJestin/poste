@@ -176,7 +176,7 @@ mod tests {
     fn other_files_need_nothing() {
         let n = need(&[
             "README.md",
-            "modules/music/src/main.rs",
+            "modules/usage/src/main.rs",
             "config/.config/git/config",
             "modules/files/README.md",
         ]);

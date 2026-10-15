@@ -34,6 +34,17 @@ pub enum Action {
 pub struct RepoModule {
     pub name: String,
     pub dir: PathBuf,
+    /// Program the module needs (`requires` in `module.toml`).
+    pub requires: Option<String>,
+}
+
+impl RepoModule {
+    /// The required program, when it cannot be found on this machine.
+    pub fn missing(&self, env: &Env) -> Option<&str> {
+        self.requires
+            .as_deref()
+            .filter(|r| !crate::provision::have(env, r))
+    }
 }
 
 pub fn repo_modules(repo: &Path) -> Result<Vec<RepoModule>> {
@@ -57,7 +68,11 @@ pub fn repo_modules(repo: &Path) -> Result<Vec<RepoModule>> {
                 card_file.display()
             );
         }
-        out.push(RepoModule { name, dir: d });
+        out.push(RepoModule {
+            name,
+            dir: d,
+            requires: card.requires,
+        });
     }
     out.sort_by(|a, b| a.name.cmp(&b.name));
     Ok(out)
@@ -65,11 +80,13 @@ pub fn repo_modules(repo: &Path) -> Result<Vec<RepoModule>> {
 
 /// Les modules du dépôt qui doivent être installés sur cette machine : tous, sauf ceux de
 /// `disabled` dans `~/.config/poste/config.toml` (`sys` n'est jamais désactivable).
+/// A module whose required program is missing is left out too.
 pub fn enabled_modules(repo: &Path, env: &Env) -> Result<Vec<RepoModule>> {
     let cfg = poste_core::Config::load(env)?;
     Ok(repo_modules(repo)?
         .into_iter()
         .filter(|m| m.name == "sys" || !cfg.is_disabled(&m.name))
+        .filter(|m| m.missing(env).is_none())
         .collect())
 }
 
@@ -289,6 +306,40 @@ mod tests {
             src("poste-installed"),
             Path::new("target/release/poste-installed")
         );
+    }
+
+    #[test]
+    fn module_left_out_without_its_program() {
+        let d = tempfile::tempdir().unwrap();
+        let repo = d.path().join("repo");
+        for (name, requires) in [
+            ("present", "poste-test-present-player"),
+            ("absent", "poste-test-absent-player"),
+        ] {
+            let m = repo.join("modules").join(name);
+            fs::create_dir_all(&m).unwrap();
+            fs::write(
+                m.join("module.toml"),
+                format!("name = \"{name}\"\nrequires = \"{requires}\"\n"),
+            )
+            .unwrap();
+            fs::write(m.join(format!("poste-{name}")), "").unwrap();
+        }
+        let bin = d.path().join("bin");
+        fs::create_dir_all(&bin).unwrap();
+        fs::write(bin.join("poste-test-present-player"), "").unwrap();
+        let mut env = Env::with_home(d.path().join("home"));
+        env.path = vec![bin];
+
+        let names: Vec<String> = enabled_modules(&repo, &env)
+            .unwrap()
+            .into_iter()
+            .map(|m| m.name)
+            .collect();
+        assert_eq!(names, ["present"]);
+        let all = repo_modules(&repo).unwrap();
+        let absent = all.iter().find(|m| m.name == "absent").unwrap();
+        assert_eq!(absent.missing(&env), Some("poste-test-absent-player"));
     }
 
     #[test]

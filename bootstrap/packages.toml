@@ -5,7 +5,6 @@
 # Clé = nom du paquet, valeur = à quoi il sert.
 [packages]
 rust = "cargo : construit poste (./setup)"
-mpv = "libmpv : lecture de poste music (rusqlite est compilé avec sa propre sqlite, inutile ici)"
 github-cli = "gh (auth git HTTPS, credential helper dans git/config)"
 direnv = "hook dans .bashrc"
 ttf-fira-code = "police des terminaux (foot / alacritty / ghostty)"

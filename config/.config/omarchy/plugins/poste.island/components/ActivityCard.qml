@@ -388,7 +388,7 @@ Rectangle {
         font.family: card.host.uiFont
         font.pixelSize: 13
       }
-      // Ligne de détail d'un module (slot « player-extra »), sur la largeur laissée par les commandes.
+      // Detail line declared by a module (`player` in its island.json), in the width the controls leave.
       Text {
         width: parent.width - 104
         visible: text !== ""
