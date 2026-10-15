@@ -1,9 +1,14 @@
 # Steps of the vocaline add-on, merged with bootstrap/steps.toml when the add-on is chosen.
 
-[[manual]]
-id = "vocaline-package"
-title = "Vocaline: install the package of its latest GitHub release (sudo pacman -U vocaline-<version>-x86_64.pkg.tar.zst), in neither the repositories nor the AUR"
-check = ["test", "-x", "/usr/bin/vocaline"]
+# Neither in the repositories nor the AUR: the package of its GitHub release. poste downloads
+# and checks it, then prints the `sudo pacman -U` to run (at setup if absent, at
+# `poste sys update` once a new release is out).
+[[app]]
+id = "vocaline"
+title = "Vocaline (dictation), pacman package"
+github = "KristenJestin/vocaline"
+asset = "vocaline-{version}-*-x86_64.pkg.tar.zst"
+package = "vocaline"
 
 [[user]]
 id = "vocaline-models"

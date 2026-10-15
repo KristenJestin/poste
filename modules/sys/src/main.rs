@@ -1,5 +1,6 @@
 //! `poste-sys`: management of the poste repository (build, install, status, git).
 
+mod apps;
 mod config;
 mod handoff;
 mod ignore;
@@ -17,6 +18,7 @@ mod setup;
 mod status;
 mod sync;
 mod units;
+mod updates;
 mod util;
 mod versions;
 
@@ -135,6 +137,17 @@ enum Cmd {
     },
     /// Source, root (current) and installed versions
     Versions,
+    /// What is behind its source: apps (GitHub releases), Omarchy plugins, system packages
+    Outdated,
+    /// Updates the apps and plugins that are behind (all, or the cited ones), after a preview
+    Update {
+        /// Identifiers of apps or plugins (default: all those behind)
+        ids: Vec<String>,
+        #[arg(short, long)]
+        yes: bool,
+        #[arg(short = 'n', long)]
+        dry_run: bool,
+    },
     /// Continuation of sync and use, run by an old poste-sys that hands over (see handoff)
     #[command(hide = true)]
     Finish {
@@ -326,6 +339,16 @@ fn run(cli: Cli) -> Result<ExitCode> {
             let done = versions::finish(&env, &root, need, &opts, prune)?;
             reload::apply(&done.need, yes, false, &setup::confirm)?;
             Ok(done.code)
+        }
+        Cmd::Outdated => {
+            let repo = versions::root(&env, &cfg)?;
+            updates::outdated(&env, &repo)?;
+            Ok(ExitCode::SUCCESS)
+        }
+        Cmd::Update { ids, yes, dry_run } => {
+            let repo = versions::root(&env, &cfg)?;
+            let code = updates::update(&env, &repo, &ids, yes, dry_run, &setup::confirm)?;
+            Ok(ExitCode::from(code))
         }
         Cmd::Versions => {
             versions::list(&env, &cfg)?;

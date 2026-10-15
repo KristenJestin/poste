@@ -4,13 +4,14 @@
 //! No step runs `sudo`. The data is in `bootstrap/packages.toml` and
 //! `bootstrap/steps.toml`; the contents of root files in `bootstrap/system/`.
 
+use crate::apps::{self, App, Tools};
 use anyhow::{bail, Context, Result};
 use poste_core::{time, Config, Env};
 use serde::Deserialize;
 use std::collections::{BTreeMap, HashSet};
 use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
+use std::process::Command;
 
 /// Variable reserved for tests: program (without arguments) run in place of `pacman -Qq`.
 pub const TEST_PACMAN_VAR: &str = "POSTE_TEST_PACMAN_QQ";
@@ -26,7 +27,9 @@ struct PackagesFile {
 #[derive(Debug, Default, Deserialize)]
 pub struct Steps {
     #[serde(default)]
-    plugin: Vec<Plugin>,
+    pub(crate) plugin: Vec<Plugin>,
+    #[serde(default)]
+    pub(crate) app: Vec<App>,
     #[serde(default)]
     file: Vec<FileStep>,
     #[serde(default)]
@@ -37,12 +40,14 @@ pub struct Steps {
     manual: Vec<ManualStep>,
 }
 
+/// A third-party plugin of the Omarchy shell, not pinned: installed at its latest version (tag,
+/// otherwise default branch), then moved by `poste sys update`.
 #[derive(Debug, Deserialize)]
-struct Plugin {
-    id: String,
+#[serde(deny_unknown_fields)]
+pub(crate) struct Plugin {
+    pub(crate) id: String,
     url: String,
-    commit: String,
-    patch: Option<String>,
+    pub(crate) patch: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -107,6 +112,8 @@ pub struct Ctx<'a> {
     /// `bootstrap/` of each add-on listed in `addons`, when it has one.
     addon_dirs: Vec<PathBuf>,
     vars: Vec<(&'static str, String)>,
+    /// gh, pacman, git: fakes in the tests.
+    pub tools: Tools,
 }
 
 impl<'a> Ctx<'a> {
@@ -153,16 +160,17 @@ impl<'a> Ctx<'a> {
             data_dir,
             addon_dirs,
             vars,
+            tools: Tools::default(),
         }
     }
 
-    fn sub(&self, s: &str) -> String {
+    pub(crate) fn sub(&self, s: &str) -> String {
         self.vars
             .iter()
             .fold(s.to_string(), |a, (k, v)| a.replace(k, v))
     }
 
-    fn sub_cmd(&self, c: &[String]) -> Vec<String> {
+    pub(crate) fn sub_cmd(&self, c: &[String]) -> Vec<String> {
         c.iter().map(|a| self.sub(a)).collect()
     }
 
@@ -172,8 +180,13 @@ impl<'a> Ctx<'a> {
         Ok(self.sub(&s))
     }
 
-    fn plugin_dir(&self, id: &str) -> PathBuf {
+    pub(crate) fn plugin_dir(&self, id: &str) -> PathBuf {
         self.env.config_home.join("omarchy/plugins").join(id)
+    }
+
+    /// Path of a plugin's patch (relative to `bootstrap/`, or absolute once merged).
+    pub(crate) fn patch_path(&self, rel: &str) -> PathBuf {
+        self.dir.join(rel)
     }
 }
 
@@ -208,6 +221,9 @@ fn merge_steps(steps: &mut Steps, more: Steps, dd: &Path) {
     for mut p in more.plugin {
         p.patch.as_mut().map(abs);
         put(&mut steps.plugin, p, |x| &x.id);
+    }
+    for a in more.app {
+        put(&mut steps.app, a, |x| &x.id);
     }
     for mut f in more.file {
         abs(&mut f.source);
@@ -280,6 +296,7 @@ fn apply_skip(
         }
     }
     steps.plugin.retain(|s| !gone.contains(&s.id));
+    steps.app.retain(|s| !gone.contains(&s.id));
     steps.file.retain(|s| !gone.contains(&s.id));
     steps.system.retain(|s| !gone.contains(&s.id));
     steps.manual.retain(|s| !gone.contains(&s.id));
@@ -308,6 +325,7 @@ fn step_ids(steps: &Steps) -> HashSet<&str> {
         .plugin
         .iter()
         .map(|s| s.id.as_str())
+        .chain(steps.app.iter().map(|s| s.id.as_str()))
         .chain(steps.file.iter().map(|s| s.id.as_str()))
         .chain(steps.user.iter().map(|s| s.id.as_str()))
         .chain(steps.system.iter().map(|s| s.id.as_str()))
@@ -316,7 +334,7 @@ fn step_ids(steps: &Steps) -> HashSet<&str> {
 }
 
 /// Wanted packages and steps, the machine's `skip` applied; warns about unknown identifiers.
-fn load_wanted(ctx: &Ctx) -> Result<(BTreeMap<String, String>, Steps, Skipped)> {
+pub(crate) fn load_wanted(ctx: &Ctx) -> Result<(BTreeMap<String, String>, Steps, Skipped)> {
     let cfg = Config::load(ctx.env)?;
     let mut wanted = load_packages(ctx)?;
     let mut steps = load_steps(ctx)?;
@@ -337,11 +355,12 @@ pub fn skip_catalog(env: &Env, repo: &Path) -> Result<BTreeMap<String, &'static 
     for k in load_packages(&ctx)?.into_keys() {
         out.insert(k, "package");
     }
-    let kinds: [(Vec<&str>, &'static str); 5] = [
+    let kinds: [(Vec<&str>, &'static str); 6] = [
         (
             steps.plugin.iter().map(|s| s.id.as_str()).collect(),
             "plugin",
         ),
+        (steps.app.iter().map(|s| s.id.as_str()).collect(), "app"),
         (steps.file.iter().map(|s| s.id.as_str()).collect(), "file"),
         (
             steps.user.iter().map(|s| s.id.as_str()).collect(),
@@ -383,20 +402,7 @@ fn print_skipped(sk: &Skipped) {
 
 // ------------------------------------------------------------------ utilities
 
-/// Runs a command without output; true if it ends with code 0.
-fn succeeds(cmd: &[String]) -> bool {
-    let Some((prog, args)) = cmd.split_first() else {
-        return false;
-    };
-    Command::new(prog)
-        .args(args)
-        .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .status()
-        .map(|s| s.success())
-        .unwrap_or(false)
-}
+use apps::succeeds;
 
 pub fn have(env: &Env, bin: &str) -> bool {
     let in_dirs = |dirs: &[PathBuf]| dirs.iter().any(|d| d.join(bin).is_file());
@@ -530,12 +536,42 @@ enum Act {
         content: String,
         mode: Option<u32>,
     },
+    /// Installs the latest release of an app (`busy` substituted).
+    App {
+        app: Box<App>,
+        busy: Vec<String>,
+        bin: PathBuf,
+        cache: PathBuf,
+        tools: Tools,
+    },
+    /// Moves a plugin just added to its latest version, its patch applied.
+    PluginLatest {
+        dir: PathBuf,
+        patch: Option<PathBuf>,
+        tools: Tools,
+    },
 }
 
 impl Act {
     fn show(&self) -> String {
         match self {
             Act::Cmd(c) => c.join(" "),
+            Act::App { app, .. } => match app.install() {
+                Ok(apps::Install::Package(_)) => format!(
+                    "download the latest release of {} (checked), then sudo pacman -U printed",
+                    app.github
+                ),
+                _ => format!("install the latest release of {} (checked)", app.github),
+            },
+            Act::PluginLatest { dir, patch, .. } => format!(
+                "move {} to its latest tag (otherwise its default branch){}",
+                dir.display(),
+                if patch.is_some() {
+                    ", local patch applied"
+                } else {
+                    ""
+                }
+            ),
             Act::Write {
                 target,
                 mode: Some(m),
@@ -583,29 +619,11 @@ fn cmd(parts: &[&str]) -> Act {
 }
 
 /// Classifies a third-party plugin: nothing to do (`Ok(vec![])`), acts, or a "by hand" note.
+/// No version is enforced here: an absent plugin is added at its latest version, a present one
+/// only gets its patch checked; moving it is `poste sys update`.
 fn plugin_acts(ctx: &Ctx, p: &Plugin) -> Result<Vec<Act>, String> {
     let dir = ctx.plugin_dir(&p.id);
-    let patch = p
-        .patch
-        .as_ref()
-        .map(|r| ctx.dir.join(r).to_string_lossy().into_owned());
-    let d = dir.to_string_lossy().into_owned();
-    let mut acts = Vec::new();
-    let checkout = |acts: &mut Vec<Act>| {
-        acts.push(cmd(&[
-            "git", "-C", &d, "fetch", "--quiet", "--tags", "origin",
-        ]));
-        acts.push(cmd(&[
-            "git",
-            "-C",
-            &d,
-            "-c",
-            "advice.detachedHead=false",
-            "checkout",
-            "--quiet",
-            &p.commit,
-        ]));
-    };
+    let patch = p.patch.as_ref().map(|r| ctx.patch_path(r));
     if !dir.exists() {
         if !have(ctx.env, "omarchy") {
             return Err(format!(
@@ -613,12 +631,14 @@ fn plugin_acts(ctx: &Ctx, p: &Plugin) -> Result<Vec<Act>, String> {
                 p.id
             ));
         }
-        acts.push(cmd(&["omarchy", "plugin", "add", &p.url, "--yes"]));
-        checkout(&mut acts);
-        if let Some(pa) = &patch {
-            acts.push(cmd(&["git", "-C", &d, "apply", pa]));
-        }
-        return Ok(acts);
+        return Ok(vec![
+            cmd(&["omarchy", "plugin", "add", &p.url, "--yes"]),
+            Act::PluginLatest {
+                dir,
+                patch,
+                tools: ctx.tools.clone(),
+            },
+        ]);
     }
     if !dir.join(".git").exists() {
         return Err(format!(
@@ -626,38 +646,21 @@ fn plugin_acts(ctx: &Ctx, p: &Plugin) -> Result<Vec<Act>, String> {
             p.id
         ));
     }
-    let head = git(&dir, &["rev-parse", "HEAD"]).unwrap_or_default();
-    if !head.starts_with(&p.commit) {
-        if !git(&dir, &["status", "--porcelain", "--untracked-files=no"])
-            .unwrap_or_default()
-            .is_empty()
-        {
-            return Err(format!(
-                "{}: at {} instead of {} and files modified (patch already applied?): to handle by hand",
-                p.id,
-                &head[..head.len().min(7)],
-                p.commit
-            ));
-        }
-        checkout(&mut acts);
-        if let Some(pa) = &patch {
-            acts.push(cmd(&["git", "-C", &d, "apply", pa]));
-        }
-        return Ok(acts);
-    }
     if let Some(pa) = &patch {
-        if git_ok(&dir, &["apply", "--reverse", "--check", pa]) {
+        let pa = pa.to_string_lossy();
+        let d = dir.to_string_lossy().into_owned();
+        if git_ok(&dir, &["apply", "--reverse", "--check", &pa]) {
             // already applied
-        } else if git_ok(&dir, &["apply", "--check", pa]) {
-            acts.push(cmd(&["git", "-C", &d, "apply", pa]));
+        } else if git_ok(&dir, &["apply", "--check", &pa]) {
+            return Ok(vec![cmd(&["git", "-C", &d, "apply", &pa])]);
         } else {
             return Err(format!(
-                "{}: the patch no longer applies (plugin updated?): {pa}",
+                "{}: the patch no longer applies (plugin moved by hand?): {pa}",
                 p.id
             ));
         }
     }
-    Ok(acts)
+    Ok(vec![])
 }
 
 fn json_equal(a: &str, b: &str) -> bool {
@@ -677,11 +680,39 @@ fn user_plan(ctx: &Ctx, steps: &Steps) -> Result<UserPlan> {
             Ok(acts) if acts.is_empty() => {}
             Ok(acts) => plan.todos.push(Todo {
                 id: p.id.clone(),
-                title: format!("plugin {} at {}", p.id, p.commit),
+                title: format!("plugin {}", p.id),
                 acts,
             }),
             Err(note) => plan.notes.push(note),
         }
+    }
+    for a in &steps.app {
+        if let Err(e) = a.install() {
+            plan.notes.push(format!("{e:#}"));
+            continue;
+        }
+        if !have(ctx.env, "gh") {
+            plan.notes.push(format!(
+                "{}: ignored, gh not found (install it, gh auth login, then run again)",
+                a.id
+            ));
+            continue;
+        }
+        // Only an absent app is installed here: moving it is `poste sys update`.
+        if apps::installed(a, &ctx.sub_cmd(&a.version), &ctx.tools).is_some() {
+            continue;
+        }
+        plan.todos.push(Todo {
+            id: a.id.clone(),
+            title: format!("{} (not installed)", a.title),
+            acts: vec![Act::App {
+                app: Box::new(a.clone()),
+                busy: ctx.sub_cmd(&a.busy),
+                bin: ctx.env.bin_dir(),
+                cache: ctx.env.cache_dir(),
+                tools: ctx.tools.clone(),
+            }],
+        });
     }
     for f in &steps.file {
         let target = PathBuf::from(ctx.sub(&f.target));
@@ -751,7 +782,9 @@ fn file_mode(path: &Path) -> Option<u32> {
         .map(|m| m.permissions().mode() & 0o7777)
 }
 
-fn run_act(act: &Act) -> Result<()> {
+/// Runs an act; `Ok(false)`: what remains is left to the user (a `sudo` printed), so the step is
+/// not done yet and triggers nothing.
+fn run_act(act: &Act) -> Result<bool> {
     match act {
         Act::Cmd(c) => {
             let (prog, args) = c.split_first().context("empty command")?;
@@ -762,7 +795,38 @@ fn run_act(act: &Act) -> Result<()> {
             if !st.success() {
                 bail!("{} failed ({st})", c.join(" "));
             }
-            Ok(())
+            Ok(true)
+        }
+        Act::App {
+            app,
+            busy,
+            bin,
+            cache,
+            tools,
+        } => {
+            let done = apps::install(app, None, busy, bin, cache, tools)?;
+            match done.by_hand {
+                Some(c) => {
+                    println!("    {}: to run yourself:\n      {c}", done.tag);
+                    Ok(false)
+                }
+                None => {
+                    println!("    {} installed", done.tag);
+                    Ok(true)
+                }
+            }
+        }
+        Act::PluginLatest { dir, patch, tools } => {
+            let st = apps::plugin_state(dir, tools)?;
+            let (name, commit) = st.target.context("no tag nor default branch found")?;
+            if st.head != commit && !st.ahead {
+                apps::plugin_move(dir, &commit, patch.as_deref(), tools)?;
+            } else if let Some(p) = patch {
+                let d = dir.to_string_lossy().into_owned();
+                run_act(&cmd(&["git", "-C", &d, "apply", &p.to_string_lossy()]))?;
+            }
+            println!("    at {name}");
+            Ok(true)
         }
         Act::Write {
             target,
@@ -777,7 +841,9 @@ fn run_act(act: &Act) -> Result<()> {
                 use std::os::unix::fs::PermissionsExt;
                 std::fs::set_permissions(&tmp, std::fs::Permissions::from_mode(*m))?;
             }
-            std::fs::rename(&tmp, target).with_context(|| format!("writing {}", target.display()))
+            std::fs::rename(&tmp, target)
+                .with_context(|| format!("writing {}", target.display()))?;
+            Ok(true)
         }
     }
 }
@@ -789,29 +855,52 @@ pub struct Applied {
     pub failed: Vec<String>,
 }
 
-fn apply_user(plan: &UserPlan) -> Applied {
-    let mut res = Applied::default();
-    let run_todo = |t: &Todo, res: &mut Applied| {
-        println!("\n  {}: {}", t.id, t.title);
-        for a in &t.acts {
-            println!("    $ {}", a.show());
-            if let Err(e) = run_act(a) {
+fn run_todo(t: &Todo, res: &mut Applied) {
+    println!("\n  {}: {}", t.id, t.title);
+    let mut complete = true;
+    for a in &t.acts {
+        println!("    $ {}", a.show());
+        match run_act(a) {
+            Ok(c) => complete &= c,
+            Err(e) => {
                 eprintln!("    failure: {e:#}");
                 res.failed.push(t.id.clone());
                 return;
             }
         }
+    }
+    if complete {
         res.done.push(t.id.clone());
-    };
+    }
+}
+
+fn run_triggers(plan: &UserPlan, res: &mut Applied) {
+    for (triggers, t) in &plan.triggered {
+        if triggers.iter().any(|x| res.done.contains(x)) {
+            run_todo(t, res);
+        }
+    }
+}
+
+fn apply_user(plan: &UserPlan) -> Applied {
+    let mut res = Applied::default();
     for t in &plan.todos {
         run_todo(t, &mut res);
     }
-    for (triggers, t) in &plan.triggered {
-        if triggers.iter().any(|x| res.done.contains(x)) {
-            run_todo(t, &mut res);
-        }
-    }
+    run_triggers(plan, &mut res);
     res
+}
+
+/// Runs the user steps triggered by `done` (steps done outside `setup`: `poste sys update`).
+/// Returns those that failed.
+pub(crate) fn run_triggered(ctx: &Ctx, steps: &Steps, done: &[String]) -> Result<Vec<String>> {
+    let plan = user_plan(ctx, steps)?;
+    let mut res = Applied {
+        done: done.to_vec(),
+        ..Default::default()
+    };
+    run_triggers(&plan, &mut res);
+    Ok(res.failed)
 }
 
 /// The triggered steps that would run if their triggers are in the plan.
@@ -1298,7 +1387,7 @@ check = ["false"]
     }
 
     #[test]
-    fn plugin_commit_patch_and_file() {
+    fn plugin_patch_and_file() {
         let (_d, repo, env) = fixture();
         let ctx = Ctx::new(&env, &repo);
         let dir = ctx.plugin_dir("p");
@@ -1307,33 +1396,29 @@ check = ["false"]
         fs::write(dir.join("f.txt"), "one\n").unwrap();
         sh(&dir, &["add", "."]);
         sh(&dir, &["commit", "-q", "-m", "1"]);
-        let head = git(&dir, &["rev-parse", "--short", "HEAD"]).unwrap();
         // Patch: changes "one" into "two".
         write(
             &repo,
             "patches/p.patch",
             "diff --git a/f.txt b/f.txt\n--- a/f.txt\n+++ b/f.txt\n@@ -1 +1 @@\n-one\n+two\n",
         );
-        let plug = |commit: &str| Plugin {
+        let plug = || Plugin {
             id: "p".into(),
             url: "u".into(),
-            commit: commit.into(),
             patch: Some("patches/p.patch".into()),
         };
-        // Right commit, patch to apply.
-        let acts = plugin_acts(&ctx, &plug(&head)).unwrap();
+        // Present, at whatever version: only the patch, to apply.
+        let acts = plugin_acts(&ctx, &plug()).unwrap();
         assert_eq!(acts.len(), 1);
         run_act(&acts[0]).unwrap();
         assert_eq!(fs::read_to_string(dir.join("f.txt")).unwrap(), "two\n");
         // Already applied: nothing.
-        assert!(plugin_acts(&ctx, &plug(&head)).unwrap().is_empty());
-        // Other commit wanted and tree modified: note, nothing to do.
-        assert!(plugin_acts(&ctx, &plug("deadbee")).is_err());
+        assert!(plugin_acts(&ctx, &plug()).unwrap().is_empty());
         // Patch that no longer applies.
         fs::write(dir.join("f.txt"), "three\n").unwrap();
-        assert!(plugin_acts(&ctx, &plug(&head)).is_err());
-        // Absent plugin without omarchy: note.
-        let mut p = plug(&head);
+        assert!(plugin_acts(&ctx, &plug()).is_err());
+        // Absent plugin: added then moved to its latest version, or a note without omarchy.
+        let mut p = plug();
         p.id = "absent".into();
         assert_eq!(
             plugin_acts(&ctx, &p).is_ok(),
@@ -1369,6 +1454,15 @@ check = ["false"]
         let steps = read_steps(&dir).unwrap();
         let ids = step_ids(&steps);
         assert!(ids.contains("strata"));
+        for a in &steps.app {
+            a.install().unwrap();
+        }
+        for addon in std::fs::read_dir(dir.join("../addons")).unwrap() {
+            let b = addon.unwrap().path().join("bootstrap");
+            for a in &read_steps(&b).unwrap().app {
+                a.install().unwrap();
+            }
+        }
         for f in &steps.file {
             assert!(
                 dir.join(&f.source).is_file(),
@@ -1476,7 +1570,12 @@ run = [["false"]]
 [[plugin]]
 id = "pl"
 url = "u"
-commit = "c"
+[[app]]
+id = "ap"
+title = "t"
+github = "o/ap"
+asset = "a"
+bin = "a"
 [[file]]
 id = "cfg"
 title = "t"
@@ -1510,13 +1609,14 @@ title = "t"
             .iter()
             .map(|(k, v)| (k.to_string(), v.to_string()))
             .collect();
-        let skip: Vec<String> = ["gimp", "pl", "sy", "ma", "gimp", "typo", "typo"]
+        let skip: Vec<String> = ["gimp", "pl", "ap", "sy", "ma", "gimp", "typo", "typo"]
             .iter()
             .map(|s| s.to_string())
             .collect();
         let sk = apply_skip(&skip, &mut wanted, &mut steps);
         assert_eq!(wanted.keys().collect::<Vec<_>>(), ["vlc"]);
-        assert!(steps.plugin.is_empty() && steps.system.is_empty() && steps.manual.is_empty());
+        assert!(steps.plugin.is_empty() && steps.app.is_empty());
+        assert!(steps.system.is_empty() && steps.manual.is_empty());
         let users: Vec<&str> = steps.user.iter().map(|u| u.id.as_str()).collect();
         assert_eq!(
             users,
@@ -1526,7 +1626,7 @@ title = "t"
         assert_eq!(steps.file.len(), 1, "cfg is not skipped");
         assert_eq!(
             sk.ignored,
-            ["gimp", "pl", "sy", "ma", "recolor", "after-recolor",]
+            ["gimp", "pl", "ap", "sy", "ma", "recolor", "after-recolor",]
         );
         assert_eq!(sk.unknown, ["typo"]);
     }

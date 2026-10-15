@@ -17,6 +17,10 @@ root `~/.local/share/poste/current`, which points to the clone (dev mode) or to 
   if it has a `Cargo.toml`, otherwise the script `poste-<name>` of the module folder.
   Exit code 2 if config conflicts remain. Unless `--no-config` is given, goes on with the "machine"
   part (see below).
+- `poste sys outdated`: what is behind its source: apps (GitHub releases), Omarchy plugins, packages
+  of the repositories and of the AUR (see [`bootstrap/README.md`](../../bootstrap/README.md), "Versions").
+- `poste sys update [<id>…] [--yes] [--dry-run]`: moves the apps and plugins that are behind to
+  their latest version, after a preview and a confirmation; prints the `sudo` left to run.
 - `poste sys done [<id>] [--undo]`: marks a manual step (or a system step that cannot be checked) done;
   without id, lists them. State in `~/.local/state/poste/done/<id>`.
 - `poste sys status`: source (dev or release) and root read; branch of the clone, uncommitted changes, unpushed commits; installed
@@ -131,7 +135,7 @@ All four are edited without opening the file (comments and other keys are kept).
 ### `skip`: bootstrap packages and steps ignored
 
 - An identifier is a package name of `bootstrap/packages.toml` or the `id` of a step of
-  `bootstrap/steps.toml` (`[[plugin]]`, `[[file]]`, `[[user]]`, `[[system]]`, `[[manual]]`).
+  `bootstrap/steps.toml` (`[[plugin]]`, `[[app]]`, `[[file]]`, `[[user]]`, `[[system]]`, `[[manual]]`).
 - What is ignored is neither required, nor offered, nor counted as missing in `setup`,
   `setup --dry-run` and `status`, which add a line
   `ignored on this machine (config.toml, skip): …`.
@@ -277,9 +281,9 @@ After the binaries and the config, `setup` reads `bootstrap/packages.toml` and `
 1. Packages: compared with `pacman -Qq`. If some are missing, the `yay -S --needed …` command is PRINTED.
 2. System steps (root): checked, then the commands are PRINTED in a copyable block.
    `setup` never runs `sudo`.
-3. User steps (pinned shell plugins + patches, files, services, theme…): preview of the
+3. User steps (shell plugins + patches, absent apps, files, services, theme…): preview of the
    commands, then confirmation (unless `--yes` is given); `--dry-run` runs none. Idempotent: a
-   state that is already right does not show up. What is ambiguous or risky (plugin at another version and modified,
+   state that is already right does not show up. What is ambiguous or risky (plugin folder without git,
    patch that no longer applies, user file that differs) is never touched, a note says so.
    If a step was done, the config is planned again (`omarchy plugin add` may rewrite
    `shell.json`) to put the links of the repository back.

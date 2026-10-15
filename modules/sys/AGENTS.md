@@ -14,6 +14,7 @@
 
 - Bootstrap: `setup` NEVER runs `sudo`; system steps are checked then printed. User steps go through a preview and a confirmation, are idempotent, and never touch what is ambiguous (a note is printed). The content of root files lives in `bootstrap/system/`, not in the code.
 - The `provision` tests run no real step (no systemctl, vocaline, omarchy); the fake `pacman -Qq` goes through `POSTE_TEST_PACMAN_QQ`.
+- Apps and plugins (`apps.rs`, `updates.rs`): no version is stored, in the repository or on the machine; the installed one is always read on the system. An asset is installed only after its sha256 (published by GitHub) is checked. A plugin is never moved back (target already in `HEAD`), never touched if modified by hand beyond its patch, and put back where it was if its patch no longer applies. `--dry-run` fetches nothing. The tests go through fake `gh`/`pacman` run by `sh` (`apps::Tools`), never the network.
 - Module lines: never change or remove a line that is absent from `installed.json` (`lines`), never write through a symbolic link, a conflict is reported without writing anything.
 - Orphans: only links to `<repository>/config/` whose target is gone, or module files of `installed.json` that are still intact (already gone: only forgotten from the manifest); never an ordinary file, always a preview and a confirmation.
 - A script module has no `Cargo.toml` and is not in `members` of the root `Cargo.toml`.

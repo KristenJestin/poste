@@ -1,16 +1,20 @@
 # Steps of the melodie add-on, merged with bootstrap/steps.toml when the add-on is chosen.
 
-# Pinned release: to update, change the version on both lines. install.sh puts melodie and
-# melodie-desktop in ~/.local/bin and melodie.desktop (the launcher's app, which MPRIS's
-# DesktopEntry names) in ~/.local/share/applications; it never touches the config, the local
-# copy nor the keyring. It stops the running player to swap it: while Mélodie plays, the update
-# is skipped (the step fails and says so) rather than cutting the music; run setup again later.
-[[user]]
+# Installed at its latest release (pre-releases included) if absent, then moved by
+# `poste sys update`. install.sh puts melodie and melodie-desktop in ~/.local/bin and
+# melodie.desktop (the launcher's app, which MPRIS's DesktopEntry names) in
+# ~/.local/share/applications; it never touches the config, the local copy nor the keyring. It
+# stops the running player to swap it: while Mélodie plays, nothing is replaced (`busy`) rather
+# than cutting the music; run the update again later.
+[[app]]
 id = "melodie"
-title = "Mélodie 0.1.1-beta.9 (music player) in ~/.local/bin"
-requires = "gh"
-check = ["sh", "-c", "\"@HOME@/.local/bin/melodie\" --version 2>/dev/null | grep -qE '(^| )v?0\\.1\\.1-beta\\.9$'"]
-run = [["sh", "-c", "set -e; if busctl --user get-property org.mpris.MediaPlayer2.melodie /org/mpris/MediaPlayer2 org.mpris.MediaPlayer2.Player PlaybackStatus 2>/dev/null | grep -q Playing; then echo \"Mélodie is playing: update skipped, run poste sys setup again once the music stops\" >&2; exit 1; fi; v=0.1.1-beta.9; d=$(mktemp -d); trap 'rm -rf \"$d\"' EXIT; cd \"$d\"; gh release download \"v$v\" -R KristenJestin/melodie --pattern \"melodie-$v-*\"; sha256sum --check \"melodie-$v-linux-x86_64.tar.gz.sha256\"; tar -xzf \"melodie-$v-linux-x86_64.tar.gz\"; cd \"melodie-$v-linux-x86_64\"; ./install.sh"]]
+title = "Mélodie (music player) in ~/.local/bin"
+github = "KristenJestin/melodie"
+prerelease = true
+asset = "melodie-{version}-linux-x86_64.tar.gz"
+script = "melodie-{version}-linux-x86_64/install.sh"
+version = ["@HOME@/.local/bin/melodie", "--version"]
+busy = ["sh", "-c", "busctl --user get-property org.mpris.MediaPlayer2.melodie /org/mpris/MediaPlayer2 org.mpris.MediaPlayer2.Player PlaybackStatus 2>/dev/null | grep -q Playing"]
 
 [[manual]]
 id = "melodie-login"

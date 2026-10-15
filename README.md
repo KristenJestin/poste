@@ -83,8 +83,8 @@ stays installed. `poste sys addons` shows each add-on and its state on this mach
 
 | Add-on | Plugs in |
 | --- | --- |
-| [`melodie`](addons/melodie/README.md) | the [Mélodie](https://github.com/KristenJestin/melodie) music player: launcher search, quality and heart on the player card. Installs the pinned release. |
-| [`vocaline`](addons/vocaline/README.md) | the [Vocaline](https://github.com/KristenJestin/vocaline) dictation: SUPER+A, animated pill at the bottom of the screen, dictated text live under the island. The `vocaline` package is installed by hand. |
+| [`melodie`](addons/melodie/README.md) | the [Mélodie](https://github.com/KristenJestin/melodie) music player: launcher search, quality and heart on the player card. Installs its latest release (`poste sys update` moves it). |
+| [`vocaline`](addons/vocaline/README.md) | the [Vocaline](https://github.com/KristenJestin/vocaline) dictation: SUPER+A, animated pill at the bottom of the screen, dictated text live under the island. poste downloads its package and prints the `sudo pacman -U`. |
 | [`voxtype`](addons/voxtype/README.md) | the [voxtype](https://github.com/peteonrails/voxtype) dictation: SUPER+A (tap to toggle, hold to talk), animated pill at the bottom of the screen. Installs `voxtype-bin`, its config, model and service. |
 
 Choose a single dictation add-on: `vocaline` and `voxtype` both take SUPER+A.
@@ -145,7 +145,7 @@ each time root rights are needed, it prints the exact command to copy.
    - puts the config in place with symbolic links (conflicts with existing files: decided one by one, see [`modules/sys/README.md`](modules/sys/README.md));
    - compares `bootstrap/packages.toml` with `pacman -Qq` and prints the `yay -S --needed …` command for the missing packages;
    - prints in one copyable block the system (root) steps not done yet;
-   - offers the user steps (shell plugins at audited versions with their patches, cursor-accent config, steps of the chosen add-ons, the Strata file manager, theme) and does them after confirmation;
+   - offers the user steps (shell plugins at their latest version with their patches, apps of GitHub releases, cursor-accent config, steps of the chosen add-ons, the Strata file manager, theme) and does them after confirmation;
    - lists the manual steps that remain.
 3. Run the printed `yay -S --needed …` command yourself, then the `sudo` commands of the "System steps" block.
 4. Run `poste sys setup` again: the steps that depended on the packages (add-ons, Strata, theme…) are done now. Repeat until "nothing to do".
@@ -286,8 +286,8 @@ poste's file manager is [Strata](https://github.com/lgse/strata), in a patched b
 on the selection, no upstream update offers, action submenus filled by a `choices` script).
 `poste sys setup` puts it in place, all in `~`, without root (steps in `bootstrap/steps.toml`):
 
-- the pinned release in `~/.local/bin/strata` (archive checked against its sha256 before
-  extracting; never updated by itself: change the tag and the two sums of the `strata` step);
+- its latest release in `~/.local/bin/strata` (`[[app]]` step: archive checked against the sha256
+  GitHub publishes before extracting; `poste sys update strata` moves it);
 - its desktop entry in `~/.local/share/applications/`, pointing to that binary;
 - the default for folders (`xdg-mime … inode/directory`), the D-Bus `org.freedesktop.FileManager1`
   service ('Show in folder' of browsers and GTK apps) and the file chooser of the portal (Open and

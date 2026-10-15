@@ -2,34 +2,33 @@
 # Substitutions in the texts and commands: @HOME@ @USER@ @UID@ @GID@ @REPO@ @BOOTSTRAP@
 # (bootstrap/ folder of the repository). The `source`/`patch` paths are relative to bootstrap/.
 #
-# Four families:
-#   [[plugin]]  third-party plugin of the Omarchy shell, pinned to a commit, optional local patch
+# Families:
+#   [[plugin]]  third-party plugin of the Omarchy shell, optional local patch
 #               (done by poste, with a preview and a confirmation)
+#   [[app]]     program published as a GitHub release (installed by poste if absent, see below)
 #   [[user]]    step without sudo: `check` (code 0 = already done), otherwise `run` (poste runs it)
 #   [[system]]  step with sudo: poste checks, PRINTS the commands, never runs them
 #   [[manual]]  step by hand; optional `check`, otherwise `poste sys done <id>`
 
-# ------------------------------------------------------------ third-party plugins (audited versions)
+# ------------------------------------------------------------ third-party plugins
+# Not pinned: installed at their latest tag (otherwise their default branch), moved by
+# `poste sys update` after a look at the new commits; a `patch` is taken off and put back.
 # poste.island, poste.notifications, poste.osd and poste.workspaces come from config/ (links).
 [[plugin]]
 id = "crmne.mpris"
 url = "https://github.com/crmne/omarchy-mpris"
-commit = "85bb4ff"
 
 [[plugin]]
 id = "jankeesvw.notification-center"
 url = "https://github.com/jankeesvw/omarchy-notification-center"
-commit = "e4c4568"
 
 [[plugin]]
 id = "io.github.honeyspoons.localsend"
 url = "https://github.com/HoneySpoons/omarchy-localsend.git"
-commit = "eef3289"
 
 [[plugin]]
 id = "omamail"
 url = "https://github.com/huacnlee/omamail"
-commit = "a7388fa" # tag v0.10.8
 # Mail sorting (text or number dates counted as 0), Delete key, AI and calendar hidden,
 # wait at startup, island style.
 patch = "patches/omamail-local.patch"
@@ -37,12 +36,10 @@ patch = "patches/omamail-local.patch"
 [[plugin]]
 id = "io.github.grichard99.omaproton-vpn"
 url = "https://github.com/grichard99/omaproton-vpn"
-commit = "6d68681"
 
 [[plugin]]
 id = "io.github.smoothpixels.cursor-accent"
 url = "https://github.com/SmoothPixels/cursor-accent"
-commit = "97e001c"
 # recolor.py: stroke_scale option (thinner outline).
 patch = "patches/cursor-accent-stroke-scale.patch"
 
@@ -72,16 +69,15 @@ run = [["systemctl", "--user", "disable", "--now", "omarchy-crash-watch.service"
 # Omarchy `strata` package may still be in /usr/bin and come first in the PATH: everything here
 # calls @HOME@/.local/bin/strata explicitly. Strata is a single instance: after an update, its
 # open windows keep the old binary until they are all closed.
-# Pinned release, never updated by itself: to update, change the tag, the sha256 of the archive
-# and the sha256 of the `strata` binary it holds, together (download the archive, check it, then
-# `sha256sum strata` on the extracted binary). The upstream desktop file
-# (files/strata/io.github.lgse.Strata.desktop) comes from the same tag.
-[[user]]
+# Installed at its latest release if absent, then moved by `poste sys update`. The upstream
+# desktop file (files/strata/io.github.lgse.Strata.desktop) comes from its repository.
+[[app]]
 id = "strata"
-title = "Strata v1.0.0-local.3b24e32 (file manager) in ~/.local/bin"
-requires = "curl"
-check = ["sh", "-c", "echo 'd4cc68c81822b88dcb2e8e350a3335f536d90ad932ed801bb3a1e4ab93d2676c  @HOME@/.local/bin/strata' | sha256sum --check --status"]
-run = [["sh", "-c", "set -e; tag=v1.0.0-local.3b24e32; sum=2c936670d78edf7d4c09b09c6190a5bfd16174beedd4b8c60c4ce6566db880f4; d=$(mktemp -d); trap 'rm -rf \"$d\"' EXIT; curl -fsSL -o \"$d/strata.tar.gz\" \"https://github.com/KristenJestin/strata/releases/download/$tag/strata-x86_64.tar.gz\"; echo \"$sum  $d/strata.tar.gz\" | sha256sum --check --quiet; tar -xzf \"$d/strata.tar.gz\" -C \"$d\" strata; mkdir -p \"@HOME@/.local/bin\"; install -m 755 \"$d/strata\" \"@HOME@/.local/bin/.strata.new\"; mv -f \"@HOME@/.local/bin/.strata.new\" \"@HOME@/.local/bin/strata\""]]
+title = "Strata (file manager) in ~/.local/bin"
+github = "KristenJestin/strata"
+asset = "strata-x86_64.tar.gz"
+bin = "strata"
+version = ["@HOME@/.local/bin/strata", "--version"]
 
 # The upstream desktop entry with the explicit path: it hides the one of a system package.
 [[file]]

@@ -25,9 +25,10 @@ its data repository), and plugged in once `melodie` is in the `PATH` (`requires`
 
 ## Install and login
 
-`bootstrap/steps.toml` downloads the pinned release (sha256 checked) and runs its `install.sh`,
-which puts `melodie` in `~/.local/bin`; to update, change the version there. The install stops the
-running player: while Mélodie plays, the step is skipped instead (it fails and says so). `bootstrap/packages.toml`
+`bootstrap/steps.toml` downloads its latest release, pre-releases included (sha256 checked), and
+runs its `install.sh`, which puts `melodie` in `~/.local/bin`; `poste sys update melodie` moves it
+later. The install stops the running player: while Mélodie plays, nothing is replaced (it fails and
+says so). `bootstrap/packages.toml`
 asks for `mpv` (libmpv). Mélodie also needs a Secret Service. Then, once per machine, in a
 terminal: `melodie login` (manual step `melodie-login`). The first copy of the library runs in
 the background.
