@@ -302,6 +302,15 @@ poste always calls `~/.local/bin/strata` by its full path: an old Omarchy `strat
 still be in `/usr/bin`, first in the `PATH`. Strata's own "default file manager" setting must not
 be used: it writes a block into `~/.config/hypr/bindings.lua`, a link to this repository.
 
+## Links shared from a phone
+
+A link shared to the PC with Taildrop arrives as an Internet shortcut (`.url`, an
+`[InternetShortcut]` file with a `URL=` line), which nothing opens by default. `poste sys setup`
+puts in place `~/.local/share/poste/open-url.sh` and its desktop entry `open-url.desktop`, made
+the default for `application/x-mswinurl`: opening the file (the notification of the Taildrop
+receiver, Strata, `xdg-open`) opens its address in the browser. Only `http(s)` addresses are
+opened, otherwise a notification says so; the file is kept.
+
 ## Repository layout
 
 ```

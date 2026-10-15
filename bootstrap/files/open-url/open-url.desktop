@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Internet shortcut (open address)
+Exec=@HOME@/.local/share/poste/open-url.sh %f
+Terminal=false
+NoDisplay=true
+MimeType=application/x-mswinurl;

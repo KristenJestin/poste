@@ -145,6 +145,27 @@ target = "@HOME@/.config/strata/actions/taildrop/run.sh"
 source = "files/strata/taildrop/run.sh"
 mode = "755"
 
+# Internet shortcuts (.url, what Taildrop receives when a phone shares a link): opening one opens
+# its http(s) address in the browser, not the file in an editor. The file is kept.
+[[file]]
+id = "open-url-script"
+title = "Internet shortcuts (.url): script opening their address"
+target = "@HOME@/.local/share/poste/open-url.sh"
+source = "files/open-url/open-url.sh"
+mode = "755"
+
+[[file]]
+id = "open-url-entry"
+title = "Internet shortcuts (.url): desktop entry"
+target = "@HOME@/.local/share/applications/open-url.desktop"
+source = "files/open-url/open-url.desktop"
+
+[[user]]
+id = "open-url-default"
+title = "Internet shortcuts (.url) open their address"
+check = ["sh", "-c", "[ \"$(xdg-mime query default application/x-mswinurl)\" = open-url.desktop ]"]
+run = [["xdg-mime", "default", "open-url.desktop", "application/x-mswinurl"]]
+
 [[user]]
 id = "theme-poste"
 title = "poste-theme theme"

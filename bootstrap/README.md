@@ -7,7 +7,7 @@ Read by `poste sys setup` (preview), `poste sys status` and `poste sys done`. No
 | `packages.toml` | expected packages (`name = "what it is for"`), compared with `pacman -Qq` |
 | `steps.toml` | third-party plugins, files, user steps, system steps, manual steps |
 | `system/` | contents of root files (`@USER@`, `@UID@`, `@GID@`, `@HOME@` are replaced in them) |
-| `files/` | contents of user files put in place by poste (cursor-accent config, Strata's desktop entry, D-Bus service and Taildrop action); `@HOME@`… are replaced in them |
+| `files/` | contents of user files put in place by poste (cursor-accent config, Strata's desktop entry, D-Bus service and Taildrop action, the handler of `.url` shortcuts); `@HOME@`… are replaced in them |
 | `patches/` | local patches of third-party plugins, applied by `git apply` |
 | `icons/` | Tabler icons in place of Nerd Font glyphs in the shell: table of correspondences (see [`icons/README.md`](icons/README.md)) |
 
