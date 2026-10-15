@@ -46,7 +46,7 @@ pub struct Entry {
     /// Target of the link put in `~`: `src`, except in a dry run where the root read is not yet
     /// `current` (the real link will go through `current/config/<rel>`).
     pub link: PathBuf,
-    /// Dans `~`.
+    /// In `~`.
     pub dest: PathBuf,
     pub kind: Kind,
 }

@@ -92,7 +92,7 @@ mod tests {
     #[test]
     fn round_trip_and_replacement() {
         let d = tempfile::tempdir().unwrap();
-        let f = d.path().join("sous/installed.json");
+        let f = d.path().join("sub/installed.json");
         assert!(Manifest::load(&f).unwrap().files.is_empty());
         let mut m = Manifest::default();
         m.upsert(entry("/a", "1"));

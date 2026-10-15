@@ -477,7 +477,7 @@ pub fn render_compare(a: (&str, &Summary), b: (&str, &Summary)) -> String {
                 None if s.windows == s.estimated => "unknown (no reading)".into(),
                 None => "never".into(),
             },
-            format!("{} ({} de sous-agents)", s.calls, s.subagent_calls),
+            format!("{} ({} from subagents)", s.calls, s.subagent_calls),
             decimal(s.mean(s.calls)),
             decimal(s.mean(s.parallel_max_sum)),
             human(s.tokens.input),
@@ -486,7 +486,7 @@ pub fn render_compare(a: (&str, &Summary), b: (&str, &Summary)) -> String {
             human(s.tokens.output),
             human(s.tokens.reasoning),
             format!(
-                "sortie {}, total {}",
+                "output {}, total {}",
                 pp(s.measured_tokens.output),
                 pp(s.measured_tokens.total())
             ),

@@ -549,7 +549,7 @@ mod tests {
     }
 
     #[test]
-    fn arguments_gsr_par_defaut() {
+    fn gsr_arguments_by_default() {
         let a = gsr_args(
             vec!["gsr".into(), "-w".into(), "DP-1".into()],
             &defaults(),
@@ -563,7 +563,7 @@ mod tests {
     }
 
     #[test]
-    fn arguments_gsr_mkv_sans_curseur_ni_son() {
+    fn gsr_arguments_mkv_without_cursor_or_sound() {
         let mut o = defaults();
         o.insert("container".into(), json!("mkv"));
         o.insert("cursor".into(), json!(false));
@@ -577,14 +577,14 @@ mod tests {
     }
 
     #[test]
-    fn drapeau_sans_valeur() {
+    fn flag_without_value() {
         let a = vec!["--preset".to_string()];
         assert!(flag_value(&a, "--preset").is_err());
         assert_eq!(flag_value(&a, "--window"), Ok(None));
     }
 
     #[test]
-    fn son_de_l_appli() {
+    fn app_sound() {
         assert!(wants_app(&json!("app")));
         assert!(wants_app(&json!("app+mic")));
         assert!(!wants_app(&json!("desktop")));

@@ -12,7 +12,7 @@ use std::io::{BufRead, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode};
 
-/// Options de `poste sys setup`.
+/// Options of `poste sys setup`.
 #[derive(Debug, Default)]
 pub struct Opts {
     pub yes: bool,
@@ -471,10 +471,7 @@ pub(crate) fn confirm(prompt: &str) -> Result<bool> {
     std::io::stdout().flush()?;
     let mut line = String::new();
     std::io::stdin().lock().read_line(&mut line)?;
-    Ok(matches!(
-        line.trim().to_lowercase().as_str(),
-        "o" | "oui" | "y" | "yes"
-    ))
+    Ok(matches!(line.trim().to_lowercase().as_str(), "y" | "yes"))
 }
 
 /// Atomic copy: neighbouring temporary file then rename (works even if
@@ -488,7 +485,7 @@ fn install(src: &Path, dest: &Path) -> Result<()> {
     std::fs::copy(src, &tmp).with_context(|| format!("copy to {}", tmp.display()))?;
     if let Err(e) = std::fs::rename(&tmp, dest) {
         let _ = std::fs::remove_file(&tmp);
-        return Err(e).with_context(|| format!("installation de {}", dest.display()));
+        return Err(e).with_context(|| format!("installing {}", dest.display()));
     }
     Ok(())
 }

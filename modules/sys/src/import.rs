@@ -149,7 +149,7 @@ fn source_paths(env: &Env, source: &Path, targets: &[String]) -> Result<Vec<Path
     Ok(out)
 }
 
-// ---------------------------------------------------------------- recherche de secrets
+// ---------------------------------------------------------------- search for secrets
 
 #[derive(Debug, Default)]
 pub struct Scan {

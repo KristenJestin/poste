@@ -135,7 +135,7 @@ mod tests {
     }
 
     #[test]
-    fn nom_de_fichier() {
+    fn file_name() {
         assert_eq!(slug("A/B: C"), "A B C");
         assert_eq!(slug("  ///  "), "Recording");
         assert_eq!(slug(""), "Recording");
@@ -144,7 +144,7 @@ mod tests {
     }
 
     #[test]
-    fn appli_de_la_fenetre() {
+    fn window_app() {
         let c = json!({"class": "zen", "initialClass": "zen", "title": "Page - Zen"});
         let c = c.as_object().unwrap();
         let names = vec!["Firefox".to_string(), "Zen".to_string()];

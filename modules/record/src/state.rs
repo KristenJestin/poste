@@ -9,7 +9,7 @@ use serde_json::Value;
 /// Content of `state.json`, in the writing order of the original script.
 #[derive(Clone, Debug, Serialize, PartialEq)]
 pub struct State {
-    /// pid de gpu-screen-recorder.
+    /// pid of gpu-screen-recorder.
     pub pid: i64,
     /// Start, in milliseconds since the epoch.
     pub started: f64,
@@ -146,7 +146,7 @@ mod tests {
     }
 
     #[test]
-    fn en_cours_et_en_pause() {
+    fn running_and_paused() {
         assert_eq!(
             dumps(&public_at(Some(&st(None)), 11_000.0)),
             r#"{"t": "status", "recording": true, "paused": false, "recordMs": 9500, "label": "Unity", "file": "/v/a.mp4"}"#

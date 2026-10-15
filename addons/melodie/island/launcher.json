@@ -7,17 +7,14 @@
       "subtitle": "Mélodie · search, playlists, mixes",
       "icon": "󰝚",
       "keywords": [
-        "musique",
         "music",
         "melodie",
-        "mélodie",
         "navidrome",
         "playlist",
         "playlists",
         "artist",
-        "artiste",
         "album",
-        "morceau",
+        "song",
         "track"
       ],
       "ttl": 30,

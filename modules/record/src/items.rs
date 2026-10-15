@@ -175,7 +175,7 @@ pub fn items_recording(label: &str, file: &str, paused: bool) -> Vec<Item> {
             "\u{f04db}".into(),
             cmd_of(&["stop"]),
             "Stop",
-            kw(&["stop", "arrêter"]),
+            kw(&["stop"]),
             vec![sub(
                 "Open recordings folder",
                 "\u{f024b}",
@@ -195,7 +195,7 @@ pub fn items_recording(label: &str, file: &str, paused: bool) -> Vec<Item> {
             if paused { "\u{f040a}" } else { "\u{f03e4}" }.into(),
             cmd_of(&["toggle"]),
             if paused { "Resume" } else { "Pause" },
-            kw(&["pause", "resume", "reprendre"]),
+            kw(&["pause", "resume"]),
             vec![],
             None,
         ),
@@ -276,11 +276,7 @@ pub fn items_idle(
             Value::from(icon),
             cmd_of(&["start", "--window", addr]),
             "Record",
-            vec![
-                Value::from("window"),
-                Value::from("fenêtre"),
-                Value::from(text(c, "class")),
-            ],
+            vec![Value::from("window"), Value::from(text(c, "class"))],
             audio_actions(&["--window", addr], None),
             window_rect(c, mons),
         ));
@@ -307,7 +303,7 @@ pub fn items_idle(
             Value::from("\u{f0379}"),
             cmd_of(&["start", "--monitor", name]),
             "Record",
-            kw(&["screen", "écran", "monitor"]),
+            kw(&["screen", "monitor"]),
             audio_actions(&["--monitor", name], None),
             Some(monitor_rect(m)),
         ));

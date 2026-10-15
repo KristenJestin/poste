@@ -169,7 +169,7 @@ mod tests {
     }
 
     #[test]
-    fn rectangle_ecran_echelle_et_rotation() {
+    fn screen_rectangle_scale_and_rotation() {
         let m = obj(
             json!({"x": 1920, "y": 0, "width": 3840, "height": 2160, "scale": 1.5, "transform": 0}),
         );
@@ -187,7 +187,7 @@ mod tests {
     }
 
     #[test]
-    fn fenetre_visible_seulement_si_son_bureau_est_affiche() {
+    fn window_visible_only_if_its_workspace_is_shown() {
         let mons = vec![obj(
             json!({"activeWorkspace": {"id": 2}, "specialWorkspace": {"id": 0}}),
         )];
@@ -200,7 +200,7 @@ mod tests {
     }
 
     #[test]
-    fn plus_grande_fenetre() {
+    fn largest_window() {
         let all = vec![
             obj(json!({"class": "Unity", "mapped": true, "size": [100, 100], "address": "a"})),
             obj(json!({"class": "Unity", "mapped": true, "size": [800, 600], "address": "b"})),

@@ -23,7 +23,7 @@ use std::path::{Path, PathBuf};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Call {
-    /// Secondes UTC.
+    /// UTC seconds.
     pub t: i64,
     pub agent: &'static str,
     pub session: String,
