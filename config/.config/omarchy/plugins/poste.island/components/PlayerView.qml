@@ -187,7 +187,7 @@ Item {
             hoverEnabled: true
             cursorShape: Qt.PointingHandCursor
             onClicked: {
-              if (player.host.playerApp === "" && player.host.playerSourceExt !== "") {
+              if (sourceChip.app === "" && player.host.playerSourceExt !== "") {
                 player.host.openLauncherExtOn(player.host.focusedScreen, player.host.playerSourceExt)
                 return
               }

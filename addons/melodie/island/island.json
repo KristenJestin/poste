@@ -3,7 +3,6 @@
     "bus": "org.mpris.MediaPlayer2.melodie",
     "quality": "melodie:quality",
     "starred": "melodie:starred",
-    "like": ["melodie", "like", "--toggle"],
-    "app": "melodie"
+    "like": ["melodie", "like", "--toggle"]
   }
 }
