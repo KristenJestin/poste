@@ -1,13 +1,13 @@
 ---
 name: poste-desktop
-description: Commandes du bureau de Kris (île poste.island : minuteurs, IA, verrouillage, sons, music with melodie, fenêtres Hyprland, quotas des agents IA avec poste usage). À charger quand on veut agir sur le bureau ou l'île, ou quand Kris demande son quota ou sa consommation (Claude Code, Codex).
+description: Commands of Kris's desktop (poste.island island: timers, AI, lock, sounds, music with melodie, Hyprland windows, AI agent quotas with poste usage). To load when acting on the desktop or the island, or when Kris asks for their quota or consumption (Claude Code, Codex).
 ---
 
-Lis `~/.config/poste-island/ai/AGENTS.md` : c'est le mémo à jour des commandes
-du bureau. Si tu changes une fonctionnalité de l'île, mets ce mémo à jour, ainsi
-que la note du wiki concernée (`~/Projects/wiki-perso`, règles dans son AGENTS.md).
+Read `~/.config/poste-island/ai/AGENTS.md`: it is the up-to-date memo of the desktop
+commands. If you change a feature of the island, update that memo, as well as the
+relevant note of the wiki (`~/Projects/wiki-perso`, rules in its AGENTS.md).
 
-Pour toute question de consommation des agents IA (quota de 5 h atteint plus vite, coût d'un
-modèle ou d'un effort, sous-agents) : `poste usage history`, `poste usage calls`,
-`poste usage windows` et `poste usage compare` (détail dans le mémo), jamais une relecture à la
-main des journaux de Claude Code ou de Codex.
+For any question about AI agent consumption (5 h quota reached faster, cost of a
+model or an effort, sub-agents): `poste usage history`, `poste usage calls`,
+`poste usage windows` and `poste usage compare` (details in the memo), never a manual reread
+of the Claude Code or Codex logs.
