@@ -1,305 +1,303 @@
 # poste sys
 
-Module de gestion du dépôt `poste`. Toujours installé. Le clone du dépôt est repéré par la clé
-`repo` de `~/.config/poste/config.toml` (écrite par `./setup`) ; ce que `setup` pose se lit dans la
-racine `~/.local/share/poste/current`, qui désigne le clone (mode dev) ou une version installée
-(mode release) : voir « Versions et racine ».
+Module that manages the `poste` repository. Always installed. The clone of the repository is found by the
+`repo` key of `~/.config/poste/config.toml` (written by `./setup`); what `setup` puts in place is read from the
+root `~/.local/share/poste/current`, which points to the clone (dev mode) or to an installed version
+(release mode): see "Versions and root".
 
-## Commandes
+## Commands
 
-- `poste sys setup [--yes] [--dry-run] [--no-config] [--take-repo <chemin>]… [--take-home <chemin>]…` :
-  pose `current` s'il est absent (dev : vers le clone ; release : vers la version installée la plus
-  récente), lance `cargo build --release` si la racine est le clone (une version installée arrive
-  construite), installe `~/.local/bin/poste` et, pour chaque
-  `modules/*/` contenant un `module.toml`, `~/.local/share/poste/modules/<nom>/`
-  (`poste-<nom>`, `module.toml`, `island/`, `hypr/`, `bin/`), puis pose la config, les lignes de
-  module et retire les orphelins (voir plus bas). Le programme d'un module est le binaire construit
-  s'il a un `Cargo.toml`, sinon le script `poste-<nom>` du dossier du module.
-  Code de sortie 2 s'il reste des conflits de config. Sauf avec `--no-config`, enchaîne la partie
-  « machine » (voir plus bas).
-- `poste sys done [<id>] [--undo]` : marque une étape manuelle (ou système non vérifiable) faite ;
-  sans id, les liste. État dans `~/.local/state/poste/done/<id>`.
-- `poste sys status` : source (dev ou release) et racine lue ; branche du clone, modifications non commitées, commits non poussés ; modules
-  installés (empreinte installée / dépôt) ; fichiers posés manquants ou modifiés à la main ;
-  config (liés, manquants, liens cassés, liens remplacés par un fichier ordinaire, conflits) ;
-  lignes de module (en place, conflits) ; orphelins ;
-  paquets manquants, étapes système, utilisateur et manuelles en attente.
-- `poste sys diff [<chemin>]` : écarts entre `config/` et `~` (diff unifié).
-- `poste sys add <chemin> [--dry-run]` : met un fichier (ou un dossier) de `~` sous gestion :
-  copié dans `config/` (après sauvegarde), remplacé par un lien. Refuse ce qui correspond à
-  `config/.poste/ignore` (secrets : `.ssh/**`, `.claude/.credentials.json`, `**/.env*`, `.npmrc`…).
-- `poste sys forget <chemin>` : remet un fichier ordinaire à la place du lien ; le fichier reste
-  dans le dépôt jusqu'à votre `git rm` et votre commit.
-- `poste sys sync [--yes] [--dry-run]` : en dev, `git pull --ff-only` dans le clone et `current` remis sur le clone ; en release, la dernière version publiée, téléchargée et vérifiée si elle n'est pas déjà installée, et `current` dessus (voir « Versions et racine »). Dans les deux modes, `git pull --ff-only` dans le dépôt de données de la machine (`data`, voir le README racine), puis `setup` (aperçu compris), puis l'élagage des anciennes versions (release). Ensuite, selon les fichiers changés par le pull, par le changement de version (les deux racines comparées) ou posés par `setup`, `omarchy restart shell` (île : `config/.config/omarchy/`, `poste-island/`, `fontconfig/`, `island/` des modules) et `hyprctl reload` (`config/.config/hypr/`, `hypr/` et `module.toml` des modules), après confirmation sauf avec `--yes`. L'île n'est pas redémarrée si `gpu-screen-recorder` tourne (le message dit de le faire plus tard).
-- `poste sys import-chezmoi [--source <dossier>] [--dry-run]` : voir « Import depuis chezmoi ».
-- `poste sys local [list|add <chemin>|remove <chemin>]` : fichiers de `config/` que CETTE machine garde
-  à elle (voir « Réglages propres à la machine »).
-- `poste sys module [list|enable <nom>|disable <nom>]` : modules du dépôt non installés ici.
+- `poste sys setup [--yes] [--dry-run] [--no-config] [--take-repo <path>]… [--take-home <path>]…`:
+  puts `current` in place if it is absent (dev: to the clone; release: to the most recent installed
+  version), runs `cargo build --release` if the root is the clone (an installed version arrives
+  already built), installs `~/.local/bin/poste` and, for each
+  `modules/*/` holding a `module.toml`, `~/.local/share/poste/modules/<name>/`
+  (`poste-<name>`, `module.toml`, `island/`, `hypr/`, `bin/`), then puts the config and the module
+  lines in place and removes the orphans (see below). The program of a module is the built binary
+  if it has a `Cargo.toml`, otherwise the script `poste-<name>` of the module folder.
+  Exit code 2 if config conflicts remain. Unless `--no-config` is given, goes on with the "machine"
+  part (see below).
+- `poste sys done [<id>] [--undo]`: marks a manual step (or a system step that cannot be checked) done;
+  without id, lists them. State in `~/.local/state/poste/done/<id>`.
+- `poste sys status`: source (dev or release) and root read; branch of the clone, uncommitted changes, unpushed commits; installed
+  modules (installed / repository fingerprint); files put in place that are missing or edited by hand;
+  config (linked, missing, broken links, links replaced by an ordinary file, conflicts);
+  module lines (in place, conflicts); orphans;
+  missing packages, pending system, user and manual steps.
+- `poste sys diff [<path>]`: differences between `config/` and `~` (unified diff).
+- `poste sys add <path> [--dry-run]`: puts a file (or folder) of `~` under management:
+  copied into `config/` (after a backup), replaced by a link. Refuses what matches
+  `config/.poste/ignore` (secrets: `.ssh/**`, `.claude/.credentials.json`, `**/.env*`, `.npmrc`…).
+- `poste sys forget <path>`: puts an ordinary file back in place of the link; the file stays
+  in the repository until your `git rm` and your commit.
+- `poste sys sync [--yes] [--dry-run]`: in dev, `git pull --ff-only` in the clone and `current` put back on the clone; in release, the latest published version, downloaded and verified if it is not already installed, and `current` on it (see "Versions and root"). In both modes, `git pull --ff-only` in the machine's data repository (`data`, see the root README), then `setup` (preview included), then pruning of the old versions (release). Then, depending on the files changed by the pull, by the version change (the two roots compared) or put in place by `setup`, `omarchy restart shell` (island: `config/.config/omarchy/`, `poste-island/`, `fontconfig/`, `island/` of the modules) and `hyprctl reload` (`config/.config/hypr/`, `hypr/` and `module.toml` of the modules), after confirmation unless `--yes` is given. The island is not restarted if `gpu-screen-recorder` is running (the message says to do it later).
+- `poste sys import-chezmoi [--source <folder>] [--dry-run]`: see "Import from chezmoi".
+- `poste sys local [list|add <path>|remove <path>]`: files of `config/` that THIS machine keeps
+  for itself (see "Machine-specific settings").
+- `poste sys module [list|enable <name>|disable <name>]`: modules of the repository not installed here.
 - `poste sys addons`: the add-ons of the repository, chosen here or not (key `addons`), program installed or not, plugged in or not.
-- `poste sys skip [list|add <id>…|remove <id>…]` : paquets et étapes du bootstrap ignorés ici.
-- `poste sys override [list|set <chemin> <clé> <valeur>|unset <chemin> <clé>]` : surcharges JSON par machine.
-- `poste sys use dev|release|<commit>` `[--yes] [--dry-run]` : bascule la machine (voir « Versions et racine »).
-- `poste sys versions` : source, racine (`current`) et versions installées (`*` : celle en place).
-- `poste sys git <args…>` : `git -C <clone> <args…>`.
-- `poste sys cd` : affiche le chemin du clone (`cd "$(poste sys cd)"`).
+- `poste sys skip [list|add <id>…|remove <id>…]`: bootstrap packages and steps ignored here.
+- `poste sys override [list|set <path> <key> <value>|unset <path> <key>]`: JSON overrides per machine.
+- `poste sys use dev|release|<commit>` `[--yes] [--dry-run]`: switches the machine (see "Versions and root").
+- `poste sys versions`: source, root (`current`) and installed versions (`*`: the one in place).
+- `poste sys git <args…>`: `git -C <clone> <args…>`.
+- `poste sys cd`: prints the path of the clone (`cd "$(poste sys cd)"`).
 
-## Versions et racine
+## Versions and root
 
-- Racine : le lien `~/.local/share/poste/current`. `config/`, `modules/`, `bootstrap/` et les binaires
-  (`target/release/`) s'y lisent ; les liens de config de `~` visent `current/config/<chemin>`, si
-  bien que changer `current` change la config sans reposer les liens. Une version a la disposition
-  du dépôt plus un fichier `VERSION` (`commit=…`, `date=…`) et `ARCHIVE_SHA256` (somme de l'archive
-  d'où elle vient) ; elle n'a pas de `Cargo.toml`.
-- Clé `source` de `config.toml` : `dev` (défaut quand elle manque) ou `release`. Écrite seulement par
-  `poste sys use` (toml_edit, le reste du fichier est gardé), jamais par `setup` ; propre à la
-  machine (ignorée dans le `poste.toml` du dépôt de données).
-- `poste sys use dev` : `source = "dev"`, `current` vers le clone, `setup` (qui construit).
-  `poste sys use release` : `source = "release"`, `current` vers la version installée la plus
-  récente (téléchargée s'il n'y en a aucune), `setup`. `poste sys use <début de commit>` : une
-  version installée précise (retour arrière ; le prochain `sync` revient à la dernière). Ensuite,
-  comme `sync` : rechargement de l'île et de Hyprland selon les fichiers qui diffèrent entre
-  l'ancienne et la nouvelle racine, après confirmation sauf `--yes`, jamais l'île pendant un enregistrement d'écran.
-  `--dry-run` montre la bascule et le rechargement prévu sans rien écrire ni lancer `setup`.
-- Téléchargement (`sync` en release, `use release` sans version installée) : `curl` lit d'abord
-  `poste-x86_64-linux.tar.gz.sha256` à l'adresse publiée (`POSTE_SYS_RELEASE_URL` la remplace, par
-  exemple pour un fork) ; si une version installée vient de la même archive, rien n'est téléchargé.
-  Sinon l'archive va dans `~/.cache/poste/download/`, sa somme est vérifiée AVANT l'extraction
-  (différente : refusée, rien n'est installé), puis elle est extraite par `tar` dans un dossier
-  temporaire de `versions/`, renommé en `versions/<commit>/`. `--dry-run` ne lit que la somme.
-- Élagage : après un `sync` en release, seules les 3 versions les plus récentes (date de
-  construction) restent, plus celle de `current` si elle est plus ancienne ; jamais celle de
-  `current`.
-- Relais (`sync` et `use`, sauf `--dry-run`) : une fois `current` posé, si le `poste-sys` de la
-  nouvelle racine (`target/release/poste-sys`, construit d'abord pour le clone) diffère de celui
-  qui tourne, celui-ci lui passe la main (`exec`) par la commande cachée `poste-sys finish`
-  (`--yes`, `--prune`, `--skip-build`, `--from <ancienne racine>` pour qu'il recompare les racines
-  lui-même, `--reload-shell`, `--reload-hypr`) : `setup`, élagage et
-  rechargement sont faits par le nouveau programme, qui connaît les nouveautés de sa version (par
-  exemple les minuteurs systemd). `finish` ne repasse jamais la main. Une version d'avant le
-  relais (retour arrière) ne connaît pas `finish` (vérifié par `finish --help`) : la suite est
-  alors faite par le programme qui tourne, comme si le lancement échoue. Les options de `finish`
-  ne changent pas d'une version à l'autre : on en ajoute seulement. Le `sync` qui installe la
-  première version avec relais est encore fait par l'ancien programme : relancer `poste sys setup`
-  ensuite si cette version apporte une nouveauté de `poste sys`.
-- Lecture seule en release : `add` et `setup --take-home` écrivent dans le dépôt, ils sont refusés
-  tant que `current` désigne une version (passer en dev). `import-chezmoi`, `git` et `cd` travaillent
-  toujours sur le clone.
-- Migration d'une machine existante : un lien de `~` vers `config/<chemin>` d'une autre racine de
-  poste (le clone, une version, `current` lui-même) au lieu de `current/config/<chemin>` est
-  « à relier ». `setup` le repose vers `current` (ancien lien sauvegardé dans `backup/`) seulement s'il
-  est noté dans `installed.json` ; sinon c'est un conflit comme un autre lien étranger, jamais touché.
+- Root: the link `~/.local/share/poste/current`. `config/`, `modules/`, `bootstrap/` and the binaries
+  (`target/release/`) are read from it; the config links in `~` point to `current/config/<path>`, so
+  changing `current` changes the config without putting the links back. A version has the layout
+  of the repository plus a `VERSION` file (`commit=…`, `date=…`) and `ARCHIVE_SHA256` (checksum of the archive
+  it comes from); it has no `Cargo.toml`.
+- Key `source` of `config.toml`: `dev` (default when it is missing) or `release`. Only written by
+  `poste sys use` (toml_edit, the rest of the file is kept), never by `setup`; specific to the
+  machine (ignored in the `poste.toml` of the data repository).
+- `poste sys use dev`: `source = "dev"`, `current` to the clone, `setup` (which builds).
+  `poste sys use release`: `source = "release"`, `current` to the most recent installed version
+  (downloaded if there is none), `setup`. `poste sys use <start of a commit>`: one precise installed
+  version (rollback; the next `sync` goes back to the latest). Then,
+  like `sync`: reload of the island and Hyprland depending on the files that differ between
+  the old and the new root, after confirmation unless `--yes`, never the island during a screen recording.
+  `--dry-run` shows the switch and the planned reload without writing anything or running `setup`.
+- Download (`sync` in release, `use release` with no installed version): `curl` first reads
+  `poste-x86_64-linux.tar.gz.sha256` at the published address (`POSTE_SYS_RELEASE_URL` replaces it, for
+  example for a fork); if an installed version comes from the same archive, nothing is downloaded.
+  Otherwise the archive goes to `~/.cache/poste/download/`, its checksum is verified BEFORE extracting
+  (different: refused, nothing is installed), then it is extracted by `tar` into a temporary folder
+  of `versions/`, renamed to `versions/<commit>/`. `--dry-run` only reads the checksum.
+- Pruning: after a `sync` in release, only the 3 most recent versions (build date)
+  stay, plus the one `current` points to if it is older; never the one `current` points to.
+- Hand-over (`sync` and `use`, except `--dry-run`): once `current` is set, if the `poste-sys` of the
+  new root (`target/release/poste-sys`, built first for the clone) differs from the one
+  that is running, this one hands over to it (`exec`) through the hidden command `poste-sys finish`
+  (`--yes`, `--prune`, `--skip-build`, `--from <old root>` so it compares the roots
+  itself again, `--reload-shell`, `--reload-hypr`): `setup`, pruning and
+  reload are done by the new program, which knows what is new in its version (for
+  example the systemd timers). `finish` never hands over again. A version from before the
+  hand-over (rollback) does not know `finish` (checked by `finish --help`): the rest is
+  then done by the running program, as if the launch failed. The options of `finish`
+  do not change from one version to the next: they are only added to. The `sync` that installs the
+  first version with hand-over is still done by the old program: run `poste sys setup` again
+  afterwards if this version brings something new to `poste sys`.
+- Read-only in release: `add` and `setup --take-home` write into the repository, they are refused
+  as long as `current` points to a version (switch to dev). `import-chezmoi`, `git` and `cd` always work
+  on the clone.
+- Migration of an existing machine: a link of `~` to `config/<path>` of another poste root (the clone, a version, `current` itself) instead of `current/config/<path>` is
+  "to be re-linked". `setup` puts it back to `current` (old link backed up in `backup/`) only if it
+  is noted in `installed.json`; otherwise it is a conflict like any other foreign link, never touched.
 
-## Règles de `setup`
+## Rules of `setup`
 
-- Relançable : ne fait que la différence (comparaison sha256), « Tout est à jour » sinon.
-- Affiche le plan (créé / modifié / inchangé, puis la config) puis demande confirmation, sauf `--yes`.
-- `--dry-run` n'écrit rien (la construction produit seulement `target/`).
-- Ne remplace jamais un fichier qu'il n'a pas posé : il refuse, sans rien écrire du tout,
-  et dit lequel gêne. Un fichier déjà identique à la source est simplement pris en compte.
-- Avant de remplacer un fichier posé, copie l'ancien dans
-  `~/.local/state/poste/backup/<chemin aplati>.<AAAAMMJJ-HHMMSS>.bak`.
-- Ne supprime que les orphelins (voir plus bas), après aperçu et confirmation : un fichier retiré du dépôt reste en place tant que ce n'est pas un lien ou un fichier de module posé par nous et intact.
-- Tient `~/.local/state/poste/installed.json` : chemin, sha256, module propriétaire (`config` pour la config), date.
+- Can be run again: only does the difference (sha256 comparison), "Everything is up to date" otherwise.
+- Shows the plan (created / changed / unchanged, then the config) then asks for confirmation, unless `--yes` is given.
+- `--dry-run` writes nothing (the build only produces `target/`).
+- Never replaces a file it did not put in place: it refuses, without writing anything at all,
+  and says which one is in the way. A file already identical to the source is simply taken into account.
+- Before replacing a file it put in place, copies the old one to
+  `~/.local/state/poste/backup/<flattened path>.<YYYYMMDD-HHMMSS>.bak`.
+- Only deletes orphans (see below), after a preview and a confirmation: a file removed from the repository stays in place unless it is a link or a module file we put in place and that is intact.
+- Keeps `~/.local/state/poste/installed.json`: path, sha256, owner module (`config` for the config), date.
 
-## Réglages propres à la machine
+## Machine-specific settings
 
-Le dépôt est le même sur tous les PC (pas de profils par machine). Ce qui diffère d'une machine à
-l'autre vit dans `~/.config/poste/config.toml`, LOCAL à la machine et jamais dans le dépôt. Quatre clés :
+The repository is the same on every PC (no per-machine profiles). What differs from one machine to
+the next lives in `~/.config/poste/config.toml`, LOCAL to the machine and never in the repository. Four keys:
 
 ```toml
-local = [".config/hypr/monitors.lua", ".config/hypr/input.lua"]   # fichiers à cette machine
-disabled = ["record", "power"]                                      # modules non installés ici
-skip = ["gimp", "io.github.grichard99.omaproton-vpn"]               # paquets / étapes du bootstrap ignorés ici
+local = [".config/hypr/monitors.lua", ".config/hypr/input.lua"]   # files of this machine
+disabled = ["record", "power"]                                      # modules not installed here
+skip = ["gimp", "io.github.grichard99.omaproton-vpn"]               # bootstrap packages / steps ignored here
 
-[[override]]                                                        # JSON : dépôt + valeurs locales
+[[override]]                                                        # JSON: repository + local values
 path = ".config/omarchy/shell.json"
 set = { "idle.lock" = 3600 }
 ```
 
-Les quatre s'éditent sans ouvrir le fichier (commentaires et autres clés conservés).
+All four are edited without opening the file (comments and other keys are kept).
 
-### `local` : fichiers à la machine
+### `local`: files of the machine
 
-- `setup` ne lie pas ces chemins, ne les signale pas en conflit, ne les touche jamais (ni liaison,
-  ni remplacement, ni droits, ni retrait comme orphelin). Un chemin peut être un dossier de `config/`
-  (tout ce qu'il contient est local) ; un fichier dans un dossier lié d'un bloc (`link-dirs`) se
-  déclare par ce dossier.
-- `status` les liste dans « Fichiers locaux » avec leur état face au dépôt (absent, identique,
-  différent, encore lié) ; `diff <chemin>` montre quand même l'écart (`diff` sans argument les saute).
-- `local add <chemin>` refuse un chemin que `config/` ne connaît pas. S'il est encore un lien vers le
-  dépôt, il est laissé tel quel (l'éditer modifierait le dépôt) : `poste sys forget <chemin>` en fait
-  un fichier ordinaire. `local remove` remet le chemin sous gestion (conflit à trancher s'il diffère).
+- `setup` does not link these paths, does not report them as conflicts, never touches them (no linking,
+  no replacing, no permissions, no removal as an orphan). A path can be a folder of `config/`
+  (everything it holds is local); a file inside a folder linked as a block (`link-dirs`) is
+  declared through that folder.
+- `status` lists them under "Local files" with their state against the repository (absent, identical,
+  different, still linked); `diff <path>` still shows the difference (`diff` without argument skips them).
+- `local add <path>` refuses a path that `config/` does not know. If it is still a link to the
+  repository, it is left as is (editing it would change the repository): `poste sys forget <path>` makes it
+  an ordinary file. `local remove` puts the path back under management (a conflict to decide if it differs).
 
-### `skip` : paquets et étapes du bootstrap ignorés
+### `skip`: bootstrap packages and steps ignored
 
-- Un identifiant est un nom de paquet de `bootstrap/packages.toml` ou l'`id` d'une étape de
+- An identifier is a package name of `bootstrap/packages.toml` or the `id` of a step of
   `bootstrap/steps.toml` (`[[plugin]]`, `[[file]]`, `[[user]]`, `[[system]]`, `[[manual]]`).
-- Ce qui est ignoré n'est ni exigé, ni proposé, ni compté comme manquant dans `setup`,
-  `setup --dry-run` et `status`, qui ajoutent une ligne
-  `ignorés sur cette machine (config.toml, skip) : …`.
-- Dépendances : une étape utilisateur dont un `trigger` est ignoré l'est aussi (par ex.
-  `cursor-accent-recolor` quand `io.github.smoothpixels.cursor-accent` ou `cursor-accent-config`
-  est dans `skip`), en cascade. `requires` désigne un binaire, pas une étape : non concerné.
-- Un identifiant inconnu (faute de frappe) donne un avertissement, pas une erreur ; `skip add` l'ajoute
-  quand même. `skip remove` échoue si un identifiant n'y est pas (les autres sont retirés).
-- Rien n'est désinstallé : poste n'a jamais lancé pacman, et un plugin ou un fichier déjà posé reste.
-  `poste sys done` reste utilisable sur une étape ignorée.
+- What is ignored is neither required, nor offered, nor counted as missing in `setup`,
+  `setup --dry-run` and `status`, which add a line
+  `ignored on this machine (config.toml, skip): …`.
+- Dependencies: a user step with an ignored `trigger` is ignored too (for example
+  `cursor-accent-recolor` when `io.github.smoothpixels.cursor-accent` or `cursor-accent-config`
+  is in `skip`), in cascade. `requires` designates a binary, not a step: not concerned.
+- An unknown identifier (typo) gives a warning, not an error; `skip add` adds it
+  anyway. `skip remove` fails if an identifier is not there (the others are removed).
+- Nothing is uninstalled: poste never ran pacman, and a plugin or file already in place stays.
+  `poste sys done` can still be used on an ignored step.
 
-### `disabled` : modules non installés
+### `disabled`: modules not installed
 
-- `setup` n'installe pas ces modules ; s'ils l'étaient, il les retire proprement par la mécanique
-  des orphelins, avec aperçu et confirmation : fichiers (`poste-<nom>`, `module.toml`, `island/`,
-  `hypr/`, `bin/`, `systemd/`), lignes posées dans des fichiers sans inclusion, unités systemd
-  (désactivées d'abord). Un fichier modifié à la main est gardé. `sys` ne se désactive pas.
-- `module enable` réactive : le prochain `setup` réinstalle. Un nom inconnu du dépôt est signalé par `module list`.
+- `setup` does not install these modules; if they were installed, it removes them cleanly through the
+  orphan mechanism, with a preview and a confirmation: files (`poste-<name>`, `module.toml`, `island/`,
+  `hypr/`, `bin/`, `systemd/`), lines put in files without includes, systemd units
+  (disabled first). A file edited by hand is kept. `sys` cannot be disabled.
+- `module enable` enables again: the next `setup` reinstalls. A name unknown to the repository is reported by `module list`.
 
-### `[[override]]` : JSON par machine
+### `[[override]]`: JSON per machine
 
-Pour un fichier JSON de `config/` dont le reste doit suivre le dépôt (cas réel : `idle.lock` du
-`shell.json` d'Omarchy, la barre et les plugins venant du dépôt). `set` : clés pointées
-(`"idle.lock" = 3600`, ou en table imbriquée `[override.set.idle] lock = 3600`, aplatie ; pas
-d'indices de tableaux). Une valeur est un nombre, booléen, chaîne ou liste.
+For a JSON file of `config/` whose rest must follow the repository (real case: `idle.lock` of Omarchy's
+`shell.json`, the bar and the plugins coming from the repository). `set`: dotted keys
+(`"idle.lock" = 3600`, or as a nested table `[override.set.idle] lock = 3600`, flattened; no
+array indices). A value is a number, boolean, string or list.
 
-- Un fichier ayant des surcharges n'est PAS lié : `setup` écrit un fichier ordinaire égal au contenu du
-  dépôt plus les surcharges, JSON réécrit proprement (indentation 2, ordre des clés du dépôt conservé).
-  Il est noté dans `installed.json` comme les autres entrées de config (empreinte du texte écrit) et
-  régénéré quand le dépôt ou les surcharges changent (« régénéré » dans l'aperçu, ancien sauvegardé).
-- Un ancien lien vers le dépôt, ou un fichier qui contient déjà les mêmes valeurs (même JSON, autre
-  mise en forme, cas du PC pro réglé à la main), est remplacé sans conflit (sauvegarde faite).
-- Modifié à la main depuis notre écriture : CONFLIT (code 2, rien n'est touché ; `status` : « généré,
-  modifié à la main » ; `diff <chemin>` compare à ce que `setup` écrirait).
-  - `--take-repo <chemin>` régénère (l'ancien est sauvegardé).
-  - `--take-home <chemin>` recopie le fichier de `~` dans le dépôt EN REMETTANT, pour chaque clé
-    surchargée, la valeur du dépôt (ou en retirant la clé si le dépôt ne l'avait pas), puis régénère. Le
-    JSON du dépôt est réécrit avec l'indentation 2. Choix : la reprise est REFUSÉE, sans rien écrire, si une valeur
-    surchargée a été changée à la main dans `~` (ou a disparu) ou si le fichier n'est pas du JSON valide : on ne peut pas deviner
-    si l'on voulait changer la surcharge ou le dépôt. Corriger la surcharge (`override set`) ou utiliser `--take-repo`.
-- `override set <chemin> <clé> <valeur>` : la valeur est du JSON (`3600`, `true`, `"texte"`, `[1,2]`),
-  sinon une chaîne ; refusé si la clé traverse une valeur qui n'est pas un objet. `override unset`
-  retire la clé ; la dernière retirée supprime l'entrée et le fichier redevient un lien au prochain
-  `setup` (un fichier généré qui diffère alors du dépôt est un conflit à trancher). `override` seul liste.
-- Un chemin à la fois `local` et surchargé reste local.
+- A file that has overrides is NOT linked: `setup` writes an ordinary file equal to the content of the
+  repository plus the overrides, JSON rewritten cleanly (indentation 2, key order of the repository kept).
+  It is noted in `installed.json` like the other config entries (fingerprint of the written text) and
+  regenerated when the repository or the overrides change ("regenerated" in the preview, old one backed up).
+- An old link to the repository, or a file that already holds the same values (same JSON, other
+  formatting, case of the work PC set by hand), is replaced without conflict (backup made).
+- Edited by hand since we wrote it: CONFLICT (code 2, nothing is touched; `status`: "generated,
+  edited by hand"; `diff <path>` compares with what `setup` would write).
+  - `--take-repo <path>` regenerates (the old one is backed up).
+  - `--take-home <path>` copies the file of `~` back into the repository WHILE PUTTING BACK, for each
+    overridden key, the value of the repository (or removing the key if the repository did not have it), then regenerates. The
+    JSON of the repository is rewritten with indentation 2. Choice: taking it back is REFUSED, without writing anything, if an
+    overridden value was changed by hand in `~` (or disappeared) or if the file is not valid JSON: we cannot guess
+    whether the override or the repository was meant to change. Fix the override (`override set`) or use `--take-repo`.
+- `override set <path> <key> <value>`: the value is JSON (`3600`, `true`, `"text"`, `[1,2]`),
+  otherwise a string; refused if the key goes through a value that is not an object. `override unset`
+  removes the key; the last one removed deletes the entry and the file becomes a link again at the next
+  `setup` (a generated file that then differs from the repository is a conflict to decide). `override` alone lists.
+- A path that is both `local` and overridden stays local.
 
-## Unités systemd utilisateur des modules
+## Systemd units
 
-Un module déclare `units = ["poste-<nom>.service"]` dans `module.toml` et range le fichier d'unité dans
-son dossier `systemd/` (copié avec le reste dans `~/.local/share/poste/modules/<nom>/systemd/`).
+A module declares `units = ["poste-<name>.service"]` in `module.toml` and puts the unit file in
+its `systemd/` folder (copied with the rest to `~/.local/share/poste/modules/<name>/systemd/`).
 
-- `setup` l'active avec `systemctl --user enable --now <chemin du fichier installé>` (systemd crée
-  lui-même le lien dans `~/.config/systemd/user/` ; rien n'est copié ailleurs) et la note dans
-  `installed.json` (`units`). Quand les fichiers du module sont mis à jour par ce `setup`, l'unité est
-  rechargée et redémarrée (`daemon-reload`, `try-restart`).
-- Module retiré, désactivé (`disabled`) ou unité retirée de `module.toml` : `systemctl --user disable
-  --now` AVANT le retrait des fichiers, puis l'entrée est oubliée.
-- Minuteur : `units = ["poste-<nom>.timer"]`, et le service qu'il déclenche (`poste-<nom>.service`,
-  même nom) à côté dans `systemd/` sans être déclaré. `setup` lie d'abord le service
-  (`systemctl --user link`, pour que systemd le trouve), puis active le minuteur ; au retrait, il
-  désactive le minuteur puis délie le service. Un lien du service qui n'est pas à nous est un conflit.
-- Une unité du même nom que nous n'avons pas posée (fichier ordinaire, lien ailleurs) est un conflit (code 2),
-  jamais touchée. `--dry-run` n'active rien (seules des lectures `is-enabled`).
-- Test : `POSTE_SYS_TEST_SYSTEMCTL` (RÉSERVÉE AUX TESTS) remplace `systemctl`.
+- `setup` enables it with `systemctl --user enable --now <path of the installed file>` (systemd creates
+  the link in `~/.config/systemd/user/` itself; nothing is copied elsewhere) and notes it in
+  `installed.json` (`units`). When the files of the module are updated by this `setup`, the unit is
+  reloaded and restarted (`daemon-reload`, `try-restart`).
+- Module removed, disabled (`disabled`) or unit removed from `module.toml`: `systemctl --user disable
+  --now` BEFORE the files are removed, then the entry is forgotten.
+- Timer: `units = ["poste-<name>.timer"]`, and the service it triggers (`poste-<name>.service`,
+  same name) next to it in `systemd/` without being declared. `setup` first links the service
+  (`systemctl --user link`, so that systemd finds it), then enables the timer; on removal, it
+  disables the timer then unlinks the service. A link of the service that is not ours is a conflict.
+- A unit with the same name that we did not put in place (ordinary file, link elsewhere) is a conflict (code 2),
+  never touched. `--dry-run` enables nothing (only `is-enabled` reads).
+- Test: `POSTE_SYS_TEST_SYSTEMCTL` (RESERVED FOR TESTS) replaces `systemctl`.
 
-## Lignes de module (fichiers sans inclusion)
+## Module lines
 
-Certains fichiers n'ont pas de mécanisme d'inclusion (cas réel : `~/.config/hypr/xdph.conf`,
-où le module `record` pose `screencopy:custom_picker_binary = …`). Un module déclare dans son
-`module.toml` :
+Some files have no include mechanism (real case: `~/.config/hypr/xdph.conf`,
+where the `record` module puts `screencopy:custom_picker_binary = …`). A module declares in its
+`module.toml`:
 
 ```toml
 [[line]]
-file = "~/.config/hypr/xdph.conf"            # sous ~ seulement
+file = "~/.config/hypr/xdph.conf"            # under ~ only
 line = "screencopy:custom_picker_binary = {modules}/record/bin/poste-share-picker"
 ```
 
-`{home}` (dossier personnel) et `{modules}` (`~/.local/share/poste/modules`) sont remplacés.
-`config/.poste/lines.toml` (même format, propriétaire `config`) porte les lignes de base du dépôt.
+`{home}` (home folder) and `{modules}` (`~/.local/share/poste/modules`) are replaced.
+`config/.poste/lines.toml` (same format, owner `config`) carries the base lines of the repository.
 
-- `setup` ajoute la ligne à la fin du fichier si elle manque (fichier créé s'il n'existe pas) et
-  note `{file, line, module}` dans `installed.json` (`lines`). Le fichier existant est d'abord sauvegardé.
-- Si le module ne la déclare plus ou disparaît, la ligne est retirée ; si elle avait déjà disparu du fichier,
-  l'entrée est seulement oubliée. Si la valeur change, la ligne qu'on avait posée est remplacée.
-- Jamais touchée : une ligne qu'on n'a pas posée (la même ligne déjà présente est laissée, non suivie).
-- Conflit (rien n'est écrit, code de sortie 2) : la clé (ce qui précède le premier `=`) est demandée par
-  deux modules, ou existe déjà dans le fichier avec une autre valeur non posée par nous.
-- Un fichier qui est un lien symbolique n'est jamais modifié (on écrirait dans sa cible).
+- `setup` adds the line at the end of the file if it is missing (file created if it does not exist) and
+  notes `{file, line, module}` in `installed.json` (`lines`). The existing file is backed up first.
+- If the module no longer declares it or disappears, the line is removed; if it had already disappeared from the file,
+  the entry is only forgotten. If the value changes, the line we had put in place is replaced.
+- Never touched: a line we did not put in place (the same line already present is left, not tracked).
+- Conflict (nothing is written, exit code 2): the key (what precedes the first `=`) is asked for by
+  two modules, or already exists in the file with another value that we did not put in place.
+- A file that is a symbolic link is never modified (we would write into its target).
 
-## Orphelins
+## Orphans
 
-`setup` et `status` repèrent ce que poste avait posé et dont la source a disparu :
+`setup` and `status` spot what poste had put in place and whose source has disappeared:
 
-- un lien de `~` qui pointe vers `config/…` d'une racine de poste (`current`, le clone, une version
-  installée, le dépôt de données) dont la cible n'existe plus (fichier renommé ou retiré du dépôt) :
-  seuls les liens, jamais un fichier ordinaire, jamais un lien étranger ;
-- un fichier de module noté dans `installed.json` que le dépôt ne produit plus (module supprimé, fichier
-  renommé) et resté tel qu'installé (un fichier modifié à la main est gardé). Il est sauvegardé avant
-  retrait, et les dossiers de module devenus vides sont retirés.
+- a link of `~` that points to `config/…` of a poste root (`current`, the clone, an installed
+  version, the data repository) whose target no longer exists (file renamed or removed from the repository):
+  only links, never an ordinary file, never a foreign link;
+- a module file noted in `installed.json` that the repository no longer produces (module deleted, file
+  renamed) and left as installed (a file edited by hand is kept). It is backed up before
+  removal, and module folders that became empty are removed.
 
-`setup` montre l'aperçu (avec les lignes de module) et demande une confirmation (sauf `--yes`) ;
-`--dry-run` ne retire rien.
+`setup` shows the preview (with the module lines) and asks for a confirmation (unless `--yes` is given);
+`--dry-run` removes nothing.
 
-## La config
+## The config
 
-Le dossier `config/` du dépôt reflète `~` avec les vrais noms (`config/.config/hypr/bindings.lua`
-pour `~/.config/hypr/bindings.lua`), sans préfixes. `setup` pose chaque entrée en lien
-symbolique vers la racine (`current/config/…`) : en dev, modifier le fichier de `~` modifie le
-clone ; en release, la version installée est en lecture seule (à ne pas modifier : le prochain
-`sync` la remplace).
+The `config/` folder of the repository mirrors `~` with the real names (`config/.config/hypr/bindings.lua`
+for `~/.config/hypr/bindings.lua`), without prefixes. `setup` puts each entry in place as a symbolic
+link to the root (`current/config/…`): in dev, editing the file in `~` edits the
+clone; in release, the installed version is read-only (do not edit it: the next
+`sync` replaces it).
 
-- Un lien symbolique de `config/` est recréé tel quel (même cible) dans `~`.
-- Le bit exécutable est porté par git. Les droits restreints (0600, 0700) sont listés dans
-  `config/.poste/modes`, une ligne `chemin mode` (par exemple `.config/foot/foot.ini 0600`), et
-  réappliqués à la cible réelle du lien (le fichier du dépôt ; pour un simple dossier, le dossier de `~`).
-- Granularité : un lien par fichier. Un dossier listé dans `config/.poste/link-dirs` (un chemin par
-  ligne) est lié d'un bloc ; à réserver aux dossiers dont tout le contenu appartient au dépôt et où
-  aucun outil n'écrit de fichiers propres. `__pycache__` est ignoré dans les comparaisons et dans git.
-- `config/.poste/ignore` : motifs (relatifs à `~`) que `add` refuse d'ajouter.
+- A symbolic link of `config/` is recreated as is (same target) in `~`.
+- The executable bit is carried by git. Restricted permissions (0600, 0700) are listed in
+  `config/.poste/modes`, one line `path mode` (for example `.config/foot/foot.ini 0600`), and
+  applied again to the real target of the link (the file of the repository; for a plain folder, the folder in `~`).
+- Granularity: one link per file. A folder listed in `config/.poste/link-dirs` (one path per
+  line) is linked as a block; to keep for folders whose whole content belongs to the repository and where
+  no tool writes files of its own. `__pycache__` is ignored in comparisons and in git.
+- `config/.poste/ignore`: patterns (relative to `~`) that `add` refuses to add.
 
-État de chaque cible et action de `setup` :
+State of each target and action of `setup`:
 
-| État de la cible | Action |
+| State of the target | Action |
 | --- | --- |
-| déjà liée comme prévu | rien |
-| absente | crée le lien |
-| fichier ordinaire identique au dépôt | sauvegarde dans `backup/`, puis lien |
-| fichier ordinaire différent | CONFLIT : rien n'est fait ; `poste sys diff <chemin>` pour voir |
-| lien vers le même chemin dans une autre racine de poste (clone, version), noté dans `installed.json` | sauvegarde dans `backup/`, puis lien vers `current` |
-| lien vers ailleurs, dossier à la place d'un fichier ou l'inverse, parent qui n'est pas un dossier | CONFLIT |
+| already linked as planned | nothing |
+| absent | creates the link |
+| ordinary file identical to the repository | backup in `backup/`, then link |
+| ordinary file that differs | CONFLICT: nothing is done; `poste sys diff <path>` to see |
+| link to the same path in another poste root (clone, version), noted in `installed.json` | backup in `backup/`, then link to `current` |
+| link elsewhere, folder in place of a file or the reverse, parent that is not a folder | CONFLICT |
 
-Les conflits n'empêchent pas le reste ; ils sont listés en fin d'aperçu et le code de sortie est 2.
-Pour trancher un par un : `--take-repo <chemin>` (le dépôt gagne, l'ancien est sauvegardé) ou
-`--take-home <chemin>` (le fichier réel est recopié dans le dépôt, sauvegardé, puis lié ; pour un
-fichier aux droits restreints, le mode est noté dans `modes`). Un dossier réel remplacé par un lien
-est déplacé tel quel dans `backup/`.
+Conflicts do not stop the rest; they are listed at the end of the preview and the exit code is 2.
+To decide them one by one: `--take-repo <path>` (the repository wins, the old one is backed up) or
+`--take-home <path>` (the real file is copied into the repository, backed up, then linked; for a
+file with restricted permissions, the mode is noted in `modes`). A real folder replaced by a link
+is moved as is into `backup/`.
 
-## La machine : paquets et étapes (`bootstrap/`)
+## The machine: packages and steps (`bootstrap/`)
 
-Après les binaires et la config, `setup` lit `bootstrap/packages.toml` et `bootstrap/steps.toml`
-(format : [`bootstrap/README.md`](../../bootstrap/README.md)) :
+After the binaries and the config, `setup` reads `bootstrap/packages.toml` and `bootstrap/steps.toml`
+(format: [`bootstrap/README.md`](../../bootstrap/README.md)):
 
-1. Paquets : comparés à `pacman -Qq`. S'il en manque, la commande `yay -S --needed …` est AFFICHÉE.
-2. Étapes système (root) : vérifiées, puis les commandes sont AFFICHÉES dans un bloc copiable.
-   `setup` ne lance jamais `sudo`.
-3. Étapes utilisateur (plugins du shell épinglés + patchs, fichiers, services, thème…) : aperçu des
-   commandes, puis confirmation (sauf `--yes`) ; `--dry-run` n'en lance aucune. Idempotentes : un
-   état déjà bon n'apparaît pas. Ce qui est ambigu ou risqué (plugin à une autre version et modifié,
-   patch qui ne s'applique plus, fichier utilisateur différent) n'est jamais touché, une note le dit.
-   Si une étape a été faite, la config est replanifiée (`omarchy plugin add` peut réécrire
-   `shell.json`) pour remettre les liens du dépôt.
-4. Étapes manuelles non faites, listées en fin de `setup`.
+1. Packages: compared with `pacman -Qq`. If some are missing, the `yay -S --needed …` command is PRINTED.
+2. System steps (root): checked, then the commands are PRINTED in a copyable block.
+   `setup` never runs `sudo`.
+3. User steps (pinned shell plugins + patches, files, services, theme…): preview of the
+   commands, then confirmation (unless `--yes` is given); `--dry-run` runs none. Idempotent: a
+   state that is already right does not show up. What is ambiguous or risky (plugin at another version and modified,
+   patch that no longer applies, user file that differs) is never touched, a note says so.
+   If a step was done, the config is planned again (`omarchy plugin add` may rewrite
+   `shell.json`) to put the links of the repository back.
+4. Manual steps not done, listed at the end of `setup`.
 
-Test : la variable `POSTE_TEST_PACMAN_QQ` (réservée aux tests) remplace `pacman -Qq` par le
-programme indiqué (sans argument).
+Test: the variable `POSTE_TEST_PACMAN_QQ` (reserved for tests) replaces `pacman -Qq` with the
+given program (without arguments).
 
-## Import depuis chezmoi
+## Import from chezmoi
 
-`poste sys import-chezmoi` liste les entrées de `chezmoi managed` et copie dans `config/` le
-contenu RÉEL de la machine (pas celui de la source chezmoi), avec bit exécutable, droits restreints
-et liens. Il n'écrit que dans le dépôt poste et dans `~/.local/state/poste/import-chezmoi.md`
-(rapport : écarts avec la source, fichiers absents, entrées `DA`, dossiers candidats au lien de
-dossier, secrets refusés sans recopier leur valeur). `README.md`, `bootstrap.sh` et
-`bootstrap-patches/` de chezmoi iraient dans `bootstrap/` : l'import est fait une fois pour toutes et ces
-fichiers ont été repris dans `bootstrap/*.toml` ; ne pas relancer l'import (il les recréerait). Un fichier qui contient un secret évident n'est pas importé. Relançable.
+`poste sys import-chezmoi` lists the entries of `chezmoi managed` and copies into `config/` the
+REAL content of the machine (not that of the chezmoi source), with executable bit, restricted permissions
+and links. It only writes in the poste repository and in `~/.local/state/poste/import-chezmoi.md`
+(report: differences with the source, missing files, `DA` entries, folders that are candidates for a folder
+link, secrets refused without copying their value). chezmoi's `README.md`, `bootstrap.sh` and
+`bootstrap-patches/` would go into `bootstrap/`: the import is done once and for all and these
+files were taken over into `bootstrap/*.toml`; do not run the import again (it would recreate them). A file that holds an obvious secret is not imported. Can be run again.
 
-## À venir
+## Coming
 
 `install <module>`.

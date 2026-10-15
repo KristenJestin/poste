@@ -1,23 +1,23 @@
-# Règles du module sys
+# Rules of the sys module
 
-- Toujours installé : `poste sys setup` doit rester utilisable seul, sans autre module.
-- Ne jamais remplacer un fichier absent de `installed.json` s'il diffère de la source ; ne jamais rien supprimer.
-- Tout fichier remplacé est d'abord copié en `.bak` horodaté dans `~/.local/state/poste/backup/`.
-- `--dry-run` n'écrit rien (hors `target/` pour la construction) ; le plan est toujours affiché avant d'écrire.
-- Écritures atomiques (fichier temporaire puis renommage) : `poste-sys` se remplace lui-même.
-- Le nom du dossier d'un module du dépôt doit être égal à son `name` dans `module.toml`.
-- Pas de `sudo`, pas de push, pas de secret dans les sorties.
-- Tests unitaires pour toute logique de plan, de classement ou de manifeste.
-- Config : `setup` ne remplace jamais un fichier ordinaire de `~` qui diffère du dépôt sans décision explicite (`--take-repo`, `--take-home`) ; un fichier identique n'est remplacé qu'après sauvegarde. Un conflit n'arrête pas le reste mais donne le code de sortie 2.
-- `add` refuse tout chemin qui correspond à `config/.poste/ignore` ou aux règles de secrets intégrées (`.ssh`, `.env*`, `.npmrc`, `.claude/.credentials.json`…).
-- Les tests de la config et de l'import travaillent dans un HOME temporaire, jamais dans le vrai `~`.
+- Always installed: `poste sys setup` must stay usable alone, without any other module.
+- Never replace a file that is absent from `installed.json` if it differs from the source; never delete anything.
+- Every replaced file is first copied to a timestamped `.bak` in `~/.local/state/poste/backup/`.
+- `--dry-run` writes nothing (outside `target/` for the build); the plan is always shown before writing.
+- Atomic writes (temporary file then rename): `poste-sys` replaces itself.
+- The folder name of a module of the repository must equal its `name` in `module.toml`.
+- No `sudo`, no push, no secret in the output.
+- Unit tests for any plan, ranking or manifest logic.
+- Config: `setup` never replaces an ordinary file of `~` that differs from the repository without an explicit decision (`--take-repo`, `--take-home`); an identical file is only replaced after a backup. A conflict does not stop the rest but gives exit code 2.
+- `add` refuses any path that matches `config/.poste/ignore` or the built-in secret rules (`.ssh`, `.env*`, `.npmrc`, `.claude/.credentials.json`…).
+- The config and import tests work in a temporary HOME, never in the real `~`.
 
-- Bootstrap : `setup` ne lance JAMAIS `sudo` ; les étapes système sont vérifiées puis affichées. Les étapes utilisateur passent par un aperçu et une confirmation, sont idempotentes, et ne touchent jamais ce qui est ambigu (note affichée). Le contenu des fichiers root vit dans `bootstrap/system/`, pas dans le code.
-- Les tests de `provision` n'exécutent aucune étape réelle (pas de systemctl, vocaline, omarchy) ; le faux `pacman -Qq` passe par `POSTE_TEST_PACMAN_QQ`.
-- Lignes de module : jamais modifier ni retirer une ligne absente de `installed.json` (`lines`), jamais écrire à travers un lien symbolique, conflit signalé sans rien écrire.
-- Orphelins : seulement des liens vers `<dépôt>/config/` à cible disparue, ou des fichiers de module de `installed.json` encore intacts (déjà disparus : seulement oubliés du manifeste) ; jamais un fichier ordinaire, toujours aperçu et confirmation.
-- Un module-script n'a pas de `Cargo.toml` et n'est pas dans `members` du `Cargo.toml` racine.
-- Config de la machine (`~/.config/poste/config.toml` : `local`, `disabled`, `[[override]]`) : jamais écrite par `setup`, seulement par `local`/`module`/`override` (toml_edit : le reste du fichier est conservé). Un chemin `local` n'est jamais lié, signalé ni touché (ni comme orphelin).
-- Fichier généré (`[[override]]`) : jamais écrasé s'il a été modifié à la main (conflit) ; `--take-home` refuse sans rien écrire si la reprise est ambiguë. Le JSON passe par `ojson.rs` (ordre des clés conservé) ; ne pas activer `preserve_order` de serde_json dans le workspace (cela changerait les autres modules).
-- Unités systemd : `setup` les active et désactive via `systemctl --user` (jamais `sudo`) ; les tests utilisent un faux `systemctl` (`POSTE_SYS_TEST_SYSTEMCTL` ou `units::Runner::with_program`), jamais le vrai.
-- Versions : tout ce que `setup` pose se lit dans la racine `~/.local/share/poste/current` (clone en dev, `versions/<commit>/` en release) ; jamais de chemin du clone en dur pour ce qui s'installe (`util::clone` seulement pour git, import, cd). `source` n'est écrite que par `use`. Une archive n'est extraite qu'après vérification de sa somme ; l'élagage ne retire jamais la version de `current`. Un lien vers une autre racine de poste n'est reposé vers `current` que s'il est dans `installed.json` (sauvegarde d'abord). Les tests de téléchargement passent par un faux `curl` lancé par `sh` (`Fetcher::with`), jamais le réseau.
+- Bootstrap: `setup` NEVER runs `sudo`; system steps are checked then printed. User steps go through a preview and a confirmation, are idempotent, and never touch what is ambiguous (a note is printed). The content of root files lives in `bootstrap/system/`, not in the code.
+- The `provision` tests run no real step (no systemctl, vocaline, omarchy); the fake `pacman -Qq` goes through `POSTE_TEST_PACMAN_QQ`.
+- Module lines: never change or remove a line that is absent from `installed.json` (`lines`), never write through a symbolic link, a conflict is reported without writing anything.
+- Orphans: only links to `<repository>/config/` whose target is gone, or module files of `installed.json` that are still intact (already gone: only forgotten from the manifest); never an ordinary file, always a preview and a confirmation.
+- A script module has no `Cargo.toml` and is not in `members` of the root `Cargo.toml`.
+- Machine config (`~/.config/poste/config.toml`: `local`, `disabled`, `[[override]]`): never written by `setup`, only by `local`/`module`/`override` (toml_edit: the rest of the file is kept). A `local` path is never linked, reported or touched (not even as an orphan).
+- Generated file (`[[override]]`): never overwritten if it was edited by hand (conflict); `--take-home` refuses without writing anything if taking it back is ambiguous. The JSON goes through `ojson.rs` (key order kept); do not enable `preserve_order` of serde_json in the workspace (it would change the other modules).
+- Systemd units: `setup` enables and disables them through `systemctl --user` (never `sudo`); the tests use a fake `systemctl` (`POSTE_SYS_TEST_SYSTEMCTL` or `units::Runner::with_program`), never the real one.
+- Versions: everything `setup` puts in place is read from the root `~/.local/share/poste/current` (clone in dev, `versions/<commit>/` in release); never a hard-coded clone path for what gets installed (`util::clone` only for git, import, cd). `source` is only written by `use`. An archive is only extracted after its checksum is verified; pruning never removes the version `current` points to. A link to another poste root is only put back to `current` if it is in `installed.json` (backup first). The download tests go through a fake `curl` run by `sh` (`Fetcher::with`), never the network.
