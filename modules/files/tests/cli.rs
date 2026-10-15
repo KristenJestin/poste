@@ -93,8 +93,29 @@ impl Sandbox {
             .unwrap();
     }
 
+    /// Waits for the background walks asked for to end (marker gone, lock free).
+    fn wait_idle(&self) {
+        let cache = self.home.join(".cache/poste");
+        wait_for("background walk ended", || {
+            !cache.join("files.pending").exists()
+                && fs::File::options()
+                    .write(true)
+                    .open(cache.join("files.lock"))
+                    .map_or(true, |f| f.try_lock().is_ok())
+        });
+    }
+
     fn opened(&self) -> String {
         fs::read_to_string(self.home.parent().unwrap().join("opened")).unwrap_or_default()
+    }
+}
+
+impl Drop for Sandbox {
+    /// No walk left running in a folder about to be deleted.
+    fn drop(&mut self) {
+        if !std::thread::panicking() {
+            self.wait_idle();
+        }
     }
 }
 
@@ -170,7 +191,19 @@ fn end_to_end() {
     });
     assert!(s.search("pancake").is_empty());
 
+    // A query starting with "-" is a query, not an option.
+    let v = s.json(&["search", "--json", "-rf"]);
+    assert!(v.iter().all(|e| e["id"] != "files-error"), "{v:#?}");
+
+    // An index in another format is rebuilt by the next search.
+    s.wait_idle();
+    fs::write(s.index(), "poste-files-index 0\n").unwrap();
+    let mut found = ids(&s.search("player"));
+    found.sort();
+    assert_eq!(found, [id(&player), id(&build)]);
+
     // Invalid pattern: one error entry for the launcher, exit code 0.
+    s.wait_idle();
     fs::write(s.home.join(".config/poste/files.ignore"), "[z-a]\n").unwrap();
     fs::remove_file(s.index()).unwrap();
     let v = s.search("player");

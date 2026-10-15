@@ -49,6 +49,8 @@ pub fn serialize(entries: &[(PathBuf, bool)], home: &Path, scan_ms: u64) -> (Str
         }
     }
     lines.sort_unstable();
+    // A root inside another gives some entries twice.
+    lines.dedup_by(|a, b| a.0 == b.0);
     let mut out = String::with_capacity(lines.iter().map(|(s, _)| s.len() + 3).sum::<usize>() + 64);
     out.push_str(&format!("{MAGIC}\t{}\t{scan_ms}\n", lines.len()));
     for (s, d) in lines {
@@ -172,7 +174,6 @@ impl Index {
             .into_iter()
             .map(|m| (u32::from(m.score), m.index))
             .collect();
-        drop(paths);
         // Name bonus, on the best candidates only: the alignment on the path already lands
         // on the name when it is there in one piece.
         top(&mut found, NAME_CANDIDATES);
@@ -194,7 +195,6 @@ impl Index {
                 .map(|p| if long(&p) { p.max_typos(Some(1)) } else { p })
                 .collect();
             let known: std::collections::HashSet<u32> = found.iter().map(|f| f.1).collect();
-            let paths: Vec<&str> = self.spans.iter().map(|s| self.path(s)).collect();
             let mut matcher = Matcher::from_patterns(&typos, &config);
             for m in matcher.match_list_parallel(&paths, threads) {
                 if !known.contains(&m.index) {
@@ -252,7 +252,7 @@ mod tests {
             (PathBuf::from("/h/b.txt"), false),
             (PathBuf::from("/h/a"), true),
             (PathBuf::from("/srv/x"), false),
-            (PathBuf::from("/h/saut\nde ligne"), false),
+            (PathBuf::from("/h/line\nbreak"), false),
         ];
         let (text, skipped) = serialize(&entries, Path::new("/h"), 12);
         assert_eq!(skipped, 1);
@@ -276,7 +276,7 @@ mod tests {
                 is_dir: false
             }]
         );
-        assert!(Index::parse("autre chose\n".into(), Path::new("/h")).is_err());
+        assert!(Index::parse("something else\n".into(), Path::new("/h")).is_err());
         assert!(Index::parse(String::new(), Path::new("/h")).is_err());
     }
 
@@ -327,7 +327,11 @@ mod tests {
         let t = tempfile::tempdir().unwrap();
         let root = t.path().join("home");
         sample_tree(&root);
-        let (text, _) = serialize(&walk(&rules(&root, ""), &root, 2), &root, 0);
+        let (text, _) = serialize(
+            &walk(&rules(&root, ""), std::slice::from_ref(&root), 2),
+            &root,
+            0,
+        );
         let ix = Index::parse(text, &root).unwrap();
         let hits = ix.search("player", 5);
         assert!(hits[0].path.ends_with("Projects/game/Assets/Player.cs"));

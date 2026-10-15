@@ -41,9 +41,11 @@ impl Rules {
     /// `path` is excluded. Only looks at `path` itself: its parents were already accepted by
     /// the walk (as in git, nothing comes back under an excluded folder).
     pub fn excluded(&self, path: &Path, is_dir: bool) -> bool {
+        // The innermost root holding `path`: its rules are anchored on it.
         self.roots
             .iter()
-            .find(|(r, _)| path.starts_with(r) && path != r)
+            .filter(|(r, _)| path.starts_with(r) && path != r)
+            .max_by_key(|(r, _)| r.as_os_str().len())
             .is_some_and(|(_, gi)| gi.matched(path, is_dir).is_ignore())
     }
 }
@@ -55,10 +57,17 @@ fn is_dir(e: &ignore::DirEntry) -> bool {
         .is_some_and(|t| t.is_dir() || (t.is_symlink() && e.path().is_dir()))
 }
 
-/// Walks `root` (a root of `rules`); returns the files and folders found (absolute path,
-/// folder or not), without `root` itself. `threads`: walk threads.
-pub fn walk(rules: &Arc<Rules>, root: &Path, threads: usize) -> Vec<(PathBuf, bool)> {
-    let mut b = WalkBuilder::new(root);
+/// Walks `roots` (roots of `rules`) together, with one pool of `threads` walk threads;
+/// returns the files and folders found (absolute path, folder or not), without the roots
+/// themselves. A root inside another may give some entries twice.
+pub fn walk(rules: &Arc<Rules>, roots: &[PathBuf], threads: usize) -> Vec<(PathBuf, bool)> {
+    let Some((first, rest)) = roots.split_first() else {
+        return Vec::new();
+    };
+    let mut b = WalkBuilder::new(first);
+    for r in rest {
+        b.add(r);
+    }
     b.standard_filters(false)
         .follow_links(false)
         .threads(threads.max(1));
@@ -106,7 +115,7 @@ pub mod tests {
             "Projects/web/node/bin/node",
             "Projects/rs/target/debug/rs",
             ".cache/thumb.png",
-            ".config/app/reglages.toml",
+            ".config/app/settings.toml",
             "Pictures/holiday.jpg",
         ];
         for f in files {
@@ -145,7 +154,10 @@ pub mod tests {
         let t = tempfile::tempdir().unwrap();
         let root = t.path().join("home");
         sample_tree(&root);
-        let entries = rel(&root, &walk(&rules(&root, ""), &root, 2));
+        let entries = rel(
+            &root,
+            &walk(&rules(&root, ""), std::slice::from_ref(&root), 2),
+        );
         for bad in [
             "node_modules",
             "Library",
@@ -185,24 +197,27 @@ pub mod tests {
         let root = t.path().join("home");
         sample_tree(&root);
         fs::create_dir_all(root.join("Archives/build")).unwrap();
-        fs::write(root.join("Archives/build/vieux.zip"), "x").unwrap();
+        fs::write(root.join("Archives/build/old.zip"), "x").unwrap();
         let user = "\
-# commentaire
+# comment
 Pictures/
 *.md
 !build/
 !.config/
 /Projects/py/
 ";
-        let entries = rel(&root, &walk(&rules(&root, user), &root, 1));
+        let entries = rel(
+            &root,
+            &walk(&rules(&root, user), std::slice::from_ref(&root), 1),
+        );
         // Added: a folder, a name pattern, a path anchored on the root.
         assert!(!entries.iter().any(|e| e.starts_with("Pictures")));
         assert!(!entries.iter().any(|e| e.ends_with(".md")));
         assert!(!entries.iter().any(|e| e.starts_with("Projects/py")));
         // Lifted: build/ and .config/ come back, the other exclusions hold.
         assert!(entries.iter().any(|e| e == "Projects/web/build/index.html"));
-        assert!(entries.iter().any(|e| e == "Archives/build/vieux.zip"));
-        assert!(entries.iter().any(|e| e == ".config/app/reglages.toml"));
+        assert!(entries.iter().any(|e| e == "Archives/build/old.zip"));
+        assert!(entries.iter().any(|e| e == ".config/app/settings.toml"));
         assert!(!entries.iter().any(|e| e.starts_with(".cache")));
         assert!(!entries.iter().any(|e| e.contains(".git/")));
         assert!(!entries.iter().any(|e| e.contains("node_modules")));
@@ -215,7 +230,14 @@ Pictures/
         sample_tree(&root);
         fs::create_dir_all(root.join("notes/Pictures")).unwrap();
         fs::write(root.join("notes/Pictures/schema.png"), "x").unwrap();
-        let entries = rel(&root, &walk(&rules(&root, "/Pictures/\n"), &root, 1));
+        let entries = rel(
+            &root,
+            &walk(
+                &rules(&root, "/Pictures/\n"),
+                std::slice::from_ref(&root),
+                1,
+            ),
+        );
         assert!(!entries.iter().any(|e| e.starts_with("Pictures")));
         assert!(entries.iter().any(|e| e == "notes/Pictures/schema.png"));
     }
@@ -224,5 +246,23 @@ Pictures/
     fn invalid_pattern_reported_with_its_line() {
         let e = Rules::new(&[PathBuf::from("/h")], "ok/\n[z-a]\n", "files.ignore").unwrap_err();
         assert!(format!("{e:#}").contains("files.ignore, line 2"), "{e:#}");
+    }
+
+    #[test]
+    fn nested_root_under_an_excluded_folder() {
+        let t = tempfile::tempdir().unwrap();
+        let root = t.path().join("home");
+        sample_tree(&root);
+        let notes = root.join(".local/share/notes");
+        fs::create_dir_all(notes.join(".trash")).unwrap();
+        fs::write(notes.join("idea.md"), "x").unwrap();
+        fs::write(notes.join(".trash/old.md"), "x").unwrap();
+        let roots = [root.clone(), notes.clone()];
+        let rules = Arc::new(Rules::new(&roots, "", "files.ignore").unwrap());
+        let entries = rel(&root, &walk(&rules, &roots, 2));
+        // `.local` is excluded under `~`, the inner root is walked all the same, with its rules.
+        assert!(entries.iter().any(|e| e == ".local/share/notes/idea.md"));
+        assert!(!entries.iter().any(|e| e.contains(".trash")));
+        assert!(entries.iter().any(|e| e == "notes/pancake-recipe.md"));
     }
 }

@@ -103,9 +103,12 @@ never followed. Changes count from the next walk (SUPER+D, or `poste files refre
 `~/.config/poste/files.toml` (optional):
 
 ```toml
-roots = ["~", "/srv/data"]      # indexed folders (default: ["~"])
+roots = ["~", "/srv/data", "~/.local/share/notes"]   # indexed folders (default: ["~"])
 limit = 30                      # results given to the launcher
 ```
+
+A root inside another one is walked too, with its own anchoring: that is how a folder under an
+excluded one (`.local` under `~`) gets indexed.
 
 ### From the machine's data repository
 

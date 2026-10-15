@@ -73,7 +73,9 @@ impl Config {
         Ok(read_optional(&Self::ignore_file(env))?.unwrap_or_default())
     }
 
-    /// Absolute roots, without duplicates or a root inside another.
+    /// Absolute roots, without duplicates. A root inside another is kept: the exclusions may
+    /// stop the walk of the outer one before it (`~/.local/share/notes` under `~`, where `.*`
+    /// excludes `.local`); the entries found twice are merged in the index.
     pub fn root_paths(&self, env: &Env) -> Result<Vec<PathBuf>> {
         let mut out: Vec<PathBuf> = Vec::new();
         for r in &self.roots {
@@ -85,8 +87,6 @@ impl Config {
         }
         out.sort();
         out.dedup();
-        let all = out.clone();
-        out.retain(|p| !all.iter().any(|o| o != p && p.starts_with(o)));
         Ok(out)
     }
 }
@@ -115,12 +115,16 @@ mod tests {
     }
 
     #[test]
-    fn roots_expanded_and_not_nested() {
+    fn roots_expanded_and_deduplicated() {
         let env = Env::with_home("/h");
         let c = Config::parse("roots = [\"~/Projects\", \"~\", \"/srv/data\", \"~\"]\n").unwrap();
         assert_eq!(
             c.root_paths(&env).unwrap(),
-            [PathBuf::from("/h"), PathBuf::from("/srv/data")]
+            [
+                PathBuf::from("/h"),
+                PathBuf::from("/h/Projects"),
+                PathBuf::from("/srv/data")
+            ]
         );
         let c = Config::parse("roots = [\"relative\"]\n").unwrap();
         assert!(c.root_paths(&env).is_err());

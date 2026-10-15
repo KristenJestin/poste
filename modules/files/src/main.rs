@@ -36,6 +36,8 @@ struct Cli {
 enum Cmd {
     /// Search for a file or folder
     Search {
+        /// Words of the query; may start with "-" (the launcher passes what was typed)
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
         query: Vec<String>,
         /// Output in the island launcher's format
         #[arg(long)]
@@ -57,6 +59,9 @@ enum Cmd {
         /// Even when the index is recent
         #[arg(long)]
         force: bool,
+        /// Started by `--background`: clears the pending marker at the end
+        #[arg(long, hide = true)]
+        spawned: bool,
     },
     /// Open a file with its default application and remember it in the recent files
     Open { path: PathBuf },
@@ -160,11 +165,19 @@ fn run(env: &Env, cmd: Cmd) -> Result<()> {
             let hits = recent::list(env, Config::load(env)?.limit);
             print_hits(env, &hits, json);
         }
-        Cmd::Refresh { background, force } => {
+        Cmd::Refresh {
+            background,
+            force,
+            spawned,
+        } => {
             if background {
                 store::refresh_in_background(env)?;
             } else {
-                match store::refresh(env, force)? {
+                let done = store::refresh(env, force);
+                if spawned {
+                    store::clear_pending(env);
+                }
+                match done? {
                     store::Refresh::Done(m) => {
                         println!("{} entries indexed in {} ms", m.count, m.scan_ms)
                     }
@@ -180,8 +193,9 @@ fn run(env: &Env, cmd: Cmd) -> Result<()> {
             }
             detach("xdg-open", &path)?;
         }
-        Cmd::Copy { path } => desktop::copy_file(&path)?,
+        Cmd::Copy { path } => desktop::copy_file(&std::path::absolute(&path)?)?,
         Cmd::Reveal { path } => {
+            let path = std::path::absolute(&path)?;
             if let Err(e) = desktop::show_item(&path) {
                 // No file manager answers on the bus: open the folder with the default
                 // application for folders, without naming any.
@@ -204,6 +218,9 @@ fn run(env: &Env, cmd: Cmd) -> Result<()> {
                     ago(age),
                     m.scan_ms
                 ),
+                None if store::index_path(env).exists() => {
+                    println!("Index: unreadable, rebuilt at the next search")
+                }
                 None => println!("Index: not built yet"),
             }
             println!("File: {}", env.display(&store::index_path(env)));
