@@ -28,13 +28,13 @@
 -- o.bind("SUPER + H", nil, "voxtype record toggle")
 -- o.bind("SUPER + PERIOD", nil, "omarchy-shell shell toggle omarchy.emojis")
 
--- --- Workspaces par écran -------------------------------------------------
--- SUPER+N va au workspace N de l'écran actif (écrans définis dans
--- workspace_monitors, monitors.lua). Remplace les SUPER+1..0 d'Omarchy.
+-- --- Workspaces per screen ------------------------------------------------
+-- SUPER+N goes to workspace N of the active screen (screens defined in
+-- workspace_monitors, monitors.lua). Replaces Omarchy's SUPER+1..0.
 
--- Une entrée de workspace_monitors désigne-t-elle cet écran ? Nom de prise
--- (DP-1) ou description EDID (desc:AOC 24G2W1G3- …), comparée au début de la
--- description comme le fait Hyprland.
+-- Does an entry of workspace_monitors designate this screen? Port name
+-- (DP-1) or EDID description (desc:AOC 24G2W1G3- …), compared with the start of the
+-- description like Hyprland does.
 local function screen_matches(entry, monitor)
   if entry:sub(1, 5) == "desc:" then
     local want = entry:sub(6):match("^%s*(.-)%s*$")
@@ -73,8 +73,8 @@ for n = 1, 10 do
   end)
 end
 
--- Workspace suivant/précédent : rester sur l'écran actif (m) au lieu de
--- parcourir tous les écrans (e).
+-- Next/previous workspace: stay on the active screen (m) instead of
+-- going through all the screens (e).
 hl.unbind("SUPER + TAB")
 hl.unbind("SUPER + SHIFT + TAB")
 hl.unbind("SUPER + mouse_down")
@@ -84,38 +84,38 @@ o.bind("SUPER + SHIFT + TAB", "Previous workspace on this monitor", hl.dsp.focus
 o.bind("SUPER + mouse_down", "Scroll active workspace forward", hl.dsp.focus({ workspace = "m+1" }))
 o.bind("SUPER + mouse_up", "Scroll active workspace backward", hl.dsp.focus({ workspace = "m-1" }))
 
--- --- Raccourcis perso (repris d'Omarchy 3) ---------------------------------
--- Les autres anciens raccourcis perso (terminal, tmux, navigateur, éditeur,
--- docker, obsidian, musique...) sont désormais des défauts Omarchy.
+-- --- Personal shortcuts (taken from Omarchy 3) -----------------------------
+-- The other old personal shortcuts (terminal, tmux, browser, editor,
+-- docker, obsidian, music...) are now Omarchy defaults.
 
--- SUPER+SPACE : lanceur de l'île poste.island (était : Vicinae — supprimé —, avant ça le menu Omarchy).
+-- SUPER+SPACE: launcher of the poste.island island (was: Vicinae, removed, before that the Omarchy menu).
 hl.unbind("SUPER + SPACE")
 o.bind("SUPER + SPACE", "Launcher", "omarchy-shell poste.island launcher")
 
 
--- SUPER+ALT+SPACE : menu Omarchy dans l'île poste.island (était : menu Omarchy natif).
+-- SUPER+ALT+SPACE: Omarchy menu in the poste.island island (was: native Omarchy menu).
 hl.unbind("SUPER + ALT + SPACE")
 o.bind("SUPER + ALT + SPACE", "Omarchy menu", "omarchy-shell poste.island menu")
 
--- SUPER+CTRL+ALT+SPACE : menu Omarchy natif (repli).
+-- SUPER+CTRL+ALT+SPACE: native Omarchy menu (fallback).
 o.bind("SUPER + CTRL + ALT + SPACE", "Omarchy menu (native)", "omarchy-menu toggle")
 
--- SUPER+L : verrouiller (était : bascule de layout du workspace).
--- SUPER+L passe par l'île : son « lock » immédiat, puis omarchy-system-lock.
--- (Verrouillage auto et déverrouillage : sons joués par l'île.)
+-- SUPER+L: lock (was: workspace layout toggle).
+-- SUPER+L goes through the island: its immediate 'lock' sound, then omarchy-system-lock.
+-- (Auto lock and unlock: sounds played by the island.)
 hl.unbind("SUPER + L")
 o.bind("SUPER + L", "Lock screen", "omarchy-shell poste.island lock || omarchy-system-lock")
--- PRINT : capture Omarchy + son « snap » quand un fichier est créé.
+-- PRINT: Omarchy capture + 'snap' sound when a file is created.
 hl.unbind("PRINT")
 o.bind("PRINT", "Screenshot", os.getenv("HOME") .. "/.config/omarchy/plugins/poste.island/bin/poste-screenshot")
--- Enregistrement d'écran (SHIFT+PRINT, ALT+PRINT retiré) : fourni par le module record
--- (~/.local/share/poste/modules/record/hypr/record.lua, chargé par hyprland.lua).
+-- Screen recording (SHIFT+PRINT, ALT+PRINT removed): provided by the record module
+-- (~/.local/share/poste/modules/record/hypr/record.lua, loaded by hyprland.lua).
 
 
 
--- SUPER+E : Flea sur le dossier du terminal actif (Nautilus reste installé).
+-- SUPER+E: Flea on the active terminal's folder (Nautilus stays installed).
 o.bind("SUPER + E", "File manager (cwd)", 'flea --gui "$(omarchy-cmd-terminal-cwd)"')
--- SUPER+SHIFT+M : mail Omamail (était : Spotify, désinstallé).
+-- SUPER+SHIFT+M: Omamail mail (was: Spotify, uninstalled).
 hl.unbind("SUPER + SHIFT + M")
 o.bind("SUPER + SHIFT + M", "Mail (Omamail)", "omarchy-shell shell toggle omamail '{}'")
 o.bind("SUPER + SHIFT + code:60", "Passwords", { launch = "proton-pass" })
@@ -123,15 +123,15 @@ o.bind("SUPER + SHIFT + code:60", "Passwords", { launch = "proton-pass" })
 -- Dictation (SUPER+A): provided by the dictation add-on the machine chooses (vocaline or voxtype,
 -- ~/.local/share/poste/modules/<add-on>/hypr/, loaded by hyprland.lua).
 
--- Envoyer la fenêtre sur un écran précis (SUPER+CTRL+ALT+flèche). Les écrans
--- de chaque flèche sont propres à la machine : screen_keys, dans monitors.lua.
+-- Send the window to a given screen (SUPER+CTRL+ALT+arrow). The screens
+-- of each arrow are specific to the machine: screen_keys, in monitors.lua.
 for _, screen in ipairs(screen_keys or {}) do
   o.bind("SUPER + CTRL + ALT + " .. screen.key, "Send window to " .. screen.name, hl.dsp.window.move({ monitor = screen.monitor }))
 end
 
--- Touches de volume : même commande qu'Omarchy, mais via le shim de poste.island
--- qui saute l'OSD de volume quand l'île est la barre active (le bandeau de l'île
--- affiche le volume lu dans PipeWire). Sans l'île, l'OSD natif s'affiche comme avant.
+-- Volume keys: same command as Omarchy, but through poste.island's shim
+-- which skips the volume OSD when the island is the active bar (the island's banner
+-- shows the volume read from PipeWire). Without the island, the native OSD shows as before.
 local island_volume = 'PATH="$HOME/.config/omarchy/plugins/poste.island/bin:$PATH" omarchy-audio-output-volume '
 for key, spec in pairs({
   ["XF86AudioRaiseVolume"] = { "Volume up", "raise", true },
@@ -144,29 +144,29 @@ for key, spec in pairs({
   o.bind(key, spec[1], island_volume .. spec[2], { locked = true, repeating = spec[3] })
 end
 
--- SUPER+SHIFT+SPACE : désactivé (défaut Omarchy « afficher/masquer la barre », sans objet avec l'île).
+-- SUPER+SHIFT+SPACE: disabled (Omarchy default 'show/hide the bar', pointless with the island).
 hl.unbind("SUPER + SHIFT + SPACE")
 
 
--- Raccourcis Omarchy par défaut vers des applis désinstallées : retirés.
+-- Omarchy default shortcuts to uninstalled apps: removed.
 -- SUPER+SHIFT+W (Omawrite), SUPER+SHIFT+ALT+M (cliamp),
--- SUPER+SHIFT+SLASH (1Password ; Proton Pass est sur SUPER+SHIFT+.), SUPER+SHIFT+G (Signal),
--- SUPER+CTRL+RETURN et SUPER+CTRL+K (Herdr) : retirés à la demande.
+-- SUPER+SHIFT+SLASH (1Password; Proton Pass is on SUPER+SHIFT+.), SUPER+SHIFT+G (Signal),
+-- SUPER+CTRL+RETURN and SUPER+CTRL+K (Herdr): removed on request.
 for _, key in ipairs({ "SUPER + SHIFT + W", "SUPER + SHIFT + ALT + M", "SUPER + SHIFT + SLASH",
                         "SUPER + SHIFT + G", "SUPER + CTRL + RETURN", "SUPER + CTRL + K" }) do
   hl.unbind(key)
 end
 
--- SUPER+SHIFT+C : T3 Code (à la place de Calendar HEY), ramène la fenêtre si elle est ouverte.
+-- SUPER+SHIFT+C: T3 Code (in place of Calendar HEY), brings the window back if it is open.
 hl.unbind("SUPER + SHIFT + C")
--- Un lanceur ~/.local/bin/t3code (propre à la machine, ex. identifiants du PC
--- pro) passe avant la commande du paquet.
+-- A launcher ~/.local/bin/t3code (specific to the machine, e.g. credentials of the work
+-- PC) takes precedence over the package's command.
 local t3code = os.getenv("HOME") .. "/.local/bin/t3code"
 local t3code_wrapper = io.open(t3code)
 if t3code_wrapper then t3code_wrapper:close() else t3code = "t3code-nightly" end
 o.bind("SUPER + SHIFT + C", "T3 Code", o.launch_sole("com.t3tools.T3Code", t3code))
 
--- Raccourcis Omarchy vers des sites web (webapps) : retirés à la demande.
+-- Omarchy shortcuts to websites (webapps): removed on request.
 for _, key in ipairs({
   "SUPER + SHIFT + A", "SUPER + SHIFT + ALT + A",                         -- ChatGPT, Grok
   "SUPER + SHIFT + E", "SUPER + SHIFT + ALT + E", "SUPER + CTRL + ALT + D", -- HEY Email, New email, Calendar
@@ -178,9 +178,9 @@ for _, key in ipairs({
   hl.unbind(key)
 end
 
--- Panneaux Réseau / Audio / Bluetooth : vues intégrées de l'île sur l'écran
--- focus (2e appui = fermer). Le panneau natif reste accessible via
--- « Advanced settings… » dans chaque vue.
+-- Network / Audio / Bluetooth panels: views built into the island on the focused
+-- screen (2nd press = close). The native panel stays reachable through
+-- 'Advanced settings…' in each view.
 for key, spec in pairs({
   ["SUPER + CTRL + W"] = { "Wi-Fi (island)", "wifi" },
   ["SUPER + CTRL + A"] = { "Sound (island)", "audio" },
@@ -190,7 +190,7 @@ for key, spec in pairs({
   o.bind(key, spec[1], "omarchy-shell poste.island " .. spec[2])
 end
 
--- SUPER+D : bac de fichiers de Flea (Shelf), ouvert sous l'île.
+-- SUPER+D: Flea's file shelf (Shelf), opened under the island.
 o.bind("SUPER + D", "File shelf (Flea)", "flea shelf toggle")
 
 -- flea --default: begin. Written by `flea --default`; `flea --default off` removes the block whole.
@@ -204,8 +204,8 @@ o.bind("SUPER + ALT + SHIFT + F", "File manager (cwd)", { launch = 'flea --gui "
 o.window("com.thisisgm.flea.picker", { tag = "+floating-window" })
 -- flea --picker: end.
 
--- SUPER+SHIFT+F et SUPER+ALT+SHIFT+F : retirés, SUPER+E suffit (Flea sur le
--- dossier du terminal). Le bloc « flea --default » ci-dessus est gardé : sans
--- lui, `flea --default` (bootstrap) le réécrirait.
+-- SUPER+SHIFT+F and SUPER+ALT+SHIFT+F: removed, SUPER+E is enough (Flea on the
+-- terminal's folder). The 'flea --default' block above is kept: without
+-- it, `flea --default` (bootstrap) would rewrite it.
 hl.unbind("SUPER + SHIFT + F")
 hl.unbind("SUPER + ALT + SHIFT + F")

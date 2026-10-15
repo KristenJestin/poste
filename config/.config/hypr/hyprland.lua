@@ -22,13 +22,13 @@ require("hypr.bindings")
 require("hypr.looknfeel")
 require("hypr.autostart")
 
--- Réglages propres à la machine, posés par son dépôt poste-data (facultatif).
+-- Machine-specific settings, put in place by its poste-data repository (optional).
 if package.searchpath("hypr.machine", package.path) then require("hypr.machine") end
 
--- Morceaux de config des modules poste : chaque module installé peut fournir
--- hypr/*.lua (installés par `poste sys setup` dans ~/.local/share/poste/modules/<nom>/hypr/).
--- Hyprland ne connaît aucun module : un module absent ne laisse aucune trace. Une erreur dans
--- un morceau est isolée (pcall) et signalée par une notification, le reste se charge.
+-- Config pieces of the poste modules: each installed module may provide
+-- hypr/*.lua (installed by `poste sys setup` in ~/.local/share/poste/modules/<name>/hypr/).
+-- Hyprland knows no module: an absent module leaves no trace. An error in
+-- a piece is isolated (pcall) and reported by a notification, the rest loads.
 do
   local data = os.getenv("XDG_DATA_HOME")
   if not data or data == "" then data = os.getenv("HOME") .. "/.local/share" end
@@ -55,6 +55,6 @@ require("default.hypr.toggles")
 -- Add any other personal Hyprland configuration below.
 -- o.window("qemu", { workspace = "5" })
 
--- Applis Qt : sélecteur de fichiers via le portail (donc Flea), au lieu de la
--- boîte GTK qu'elles dessinent elles-mêmes avec le thème gtk3 d'Omarchy.
+-- Qt apps: file picker through the portal (so Flea), instead of the
+-- GTK box they draw themselves with Omarchy's gtk3 theme.
 hl.env("QT_QPA_PLATFORMTHEME", "xdgdesktopportal")

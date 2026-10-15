@@ -1,17 +1,17 @@
-# poste-theme : palette de Linear (linear.app, thème sombre), fond d'écran "winding road".
-# Sources (variables CSS de linear.app) : bg-primary #08090a, bg-level-1 #0f1011,
+# poste-theme: Linear palette (linear.app, dark theme), "winding road" wallpaper.
+# Sources (CSS variables of linear.app): bg-primary #08090a, bg-level-1 #0f1011,
 # bg-marketing #010102, text-primary #f7f8f8, text-secondary #d0d6e0,
-# text-tertiary #8a8f98, text-quaternary #62666d, accent-tint #18182f (accent perso : #ff8226, orange),
+# text-tertiary #8a8f98, text-quaternary #62666d, accent-tint #18182f (personal accent: #ff8226, orange),
 # red #eb5757, orange #fc7840, yellow #f0bf00, green #27a644, teal #00b8cc,
-# blue #4ea7fc, plan #68cc58 ; coloration syntaxique du site pour les variantes vives.
+# blue #4ea7fc, plan #68cc58; the site's syntax highlighting for the vivid variants.
 mode = "dark"
 
 accent = "#ff8226"
 selection = "#2b2118"
 muted = "#62666d"
 
-# Bordures neutres (fenêtres actives, menus, panneaux, popups) : l'accent
-# orange reste réservé aux éléments actifs.
+# Neutral borders (active windows, menus, panels, popups): the orange
+# accent stays reserved for active elements.
 hyprland_active_border = "#80848c"
 hyprland_inactive_border = "#141517"
 

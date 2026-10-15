@@ -1,5 +1,5 @@
 {
-  "//": "Sons de l'île (bin/poste-sfx). enabled: false coupe tout. events : son par événement (\"\" = muet, ou {\"sound\": …, \"volume\": 0.2}) ; volume : multiplicateur (1.0 = volumes du site uisfx), relatif à ~/.config/poste-island/sounds, sans .ogg. notifications : sonne seulement pour ces applis (\"*\" = toutes) ou ces urgences ; appSounds : un son propre à une appli.",
+  "//": "Island sounds (bin/poste-sfx). enabled: false turns everything off. events: sound per event (\"\" = mute, or {\"sound\": …, \"volume\": 0.2}) ; volume: multiplier (1.0 = volumes of the uisfx site), relative to ~/.config/poste-island/sounds, without .ogg. notifications: rings only for these apps (\"*\" = all) or these urgencies; appSounds: a sound of its own for an app.",
   "enabled": true,
   "volume": 1.0,
   "gains": {

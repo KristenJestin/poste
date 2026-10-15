@@ -1,2 +1,2 @@
-Sons : uisfx (https://uisfx.com, github.com/romainsimon/uisfx), jeux « cinematic » (complet) et « minimal » (quelques sons) et « zen » (lock, unlock, snap, queued), v0.4.0.
-Licence de l'audio : CC0 (domaine public), sans attribution requise.
+Sounds: uisfx (https://uisfx.com, github.com/romainsimon/uisfx), sets 'cinematic' (complete), 'minimal' (a few sounds) and 'zen' (lock, unlock, snap, queued), v0.4.0.
+Audio license: CC0 (public domain), no attribution required.

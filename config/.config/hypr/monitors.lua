@@ -1,34 +1,34 @@
 -- See https://wiki.hypr.land/Configuring/Basics/Monitors/
 -- List current monitors and supported resolutions with: hyprctl monitors all
 
--- Exemple générique : chaque machine pose son vrai monitors.lua par son dépôt de
--- données (poste-data, config/.config/hypr/monitors.lua), qui remplace celui-ci.
--- Sans lui : tout écran branché en mode préféré, et les workspaces 1 à 10
--- d'Hyprland, partagés entre les écrans.
+-- Generic example: each machine puts its real monitors.lua in place through its data
+-- repository (poste-data, config/.config/hypr/monitors.lua), which replaces this one.
+-- Without it: every connected screen in preferred mode, and Hyprland's
+-- workspaces 1 to 10, shared between the screens.
 hl.env("GDK_SCALE", "1")
 
--- Un écran par prise (DP-1) ou par sa description EDID (desc:…, début de la
--- description de `hyprctl monitors`), qui le reconnaît quelle que soit la prise :
+-- A screen by port (DP-1) or by its EDID description (desc:…, start of the
+-- description from `hyprctl monitors`), which recognizes it whatever the port:
 -- hl.monitor({ output = "DP-1", mode = "1920x1080@144", position = "0x0", scale = 1, transform = 1 }) -- portrait
--- hl.monitor({ output = "desc:Fabricant Modèle Série", mode = "1920x1080@144", position = "1080x420", scale = 1 })
+-- hl.monitor({ output = "desc:Maker Model Serial", mode = "1920x1080@144", position = "1080x420", scale = 1 })
 
--- Fallback pour tout autre écran branché (vidéoprojecteur, etc.).
+-- Fallback for any other connected screen (projector, etc.).
 hl.monitor({ output = "", mode = "preferred", position = "auto", scale = 1 })
 
--- --- Workspaces par écran -------------------------------------------------
--- Chaque écran de workspace_monitors a ses propres workspaces 1 à 10 (voir
--- bindings.lua) : en interne, premier écran = 1-10, deuxième = 11-20, etc.
--- default_name affiche 1 à 10 sur chaque écran au lieu de 11-30.
--- Plusieurs jeux d'écrans (portable au bureau, seul…) tiennent dans la même
--- liste : un écran absent garde ses numéros. Débranché, Hyprland pose ses
--- workspaces sur un écran restant (l'île les y montre à part) et les lui rend
--- quand il revient sur la même prise.
--- SUPER+CTRL+ALT+flèche envoie la fenêtre sur l'écran de cette flèche (bindings.lua).
+-- --- Workspaces per screen ------------------------------------------------
+-- Each screen of workspace_monitors has its own workspaces 1 to 10 (see
+-- bindings.lua): internally, first screen = 1-10, second = 11-20, etc.
+-- default_name shows 1 to 10 on each screen instead of 11-30.
+-- Several sets of screens (laptop at the desk, alone…) fit in the same
+-- list: an absent screen keeps its numbers. When unplugged, Hyprland puts its
+-- workspaces on a remaining screen (the island shows them apart there) and gives them back
+-- when it returns on the same port.
+-- SUPER+CTRL+ALT+arrow sends the window to the screen in that arrow's direction (bindings.lua).
 screen_keys = {
   -- { key = "LEFT", monitor = "DP-1", name = "left screen" },
 }
 
-workspace_monitors = {} -- { "DP-1", "desc:Fabricant Modèle Série" }
+workspace_monitors = {} -- { "DP-1", "desc:Maker Model Serial" }
 
 for index, output in ipairs(workspace_monitors) do
   local offset = (index - 1) * 10

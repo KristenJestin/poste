@@ -206,8 +206,8 @@ scrim-alpha      = 0.5
 accent           = "{{ accent }}"
 
 [lock]
-# kris : champ façon île — pilule quasi noire, liseré discret, plus clair en
-# saisie, rouge en erreur ; pas d'orange sur les bordures.
+# kris: island-style field: near-black pill, discreet outline, lighter while
+# typing, red on error; no orange on the borders.
 # Lock screen password input. background/background-alpha control the
 # centered input field card; border/border-active/border-error cycle
 # through idle, typing/authenticating, and wrong-password states.
