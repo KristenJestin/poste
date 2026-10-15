@@ -7,9 +7,9 @@
 //
 // One island per screen shows that screen's workspaces, the clock, and the
 // now-playing cover + wave; clicking the music opens a player on that screen.
-// Ce qui passe (notifications, volume, OSD, texte dicté) s'affiche dans le bandeau (bandeau/),
-// empilé juste sous l'île ; seule la pastille de la dictée (micro, onde) va en bas de l'écran
-// actif. L'île ne se transforme pas pour le montrer.
+// What passes (notifications, volume, OSD, dictated text) is shown in the banner (bandeau/),
+// stacked just under the island; only the dictation pill (microphone, wave) goes at the bottom of the
+// active screen. The island does not transform to show it.
 import QtQuick
 import Qt.labs.folderlistmodel
 import Quickshell
@@ -52,8 +52,8 @@ Item {
     showHidden: true
   }
 
-  // ---------------------------------------------------------------- modules poste
-  // Morceaux d'île fournis par les modules (lanceur, éléments QML) : voir ModuleRegistry.qml.
+  // ---------------------------------------------------------------- poste modules
+  // Island pieces provided by the modules (launcher, QML elements): see ModuleRegistry.qml.
   ModuleRegistry { id: moduleRegistry }
   readonly property var modules: moduleRegistry
 
@@ -89,10 +89,10 @@ Item {
 
   ColorQuantizer {
     id: coverColors
-    // Images locales seulement : ColorQuantizer ne sait pas charger les
-    // pochettes HTTP(S) (lecteurs en ligne) et journalise alors l'URL
-    // complète, jeton d'authentification Subsonic compris. L'onde garde
-    // l'accent quand la pochette est distante.
+    // Local images only: ColorQuantizer cannot load
+    // HTTP(S) covers (online players) and then logs the full
+    // URL, Subsonic authentication token included. The wave keeps
+    // the accent when the cover is remote.
     source: /^(file:|\/)/.test(root.mediaArt) ? root.mediaArt : ""
     depth: 2
     rescaleSize: 64
@@ -124,11 +124,11 @@ Item {
   readonly property string playerApp: playerExtras.app
   function playerAction() { if (playerHasAction) Quickshell.execDetached(playerExtras.like) }
 
-  // ---------------------------------------------------------------- volume du lecteur
-  // Volume de l'application du lecteur courant : son ou ses flux PipeWire
-  // (nœuds « Stream/Output/Audio » dont `application.name` correspond à
-  // l'identité ou à l'entrée de bureau MPRIS : « Musique », « Zen »...), sinon
-  // la propriété MPRIS `volume` si le lecteur la gère, sinon -1 (rien à régler).
+  // ---------------------------------------------------------------- player volume
+  // Volume of the current player's application: its PipeWire stream(s)
+  // (nodes 'Stream/Output/Audio' whose `application.name` matches
+  // the MPRIS identity or desktop entry: 'Music', 'Zen'...), otherwise
+  // the MPRIS `volume` property if the player handles it, otherwise -1 (nothing to adjust).
   readonly property var pwAllStreams: (Pipewire.nodes ? Pipewire.nodes.values : []).filter(function(n) { return n && n.isStream })
   PwObjectTracker { objects: root.pwAllStreams }
 
@@ -167,7 +167,7 @@ Item {
     if (playerStreams.length > 0) return playerStreams.every(function(n) { return n.audio.muted })
     return playerMprisVolume && Number(player.volume) <= 0
   }
-  // Dernier niveau avant la mise en sourdine MPRIS (qui n'a pas de « muet »).
+  // Last level before the MPRIS mute (which has no 'muted').
   property real mprisVolumeBeforeMute: 0.5
   function setPlayerVolume(v) {
     v = Math.max(0, Math.min(1, v))
@@ -182,7 +182,7 @@ Item {
     setPlayerVolume(Math.round((playerVolume + delta) * 100) / 100)
     playerVolumeHint.restart()
   }
-  // Molette : 120 unités = un cran = 5 % (les pavés tactiles cumulent leurs petits pas).
+  // Wheel: 120 units = one notch = 5 % (touchpads accumulate their small steps).
   property real wheelAccum: 0
   function wheelPlayerVolume(dy) {
     if (playerVolume < 0) return
@@ -201,7 +201,7 @@ Item {
       else { mprisVolumeBeforeMute = Math.max(0.05, Number(player.volume)); setPlayerVolume(0) }
     }
   }
-  // Pastille « NN % » brève après un coup de molette (pastille et carte).
+  // Brief 'NN %' pill after a wheel notch (pill and card).
   readonly property bool playerVolumeHintShown: playerVolumeHint.running
   Timer { id: playerVolumeHint; interval: 1200 }
 
@@ -273,8 +273,8 @@ Item {
   Connections {
     target: Hyprland
     function onRawEvent(event) {
-      // Un monitors.lua recâblé (lien vers un autre fichier) ne déclenche pas
-      // watchChanges : on le relit quand Hyprland recharge sa config.
+      // A re-wired monitors.lua (link to another file) does not trigger
+      // watchChanges: it is read again when Hyprland reloads its config.
       if (event.name === "configreloaded") monitorsFile.reload()
       if (/workspace|window|monitor|focus|fullscreen/.test(event.name)) root.refreshWorkspaces()
     }
@@ -371,7 +371,7 @@ Item {
   function run(command) { if (command) Util.execDetached(command) }
 
   property var nativeWidgets: []
-  // Un widget rechargé à la même place (registre des plugins relu) remplace l'ancien.
+  // A widget reloaded in the same place (plugin registry read again) replaces the old one.
   function registerNativeWidget(id, screenName, item) {
     nativeWidgets = nativeWidgets.filter(function(w) {
       return w.item !== item && !(w.id === id && w.screen === screenName)
@@ -419,9 +419,9 @@ Item {
   // VPN (OmaProton): its panel keeps the Proton CLI state in a child Service
   // object, found once the widget is mounted. The tile shows once the CLI is
   // installed (or a tunnel is up), the lock only while connected.
-  // Lu dans la liste des widgets montés plutôt que tenu à la main : quand l'écran du
-  // milieu change (écran débranché, écrans de Navette), le widget du nouvel écran peut
-  // se charger avant que l'ancien soit détruit ; la liaison suit dans tous les ordres.
+  // Read from the list of mounted widgets rather than held by hand: when the
+  // middle screen changes (screen unplugged, Navette screens), the new screen's widget can
+  // load before the old one is destroyed; the binding follows in every order.
   readonly property var vpnService: findVpnService(nativeWidgetOn(vpnId, primaryScreenName))
   function findVpnService(item) {
     var kids = item && item.data ? item.data : []
@@ -455,9 +455,9 @@ Item {
     else item.open()
   }
 
-  // ---------------------------------------------------------------- bord de l'île
-  // Chaque île donne au bandeau son bord bas dessiné (IslandWindow.qml, `edge`) : la pile du
-  // bandeau se pose juste en dessous, sur le même écran.
+  // ---------------------------------------------------------------- island edge
+  // Each island gives the banner its drawn bottom edge (IslandWindow.qml, `edge`): the banner's
+  // stack sits just below, on the same screen.
   function reportEdge(screenName, bottom) { Bandeau.setIslandEdge(screenName, bottom) }
 
   // ---------------------------------------------------------------- notifications list
@@ -468,7 +468,7 @@ Item {
   readonly property string ncStore: home + "/.local/state/omarchy-notification-center"
   property int unreadCount: 0
   property double seenAt: 0
-  // Une notification critique non lue : le point de l'île passe au rouge.
+  // An unread critical notification: the island's dot turns red.
   readonly property bool unreadImportant: {
     for (var i = 0; i < notificationList.length; i++) {
       var n = notificationList[i]
@@ -536,12 +536,12 @@ Item {
     return Qt.formatDateTime(new Date(Number(ms)), "d MMM")
   }
 
-  // Slot « dictation » : un add-on fournit la source de dictée (vocaline ou voxtype).
-  // Contrat de l'élément chargé : propriétés lues `listening` (micro ouvert),
-  // `transcribing` (fin en cours), `level` (niveau courant de 0 à 1 ;
-  // la source le met à jour à son rythme et le lisse si elle est lente), `finals` (texte figé
-  // de la dictée) et `partial` (phrase en cours). Le micro et l'onde vont en bas de l'écran actif,
-  // le texte, s'il y en a, juste sous l'île (le bandeau, bandeau/).
+  // 'dictation' slot: an add-on provides the dictation source (vocaline or voxtype).
+  // Contract of the loaded element: read properties `listening` (microphone open),
+  // `transcribing` (ending in progress), `level` (current level from 0 to 1;
+  // the source updates it at its own pace and smooths it if it is slow), `finals` (frozen text
+  // of the dictation) and `partial` (sentence in progress). The microphone and wave go at the bottom of the active screen,
+  // the text, if any, just under the island (the banner, bandeau/).
   property var dictationItems: []
   function collectDictations() {
     var list = []
@@ -568,38 +568,38 @@ Item {
     return null
   }
 
-  // La dictée en cours : la source du slot qui dicte.
+  // The dictation in progress: the source of the slot that is dictating.
   readonly property bool voxListening: !!dictation && dictation.listening
   readonly property bool voxTranscribing: !!dictation && dictation.transcribing
-  // Une seule onde pour toutes les sources : chacune ne donne que son niveau courant, que le
-  // bandeau échantillonne à cadence fixe (bandeau/Bandeau.qml, « dictée »).
+  // A single wave for all the sources: each only gives its current level, which the
+  // banner samples at a fixed rate (bandeau/Bandeau.qml, 'dictation').
   readonly property real voxLevel: dictation && dictation.listening ? Number(dictation.level) || 0 : 0
   readonly property string dictationFinals: dictation ? String(dictation.finals || "") : ""
   readonly property string dictationPartial: dictation ? String(dictation.partial || "") : ""
-  // La dictée s'affiche dans le bandeau : la pastille en bas, le texte sous l'île.
+  // The dictation shows in the banner: the pill at the bottom, the text under the island.
   Binding { target: Bandeau; property: "dictationListening"; value: root.voxListening }
   Binding { target: Bandeau; property: "dictationTranscribing"; value: root.voxTranscribing }
   Binding { target: Bandeau; property: "dictationLevel"; value: root.voxLevel }
   Binding { target: Bandeau; property: "dictationFinals"; value: root.dictationFinals }
   Binding { target: Bandeau; property: "dictationPartial"; value: root.dictationPartial }
 
-  // Sons de dictée (poste-sfx) : boucle pendant l'écoute, « stop » à la fin.
+  // Dictation sounds (poste-sfx): loop while listening, 'stop' at the end.
   readonly property string sfx: root.home + "/.config/omarchy/plugins/poste.island/bin/poste-sfx"
-  // Verrouillage / déverrouillage (écran de verrouillage d'Omarchy, raccourci
-  // comme mise en veille automatique) : sons « lock » et « unlock ». Le service
-  // de verrouillage n'est pas exposé aux plugins ; comme omarchy-hyprland-
-  // session-locked, on lit « LOCK » dans solitaryBlockedBy des écrans Hyprland.
-  // SUPER+L passe par l'île (lockNow) : son immédiat, puis verrouillage. La
-  // détection ne sert qu'au verrouillage automatique et au déverrouillage :
-  // relue toutes les 60 ms tant que c'est verrouillé (700 ms sinon), et à
-  // chaque événement Hyprland.
+  // Lock / unlock (Omarchy lock screen, shortcut
+  // as well as automatic sleep): 'lock' and 'unlock' sounds. The lock
+  // service is not exposed to plugins; like omarchy-hyprland-
+  // session-locked, we read 'LOCK' in solitaryBlockedBy of the Hyprland screens.
+  // SUPER+L goes through the island (lockNow): immediate sound, then lock. The
+  // detection is only used for the automatic lock and the unlock:
+  // read again every 60 ms while locked (700 ms otherwise), and at
+  // each Hyprland event.
   property bool sessionLocked: false
   property bool lockKnown: false
   property bool lockAnnounced: false
   function lockNow() {
     lockAnnounced = true
     Quickshell.execDetached(["omarchy-system-lock"])
-    lockSoundDelay.restart()   // le son suit l'apparition de l'écran de verrouillage
+    lockSoundDelay.restart()   // the sound follows the appearance of the lock screen
   }
   Timer { id: lockSoundDelay; interval: 175; onTriggered: Quickshell.execDetached([root.sfx, "lock"]) }
   function readLock() {
@@ -616,7 +616,7 @@ Item {
     Qt.callLater(root.readLock)
     lockReread.restart()
   }
-  // refreshMonitors() répond de façon asynchrone : relecture juste après.
+  // refreshMonitors() answers asynchronously: read again right after.
   Timer { id: lockReread; interval: 30; onTriggered: root.readLock() }
   Timer {
     interval: root.sessionLocked ? 60 : 700
@@ -639,8 +639,8 @@ Item {
     running: root.voxListening
     command: ["sh", "-c", 'while :; do "$1" dictation-start || exit; done', "vox-loop", root.sfx]
   }
-  // Le son d'écoute tourne en boucle (voxLoop) ; à l'arrêt, « stop ». Pour toute source du
-  // slot « dictation ».
+  // The listening sound loops (voxLoop); at the stop, 'stop'. For any source of the
+  // 'dictation' slot.
   onVoxListeningChanged: if (!voxListening) Quickshell.execDetached([root.sfx, "dictation-stop"])
 
   // ---------------------------------------------------------------- AI usage
@@ -650,11 +650,11 @@ Item {
   // widget that ran the updater isn't mounted without the bar, so the island
   // runs it: every 5 minutes, and a cheaper --limits-only pass when the
   // control center opens. A run in progress absorbs further requests.
-  // OBS : enregistrement / diffusion (ObsState.qml, bin/poste-obs).
+  // OBS: recording / streaming (ObsState.qml, bin/poste-obs).
   ObsState { id: obsState }
-  // Slot « capture » : un module peut fournir sa propre source d'enregistrement (élément
-  // de même interface qu'ObsState : active, recording, paused, recordElapsed, request…).
-  // La pastille de capture et sa carte suivent celle qui enregistre, OBS sinon.
+  // 'capture' slot: a module can provide its own recording source (element
+  // with the same interface as ObsState: active, recording, paused, recordElapsed, request…).
+  // The capture pill and its card follow the one that is recording, OBS otherwise.
   property var captureItems: []
   function collectCaptures() {
     var list = []
@@ -675,8 +675,8 @@ Item {
     onItemAdded: Qt.callLater(root.collectCaptures)
     onItemRemoved: Qt.callLater(root.collectCaptures)
   }
-  // Cible encadrée pendant le choix dans une extension du lanceur qui le demande
-  // (« highlight »: true) : { x, y, w, h, window } en coordonnées globales Hyprland, ou null.
+  // Target framed while choosing in a launcher extension that asks for it
+  // ('highlight': true): { x, y, w, h, window } in global Hyprland coordinates, or null.
   property var recordHighlight: null
   readonly property var obs: {
     var list = captureItems
@@ -685,27 +685,27 @@ Item {
     return list.length > 0 ? list[0] : obsState
   }
 
-  // Batteries des périphériques sans fil (clavier, souris, casque) : DevicesState.qml.
+  // Batteries of wireless devices (keyboard, mouse, headset): DevicesState.qml.
   DevicesState { id: devicesState }
   readonly property var devices: devicesState
 
-  // La batterie (activité de l'île, portables seulement) : BatteryState.qml.
+  // The battery (island activity, laptops only): BatteryState.qml.
   BatteryState { id: batteryState; profile: powerProfileState }
   readonly property var battery: batteryState
 
-  // Le profil d'alimentation (centre de contrôle, activité de la batterie) :
-  // PowerProfileState.qml. Chaque changement, d'où qu'il vienne, passe en OSD dans le bandeau.
+  // The power profile (control center, battery activity):
+  // PowerProfileState.qml. Each change, wherever it comes from, shows as an OSD in the banner.
   PowerProfileState {
     id: powerProfileState
     onSwitched: function(name) { Bandeau.showOsd(powerProfileState.glyphOf(name), powerProfileState.label(name), "", "100", "", "1600") }
   }
   readonly property var powerProfile: powerProfileState
 
-  // La conversation avec l'IA, commune à tous les écrans (AskService.qml).
+  // The conversation with the AI, common to all screens (AskService.qml).
   AskService { id: aiService }
   readonly property var ai: aiService
 
-  // Fournisseur affiché par la vue « Usage » (claude ou codex).
+  // Provider shown by the 'Usage' view (claude or codex).
   property string usageProvider: "claude"
   readonly property string agentUsageDir: home + "/.local/state/omarchy/agents/usage"
   property var agentUsage: []
@@ -807,13 +807,13 @@ Item {
   Timer { interval: 900; running: root.anyListOpen; repeat: true; onTriggered: root.refreshStore() }
 
   // ---------------------------------------------------------------- timers
-  // Minuteurs lancés depuis le lanceur (« timer 10m pâtes ») ou par IPC
-  // (omarchy-shell poste.island timer "10m pâtes"). Chacun s'affiche dans sa
-  // petite île à droite de l'île principale (TimerPill), dont le fond se vide
-  // avec le temps. Fin : son en boucle et pastille qui pulse jusqu'au clic. Survivent à un redémarrage
-  // du shell (~/.local/state/poste-island/timers.json).
-  // Les rappels d'Omarchy (omarchy-reminder) s'y ajoutent à l'affichage
-  // (allTimers) sans être stockés : systemd reste leur source de vérité.
+  // Timers started from the launcher ('timer 10m pasta') or by IPC
+  // (omarchy-shell poste.island timer "10m pasta"). Each one shows in its own
+  // small island to the right of the main island (TimerPill), whose background empties
+  // with time. End: looping sound and a pill that pulses until clicked. They survive a restart
+  // of the shell (~/.local/state/poste-island/timers.json).
+  // Omarchy's reminders (omarchy-reminder) are added to the display
+  // (allTimers) without being stored: systemd remains their source of truth.
   property var timers: []
   property var omarchyReminders: []
   readonly property var allTimers: timers.concat(omarchyReminders)
@@ -843,7 +843,7 @@ Item {
   function saveTimers() { timersFile.setText(JSON.stringify(timers)) }
   function setTimers(list) { timers = list; saveTimers() }
   function timerLeft(t) { return t.done ? 0 : t.paused ? t.left : Math.max(0, t.end - now) }
-  // « 10m », « 1h30 », « 90s », « 1:30 », « 25 » (minutes), « 2 min »…
+  // '10m', '1h30', '90s', '1:30', '25' (minutes), '2 min'…
   function parseDuration(text) {
     var m = String(text || "").trim().match(/^((?:\d+(?:[.,]\d+)?\s*(?:h|hr|hrs|hours?|heures?|m|mn|min|mins?|minutes?|s|sec|secs?|seconds?|secondes?)?\s*)+|\d+:\d{1,2}(?::\d{1,2})?)(?:\s+(.*))?$/i)
     if (!m) return null
@@ -855,7 +855,7 @@ Item {
       var re = /(\d+(?:[.,]\d+)?)\s*([a-z]*)/gi, g, lastUnit = ""
       while ((g = re.exec(spec)) !== null) {
         var n = Number(g[1].replace(",", ".")), u = g[2].toLowerCase()
-        if (!u) u = lastUnit === "h" ? "m" : lastUnit === "m" ? "s" : "m"   // « 1h30 », « 5m30 », « 25 »
+        if (!u) u = lastUnit === "h" ? "m" : lastUnit === "m" ? "s" : "m"   // '1h30', '5m30', '25'
         var unit = u.charAt(0)
         ms += n * (unit === "h" ? 3600000 : unit === "s" ? 1000 : 60000)
         lastUnit = unit
@@ -881,7 +881,7 @@ Item {
     setTimers(timers.filter(function(t) { return t.id !== id }))
   }
   function togglePause(id) {
-    if (isReminder(id)) return   // un minuteur systemd ne se met pas en pause
+    if (isReminder(id)) return   // a systemd timer cannot be paused
     now = Date.now()
     updateTimer(id, function(t) {
       if (t.done) return
@@ -890,7 +890,7 @@ Item {
     })
   }
   function addToTimer(id, ms) {
-    if (isReminder(id)) return   // ni prolongé : l'unité systemd n'est pas la nôtre
+    if (isReminder(id)) return   // nor extended: the systemd unit is not ours
     now = Date.now()
     updateTimer(id, function(t) {
       if (t.done) { t.done = false; t.end = now + ms; t.duration = ms; return }
@@ -909,14 +909,14 @@ Item {
       return c
     })
     if (changed) setTimers(list)
-    // Un rappel dont l'heure est passée disparaît tout de suite, sans attendre
-    // la prochaine lecture : l'unité a sonné, sa notification est l'alerte.
+    // A reminder whose time has passed disappears right away, without waiting for
+    // the next read: the unit has rung, its notification is the alert.
     var live = omarchyReminders.filter(function(r) { return r.end > now })
     if (live.length !== omarchyReminders.length) omarchyReminders = live
   }
-  function ringTimer(t) { }  // le son part tout seul (ringProc) tant qu'un minuteur est terminé
-  // Terminé : « complete » (jeu cinematic, uisfx, CC0) en boucle jusqu'au clic
-  // qui ferme la pastille, 2 min au plus.
+  function ringTimer(t) { }  // the sound starts by itself (ringProc) as long as a timer is finished
+  // Finished: 'complete' (cinematic set, uisfx, CC0) looping until the click
+  // that closes the pill, 2 min at most.
   readonly property bool timerRinging: {
     for (var i = 0; i < timers.length; i++) if (timers[i].done) return true
     return false
@@ -927,20 +927,20 @@ Item {
     command: ["timeout", "120", "sh", "-c", 'while :; do "$1" timer-done; sleep 1.4; done', "ring", root.sfx]
   }
 
-  // ---------------------------------------------------------------- rappels d'Omarchy
-  // `omarchy-reminder <minutes> [message]` crée une unité systemd transitoire
-  // omarchy-reminder-<N>m-<instant>.timer ; son message, s'il y en a un, est
-  // dans $XDG_RUNTIME_DIR/omarchy-reminders/<unité>.message. Omarchy les
-  // montrait dans sa barre, que l'île remplace : on les lit donc ici et on les
-  // affiche comme des minuteurs (même bulle, même carte). Rien n'est écrit dans
-  // timers.json, systemd reste la source de vérité. Pas de pause ni de +1 min
-  // (un minuteur systemd ne se suspend pas, et recréer l'unité ferait dépendre
-  // l'île de la commande interne d'Omarchy) ; pas de sonnerie à la fin non
-  // plus : l'unité envoie sa propre notification, qui est l'alerte, et la
-  // bulle disparaît à l'heure dite. Sans systemctl ni unité, il n'y a rien.
-  // Lecture toutes les 5 s (un `systemctl list-timers` ; pas de signal à
-  // écouter pour une unité transitoire), et aussitôt après une annulation.
-  property var remindersGone: []   // unités annulées d'ici, ignorées jusqu'à ce que systemd les ait lâchées
+  // ---------------------------------------------------------------- Omarchy reminders
+  // `omarchy-reminder <minutes> [message]` creates a transient systemd unit
+  // omarchy-reminder-<N>m-<instant>.timer; its message, if there is one, is
+  // in $XDG_RUNTIME_DIR/omarchy-reminders/<unit>.message. Omarchy
+  // showed them in its bar, which the island replaces: so we read them here and
+  // show them as timers (same bubble, same card). Nothing is written to
+  // timers.json, systemd remains the source of truth. No pause or +1 min
+  // (a systemd timer cannot be suspended, and recreating the unit would make
+  // the island depend on Omarchy's internal command); no ring at the end
+  // either: the unit sends its own notification, which is the alert, and the
+  // bubble disappears at the due time. Without systemctl or a unit, there is nothing.
+  // Read every 5 s (one `systemctl list-timers`; no signal to
+  // listen to for a transient unit), and right after a cancellation.
+  property var remindersGone: []   // units cancelled from here, ignored until systemd has let go of them
   readonly property string remindersMarker: "--messages--"
   function isReminder(id) { return String(id).indexOf("omarchy:") === 0 }
   function pollReminders() { if (!remindersProc.running) remindersProc.running = true }
@@ -960,7 +960,7 @@ Item {
       var unit = String(u.unit || "").replace(/\.timer$/, "")
       if (!/^omarchy-reminder-[A-Za-z0-9_.-]+$/.test(unit)) return
       seen.push(unit)
-      var end = Number(u.next) / 1000      // microsecondes depuis l'epoch
+      var end = Number(u.next) / 1000      // microseconds since the epoch
       if (!(end > at) || remindersGone.indexOf(unit) !== -1) return
       var m = unit.match(/^omarchy-reminder-(\d+)m-/)
       list.push({ id: "omarchy:" + unit, unit: unit, label: msgs[unit + ".message"] || "Rappel",
@@ -968,12 +968,12 @@ Item {
                   paused: false, left: 0, done: false, omarchy: true })
     })
     remindersGone = remindersGone.filter(function(u) { return seen.indexOf(u) !== -1 })
-    // Pas de nouvelle liste si rien n'a changé : la bande d'activités ne se reconstruit pas pour rien.
+    // No new list if nothing changed: the activity strip is not rebuilt for nothing.
     var sig = function(l) { return l.map(function(r) { return r.id + "|" + r.end + "|" + r.label + "|" + r.duration }).join("\n") }
     if (sig(list) !== sig(omarchyReminders)) { now = at; omarchyReminders = list }
   }
-  // Annule un rappel : arrête son minuteur systemd et retire son message, comme
-  // `omarchy-reminder clear` le fait pour tous.
+  // Cancels a reminder: stops its systemd timer and removes its message, like
+  // `omarchy-reminder clear` does for all of them.
   function cancelReminder(id) {
     var unit = String(id).substring(8)
     if (!/^omarchy-reminder-[A-Za-z0-9_.-]+$/.test(unit)) return
@@ -1004,10 +1004,10 @@ Item {
 
 
   // ---------------------------------------------------------------- shelf (Flea)
-  // Bac de fichiers de Flea, affiché par l'île (vue « shelf ») : la pile, les
-  // épinglés et les dernières captures viennent de la logique de Flea
-  // (/usr/share/flea/shelf, paquet flea) ; l'île ne fait que l'affichage.
-  // SUPER+D (flea shelf toggle) sonne via summon.json.
+  // Flea's file shelf, shown by the island ('shelf' view): the stack, the
+  // pinned items and the latest captures come from Flea's logic
+  // (/usr/share/flea/shelf, flea package); the island only does the display.
+  // SUPER+D (flea shelf toggle) rings via summon.json.
   readonly property bool shelfAvailable: shelfProbe.count > 0
   FolderListModel {
     id: shelfProbe
@@ -1037,16 +1037,16 @@ Item {
       onRan: if (root.shelf) root.shelf.reread()
     }
   }
-  // Tout ce qui entre dans le Shelf y reste jusqu'à ce qu'on le retire : on
-  // l'y met « épinglé » (Flea ne retire alors rien après un déplacement ou un
-  // zip), y compris ce qui arrive par « Add to shelf » dans Flea.
+  // Everything that enters the Shelf stays there until it is removed: it
+  // is put there 'pinned' (Flea then removes nothing after a move or a
+  // zip), including what arrives through 'Add to shelf' in Flea.
   function addToShelf(paths) { if (shelf && paths && paths.length) shelf.pinAll(paths, true) }
   Connections {
     target: root.shelf
     ignoreUnknownSignals: true
     function onPileChanged() {
-      // Seuls les nouveaux éléments : un élément qu'on désépingle pour le
-      // retirer ne doit pas être réépinglé entre-temps.
+      // Only the new items: an item that is unpinned in order to
+      // be removed must not be pinned again in the meantime.
       var items = root.shelf.pile && root.shelf.pile.items ? root.shelf.pile.items : []
       var known = {}
       var fresh = []
@@ -1071,7 +1071,7 @@ Item {
   signal toggleLauncherOn(string screenName)
   signal openLauncherExtOn(string screenName, string ext)
   signal toggleMenuOn(string screenName)
-  // Question à l'IA (vue « ask ») : texte pré-rempli, envoyé tout de suite si sendNow.
+  // Question to the AI ('ask' view): pre-filled text, sent right away if sendNow.
   signal openAskOn(string screenName, string text, bool sendNow)
   function openAsk(text, sendNow) { openAskOn(focusedScreen, text || "", !!sendNow) }
   IpcHandler {
@@ -1086,57 +1086,57 @@ Item {
     function tailscale(): string { root.openModuleOn(root.focusedScreen, "tailscale"); return "ok" }
     function module(name: string): string { root.openModuleOn(root.focusedScreen, name); return "ok" }
     function launcher(): string { root.toggleLauncherOn(root.focusedScreen); return "ok" }
-    // Le lanceur ouvert directement dans une extension (« record », « ssh »…).
+    // The launcher opened directly in an extension ('record', 'ssh'…).
     function launcherIn(ext: string): string { root.openLauncherExtOn(root.focusedScreen, ext); return "ok" }
-    // omarchy-shell poste.island ask "question" (vide = ouvre la vue)
+    // omarchy-shell poste.island ask "question" (empty = opens the view)
     function ask(question: string): string { root.openAsk(question, question !== ""); return "ok" }
-    // omarchy-shell poste.island timer "10m pâtes"
+    // omarchy-shell poste.island timer "10m pasta"
     function timer(spec: string): string {
       var d = root.parseDuration(spec)
       if (!d) return "invalid duration"
       root.startTimer(d.ms, d.label)
       return "ok"
     }
-    // omarchy-shell poste.island timerStop : arrête tous les minuteurs.
-    // omarchy-shell poste.island lock : son « lock » immédiat puis verrouillage (SUPER+L).
+    // omarchy-shell poste.island timerStop: stops all the timers.
+    // omarchy-shell poste.island lock: immediate 'lock' sound then lock (SUPER+L).
     function lock(): string { root.lockNow(); return "ok" }
     function timerStop(): string { root.setTimers([]); return "ok" }
-    // omarchy-shell poste.island timerCancel <id> : annule un seul minuteur.
-    // Un rappel d'Omarchy se désigne par « omarchy:<unité> ».
+    // omarchy-shell poste.island timerCancel <id>: cancels a single timer.
+    // An Omarchy reminder is designated by 'omarchy:<unit>'.
     function timerCancel(id: string): string {
       if (root.isReminder(id)) root.cancelReminder(id)
       else root.setTimers(root.timers.filter(function(t) { return String(t.id) !== String(id) }))
       return "ok"
     }
     function shelf(): string { root.openModuleOn(root.focusedScreen, "shelf"); return "ok" }
-    // omarchy-shell poste.island usage : détail de la consommation de Claude Code.
-    // omarchy-shell poste.island batterySim "charging 75" | "low 15" | "critical 6" | "off" :
-    // simule une batterie (pour voir son activité sur un PC qui n'en a pas).
+    // omarchy-shell poste.island usage: detail of Claude Code consumption.
+    // omarchy-shell poste.island batterySim "charging 75" | "low 15" | "critical 6" | "off":
+    // simulates a battery (to see its activity on a PC that has none).
     function batterySim(spec: string): string { return root.battery.simulate(spec) }
-    // omarchy-shell poste.island profileSim "power-saver" | "balanced" | "performance" | "off" :
-    // simule le profil d'alimentation (un choix dans le centre de contrôle ne change alors que
-    // la simulation). profile : le profil en place et ceux de la machine (JSON).
+    // omarchy-shell poste.island profileSim "power-saver" | "balanced" | "performance" | "off":
+    // simulates the power profile (a choice in the control center then only changes
+    // the simulation). profile: the current profile and those of the machine (JSON).
     function profileSim(spec: string): string { return root.powerProfile.simulate(spec) }
     function profile(): string {
       return JSON.stringify({ active: root.powerProfile.present ? root.powerProfile.active : "",
         profiles: root.powerProfile.shownProfiles, simulated: root.powerProfile.simulated })
     }
-    // omarchy-shell poste.island obs <Requête OBS> : ToggleRecord, StopRecord,
-    // ToggleRecordPause, SaveReplayBuffer… (pour un raccourci clavier).
+    // omarchy-shell poste.island obs <OBS request>: ToggleRecord, StopRecord,
+    // ToggleRecordPause, SaveReplayBuffer… (for a keyboard shortcut).
     function obs(kind: string): string { root.obs.request(kind || "ToggleRecord"); return "ok" }
-    // omarchy-shell poste.island devices : batteries des périphériques (JSON).
+    // omarchy-shell poste.island devices: batteries of the devices (JSON).
     function devices(): string { return JSON.stringify(root.devices.list) }
-    // omarchy-shell poste.island deviceSim "mouse 12" | "off" : simule un périphérique faible.
+    // omarchy-shell poste.island deviceSim "mouse 12" | "off": simulates a weak device.
     function deviceSim(spec: string): string { return root.devices.simulate(spec) }
-    // omarchy-shell poste.island askBg "question" [claude|codex] : lance la
-    // question en arrière-plan, dans une pastille épinglée (vue non ouverte).
+    // omarchy-shell poste.island askBg "question" [claude|codex]: starts the
+    // question in the background, in a pinned pill (view not opened).
     function askBg(question: string): string { return root.ai.spawn(question, "") ? "ok" : "empty" }
     function askBgWith(question: string, provider: string): string { return root.ai.spawn(question, provider) ? "ok" : "empty" }
-    // omarchy-shell poste.island askUnpinAll : retire toutes les pastilles IA
-    // au repos (celles qui travaillent restent).
+    // omarchy-shell poste.island askUnpinAll: removes all the idle AI pills
+    // (those that are working stay).
     function askUnpinAll(): string { return String(root.ai.unpinAll()) }
-    // omarchy-shell poste.island askPin : range la conversation IA courante dans
-    // sa pastille de droite (vue fermée), ou l'en retire si elle y est déjà.
+    // omarchy-shell poste.island askPin: puts the current AI conversation in
+    // its right-hand pill (view closed), or removes it from there if it is already in.
     function askPin(): string {
       var c = root.ai.current
       if (!c || c.messages.count === 0) return "empty"
@@ -1204,8 +1204,8 @@ Item {
           onDismissed: islandWindow.view = "rest"
         }
 
-        // Cadre autour de la cible d'enregistrement sélectionnée dans le
-        // lanceur : au-dessus du voile, sous l'île, sans prendre la souris.
+        // Frame around the recording target selected in the
+        // launcher: above the veil, under the island, without taking the mouse.
         PanelWindow {
           id: highlightWindow
           screen: screenScope.modelData
@@ -1247,7 +1247,7 @@ Item {
           screen: screenScope.modelData
         }
 
-        // Rail de bord du Shelf (réglage « Edge rail » de Flea), écran du milieu.
+        // Edge rail of the Shelf ('Edge rail' setting of Flea), middle screen.
         Loader {
           active: root.shelfAvailable && !!root.shelf && root.shelf.railEdge !== "off"
             && String(screenScope.modelData.name) === root.primaryScreenName
