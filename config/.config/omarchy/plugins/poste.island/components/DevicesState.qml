@@ -20,8 +20,8 @@ Item {
     if (t === 6) return "keyboard"
     if (t === 17 || t === 19) return "headset"
     if (t === 12) return "gamepad"
-    if (/mouse/i.test(name)) return "mouse"
-    if (/keyboard/i.test(name)) return "keyboard"
+    if (/mouse|souris/i.test(name)) return "mouse"   // device names, which some vendors write in French
+    if (/keyboard|clavier/i.test(name)) return "keyboard"
     return "device"
   }
   function glyphOf(kind) {
