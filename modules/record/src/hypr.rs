@@ -169,7 +169,7 @@ mod tests {
     }
 
     #[test]
-    fn rectangle_ecran_echelle_et_rotation() {
+    fn rectangle_screen_scale_and_rotation() {
         let m = obj(
             json!({"x": 1920, "y": 0, "width": 3840, "height": 2160, "scale": 1.5, "transform": 0}),
         );

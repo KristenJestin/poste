@@ -204,8 +204,8 @@ Item {
   // Functions and not bound properties: onQueryChanged and rebuild() read them while
   // the input changes, when a binding may still hold the previous input.
   function looksLikeMath() {
-    return /[0-9]/.test(query) && /^[0-9\s.,+\-*\/^%()a-zA-Zà-ÿ²³√π!€$]+$/.test(query)
-      && /[+\-*\/^%()!√]|sqrt|sin|cos|tan|log|\s(to|en|in|de|of)\s/.test(query)
+    return /[0-9]/.test(query) && /^[0-9\s.,+\-*\/^%()a-zA-Z²³√π!€$]+$/.test(query)
+      && /[+\-*\/^%()!√]|sqrt|sin|cos|tan|log|\s(to|in|of)\s/.test(query)
   }
   // qalc speaks English and prints conversions in mixed units ("6 mi + 376
   // yd…"): "15% de 80" becomes (15/100)*(80), "10 km en miles" becomes
@@ -216,7 +216,7 @@ Item {
     calcUnit = ""
     var pct = q.match(/^([0-9.,]+)\s*%\s*(de|of)\s+(.+)$/i)
     if (pct) return "(" + pct[1].replace(",", ".") + "/100)*(" + pct[3] + ")"
-    var conv = q.match(/^(.+?)\s+(en|to|in|->)\s+([a-zA-Zà-ÿ€$ ]+)$/i)
+    var conv = q.match(/^(.+?)\s+(to|in|->)\s+([a-zA-Z€$ ]+)$/i)
     if (conv) { calcUnit = conv[3].trim(); return "(" + conv[1] + ")/(1 " + calcUnit + ")" }
     return q
   }
@@ -247,10 +247,10 @@ Item {
 
   // ---------------------------------------------------------------- results
   readonly property var systemCommands: [
-    { title: "Lock", subtitle: "Lock the session", glyph: "󰌾", command: ["omarchy-system-lock"], words: "lock verrouiller" },
-    { title: "Sleep", subtitle: "Suspend the computer", glyph: "󰒲", command: ["systemctl", "suspend"], words: "suspend sleep veille", confirm: true },
-    { title: "Restart", subtitle: "Restart the computer", glyph: "󰜉", command: ["omarchy-system-reboot"], words: "reboot restart redemarrer redémarrer", confirm: true },
-    { title: "Shut down", subtitle: "Power off the computer", glyph: "󰐥", command: ["omarchy-system-shutdown"], words: "shutdown poweroff eteindre éteindre", confirm: true }
+    { title: "Lock", subtitle: "Lock the session", glyph: "󰌾", command: ["omarchy-system-lock"], words: "lock" },
+    { title: "Sleep", subtitle: "Suspend the computer", glyph: "󰒲", command: ["systemctl", "suspend"], words: "suspend sleep", confirm: true },
+    { title: "Restart", subtitle: "Restart the computer", glyph: "󰜉", command: ["omarchy-system-reboot"], words: "reboot restart", confirm: true },
+    { title: "Shut down", subtitle: "Power off the computer", glyph: "󰐥", command: ["omarchy-system-shutdown"], words: "shutdown poweroff", confirm: true }
   ]
   // Commands that make you lose something ('confirm'): the first Enter
   // asks for confirmation (row in red), the second, within 4 s, runs it.
@@ -831,8 +831,8 @@ Item {
     } else {
       if (q && looksLikeUrl())
         rows.push({ kind: "url", title: "Open " + query.trim(), subtitle: urlFor(query), icon: "", glyph: "󰖟", chevron: false, key: "", pinned: false, ref: urlFor(query) })
-      // 'timer 10m pasta' (or minuteur): starts a timer in the island.
-      var tm = query.trim().match(/^(timer|minuteur|minuterie)\b\s*(.*)$/i)
+      // 'timer 10m pasta': starts a timer in the island.
+      var tm = query.trim().match(/^(timer)\b\s*(.*)$/i)
       if (tm) {
         var dur = tm[2] ? host.parseDuration(tm[2]) : null
         if (dur)

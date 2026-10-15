@@ -845,7 +845,7 @@ Item {
   function timerLeft(t) { return t.done ? 0 : t.paused ? t.left : Math.max(0, t.end - now) }
   // '10m', '1h30', '90s', '1:30', '25' (minutes), '2 min'…
   function parseDuration(text) {
-    var m = String(text || "").trim().match(/^((?:\d+(?:[.,]\d+)?\s*(?:h|hr|hrs|hours?|heures?|m|mn|min|mins?|minutes?|s|sec|secs?|seconds?|secondes?)?\s*)+|\d+:\d{1,2}(?::\d{1,2})?)(?:\s+(.*))?$/i)
+    var m = String(text || "").trim().match(/^((?:\d+(?:[.,]\d+)?\s*(?:h|hr|hrs|hours?|m|mn|min|mins?|minutes?|s|sec|secs?|seconds?)?\s*)+|\d+:\d{1,2}(?::\d{1,2})?)(?:\s+(.*))?$/i)
     if (!m) return null
     var spec = m[1].trim(), ms = 0
     if (/^\d+:\d/.test(spec)) {

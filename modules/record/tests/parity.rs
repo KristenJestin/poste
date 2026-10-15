@@ -25,7 +25,7 @@ const CLIENTS: &str = r#"[
 const PRESETS: &str = r#"{
  "defaults": {"dir": "~/Videos", "fps": 60, "quality": "very_high", "codec": "auto", "container": "mp4", "cursor": true},
  "presets": [
-  {"id": "unity", "name": "Unity", "subtitle": "Unity editor · FMOD · 1080p60 · no cursor", "icon": "unityhub", "keywords": ["unity", "jeu"],
+  {"id": "unity", "name": "Unity", "subtitle": "Unity editor · FMOD · 1080p60 · no cursor", "icon": "unityhub", "keywords": ["unity", "game"],
    "window": {"class": "^Unity$"}, "audioSource": "app", "audioAppName": "FMOD Ex App", "resolution": "1920x1080", "cursor": false, "dir": "~/Videos/Unity"},
   {"id": "screen", "monitor": "DP-1", "audioSource": "desktop+mic", "container": "mkv", "fps": 30},
   {"id": "zone"},

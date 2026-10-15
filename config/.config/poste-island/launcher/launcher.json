@@ -22,8 +22,8 @@
         "top",
         "cpu",
         "ram",
-        "moniteur",
-        "système"
+        "monitor",
+        "system"
       ],
       "type": "terminal",
       "command": "btop",
@@ -37,7 +37,6 @@
         "vpn",
         "proton",
         "protonvpn",
-        "connexion",
         "connection"
       ],
       "type": "command",
@@ -53,9 +52,6 @@
       "icon": "unityhub",
       "keywords": [
         "editor",
-        "jeu",
-        "projet",
-        "projets",
         "unity",
         "game",
         "project",
@@ -81,9 +77,8 @@
       "keywords": [
         "ssh",
         "server",
-        "serveur",
         "remote",
-        "connexion"
+        "connection"
       ],
       "ttl": 60,
       "source": {
@@ -100,8 +95,7 @@
       "icon": "~/.config/poste-island/launcher/icons/youtube.png",
       "keywords": [
         "youtube",
-        "video",
-        "vidéo"
+        "video"
       ]
     },
     {
@@ -111,7 +105,6 @@
       "icon": "~/.config/poste-island/launcher/icons/ytmusic.png",
       "keywords": [
         "youtube music",
-        "musique",
         "music",
         "ytmusic"
       ]
@@ -134,8 +127,7 @@
       "icon": "~/.config/poste-island/launcher/icons/aur.svg",
       "keywords": [
         "arch",
-        "package",
-        "paquet"
+        "package"
       ]
     },
     {
@@ -144,10 +136,9 @@
       "url": "https://www.google.com/maps/search/%s",
       "icon": "~/.config/poste-island/launcher/icons/maps.png",
       "keywords": [
-        "carte",
         "map",
-        "adresse",
-        "itinéraire"
+        "address",
+        "directions"
       ]
     }
   ],

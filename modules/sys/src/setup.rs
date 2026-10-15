@@ -471,10 +471,7 @@ pub(crate) fn confirm(prompt: &str) -> Result<bool> {
     std::io::stdout().flush()?;
     let mut line = String::new();
     std::io::stdin().lock().read_line(&mut line)?;
-    Ok(matches!(
-        line.trim().to_lowercase().as_str(),
-        "o" | "oui" | "y" | "yes"
-    ))
+    Ok(matches!(line.trim().to_lowercase().as_str(), "y" | "yes"))
 }
 
 /// Atomic copy: neighbouring temporary file then rename (works even if
