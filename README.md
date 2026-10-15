@@ -99,8 +99,10 @@ connaître aucun module ; module absent, aucune trace) :
   - `island.json` : `{"slots": [{"slot": "<nom>", "file": "Fichier.qml"}], "player": {…}}`.
     `player` declares, without any QML, what the player card shows for one MPRIS player:
     `bus` (its MPRIS bus name), `quality` (metadata key of the line under the artist), `starred`
-    (boolean metadata key of the heart), `like` (command run by the heart), `launcher` (launcher
-    extension opened by the sound source pill). Example: `addons/melodie/island/island.json`.
+    (boolean metadata key of the heart), `like` (command run by the heart), `app` (desktop entry
+    of the player's app when its MPRIS has no DesktopEntry: the sound source pill brings its
+    window up or opens it), `launcher` (launcher extension the pill opens instead, for a player
+    without a window). Example: `addons/melodie/island/island.json`.
     Slots chargés par l'île : `capture` (source d'enregistrement
     de même interface qu'`ObsState.qml`, pour la pastille de capture) et `dictation` (source de
     dictée : `listening`, `transcribing`, `level`, `finals`, `partial`, pour la pastille de dictée

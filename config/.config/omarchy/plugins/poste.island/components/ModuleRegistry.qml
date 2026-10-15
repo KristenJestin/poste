@@ -12,8 +12,9 @@ import "ModulePlayers.js" as ModulePlayers
 // "player" declares what the player card can show for one MPRIS player, without any QML
 // (see Island.qml): "bus" (its MPRIS bus name, required), "quality" (metadata key of a short
 // line under the artist), "starred" (boolean metadata key, the heart is lit when true),
-// "like" (command run by the heart), "launcher" (launcher extension opened by the sound
-// source pill, for a player without a window).
+// "like" (command run by the heart), "app" (desktop entry of the player's app, when its MPRIS
+// has no DesktopEntry: the sound source pill shows it and brings its window up or opens it),
+// "launcher" (launcher extension opened by the pill instead, for a player without a window).
 // Slots que l'île charge (voir Island.qml) : « capture »
 // (source d'enregistrement pour la pastille de capture), « dictation » (source de dictée pour
 // la pastille de dictée en bas de l'écran et le texte sous l'île).

@@ -4,6 +4,6 @@
     "quality": "melodie:quality",
     "starred": "melodie:starred",
     "like": ["melodie", "like", "--toggle"],
-    "launcher": "melodie"
+    "app": "melodie"
   }
 }
