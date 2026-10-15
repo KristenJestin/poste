@@ -514,7 +514,7 @@ Item {
           else if (lines[i].indexOf("FILE:") === 0) files.push(lines[i].substring(5))
         }
         if (!files.length) { view.say("Nothing could be sent.", true); view.lsCleanup(); return }
-        view.say("Sending " + view.lsLabel + " to " + view.lsPeer + " — accept it on the device…", false)
+        view.say("Sending " + view.lsLabel + " to " + view.lsPeer + " - accept it on the device…", false)
         view.lsWrite({ c: "localsend", op: "send", peer: view.lsPeer, paths: files, id: ++view.lsId })
       }
     }

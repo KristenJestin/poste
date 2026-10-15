@@ -1,4 +1,4 @@
-// Poste Island — a floating, per-monitor island that replaces the Omarchy bar.
+// Poste Island: a floating, per-monitor island that replaces the Omarchy bar.
 //
 // Parts of this plugin (the morphing pill, the sound wave, the media and
 // volume pill, the player view) are adapted from Island

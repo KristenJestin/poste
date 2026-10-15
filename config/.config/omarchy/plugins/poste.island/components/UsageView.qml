@@ -179,7 +179,7 @@ Item {
       Row {
         spacing: 10
         Text {
-          text: view.usage ? view.fmt(view.totalTokens) : (view.loading ? "…" : "—")
+          text: view.usage ? view.fmt(view.totalTokens) : (view.loading ? "…" : "-")
           color: view.host.colorText
           font.family: view.host.uiFont
           font.pixelSize: 26

@@ -46,7 +46,7 @@ hover-cursor-border-alpha = 0.25
 
 # Focus: Qt activeFocus. Mirror the hover-cursor values by default so
 # mouse hover, keyboard cursor, and tab focus all read as the same state
-# — themes that want focus to stand out override these four lines.
+# - themes that want focus to stand out override these four lines.
 focus-color        = "{{ foreground }}"
 focus-fill-alpha   = 0.08
 focus-border       = "{{ foreground }}"
@@ -124,7 +124,7 @@ base-size = 12
 # Border accepts either a solid color or a Hyprland-style gradient. Border
 # widths accept one CSS-style scalar/list: N, "Y X", "T X B", or "T R B L";
 # individual border-width-top/right/bottom/left keys override the list.
-# Kris: island look (poste.island) — near-black card, hairline border.
+# Kris: island look (poste.island) - near-black card, hairline border.
 background       = "{{ mix background darker_background 50% }}"
 background-alpha = 1.0
 text             = "{{ foreground }}"

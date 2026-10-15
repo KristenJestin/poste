@@ -4,8 +4,8 @@ import Quickshell.Io
 import "file:///usr/share/omarchy/shell/plugins/menu/MenuModel.js" as MenuModel
 
 // The Omarchy menu inside the island (SUPER+ALT+SPACE). The tree comes from
-// Omarchy's own definition — the default omarchy-menu.jsonc merged with
-// ~/.config/omarchy/extensions/omarchy-menu.jsonc — parsed, guarded (when /
+// Omarchy's own definition - the default omarchy-menu.jsonc merged with
+// ~/.config/omarchy/extensions/omarchy-menu.jsonc - parsed, guarded (when /
 // checked) and filtered with Omarchy's MenuModel.js, and every action runs
 // the exact command the native menu runs. Layout inspired by Island's
 // OmarchyMenu view (https://github.com/Guilhermerisu/island, MIT).
