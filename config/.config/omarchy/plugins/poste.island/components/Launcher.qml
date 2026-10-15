@@ -100,7 +100,7 @@ Item {
   property var desktopHidden: ({})
   Process {
     id: hiddenScan
-    // + les entrées dont le programme n'existe plus (désinstallé mais .desktop resté).
+    // + the entries whose program no longer exists (uninstalled but the .desktop remained).
     command: ["bash", "-c", "\"$1\" \"$2\"; \"$3\"", "scan",
       (launcher.host.omarchyPath || "/usr/share/omarchy") + "/shell/services/hidden-entries.sh",
       [Quickshell.env("XDG_CURRENT_DESKTOP"), Quickshell.env("XDG_SESSION_DESKTOP"), Quickshell.env("DESKTOP_SESSION")].filter(function(v) { return String(v || "").length > 0 }).join(":"),
@@ -168,9 +168,9 @@ Item {
     return score
   }
 
-  // Tolérance aux fautes (dernier recours, sous les correspondances exactes) :
-  // distance de Damerau-Levenshtein entre la saisie et le début de chaque mot
-  // (inversion de deux lettres = 1 faute). 1 faute dès 3 lettres, 2 dès 6.
+  // Typo tolerance (last resort, below exact matches):
+  // Damerau-Levenshtein distance between the input and the start of each word
+  // (swap of two letters = 1 typo). 1 typo from 3 letters, 2 from 6.
   function typoScore(text, q) {
     if (q.length < 3) return -1
     var maxErr = q.length >= 6 ? 2 : 1
@@ -179,7 +179,7 @@ Item {
     for (var w = 0; w < words.length; w++) {
       var word = words[w]
       if (word.length < 2) continue
-      // compare à des préfixes du mot de longueur proche de la saisie
+      // compare with prefixes of the word of a length close to the input
       for (var len = Math.max(1, q.length - maxErr); len <= Math.min(word.length, q.length + maxErr); len++) {
         var d = editDistance(q, word.substring(0, len))
         if (d <= maxErr) best = Math.max(best, 60 - d * 20 - (w > 0 ? 5 : 0))
@@ -201,8 +201,8 @@ Item {
 
   // ---------------------------------------------------------------- calculator
   property string calcResult: ""
-  // Des fonctions et non des propriétés liées : onQueryChanged et rebuild() les lisent pendant
-  // que la saisie change, quand une liaison peut encore valoir la saisie d'avant.
+  // Functions and not bound properties: onQueryChanged and rebuild() read them while
+  // the input changes, when a binding may still hold the previous input.
   function looksLikeMath() {
     return /[0-9]/.test(query) && /^[0-9\s.,+\-*\/^%()a-zA-Zà-ÿ²³√π!€$]+$/.test(query)
       && /[+\-*\/^%()!√]|sqrt|sin|cos|tan|log|\s(to|en|in|de|of)\s/.test(query)
@@ -252,12 +252,12 @@ Item {
     { title: "Restart", subtitle: "Restart the computer", glyph: "󰜉", command: ["omarchy-system-reboot"], words: "reboot restart redemarrer redémarrer", confirm: true },
     { title: "Shut down", subtitle: "Power off the computer", glyph: "󰐥", command: ["omarchy-system-shutdown"], words: "shutdown poweroff eteindre éteindre", confirm: true }
   ]
-  // Commandes qui font perdre quelque chose (« confirm ») : la première Entrée
-  // demande confirmation (ligne en rouge), la seconde, dans les 4 s, exécute.
+  // Commands that make you lose something ('confirm'): the first Enter
+  // asks for confirmation (row in red), the second, within 4 s, runs it.
   property string confirmPending: ""
   Timer { id: confirmTimer; interval: 4000; onTriggered: launcher.confirmPending = "" }
-  // Une commande système ne sort que si la saisie est le début exact d'un de
-  // ses mots (pas de tolérance aux fautes : « test » donnait « Restart »).
+  // A system command only comes out if the input is the exact start of one of
+  // its words (no typo tolerance: 'test' used to give 'Restart').
   function systemMatch(cmd, q) {
     if (q.length < 2) return false
     var words = (cmd.title + " " + cmd.words).toLowerCase().split(/\s+/)
@@ -266,34 +266,34 @@ Item {
   }
 
   // ---------------------------------------------------------------- user items & extensions
-  // ~/.config/poste-island/launcher/launcher.json (hot-reloaded), plus celui de chaque module :
+  // ~/.config/poste-island/launcher/launcher.json (hot-reloaded), plus that of each module:
   //   items:      [{ name, subtitle, icon, keywords, type: url|command|terminal|app|copy,
   //                  url | command | id (+args) | text, cwd, enabled }]
   //   extensions: [{ id, name, subtitle, icon, keywords, ttl, enabled,
   //                  source: { type: "script", command } }]
-  //   Une extension peut avoir un « keyword » (mot-clé + espace pour y entrer)
-  //   et source.search : commande appelée avec la saisie ("$1") à chaque
-  //   frappe, dont la sortie remplace la liste (recherche en direct) ; sans
-  //   saisie, la liste en cache s'affiche.
-  //   engines:    [{ keyword, name, url ("…%s…"), icon, keywords, enabled }] :
-  //               moteurs de recherche. « yt » + espace (ou Entrée / → sur la
-  //               ligne YouTube) entre dans le moteur, puis Entrée ouvre la page
-  //               de résultats. Ctrl+B sur « Search the web » les propose aussi.
+  //   An extension can have a 'keyword' (keyword + space to enter it)
+  //   and source.search: command called with the input ("$1") at every
+  //   keystroke, whose output replaces the list (live search); without
+  //   input, the cached list is shown.
+  //   engines:    [{ keyword, name, url ("…%s…"), icon, keywords, enabled }]:
+  //               search engines. 'yt' + space (or Enter / → on the
+  //               YouTube row) enters the engine, then Enter opens the results
+  //               page. Ctrl+B on 'Search the web' offers them too.
   // A source script prints [{ id, name, subtitle, icon, keywords, path?, action: {...},
   // actions: [{ label, icon, action }] }]. Results are cached `ttl` seconds.
   readonly property string configPath: Quickshell.env("HOME") + "/.config/poste-island/launcher/launcher.json"
   property var userItems: []
   property var extensions: []
   property var engines: []
-  // Les extensions et entrées des modules (~/.local/share/poste/modules/*/island/launcher.json,
-  // même format) s'ajoutent à celles de la config de l'utilisateur, qui gagne en cas d'id identique.
+  // The modules' extensions and entries (~/.local/share/poste/modules/*/island/launcher.json,
+  // same format) are added to those of the user's config, which wins in case of an identical id.
   property var userDoc: ({})
   readonly property var moduleDocs: host && host.modules ? host.modules.launcherDocs : []
   onModuleDocsChanged: applyConfig()
-  // Propre à chaque machine (pas versionné) : ~/.config/poste-island/launcher/hidden.json,
-  // ["Jellyfin", "unity", …] : noms d'entrées et de moteurs, id d'extensions, mots-clés de moteurs.
-  // Et « requires » sur une entrée, extension ou moteur : "unityhub" (commande dans le PATH)
-  // ou "plugin:<id>" (plugin Omarchy installé), une valeur ou une liste ; sinon l'entrée est masquée.
+  // Specific to each machine (not versioned): ~/.config/poste-island/launcher/hidden.json,
+  // ["Jellyfin", "unity", …]: names of entries and engines, ids of extensions, keywords of engines.
+  // And 'requires' on an entry, extension or engine: "unityhub" (command in the PATH)
+  // or "plugin:<id>" (installed Omarchy plugin), one value or a list; otherwise the entry is hidden.
   property var localHidden: []
   FileView {
     path: Quickshell.env("HOME") + "/.config/poste-island/launcher/hidden.json"
@@ -308,7 +308,7 @@ Item {
     }
     onLoadFailed: { launcher.localHidden = []; launcher.applyConfig() }
   }
-  // Exigences absentes de cette machine (null tant que la vérification n'a pas répondu).
+  // Requirements missing from this machine (null until the check has answered).
   property var missingRequires: null
   property string requiresKey: ""
   Process {
@@ -394,9 +394,9 @@ Item {
     }
     onLoadFailed: { launcher.userDoc = ({}); launcher.applyConfig() }
   }
-  // Propre à la machine et versionné ailleurs (dépôt de données, poste-data) :
-  // ~/.config/poste-island/launcher/machine.json, même format, ajouté après launcher.json
-  // (entrées vers des services privés, par exemple).
+  // Specific to the machine and versioned elsewhere (data repository, poste-data):
+  // ~/.config/poste-island/launcher/machine.json, same format, added after launcher.json
+  // (entries to private services, for example).
   property var machineDoc: ({})
   FileView {
     path: Quickshell.env("HOME") + "/.config/poste-island/launcher/machine.json"
@@ -419,11 +419,11 @@ Item {
     for (var i = 0; i < extensions.length; i++) if (extensions[i].id === id) return extensions[i]
     return null
   }
-  // Un moteur se comporte comme une extension (« engine:<mot-clé> ») : on y
-  // entre, le fil d'Ariane affiche son nom, Retour arrière en sort.
+  // An engine behaves like an extension ('engine:<keyword>'): it is
+  // entered, the breadcrumb shows its name, Backspace leaves it.
   function engineById(id) {
     var kw = String(id).replace(/^engine:/, "")
-    // « keyword » : un mot-clé ou une liste (["jf", "media"]) ; le premier sert d'identifiant.
+    // 'keyword': a keyword or a list (["jf", "media"]); the first one serves as identifier.
     for (var i = 0; i < engines.length; i++) {
       var e = engines[i]
       var kws = [].concat(e.keyword).map(function(k) { return String(k).toLowerCase() })
@@ -482,7 +482,7 @@ Item {
     onExited: Qt.callLater(launcher.runNextSource)
   }
 
-  // Recherche en direct dans une extension (source.search).
+  // Live search in an extension (source.search).
   property var liveItems: []
   property string liveFor: ""
   Timer { id: liveDebounce; interval: 180; onTriggered: launcher.runLive() }
@@ -498,10 +498,10 @@ Item {
     liveRestarting = false
     if (!liveSlow) liveSlowTimer.restart()
   }
-  // Indicateur « ça cherche » : seulement si la recherche dure plus de 120 ms
-  // (pas de clignotement pour les recherches rapides), éteint dès qu'elle finit.
+  // 'It is searching' indicator: only if the search lasts more than 120 ms
+  // (no flicker for fast searches), off as soon as it ends.
   property bool liveSlow: false
-  // Vrai le temps de relancer la recherche : l'indicateur déjà allumé ne s'éteint pas.
+  // True while the search is restarted: the already lit indicator does not go off.
   property bool liveRestarting: false
   Timer { id: liveSlowTimer; interval: 120; onTriggered: launcher.liveSlow = liveProc.running }
   Process {
@@ -524,8 +524,8 @@ Item {
       }
     }
   }
-  // Même geste pour toutes les listes : « mot-clé + espace » y entre, comme
-  // pour les moteurs. « keyword » : un mot ou une liste (["fs", "music"]).
+  // Same gesture for all the lists: 'keyword + space' enters it, as
+  // for engines. 'keyword': a word or a list (["fs", "music"]).
   function extensionByKeyword(word) {
     word = String(word).toLowerCase()
     for (var i = 0; i < extensions.length; i++) {
@@ -551,8 +551,8 @@ Item {
   }
   function leaveExtension() {
     if (currentExt === "") return false
-    // Sous-liste : retour à la liste d'où l'on vient (extension, recherche et
-    // sélection comprises), sans fermer le lanceur.
+    // Sub-list: back to the list we come from (extension, search and
+    // selection included), without closing the launcher.
     if (currentExt.indexOf("sub:") === 0 && subStack.length > 0) {
       var back = subStack[subStack.length - 1]
       subStack = subStack.slice(0, -1)
@@ -580,10 +580,10 @@ Item {
     return true
   }
 
-  // Sous-listes : une action {"type":"submenu","command":"…"} exécute la commande,
-  // lit sa sortie (même JSON que les sources) et l'affiche comme une extension
-  // éphémère « sub:<n> » (même fil d'Ariane, mêmes lignes, même glissement).
-  // subStack garde la liste d'où l'on vient ; Échap ou Retour arrière y revient.
+  // Sub-lists: an action {"type":"submenu","command":"…"} runs the command,
+  // reads its output (same JSON as the sources) and shows it as an
+  // ephemeral extension 'sub:<n>' (same breadcrumb, same rows, same slide).
+  // subStack keeps the list we come from; Escape or Backspace goes back to it.
   property var subDefs: ({})
   property var subStack: []
   property int subCounter: 0
@@ -597,7 +597,7 @@ Item {
     subStack = subStack.concat([{ ext: currentExt, query: query, selected: selected }])
     setCache(id, { items: [], at: Date.now(), loading: true })
     enterExtension(id)
-    // Une seule commande à la fois : la suivante attend la fin de la précédente.
+    // One command at a time: the next one waits for the end of the previous one.
     if (subProc.running) { subPending = { id: id, command: command }; return }
     startSub(id, command)
   }
@@ -615,7 +615,7 @@ Item {
         var list = null
         try { list = JSON.parse(text) } catch (e) { console.warn("poste.island: submenu printed invalid JSON") }
         if (!Array.isArray(list))
-          list = [{ id: "sub-error", name: "Liste indisponible", subtitle: "La commande n'a pas renvoyé de JSON valide", icon: "󰅛" }]
+          list = [{ id: "sub-error", name: "List unavailable", subtitle: "The command did not return valid JSON", icon: "󰅛" }]
         launcher.setCache(subProc.subId, { items: list, at: Date.now(), loading: false })
         launcher.rebuild()
       }
@@ -646,7 +646,7 @@ Item {
     return extId ? "ext:" + extId + ":" + String(entry.id || entry.name) : "item:" + String(entry.name)
   }
   function itemRow(entry, pathLabel, extId) {
-    // Les lignes d'une sous-liste ne s'épinglent pas et ne comptent pas dans l'usage.
+    // The rows of a sub-list are not pinned and do not count in the usage.
     var key = String(extId).indexOf("sub:") === 0 ? "" : itemKey(entry, extId)
     return { kind: "item", title: String(entry.name || ""), subtitle: pathLabel || String(entry.subtitle || ""),
       icon: iconSourceOf(entry.icon), glyph: glyphOf(entry.icon, "󰀻"), chevron: false, key: key, pinned: isPinned(key),
@@ -656,10 +656,10 @@ Item {
     var c = extCache[ext.id]
     var count = c && c.items ? c.items.length : 0
     var key = "ext:" + ext.id
-    // Moteurs et extensions à recherche directe : « Search … », pour ne pas
-    // les confondre avec une appli du même nom.
+    // Engines and live-search extensions: 'Search …', so as not to
+    // confuse them with an app of the same name.
     var searchable = String(ext.id).indexOf("engine:") === 0 || !!(ext.source && ext.source.search)
-    // Le mot-clé s'affiche toujours au même endroit : « rec ␣ ».
+    // The keyword always shows in the same place: 'rec ␣'.
     var kw = String([].concat(ext.keyword || [])[0] || "").split(" ")[0]
     return { kind: "extension", title: (searchable ? "Search " : "") + String(ext.name),
       subtitle: String(ext.subtitle || "") + (count && !searchable ? " · " + count : "") + (kw ? " · " + kw + " ␣" : ""),
@@ -687,11 +687,11 @@ Item {
   ListModel { id: results }
 
   // ---------------------------------------------------------------- open windows
-  // Les fenêtres ouvertes (hyprctl clients) : taper le nom d'une appli ouverte
-  // ou le titre d'une fenêtre propose « Switch to … », qui va sur la fenêtre
-  // (écran et workspace compris). Repris de l'audit d'omarchy-jump-to : l'adresse
-  // est validée avant d'entrer dans la commande Hyprland (du Lua), et les
-  // fenêtres sont triées par usage récent.
+  // The open windows (hyprctl clients): typing the name of an open app
+  // or the title of a window offers 'Switch to …', which goes to the window
+  // (screen and workspace included). Taken from the audit of omarchy-jump-to: the address
+  // is validated before entering the Hyprland command (Lua), and the
+  // windows are sorted by recent use.
   property var windows: []
   Process {
     id: windowsProc
@@ -734,16 +734,16 @@ Item {
     appByClass = next
     return found
   }
-  // Les applis Quickshell (Omamail…) ont toutes la classe org.quickshell :
-  // on les reconnaît à leur titre, égal au nom de l'appli.
+  // Quickshell apps (Omamail…) all have the class org.quickshell:
+  // they are recognized by their title, equal to the app's name.
   function appForWindow(w) {
     if (String(w.cls).toLowerCase() !== "org.quickshell") return appForClass(w.cls)
     var t = String(w.title).toLowerCase(), apps = DesktopEntries.applications.values || []
     for (var i = 0; i < apps.length; i++) if (String(apps[i].name || "").toLowerCase() === t) return apps[i]
     return null
   }
-  // « Center · 3 » : l'écran (workspaces 1-10 à gauche, 11-20 au centre,
-  // 21-30 à droite) puis le numéro local.
+  // 'Center · 3': the screen (workspaces 1-10 on the left, 11-20 in the center,
+  // 21-30 on the right) then the local number.
   function windowWhere(w) {
     if (w.wsId < 0) return "Scratchpad"
     var side = ["Left", "Center", "Right"][Math.floor((w.wsId - 1) / 10)] || "Screen"
@@ -777,8 +777,8 @@ Item {
     return { kind: "app", title: String(app.name), subtitle: String(app.genericName || app.comment || ""),
       icon: app.icon ? Quickshell.iconPath(app.icon, true) : "", glyph: "󰀻", chevron: false, key: key, pinned: isPinned(key), ref: String(app.id) }
   }
-  // Une adresse : un nom de domaine, localhost ou une IPv4, avec port et chemin facultatifs.
-  // Sans protocole : https, sauf localhost et les IP (un service local est rarement en https).
+  // An address: a domain name, localhost or an IPv4, with optional port and path.
+  // Without protocol: https, except localhost and IPs (a local service is rarely on https).
   function looksLikeUrl() { return /^(https?:\/\/)?(([a-z0-9-]+\.)+[a-z]{2,}|localhost|(\d{1,3}\.){3}\d{1,3})(:[0-9]+)?(\/\S*)?$/i.test(query.trim()) }
   function urlFor(text) {
     text = text.trim()
@@ -801,7 +801,7 @@ Item {
           icon: iconSourceOf(eng.icon), glyph: glyphOf(eng.icon, "󰖟"), chevron: false, key: "", pinned: false, ref: "" })
     } else if (tab === "apps" && currentExt !== "" && q && (extensionById(currentExt) || {}).source
                && extensionById(currentExt).source.search) {
-      // Extension en recherche directe : la sortie du script, telle quelle.
+      // Live-search extension: the script's output, as is.
       if (liveFor === query.trim())
         for (var lv = 0; lv < liveItems.length; lv++) rows.push(itemRow(liveItems[lv], "", currentExt))
       else if (shownUids.length === 0 || liveItems.length === 0)
@@ -831,7 +831,7 @@ Item {
     } else {
       if (q && looksLikeUrl())
         rows.push({ kind: "url", title: "Open " + query.trim(), subtitle: urlFor(query), icon: "", glyph: "󰖟", chevron: false, key: "", pinned: false, ref: urlFor(query) })
-      // « timer 10m pâtes » (ou minuteur) : lance un minuteur dans l'île.
+      // 'timer 10m pasta' (or minuteur): starts a timer in the island.
       var tm = query.trim().match(/^(timer|minuteur|minuterie)\b\s*(.*)$/i)
       if (tm) {
         var dur = tm[2] ? host.parseDuration(tm[2]) : null
@@ -868,7 +868,7 @@ Item {
       }
       for (var en = 0; en < engines.length; en++) {
         var engRow = engineById("engine:" + [].concat(engines[en].keyword)[0])
-        // (un -1 ne doit jamais devenir positif par un bonus)
+        // (a -1 must never become positive through a bonus)
         var kwScore = fuzzy(engRow.keyword, q)
         var ens = q ? Math.max(fuzzy(engRow.name, q), kwScore >= 0 ? kwScore + 50 : -1, fuzzy(engRow.keywords.join(" "), q) - 120) : 0
         if (ens >= 0) cands.push({ row: extensionRow(engRow), s: ens })
@@ -878,7 +878,7 @@ Item {
         if (us >= 0) cands.push({ row: itemRow(userItems[ui], "", ""), s: us })
       }
       for (var ey = 0; ey < extensions.length; ey++) {
-        // "rootItems": false : ses éléments ne sortent que dans l'extension.
+        // "rootItems": false: its elements only come out inside the extension.
         if (extensions[ey].rootItems === false) continue
         var cached = (extCache[extensions[ey].id] || {}).items || []
         for (var ci = 0; ci < cached.length; ci++) {
@@ -904,8 +904,8 @@ Item {
         // Search: match score first; frecency and pins as a moderate bonus.
         for (var c4 = 0; c4 < cands.length; c4++)
           cands[c4].t = cands[c4].s + Math.log(1 + cands[c4].f) * 25 + (cands[c4].row.pinned ? 40 : 0)
-        // Une fenêtre ouverte passe toujours juste devant son appli (sinon
-        // l'usage de l'appli, compté en bonus, la ferait passer devant).
+        // An open window always comes right before its app (otherwise
+        // the app's usage, counted as a bonus, would put the app before it).
         var appT = {}
         for (var c5 = 0; c5 < cands.length; c5++)
           if (cands[c5].row.kind === "app") appT[cands[c5].row.ref] = cands[c5].t
@@ -931,8 +931,8 @@ Item {
     updateHighlight()
   }
 
-  // Extension avec « highlight »: true (par exemple « Record ») : la cible de la ligne
-  // sélectionnée (fenêtre, écran, préréglage) est encadrée à l'écran par l'île (host.recordHighlight).
+  // Extension with 'highlight': true (for example 'Record'): the target of the
+  // selected row (window, screen, preset) is framed on screen by the island (host.recordHighlight).
   property bool ownsHighlight: false
   function updateHighlight() {
     if (!active) return
@@ -962,10 +962,10 @@ Item {
   }
   function applyRows(rows) {
     // The default selection (first row) stays on the best match; a row the
-    // user moved to is followed while it stays in the list. Quand la saisie
-    // change, pas les lignes faites de la saisie (adresse, recherche web,
-    // calcul…) : suivre « Search the web » faisait chercher une adresse au
-    // lieu de l'ouvrir.
+    // user moved to is followed while it stays in the list. When the input
+    // changes, not the rows made of the input (address, web search,
+    // calculation…): following 'Search the web' made it search an address
+    // instead of opening it.
     var prevUid = selected > 0 && selected < shownUids.length ? shownUids[selected] : ""
     if (query !== shownQuery && prevUid.indexOf("|") === -1) prevUid = ""
     shownQuery = query
@@ -1000,10 +1000,10 @@ Item {
 
   onQueryChanged: {
     confirmPending = ""
-    // « yt » + espace : entre dans le moteur (le reste de la saisie suit).
+    // 'yt' + space: enters the engine (the rest of the input follows).
     if (tab === "apps" && currentExt === "") {
       var m = query.match(/^(\S+)\s(.*)$/)
-      // « ai » + espace : bascule sur la vue IA de l'île.
+      // 'ai' + space: switches to the island's AI view.
       if (m && /^(ai|ia)$/i.test(m[1])) { host.openAsk(m[2], false); return }
       var hit = m ? (engineById("engine:" + m[1]) || extensionByKeyword(m[1])) : null
       if (hit) {
@@ -1096,7 +1096,7 @@ Item {
     if (row.kind === "item") {
       var ref = JSON.parse(row.ref)
       var spec = actionSpecOf(ref.item)
-      // "verb" : le mot de l'action principale (« Play » pour la musique).
+      // "verb": the word of the main action ('Play' for music).
       var acts = [{ id: "open", label: String(ref.item.verb || "Open"), glyph: ref.item.verb === "Play" ? "󰐊" : spec.type === "submenu" ? "󰅂" : "󰏌" }]
       if (spec.type === "url") acts.push({ id: "copy-url", label: "Copy URL", glyph: "󰆏" })
       if (ref.item.path || spec.cwd) acts.push({ id: "copy-path", label: "Copy path", glyph: "󰆏" })
@@ -1180,7 +1180,7 @@ Item {
       else if (actionId.indexOf("extra:") === 0) {
         var ex = (r.item.actions || [])[Number(actionId.slice(6))]
         if (ex) runSpec(ex.action, ex.label, ex.icon)
-        // Une sous-liste s'ouvre dans le lanceur, qui reste ouvert.
+        // A sub-list opens in the launcher, which stays open.
         if (ex && ex.action && ex.action.type === "submenu") { actionsOpen = false; return }
       } else {
         runSpec(sp, r.item.name, r.item.icon)
@@ -1244,8 +1244,8 @@ Item {
       }
       TextInput {
         id: field
-        // (sans fil d'Ariane, le champ part du glyphe : pas de largeur liée à implicitWidth,
-        // qui bouclait quand le nom change d'une sous-liste à l'autre)
+        // (without breadcrumb, the field starts from the glyph: no width bound to implicitWidth,
+        // which looped when the name changes from one sub-list to another)
         anchors.left: crumb.visible ? crumb.right : searchGlyph.right
         anchors.leftMargin: 10
         anchors.right: tabs.left
@@ -1318,8 +1318,8 @@ Item {
         }
       }
     }
-    // Filet sous le champ ; pendant une recherche d'extension lente, un trait
-    // d'accent y glisse en boucle.
+    // Rule under the field; during a slow extension search, an accent
+    // line slides along in a loop.
     Item {
       id: searchRule
       width: parent.width
@@ -1451,12 +1451,12 @@ Item {
       required property bool chevron
       required property bool pinned
       required property string ref
-      // Pastille sur le logo : « bascule » pour une fenêtre ouverte, ou celle
-      // qu'un élément d'extension demande (« badge », ex. préréglage).
+      // Pill on the logo: 'switch' for an open window, or the one
+      // an extension element asks for ('badge', e.g. preset).
       readonly property string badge: kind === "window" ? "󰁔" : kind === "item" ? (function() {
         try { return String(JSON.parse(ref).item.badge || "") } catch (e) { return "" }
       })() : ""
-      // Commande système en attente de confirmation (seconde Entrée).
+      // System command waiting for confirmation (second Enter).
       readonly property bool confirming: kind === "system" && launcher.confirmPending !== "" && launcher.confirmPending === ref
       width: list.width
       height: launcher.rowHeight
@@ -1502,7 +1502,7 @@ Item {
             pixelSize: 16
           }
         }
-        // Petite pastille sur le logo (fenêtre ouverte, préréglage…).
+        // Small pill on the logo (open window, preset…).
         Rectangle {
           visible: row.badge !== ""
           anchors.right: parent.right
