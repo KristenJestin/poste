@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="640" viewBox="0 0 1280 640">
+<defs>
+<linearGradient id="wall" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#2a2119"/><stop offset="1" stop-color="#171410"/></linearGradient>
+<clipPath id="screen"><rect x="96" y="290" width="1088" height="400" rx="18"/></clipPath>
+</defs>
+<rect width="1280" height="640" fill="#14120f"/>
+<g transform="translate(372 70) scale(0.95) translate(-20 -72.1)"><rect x="20" y="72.1" width="160" height="55.8" rx="27.9" fill="#fb9f44"/><circle cx="49.8" cy="100" r="12.1" fill="#14120f"/><rect x="72.1" y="92.6" width="59.5" height="14.9" rx="7.4" fill="#14120f"/><circle cx="152.1" cy="100" r="7.4" fill="#14120f"/></g>
+<text x="560" y="136" font-family="Unbounded" font-weight="600" font-size="100" fill="#ece5d8">poste</text>
+<text x="640" y="236" text-anchor="middle" font-family="Open Sauce Sans" font-size="25" fill="#a39b8c">My Arch Linux and Omarchy setup, rebuilt in Rust, installed in one command.</text>
+<g clip-path="url(#screen)">
+<rect x="96" y="290" width="1088" height="400" fill="url(#wall)"/>
+<rect x="128" y="382" width="236" height="300" rx="10" fill="#211d18" stroke="#2e2a24" stroke-width="2"/><rect x="129" y="383" width="234" height="26" rx="9" fill="#2a251f"/><rect x="146" y="430" width="140" height="8" rx="4" fill="#3a342c"/><rect x="146" y="452" width="90" height="8" rx="4" fill="#3a342c"/><rect x="146" y="474" width="170" height="8" rx="4" fill="#3a342c"/><rect x="146" y="496" width="120" height="8" rx="4" fill="#3a342c"/><rect x="146" y="518" width="70" height="8" rx="4" fill="#3a342c"/>
+<rect x="912" y="372" width="244" height="300" rx="10" fill="#211d18" stroke="#fb9f44" stroke-width="3"/><rect x="913" y="373" width="242" height="26" rx="9" fill="#2a251f"/><rect x="930" y="420" width="145.6" height="8" rx="4" fill="#3a342c"/><rect x="930" y="442" width="93.60000000000001" height="8" rx="4" fill="#3a342c"/><rect x="930" y="464" width="176.79999999999998" height="8" rx="4" fill="#3a342c"/><rect x="930" y="486" width="124.8" height="8" rx="4" fill="#3a342c"/><rect x="930" y="508" width="72.8" height="8" rx="4" fill="#3a342c"/>
+<rect x="96" y="290" width="1088" height="400" fill="#000" opacity="0.38"/>
+<rect x="912" y="372" width="244" height="300" rx="10" fill="none" stroke="#fb9f44" stroke-width="3"/>
+<rect x="912" y="346" width="58" height="22" rx="6" fill="#fb9f44"/>
+<text x="941" y="362" text-anchor="middle" font-family="JetBrains Mono" font-size="12" fill="#0a0908">Unity</text>
+<rect x="302" y="300" width="80" height="34" rx="17" fill="#0a0908" stroke="#3a352d" stroke-width="2"/>
+<rect x="314" y="309" width="16" height="16" rx="4" fill="#fb9f44" opacity="0.8"/>
+<rect x="340" y="312" width="4" height="10" rx="2" fill="#ece5d8"/><rect x="348" y="308" width="4" height="18" rx="2" fill="#ece5d8"/><rect x="356" y="311" width="4" height="12" rx="2" fill="#ece5d8"/><rect x="364" y="309" width="4" height="16" rx="2" fill="#ece5d8"/>
+<rect x="898" y="300" width="84" height="34" rx="17" fill="#0a0908" stroke="#3a352d" stroke-width="2"/>
+<circle cx="917" cy="317" r="8" fill="none" stroke="#3a352d" stroke-width="3"/>
+<path d="M917 309 A8 8 0 1 1 909.4 319.5" fill="none" stroke="#fb9f44" stroke-width="3" stroke-linecap="round"/>
+<text x="934" y="323" font-family="JetBrains Mono" font-size="14" fill="#ece5d8">8:12</text>
+<rect x="388" y="270" width="504" height="446" rx="26" fill="#0a0908" stroke="#3a352d" stroke-width="2"/>
+<text x="414" y="340" font-family="Open Sauce Sans" font-size="20" fill="#ece5d8">rec</text>
+<rect x="447" y="322" width="2" height="24" fill="#fb9f44"/>
+<rect x="808" y="320" width="62" height="26" rx="13" fill="#2a2016"/>
+<text x="839" y="338" text-anchor="middle" font-family="Open Sauce Sans" font-weight="500" font-size="13" fill="#fb9f44">Record</text>
+<line x1="408" y1="364" x2="872" y2="364" stroke="#2e2a24" stroke-width="2"/>
+<text x="410" y="398" font-family="Open Sauce Sans" font-weight="600" font-size="12" letter-spacing="1.5" fill="#7d7567">PRESETS, WINDOWS, SCREENS</text>
+<rect x="396" y="426" width="488" height="48" rx="12" fill="#2a2016"/><rect x="410" y="434" width="32" height="32" rx="8" fill="#fb9f44"/><path transform="translate(426 450)" d="M0 -9 L2.6 -3.2 L8.6 -2.8 L4 1.2 L5.4 7.4 L0 4.1 L-5.4 7.4 L-4 1.2 L-8.6 -2.8 L-2.6 -3.2 Z" fill="#0a0908"/><text x="456" y="448" font-family="Open Sauce Sans" font-weight="500" font-size="17" fill="#ece5d8">Unity</text><text x="456" y="468" font-family="Open Sauce Sans" font-size="14" fill="#7d7567">Preset · editor window, game sound</text><text x="868" y="456" text-anchor="end" font-family="JetBrains Mono" font-size="13" fill="#fb9f44">Enter</text>
+<rect x="410" y="486" width="32" height="32" rx="8" fill="#26221c"/><text x="456" y="500" font-family="Open Sauce Sans" font-weight="500" font-size="17" fill="#ece5d8">Zen Browser</text><text x="456" y="520" font-family="Open Sauce Sans" font-size="14" fill="#7d7567">Window · workspace 2</text>
+<rect x="410" y="538" width="32" height="32" rx="8" fill="#26221c"/><text x="456" y="552" font-family="Open Sauce Sans" font-weight="500" font-size="17" fill="#ece5d8">Center screen</text><text x="456" y="572" font-family="Open Sauce Sans" font-size="14" fill="#7d7567">Screen · 2560×1440</text>
+<rect x="410" y="590" width="32" height="32" rx="8" fill="#26221c"/><text x="456" y="604" font-family="Open Sauce Sans" font-weight="500" font-size="17" fill="#ece5d8">Region…</text><text x="456" y="624" font-family="Open Sauce Sans" font-size="14" fill="#7d7567">Select an area</text>
+</g>
+<rect x="96" y="290" width="1088" height="400" rx="18" fill="none" stroke="#2e2a24" stroke-width="2"/>
+</svg>
