@@ -43,7 +43,9 @@ bin = "~/chemin/vers/vocaline"
 La config de Vocaline lui-même (`~/.config/vocaline/`) se range aussi dans le dépôt de données de
 la machine, jamais dans poste.
 
-## Désactiver sur une machine
+## Choose it on a machine
 
-`disabled = ["vocaline"]` dans le `poste.toml` du dépôt de données (ou `poste sys module disable
-vocaline`) : ni touche, ni slot de l'île.
+This is an add-on: it is installed only on a machine that lists it in the `poste.toml` of its
+data repository (`addons = ["vocaline"]`), and plugged in once `vocaline` is in the `PATH`
+(`requires`). The `vocaline` package itself is installed by hand (see the Vocaline repository).
+Removing it from the list removes the key and the island part.

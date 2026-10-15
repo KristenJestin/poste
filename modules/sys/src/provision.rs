@@ -102,15 +102,24 @@ pub struct Ctx<'a> {
     dir: PathBuf,
     /// `bootstrap/` du dépôt de données, s'il est déclaré et existe.
     data_dir: Option<PathBuf>,
+    /// `bootstrap/` of each add-on listed in `addons`, when it has one.
+    addon_dirs: Vec<PathBuf>,
     vars: Vec<(&'static str, String)>,
 }
 
 impl<'a> Ctx<'a> {
     pub fn new(env: &'a Env, repo: &Path) -> Self {
         let dir = repo.join("bootstrap");
-        let data = poste_core::Config::load(env)
-            .ok()
-            .and_then(|c| c.data_path(env));
+        let cfg = poste_core::Config::load(env).ok();
+        let data = cfg.as_ref().and_then(|c| c.data_path(env));
+        let addon_dirs = cfg
+            .map(|c| c.addons)
+            .unwrap_or_default()
+            .iter()
+            .filter(|a| poste_core::modules::valid_name(a))
+            .map(|a| repo.join("addons").join(a).join("bootstrap"))
+            .filter(|d| d.is_dir())
+            .collect();
         let data_dir = data
             .as_ref()
             .map(|d| d.join("bootstrap"))
@@ -140,6 +149,7 @@ impl<'a> Ctx<'a> {
             env,
             dir,
             data_dir,
+            addon_dirs,
             vars,
         }
     }
@@ -175,14 +185,18 @@ fn read_steps(dir: &Path) -> Result<Steps> {
     toml::from_str(&s).with_context(|| format!("lecture de {}", p.display()))
 }
 
-/// Les étapes du dépôt, puis celles du dépôt de données : leurs chemins relatifs (patch, source,
-/// line) partent de son `bootstrap/`, et une étape de même `id` remplace celle du dépôt.
+/// The steps of the repository, then those of the listed add-ons, then those of the data
+/// repository: their relative paths (patch, source, line) start from their own `bootstrap/`, and
+/// a step with the same `id` replaces the earlier one.
 fn load_steps(ctx: &Ctx) -> Result<Steps> {
     let mut steps = read_steps(&ctx.dir)?;
-    let Some(dd) = &ctx.data_dir else {
-        return Ok(steps);
-    };
-    let more = read_steps(dd)?;
+    for dd in ctx.addon_dirs.iter().chain(&ctx.data_dir) {
+        merge_steps(&mut steps, read_steps(dd)?, dd);
+    }
+    Ok(steps)
+}
+
+fn merge_steps(steps: &mut Steps, more: Steps, dd: &Path) {
     let abs = |r: &mut String| *r = dd.join(&*r).to_string_lossy().into_owned();
     fn put<T>(list: &mut Vec<T>, item: T, id: impl Fn(&T) -> &str) {
         match list.iter().position(|x| id(x) == id(&item)) {
@@ -209,7 +223,6 @@ fn load_steps(ctx: &Ctx) -> Result<Steps> {
     for m in more.manual {
         put(&mut steps.manual, m, |x| &x.id);
     }
-    Ok(steps)
 }
 
 fn read_packages(dir: &Path) -> Result<BTreeMap<String, String>> {
@@ -223,10 +236,10 @@ fn read_packages(dir: &Path) -> Result<BTreeMap<String, String>> {
     Ok(f.packages)
 }
 
-/// Les paquets du dépôt, plus ceux du dépôt de données.
+/// The packages of the repository, plus those of the listed add-ons and of the data repository.
 fn load_packages(ctx: &Ctx) -> Result<BTreeMap<String, String>> {
     let mut out = read_packages(&ctx.dir)?;
-    if let Some(dd) = &ctx.data_dir {
+    for dd in ctx.addon_dirs.iter().chain(&ctx.data_dir) {
         out.extend(read_packages(dd)?);
     }
     Ok(out)
@@ -1126,6 +1139,35 @@ mod tests {
             cmds[0].contains(&format!("LIGNE {}", data.display())),
             "{cmds:?}"
         );
+    }
+
+    #[test]
+    fn steps_and_packages_of_chosen_addons_only() {
+        let (_d, repo, env) = fixture();
+        write(&repo, "packages.toml", "[packages]\na = \"\"\n");
+        for name in ["chosen", "other"] {
+            let b = repo.join("addons").join(name).join("bootstrap");
+            fs::create_dir_all(&b).unwrap();
+            fs::write(
+                b.join("packages.toml"),
+                format!("[packages]\n{name}-lib = \"\"\n"),
+            )
+            .unwrap();
+            fs::write(
+                b.join("steps.toml"),
+                format!("[[user]]\nid = \"{name}\"\ntitle = \"install\"\nrun = [[\"true\"]]\n"),
+            )
+            .unwrap();
+        }
+        fs::create_dir_all(env.config_file().parent().unwrap()).unwrap();
+        fs::write(env.config_file(), "addons = [\"chosen\", \"../x\"]\n").unwrap();
+
+        let ctx = Ctx::new(&env, &repo);
+        let pk: Vec<_> = load_packages(&ctx).unwrap().into_keys().collect();
+        assert_eq!(pk, ["a", "chosen-lib"]);
+        let steps = load_steps(&ctx).unwrap();
+        let ids: Vec<_> = steps.user.iter().map(|u| u.id.as_str()).collect();
+        assert_eq!(ids, ["chosen"]);
     }
 
     #[test]

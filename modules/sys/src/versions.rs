@@ -420,7 +420,7 @@ fn snapshot(root: &Path) -> Result<BTreeMap<String, String>> {
         Ok(())
     }
     let mut out = BTreeMap::new();
-    for sub in ["config", "modules"] {
+    for sub in ["config", "modules", "addons"] {
         walk(root, &root.join(sub), &mut out)?;
     }
     Ok(out)

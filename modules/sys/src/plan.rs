@@ -36,6 +36,7 @@ pub struct RepoModule {
     pub dir: PathBuf,
     /// Program the module needs (`requires` in `module.toml`).
     pub requires: Option<String>,
+    pub description: String,
 }
 
 impl RepoModule {
@@ -48,9 +49,26 @@ impl RepoModule {
 }
 
 pub fn repo_modules(repo: &Path) -> Result<Vec<RepoModule>> {
+    read_modules(&repo.join("modules"))
+}
+
+/// The add-ons of the repository (`addons/<name>/`): same layout as a module, each plugging an
+/// outside program into the desktop. Installed only on a machine that lists it in `addons`.
+pub fn repo_addons(repo: &Path) -> Result<Vec<RepoModule>> {
+    let addons = read_modules(&repo.join("addons"))?;
+    let modules = repo_modules(repo)?;
+    if let Some(a) = addons
+        .iter()
+        .find(|a| modules.iter().any(|m| m.name == a.name))
+    {
+        bail!("add-on « {} » has the name of a module", a.name);
+    }
+    Ok(addons)
+}
+
+fn read_modules(dir: &Path) -> Result<Vec<RepoModule>> {
     let mut out = Vec::new();
-    let dir = repo.join("modules");
-    let Ok(entries) = std::fs::read_dir(&dir) else {
+    let Ok(entries) = std::fs::read_dir(dir) else {
         return Ok(out);
     };
     for e in entries.flatten() {
@@ -72,22 +90,30 @@ pub fn repo_modules(repo: &Path) -> Result<Vec<RepoModule>> {
             name,
             dir: d,
             requires: card.requires,
+            description: card.description,
         });
     }
     out.sort_by(|a, b| a.name.cmp(&b.name));
     Ok(out)
 }
 
-/// Les modules du dépôt qui doivent être installés sur cette machine : tous, sauf ceux de
-/// `disabled` dans `~/.config/poste/config.toml` (`sys` n'est jamais désactivable).
-/// A module whose required program is missing is left out too.
+/// What must be installed on this machine: every module of the repository except those in
+/// `disabled` (`sys` can never be disabled), plus the add-ons listed in `addons`. A module or
+/// add-on whose required program is missing is left out.
 pub fn enabled_modules(repo: &Path, env: &Env) -> Result<Vec<RepoModule>> {
     let cfg = poste_core::Config::load(env)?;
-    Ok(repo_modules(repo)?
+    let modules = repo_modules(repo)?
         .into_iter()
-        .filter(|m| m.name == "sys" || !cfg.is_disabled(&m.name))
+        .filter(|m| m.name == "sys" || !cfg.is_disabled(&m.name));
+    let addons = repo_addons(repo)?
+        .into_iter()
+        .filter(|a| cfg.addons.contains(&a.name));
+    let mut out: Vec<RepoModule> = modules
+        .chain(addons)
         .filter(|m| m.missing(env).is_none())
-        .collect())
+        .collect();
+    out.sort_by(|a, b| a.name.cmp(&b.name));
+    Ok(out)
 }
 
 /// Tous les fichiers (récursivement) sous `dir`, triés.
@@ -340,6 +366,44 @@ mod tests {
         let all = repo_modules(&repo).unwrap();
         let absent = all.iter().find(|m| m.name == "absent").unwrap();
         assert_eq!(absent.missing(&env), Some("poste-test-absent-player"));
+    }
+
+    #[test]
+    fn addons_only_when_chosen() {
+        let d = tempfile::tempdir().unwrap();
+        let repo = d.path().join("repo");
+        for (kind, name) in [
+            ("modules", "base"),
+            ("addons", "chosen"),
+            ("addons", "other"),
+        ] {
+            let m = repo.join(kind).join(name);
+            fs::create_dir_all(&m).unwrap();
+            fs::write(m.join("module.toml"), format!("name = \"{name}\"\n")).unwrap();
+            fs::write(m.join(format!("poste-{name}")), "").unwrap();
+        }
+        let env = Env::with_home(d.path().join("home"));
+        fs::create_dir_all(env.config_file().parent().unwrap()).unwrap();
+        fs::write(env.config_file(), "addons = [\"chosen\"]\n").unwrap();
+
+        let names: Vec<String> = enabled_modules(&repo, &env)
+            .unwrap()
+            .into_iter()
+            .map(|m| m.name)
+            .collect();
+        assert_eq!(names, ["base", "chosen"]);
+        let dests: Vec<String> = desired(&repo, &env)
+            .unwrap()
+            .iter()
+            .map(|i| env.display(&i.dest))
+            .collect();
+        assert!(dests.contains(&"~/.local/share/poste/modules/chosen/poste-chosen".to_string()));
+
+        // An add-on may not take the name of a module.
+        let m = repo.join("addons/base");
+        fs::create_dir_all(&m).unwrap();
+        fs::write(m.join("module.toml"), "name = \"base\"\n").unwrap();
+        assert!(repo_addons(&repo).is_err());
     }
 
     #[test]

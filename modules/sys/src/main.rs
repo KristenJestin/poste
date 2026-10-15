@@ -116,6 +116,8 @@ enum Cmd {
         #[command(subcommand)]
         action: Option<ModuleCmd>,
     },
+    /// Add-ons of the repository and their state here (key addons, in poste.toml of the data repository)
+    Addons,
     /// Paquets et étapes du bootstrap ignorés sur cette machine (config.toml, clé skip)
     Skip {
         #[command(subcommand)]
@@ -340,6 +342,11 @@ fn run(cli: Cli) -> Result<ExitCode> {
                 ModuleCmd::Enable { name } => machine::module_set(&env, &repo, &name, true)?,
                 ModuleCmd::Disable { name } => machine::module_set(&env, &repo, &name, false)?,
             }
+            Ok(ExitCode::SUCCESS)
+        }
+        Cmd::Addons => {
+            let repo = versions::root(&env, &cfg)?;
+            machine::addon_list(&env, &repo)?;
             Ok(ExitCode::SUCCESS)
         }
         Cmd::Skip { action } => {

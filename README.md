@@ -49,9 +49,7 @@ commands = [{ name = "status", description = "état du dépôt" }]   # facultati
 | Module | Rôle |
 | --- | --- |
 | [`sys`](modules/sys/README.md) | gère le dépôt : construction, installation, état, git. Toujours installé. |
-| [`melodie`](modules/melodie/README.md) | plugs the [Mélodie](https://github.com/KristenJestin/melodie) music player into the desktop: launcher search, quality and heart on the player card. Needs `melodie`. |
 | [`record`](modules/record/README.md) | enregistrement d'écran (gpu-screen-recorder) piloté par l'île : préréglages, fenêtres, écrans, zone. |
-| [`vocaline`](modules/vocaline/README.md) | dictée Vocaline : SUPER+Z, pastille animée en bas de l'écran, texte dicté en direct sous l'île. |
 | [`usage`](modules/usage/README.md) | quotas des agents IA (Claude Code, Codex…) lus dans le collecteur d'Omarchy, leur historique, et la consommation relue dans les journaux des agents (appels, fenêtres de 5 h, comparaisons). |
 | [`power`](modules/power/README.md) | alertes batterie (faible, critique, branché mais ça se vide) et disque presque plein ; démon léger (portable). |
 
@@ -62,11 +60,30 @@ release), soit un script (`poste-<nom>` exécutable à la racine du module, en P
 copié tel quel : pas de `Cargo.toml`, pas dans `members`). `poste` ne fait pas la différence : il
 exécute `~/.local/share/poste/modules/<nom>/poste-<nom>`.
 
-A module that plugs an outside program into the desktop (Vocaline, Mélodie) says so with
-`requires = "<program>"` in its `module.toml`: when that program is not in the `PATH`,
-`poste sys setup` leaves the module out (and removes it if it was installed), so a machine
-without it gets no dead shortcut, launcher entry or island part. Installing the program itself
-is a choice of the machine: it belongs in its data repository, not here.
+A module can say `requires = "<program>"` in its `module.toml`: when that program is not in
+the `PATH`, `poste sys setup` leaves the module out (and removes it if it was installed).
+
+## Add-ons
+
+Ready-made integrations of outside programs, in `addons/<name>/`. An add-on has the same layout
+as a module (`module.toml` with `requires`, `island/`, `hypr/`, a `poste-<name>` relay) plus a
+`bootstrap/` folder (`packages.toml`, `steps.toml`, same format as the repository's) that
+installs the program. Nothing of an add-on is installed unless the machine chooses it, in the
+`poste.toml` of its data repository:
+
+```toml
+addons = ["melodie", "vocaline"]
+```
+
+`poste sys setup` then runs the add-on's bootstrap steps (install the program, print the
+packages to install with sudo) and plugs the add-on in as soon as the program is there (a second
+`poste sys setup` the first time). Removing a name from the list unplugs it; the program itself
+stays installed. `poste sys addons` shows each add-on and its state on this machine.
+
+| Add-on | Plugs in |
+| --- | --- |
+| [`melodie`](addons/melodie/README.md) | the [Mélodie](https://github.com/KristenJestin/melodie) music player: launcher search, quality and heart on the player card. Installs the pinned release. |
+| [`vocaline`](addons/vocaline/README.md) | dictée Vocaline : SUPER+Z, pastille animée en bas de l'écran, texte dicté en direct sous l'île. The `vocaline` package is installed by hand. |
 
 ### Ce que les modules apportent à la machine
 
@@ -75,7 +92,7 @@ Un module peut fournir, à côté de son programme, des dossiers facultatifs cop
 connaître aucun module ; module absent, aucune trace) :
 
 - `island/` : pour l'île Quickshell (`config/.config/omarchy/plugins/poste.island`, composant `ModuleRegistry.qml`).
-  - `launcher.json` : entrées, extensions et moteurs du lanceur, même format que
+  - `launcher.json` (format: [`docs/launcher-format.md`](docs/launcher-format.md)) : entrées, extensions et moteurs du lanceur, même format que
     `~/.config/poste-island/launcher/launcher.json` (fusionné avec lui ; la config de l'utilisateur
     gagne en cas d'id identique). Une extension peut avoir `"highlight": true` : l'île encadre à
     l'écran la cible (`highlight: {x,y,w,h,window}`) de la ligne sélectionnée.
@@ -83,7 +100,7 @@ connaître aucun module ; module absent, aucune trace) :
     `player` declares, without any QML, what the player card shows for one MPRIS player:
     `bus` (its MPRIS bus name), `quality` (metadata key of the line under the artist), `starred`
     (boolean metadata key of the heart), `like` (command run by the heart), `launcher` (launcher
-    extension opened by the sound source pill). Example: `modules/melodie/island/island.json`.
+    extension opened by the sound source pill). Example: `addons/melodie/island/island.json`.
     Slots chargés par l'île : `capture` (source d'enregistrement
     de même interface qu'`ObsState.qml`, pour la pastille de capture) et `dictation` (source de
     dictée : `listening`, `transcribing`, `level`, `finals`, `partial`, pour la pastille de dictée

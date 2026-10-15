@@ -34,6 +34,10 @@ pub struct Config {
     /// Modules du dépôt à ne pas installer sur cette machine (retirés s'ils l'étaient).
     #[serde(default)]
     pub disabled: Vec<String>,
+    /// Add-ons of the repository (`addons/<name>/`) this machine uses: their bootstrap steps
+    /// install the program, and the add-on is plugged in once the program is there.
+    #[serde(default)]
+    pub addons: Vec<String>,
     /// Paquets (`bootstrap/packages.toml`) et étapes (`bootstrap/steps.toml`, par `id`) que cette
     /// machine n'installe pas : ni exigés, ni proposés, ni comptés manquants. Rien n'est désinstallé.
     #[serde(default)]
@@ -112,6 +116,7 @@ impl Config {
         extend(&mut self.modules, more.modules);
         extend(&mut self.local, more.local);
         extend(&mut self.disabled, more.disabled);
+        extend(&mut self.addons, more.addons);
         extend(&mut self.skip, more.skip);
         self.overrides.extend(more.overrides);
     }
@@ -207,13 +212,14 @@ mod tests {
         assert_eq!(c.disabled, ["power"]);
         std::fs::write(
             data.join(DATA_CONFIG),
-            "repo = \"/ailleurs\"\ndisabled = [\"power\", \"record\"]\nlocal = [\".x\"]\n",
+            "repo = \"/ailleurs\"\ndisabled = [\"power\", \"record\"]\nlocal = [\".x\"]\naddons = [\"player\"]\n",
         )
         .unwrap();
         let c = Config::load(&e).unwrap();
         assert_eq!(c.repo.as_deref(), Some("~/poste"));
         assert_eq!(c.disabled, ["power", "record"]);
         assert_eq!(c.local, [".x"]);
+        assert_eq!(c.addons, ["player"]);
     }
 
     #[test]

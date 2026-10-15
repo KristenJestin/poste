@@ -3,7 +3,8 @@
 Plugs [Mélodie](https://github.com/KristenJestin/melodie), a Navidrome music player, into the
 desktop. Mélodie itself (player daemon, local copy of the library, search, mixes, likes,
 playlists, MPRIS) is not in poste: this module only declares where the island finds it.
-It is installed only when `melodie` is in the `PATH` (`requires` in `module.toml`).
+It is an add-on: installed only on a machine that lists `melodie` in `addons` (`poste.toml` of
+its data repository), and plugged in once `melodie` is in the `PATH` (`requires`).
 
 ## What it brings
 
@@ -20,12 +21,13 @@ It is installed only when `melodie` is in the `PATH` (`requires` in `module.toml
 
 ## Install and login
 
-Installing Mélodie is a choice of the machine, so it lives in the machine's data repository
-(a step that downloads a pinned release and runs its `install.sh`), not in poste. Mélodie needs
-`libmpv` (`mpv` package) and a Secret Service. Then, once per machine, in a terminal:
-`melodie login`. The first copy of the library runs in the background.
+`bootstrap/steps.toml` downloads the pinned release (sha256 checked) and runs its `install.sh`,
+which puts `melodie` in `~/.local/bin`; to update, change the version there. `bootstrap/packages.toml`
+asks for `mpv` (libmpv). Mélodie also needs a Secret Service. Then, once per machine, in a
+terminal: `melodie login` (manual step `melodie-login`). The first copy of the library runs in
+the background.
 
 ## Contract
 
-Mélodie's README and `docs/events.md` are the reference: launcher JSON, exit codes, MPRIS keys.
+The launcher format is poste's `docs/launcher-format.md`; Mélodie's README and `docs/events.md` are the reference for its exit codes and MPRIS keys.
 The desktop relies on exit codes and JSON, never on message text.

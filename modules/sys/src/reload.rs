@@ -26,9 +26,16 @@ impl Need {
                 self.shell = true
             }
             ["config", ".config", "hypr", ..] => self.hypr = true,
-            ["modules", _, "island", ..] => self.shell = true,
+            ["modules" | "addons", _, "island", ..] => self.shell = true,
             // module.toml : ses `[[line]]` peuvent viser la config de Hyprland.
-            ["modules", _, "hypr", ..] | ["modules", _, "module.toml"] => self.hypr = true,
+            ["modules" | "addons", _, "hypr", ..] | ["modules" | "addons", _, "module.toml"] => {
+                self.hypr = true
+            }
+            // The data repository's poste.toml can plug or unplug add-ons and modules.
+            ["poste.toml"] => {
+                self.shell = true;
+                self.hypr = true
+            }
             _ => {}
         }
     }
@@ -136,7 +143,7 @@ mod tests {
     fn island_files_restart_the_shell() {
         let n = need(&[
             "config/.config/omarchy/plugins/poste.island/Island.qml",
-            "modules/vocaline/island/VocalineState.qml",
+            "addons/vocaline/island/VocalineState.qml",
         ]);
         assert_eq!(
             n,
@@ -170,6 +177,25 @@ mod tests {
                 hypr: true
             }
         );
+    }
+
+    #[test]
+    fn addon_files_and_data_choices() {
+        assert_eq!(
+            need(&["addons/vocaline/hypr/vocaline.lua"]),
+            Need {
+                shell: false,
+                hypr: true
+            }
+        );
+        assert_eq!(
+            need(&["poste.toml"]),
+            Need {
+                shell: true,
+                hypr: true
+            }
+        );
+        assert!(!need(&["addons/melodie/README.md"]).any());
     }
 
     #[test]
