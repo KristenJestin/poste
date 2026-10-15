@@ -235,6 +235,7 @@ fn run(cli: Cli) -> Result<ExitCode> {
             if !take_home.is_empty() {
                 versions::ensure_writable(&env, &repo, "--take-home")?;
             }
+            let built = handoff::setup_from_clone(&repo)?;
             let done = setup::run(
                 &env,
                 &repo,
@@ -242,7 +243,7 @@ fn run(cli: Cli) -> Result<ExitCode> {
                     yes,
                     dry_run,
                     no_config,
-                    skip_build: false,
+                    skip_build: built,
                     link_root: versions::link_root(&env, &repo),
                     take_repo,
                     take_home,

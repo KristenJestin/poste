@@ -52,6 +52,37 @@ fn target(root: &Path, running: &Path) -> Option<PathBuf> {
     (!same).then_some(bin)
 }
 
+/// Set in the environment of a `setup` handed over by [`setup_from_clone`]: it never hands over
+/// again, and knows the clone is already built.
+const SETUP_HANDED_OVER: &str = "POSTE_SYS_SETUP_HANDED_OVER";
+
+/// `setup` from a clone (dev mode): the clone is built first, then, if its `poste-sys` differs
+/// from the running one (`poste` in `~/.local/bin` runs the previous build), it is handed over to
+/// with the same arguments, so that what is new in `setup` applies in this run, not the next one.
+/// Returns whether the clone is built (by this process or the one that handed over).
+pub fn setup_from_clone(root: &Path) -> Result<bool> {
+    if !root.join("Cargo.toml").is_file() {
+        return Ok(false);
+    }
+    if std::env::var_os(SETUP_HANDED_OVER).is_some() {
+        return Ok(true);
+    }
+    setup::build(root)?;
+    let Some(bin) = running().and_then(|r| target(root, &r)) else {
+        return Ok(true);
+    };
+    println!("Handing over to the new build: {}", bin.display());
+    let err = Command::new(&bin)
+        .args(std::env::args_os().skip(1))
+        .env(SETUP_HANDED_OVER, "1")
+        .exec();
+    eprintln!(
+        "poste sys: could not hand over to {} ({err}), going on with this program",
+        bin.display()
+    );
+    Ok(true)
+}
+
 /// Does the program know `finish`? (a version from before the hand-over does not know it: rollback
 /// to it).
 fn knows_finish(bin: &Path) -> bool {
@@ -122,6 +153,12 @@ fn finish_command(bin: &Path, old: Option<&Path>, need: &Need, yes: bool, prune:
 mod tests {
     use super::*;
     use std::fs;
+
+    #[test]
+    fn setup_from_a_version_builds_nothing() {
+        let d = tempfile::tempdir().unwrap();
+        assert!(!setup_from_clone(d.path()).unwrap());
+    }
 
     #[test]
     fn hand_over_only_to_a_different_binary() {
