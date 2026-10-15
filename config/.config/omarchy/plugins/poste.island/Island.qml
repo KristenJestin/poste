@@ -537,8 +537,7 @@ Item {
     if (!n) return
     if (n.file) { Quickshell.execDetached(["xdg-open", String(n.file)]); return }
     if (!/^[0-9]+-[0-9]+$/.test(String(n.key || ""))) { focusNotificationApp(n); return }
-    var reader = toastFileComponent.createObject(root, { note: n })
-    reader.path = toastStateDir + "/" + n.key + ".json"
+    toastCommandComponent.createObject(root, { note: n }).running = true
   }
   function focusNotificationApp(n) {
     if (n && n.app) Quickshell.execDetached(["omarchy-hyprland-focus-app", String(n.app)])
@@ -546,39 +545,35 @@ Item {
   // The file a stored toast opened: `xdg-open` and one absolute path (or file://
   // URI), nothing else. Not NotificationLogic.parseExecArgv: importing another
   // plugin's file would take the whole island down if it were missing.
-  function openedFileOf(text) {
+  function openedFileOf(execArgv) {
     var argv
-    try { argv = JSON.parse(JSON.parse(text).execArgv || "") } catch (e) { return "" }
+    try { argv = JSON.parse(execArgv) } catch (e) { return "" }
     if (!Array.isArray(argv) || argv.length !== 2 || argv[0] !== "xdg-open") return ""
     var target = typeof argv[1] === "string" ? argv[1] : ""
     if (target.indexOf("file:///") === 0) target = decodeURIComponent(target.slice(7))
     return target.charAt(0) === "/" ? target : ""
   }
-  // One reader per click, so two quick clicks never mix their answers. The toast's
-  // file first; the history copy when it is gone or unreadable (moved there as it ends).
+  // One reader per click, so two quick clicks never mix their answers: the
+  // toast's file first, the history copy when it holds no command. Destroyed
+  // once its output is read and the process has ended, whichever comes last.
   Component {
-    id: toastFileComponent
-    FileView {
+    id: toastCommandComponent
+    Process {
+      id: reader
       property var note
-      property bool triedHistory: false
-      printErrors: false
-      function tryHistory() {
-        if (triedHistory) return false
-        triedHistory = true
-        path = root.toastStateDir + "/history/" + note.key + ".json"
-        return true
-      }
-      onLoaded: {
-        var file = root.openedFileOf(text())
-        if (!file && tryHistory()) return
-        if (file) Quickshell.execDetached(["xdg-open", file])
-        else root.focusNotificationApp(note)
-        destroy()
-      }
-      onLoadFailed: {
-        if (tryHistory()) return
-        root.focusNotificationApp(note)
-        destroy()
+      property bool handled: false
+      command: ["sh", "-c", "for f in \"$1/$2.json\" \"$1/history/$2.json\"; do jq -er 'first(.execArgv | strings | select(length > 0))' \"$f\" 2>/dev/null && exit; done; true",
+        "toast", root.toastStateDir, String(note ? note.key : "")]
+      onRunningChanged: if (!running && handled) destroy()
+      stdout: StdioCollector {
+        waitForEnd: true
+        onStreamFinished: {
+          var file = root.openedFileOf(text.trim())
+          if (file) Quickshell.execDetached(["xdg-open", file])
+          else root.focusNotificationApp(reader.note)
+          reader.handled = true
+          if (!reader.running) reader.destroy()
+        }
       }
     }
   }
