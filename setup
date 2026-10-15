@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Premier lancement de poste (Omarchy fraîche) : vérifie cargo, enregistre l'emplacement du
-# dépôt, construit, puis laisse `poste-sys setup` installer (binaires, config, étapes de bootstrap/). Options : --yes, --dry-run, --no-config, --take-repo, --take-home, --data.
+# First run of poste (fresh Omarchy): checks cargo, records the location of the
+# repository, builds, then lets `poste-sys setup` install (binaries, config, steps of bootstrap/). Options: --yes, --dry-run, --no-config, --take-repo, --take-home, --data.
 set -euo pipefail
 
 repo="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
@@ -17,7 +17,7 @@ while (($#)); do
     --no-config) pass+=(--no-config) ;;
     --take-repo | --take-home)
       if (($# == 0)); then
-        echo "setup : $arg attend un chemin" >&2
+        echo "setup: $arg expects a path" >&2
         exit 2
       fi
       pass+=("$arg" "$1")
@@ -25,25 +25,25 @@ while (($#)); do
       ;;
     --data)
       if (($# == 0)); then
-        echo "setup : --data attend l'adresse git ou le dossier du dépôt de données" >&2
+        echo "setup: --data expects the git address or the folder of the data repository" >&2
         exit 2
       fi
       data="$1"
       shift
       ;;
     -h | --help)
-      echo "Usage : ./setup [--yes] [--dry-run] [--no-config] [--take-repo CHEMIN]... [--take-home CHEMIN]... [--data ADRESSE|DOSSIER]"
+      echo "Usage: ./setup [--yes] [--dry-run] [--no-config] [--take-repo PATH]... [--take-home PATH]... [--data ADDRESS|FOLDER]"
       exit 0
       ;;
     *)
-      echo "setup : option inconnue : $arg" >&2
+      echo "setup: unknown option: $arg" >&2
       exit 2
       ;;
   esac
 done
 
 if ! command -v cargo > /dev/null 2>&1; then
-  echo "setup : cargo est introuvable. Installez Rust (poste ne lance jamais sudo), puis relancez ./setup :" >&2
+  echo "setup: cargo not found. Install Rust (poste never runs sudo), then run ./setup again:" >&2
   echo "  sudo pacman -S --needed rust" >&2
   exit 1
 fi
@@ -51,7 +51,7 @@ fi
 config="${XDG_CONFIG_HOME:-$HOME/.config}/poste/config.toml"
 mkdir -p "$(dirname "$config")"
 
-# Écrit (ou met à jour) une clé de premier niveau sans toucher au reste de la config.
+# Writes (or updates) a top-level key without touching the rest of the config.
 set_key() {
   local key="$1" value="$2" line tmp
   value="${value//\\/\\\\}"
@@ -59,13 +59,13 @@ set_key() {
   line="$key = \"$value\""
   tmp="$(mktemp "$config.XXXXXX")"
   if [[ -f $config ]] && grep -Eq "^[[:space:]]*$key[[:space:]]*=" "$config"; then
-    # La clé existe : on remplace seulement cette ligne.
+    # The key exists: only that line is replaced.
     NEWLINE="$line" KEY="$key" awk '
       !done && $0 ~ "^[[:space:]]*" ENVIRON["KEY"] "[[:space:]]*=" { print ENVIRON["NEWLINE"]; done = 1; next }
       { print }
     ' "$config" > "$tmp"
   else
-    # Une clé de premier niveau doit précéder toute table : on l'ajoute en tête.
+    # A top-level key must come before any table: it is added at the top.
     { echo "$line"; [[ -f $config ]] && cat "$config"; true; } > "$tmp"
   fi
   if [[ -f $config ]] && cmp -s "$tmp" "$config"; then
@@ -73,28 +73,28 @@ set_key() {
   else
     chmod 644 "$tmp"
     mv "$tmp" "$config"
-    echo "Config : $key enregistré dans $config"
+    echo "Config: $key saved in $config"
   fi
 }
 
 set_key repo "$repo"
 
-# Dépôt de données de la machine (privé) : un dossier existant, ou une adresse git clonée
-# à côté du dépôt (poste-data).
+# The machine's data repository (private): an existing folder, or a git address cloned
+# next to the repository (poste-data).
 if [[ -n $data ]]; then
   if [[ -d $data ]]; then
     data="$(cd "$data" && pwd -P)"
   else
     dest="$(dirname "$repo")/poste-data"
     if [[ -e $dest ]]; then
-      echo "setup : $dest existe déjà ; passez ce dossier à --data, ou déplacez-le" >&2
+      echo "setup: $dest already exists; pass this folder to --data, or move it" >&2
       exit 1
     fi
     if ((dry)); then
-      echo "Simulation : git clone $data $dest non lancé, data non enregistré."
+      echo "Dry run: git clone $data $dest not run, data not saved."
       data=""
     else
-      echo "Clonage du dépôt de données dans $dest…"
+      echo "Cloning the data repository into $dest…"
       git clone "$data" "$dest"
       data="$dest"
     fi
@@ -102,12 +102,12 @@ if [[ -n $data ]]; then
   if [[ -n $data ]]; then set_key data "$data"; fi
 fi
 
-echo "Construction de l'espace de travail (release)…"
+echo "Building the workspace (release)…"
 cargo build --release --manifest-path "$repo/Cargo.toml"
 
 case ":$PATH:" in
   *":$HOME/.local/bin:"*) ;;
-  *) echo "Attention : $HOME/.local/bin n'est pas dans votre PATH, la commande « poste » ne sera pas trouvée." >&2 ;;
+  *) echo "Warning: $HOME/.local/bin is not in your PATH, the 'poste' command will not be found." >&2 ;;
 esac
 
 exec "$repo/target/release/poste-sys" setup "${pass[@]}"

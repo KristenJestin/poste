@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Construit l'archive d'une version de poste : ce que `poste sys setup` lit dans une racine
-# (config/, bootstrap/, les fichiers de modules qu'il pose, les binaires dans target/release/),
-# plus VERSION (commit et date). Seuls les fichiers suivis par git y entrent.
-# Usage : .github/package.sh [DOSSIER_DE_SORTIE]   (défaut : target/dist)
-# Les binaires viennent de target/release/ (cargo build --release), ou de $POSTE_BIN_DIR.
+# Builds the archive of a poste version: what `poste sys setup` reads in a root
+# (config/, bootstrap/, the module files it puts in place, the binaries in target/release/),
+# plus VERSION (commit and date). Only files tracked by git go in.
+# Usage: .github/package.sh [OUTPUT_FOLDER]   (default: target/dist)
+# The binaries come from target/release/ (cargo build --release), or from $POSTE_BIN_DIR.
 set -euo pipefail
 
 repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
@@ -19,8 +19,8 @@ trap 'rm -rf "$stage"' EXIT
 
 git -C "$repo" archive --format=tar HEAD config bootstrap modules addons | tar -x -C "$stage"
 
-# D'un module, seulement ce que setup pose : module.toml, island/, hypr/, bin/, systemd/ et le
-# programme d'un module-script (poste-<nom>). An add-on also keeps its bootstrap/.
+# Of a module, only what setup puts in place: module.toml, island/, hypr/, bin/, systemd/ and the
+# program of a script module (poste-<name>). An add-on also keeps its bootstrap/.
 for m in "$stage"/modules/*/ "$stage"/addons/*/; do
   [[ -d $m ]] || continue
   n="$(basename "$m")"
@@ -40,7 +40,7 @@ for b in "$bin"/poste*; do
   fi
 done
 if ((found == 0)); then
-  echo "package : aucun binaire poste* dans $bin (cargo build --release d'abord)" >&2
+  echo "package: no poste* binary in $bin (cargo build --release first)" >&2
   exit 1
 fi
 
@@ -49,4 +49,4 @@ printf 'commit=%s\ndate=%s\n' "$commit" "$date" > "$stage/VERSION"
 mkdir -p "$out"
 tar -czf "$out/$name" --owner=0 --group=0 -C "$stage" .
 (cd "$out" && sha256sum "$name" > "$name.sha256")
-echo "Archive : $out/$name ($(cut -c1-12 "$out/$name.sha256"))"
+echo "Archive: $out/$name ($(cut -c1-12 "$out/$name.sha256"))"

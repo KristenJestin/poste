@@ -1,10 +1,10 @@
-# Archive d'une version de poste (binaires + config/ + bootstrap/ + fichiers des modules), que
-# `poste sys sync` installe sur les machines en mode release.
-# - sur une pull request : construite seulement (artefact), pour vérifier qu'elle se construit ;
-# - sur un push sur main : publiée dans la préversion `latest` (adresse fixe :
-#   .../releases/download/latest/<archive>), avec sa somme sha256.
-# Construite dans un conteneur Arch : la cible est Arch x86_64 (glibc et libmpv de la machine).
-# Les actions tierces sont épinglées sur un commit (la version est en commentaire).
+# Archive of a poste version (binaries + config/ + bootstrap/ + module files), which
+# `poste sys sync` installs on the machines in release mode.
+# - on a pull request: only built (artifact), to check that it builds;
+# - on a push to main: published in the `latest` prerelease (fixed address:
+#   .../releases/download/latest/<archive>), with its sha256 sum.
+# Built in an Arch container: the target is Arch x86_64 (the machine's glibc and libmpv).
+# Third-party actions are pinned to a commit (the version is in a comment).
 name: archive
 
 on:
@@ -12,7 +12,7 @@ on:
     branches: [main]
   pull_request:
 
-# Le travail de construction ne fait que lire : le droit d'écrire n'est donné qu'à la publication.
+# The build job only reads: the right to write is given only to the publication.
 permissions:
   contents: read
 
@@ -25,17 +25,17 @@ jobs:
     runs-on: ubuntu-latest
     container: archlinux:latest
     steps:
-      - name: Paquets
+      - name: Packages
         run: pacman -Syu --noconfirm --needed base-devel git rust mpv
 
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
-      - name: Dépôt sûr pour git (conteneur)
+      - name: Safe repository for git (container)
         run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
 
-      - name: Construction
+      - name: Build
         run: cargo build --release --locked
 
       - name: Archive
@@ -46,8 +46,8 @@ jobs:
           name: poste-x86_64-linux
           path: dist/
 
-  # Publication : seulement sur main, avec le droit d'écrire, et sans rien construire ici (elle ne
-  # fait que reprendre l'artefact du travail précédent).
+  # Publication: only on main, with the right to write, and building nothing here (it only
+  # picks up the artifact of the previous job).
   publish:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: archive
@@ -60,16 +60,16 @@ jobs:
           name: poste-x86_64-linux
           path: dist/
 
-      # Jamais de moment sans préversion : on ne supprime plus `latest` pour la recréer. Si elle
-      # existe, ses fichiers sont remplacés (--clobber) puis son étiquette est déplacée sur le
-      # commit construit ; sinon (premier passage) elle est créée. Pendant le remplacement des
-      # fichiers (quelques secondes) un `sync` peut lire une somme qui ne correspond pas à
-      # l'archive : il refuse alors l'archive sans rien installer et réussit au passage suivant.
-      - name: Publication dans la préversion latest
+      # Never a moment without a prerelease: `latest` is no longer deleted to be recreated. If it
+      # exists, its files are replaced (--clobber) then its tag is moved to the built
+      # commit; otherwise (first run) it is created. During the replacement of the
+      # files (a few seconds) a `sync` may read a sum that does not match the
+      # archive: it then refuses the archive without installing anything and succeeds on the next run.
+      - name: Publish to the latest prerelease
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          notes="Dernière version construite depuis main ($GITHUB_SHA). Installée par \`poste sys sync\` en mode release."
+          notes="Latest version built from main ($GITHUB_SHA). Installed by \`poste sys sync\` in release mode."
           if gh release view latest --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             gh release upload latest dist/* --clobber --repo "$GITHUB_REPOSITORY"
             gh api --method PATCH "repos/$GITHUB_REPOSITORY/git/refs/tags/latest" \
