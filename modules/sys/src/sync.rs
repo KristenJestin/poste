@@ -17,10 +17,7 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode};
 
 /// Ce que `run` a fait : code de sortie et ce qu'il faut recharger.
-pub struct Synced {
-    pub code: ExitCode,
-    pub need: Need,
-}
+pub use versions::Switched as Synced;
 
 /// `git pull --ff-only` dans chaque dépôt ; renvoie le commit de chacun avant le pull.
 fn pull(dirs: &[PathBuf], dry_run: bool) -> Result<Vec<(PathBuf, String)>> {
@@ -112,49 +109,16 @@ pub fn run(env: &Env, cfg: &Config, f: &Fetcher, yes: bool, dry_run: bool) -> Re
             ..Default::default()
         };
         let done = setup::run(env, &root, &opts)?;
+        if done.config_changed {
+            need.shell = true;
+            need.hypr = true;
+        }
         return Ok(Synced {
             code: done.code,
             need,
         });
     }
-    if let Some(bin) = handoff::prepare(&root, false)? {
-        return Err(handoff::relay(&bin, &need, yes, prune));
-    }
-    finish(env, yes, prune, need, false)
-}
-
-/// La suite de `sync` (et de `use`), une fois `current` posé : `setup` depuis `current`, élagage
-/// des anciennes versions si `prune`. Lancée aussi par un ancien `poste-sys` qui passe la main
-/// (`poste-sys finish`, voir `handoff`).
-pub fn finish(
-    env: &Env,
-    yes: bool,
-    prune: bool,
-    mut need: Need,
-    skip_build: bool,
-) -> Result<Synced> {
-    let root = env.current_link();
-    let opts = setup::Opts {
-        yes,
-        skip_build,
-        link_root: versions::link_root(env, &root),
-        ..Default::default()
-    };
-    let done = setup::run(env, &root, &opts)?;
-    if done.config_changed {
-        need.shell = true;
-        need.hypr = true;
-    }
-    if prune {
-        let removed = versions::prune(env, versions::KEEP)?;
-        if !removed.is_empty() {
-            println!("Anciennes versions retirées : {}.", removed.join(", "));
-        }
-    }
-    Ok(Synced {
-        code: done.code,
-        need,
-    })
+    handoff::complete(env, &root, need, yes, prune, false)
 }
 
 /// Pour les messages : la racine lue, en clair.

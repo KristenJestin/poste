@@ -8,7 +8,7 @@
 
 use crate::reload::Need;
 use crate::util::{self, sha256_file};
-use crate::{handoff, machine, setup, sync};
+use crate::{handoff, machine, setup};
 use anyhow::{bail, Context, Result};
 use poste_core::{Config, Env, Source};
 use std::collections::{BTreeMap, BTreeSet};
@@ -587,13 +587,38 @@ pub fn switch(env: &Env, source: Source, dir: &Path, o: &setup::Opts) -> Result<
         );
     }
     point_current(env, dir)?;
-    if let Some(bin) = handoff::prepare(&env.current_link(), o.skip_build)? {
-        return Err(handoff::relay(&bin, &need, o.yes, false));
+    handoff::complete(env, &env.current_link(), need, o.yes, false, o.skip_build)
+}
+
+/// La suite de `sync` et de `use` une fois `current` posé : `setup` depuis `current`, élagage des
+/// anciennes versions si `prune`. Lancée ici, ou par l'ancien `poste-sys` qui passe la main
+/// (`poste-sys finish`, voir `handoff`).
+pub fn finish(
+    env: &Env,
+    mut need: Need,
+    yes: bool,
+    prune: bool,
+    skip_build: bool,
+) -> Result<Switched> {
+    let opts = setup::Opts {
+        yes,
+        skip_build,
+        ..Default::default()
+    };
+    let done = setup::run(env, &env.current_link(), &opts)?;
+    if done.config_changed {
+        need.shell = true;
+        need.hypr = true;
     }
-    let done = sync::finish(env, o.yes, false, need, o.skip_build)?;
+    if prune {
+        let removed = crate::versions::prune(env, KEEP)?;
+        if !removed.is_empty() {
+            println!("Anciennes versions retirées : {}.", removed.join(", "));
+        }
+    }
     Ok(Switched {
         code: done.code,
-        need: done.need,
+        need,
     })
 }
 

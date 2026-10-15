@@ -12,8 +12,9 @@ fn script(path: &Path, body: &str) {
     fs::set_permissions(path, fs::Permissions::from_mode(0o755)).unwrap();
 }
 
-#[test]
-fn sync_passe_la_main_au_nouveau_poste_sys() {
+/// `poste-sys sync --yes` sur une version publiée dont le `poste-sys` est `bin` (script shell, `$LOG`
+/// désigne son journal) ; renvoie le succès et le journal.
+fn sync_with(bin: &str) -> (bool, String) {
     let d = tempfile::tempdir().unwrap();
     let home = d.path().join("home");
     let log = d.path().join("relais.log");
@@ -21,6 +22,7 @@ fn sync_passe_la_main_au_nouveau_poste_sys() {
     // Version publiée : son poste-sys note comment il est lancé.
     let src = d.path().join("v1");
     fs::create_dir_all(src.join("target/release")).unwrap();
+    fs::write(src.join("target/release/poste"), "bin").unwrap();
     fs::write(
         src.join("VERSION"),
         "commit=1111111\ndate=2026-10-01T10:00:00Z\n",
@@ -28,10 +30,7 @@ fn sync_passe_la_main_au_nouveau_poste_sys() {
     .unwrap();
     script(
         &src.join("target/release/poste-sys"),
-        &format!(
-            "echo \"$* relaye=$POSTE_SYS_RELAYED\" > '{}'\n",
-            log.display()
-        ),
+        &format!("LOG='{}'\n{bin}", log.display()),
     );
     let pubdir = d.path().join("pub");
     fs::create_dir_all(&pubdir).unwrap();
@@ -83,15 +82,26 @@ fn sync_passe_la_main_au_nouveau_poste_sys() {
         .env("POSTE_SYS_RELEASE_URL", "https://example.com/r")
         .status()
         .unwrap();
-    assert!(st.success());
-    // current désigne la version, et c'est son poste-sys qui a fait la suite.
+    // La version est installée et current la désigne, relais ou pas.
     let current = home.join(".local/share/poste/current");
     assert_eq!(
         fs::canonicalize(&current).unwrap(),
         fs::canonicalize(home.join(".local/share/poste/versions/1111111")).unwrap()
     );
-    assert_eq!(
-        fs::read_to_string(&log).unwrap().trim(),
-        "finish --yes --prune relaye=1"
-    );
+    (st.success(), fs::read_to_string(&log).unwrap_or_default())
+}
+
+#[test]
+fn sync_passe_la_main_au_nouveau_poste_sys() {
+    let (ok, log) = sync_with("echo \"$*\" >> \"$LOG\"\n");
+    assert!(ok);
+    assert_eq!(log, "finish --help\nfinish --skip-build --yes --prune\n");
+}
+
+#[test]
+fn sync_garde_la_main_si_la_version_ne_connait_pas_finish() {
+    // Version d'avant le relais : clap refuse `finish` (code 2) ; la suite est faite ici.
+    let (ok, log) = sync_with("echo \"$*\" >> \"$LOG\"\nexit 2\n");
+    assert!(ok);
+    assert_eq!(log, "finish --help\n");
 }

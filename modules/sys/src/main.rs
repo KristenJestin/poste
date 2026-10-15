@@ -141,6 +141,9 @@ enum Cmd {
         /// Retire les anciennes versions après setup
         #[arg(long)]
         prune: bool,
+        /// Le clone est déjà construit par celui qui passe la main
+        #[arg(long)]
+        skip_build: bool,
         #[arg(long)]
         reload_shell: bool,
         #[arg(long)]
@@ -296,6 +299,7 @@ fn run(cli: Cli) -> Result<ExitCode> {
         Cmd::Finish {
             yes,
             prune,
+            skip_build,
             reload_shell,
             reload_hypr,
         } => {
@@ -303,7 +307,7 @@ fn run(cli: Cli) -> Result<ExitCode> {
                 shell: reload_shell,
                 hypr: reload_hypr,
             };
-            let done = sync::finish(&env, yes, prune, need, false)?;
+            let done = versions::finish(&env, need, yes, prune, skip_build)?;
             reload::apply(&done.need, yes, false, &setup::confirm)?;
             Ok(done.code)
         }
