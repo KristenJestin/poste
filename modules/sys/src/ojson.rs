@@ -327,7 +327,7 @@ mod tests {
     }
 
     #[test]
-    fn erreurs() {
+    fn error_cases() {
         assert!(parse("{").is_err());
         assert!(parse("{\"a\":1} x").is_err());
         assert!(parse("[1,]").is_err());

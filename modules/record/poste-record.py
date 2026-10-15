@@ -450,11 +450,11 @@ def items():
     if st:
         p = public(st)
         out.append(item("stop", "Stop recording", p["label"] + " · " + os.path.basename(p["file"]), "󰓛",
-                        cmd_of("stop"), verb="Stop", keywords=["stop", "arrêter"],
+                        cmd_of("stop"), verb="Stop", keywords=["stop"],
                         actions=[("Open recordings folder", "󰉋", "xdg-open '%s'" % os.path.dirname(p["file"]).replace("'", "'\\''"))]))
         out.append(item("pause", "Resume recording" if p["paused"] else "Pause recording", p["label"],
                         "󰐊" if p["paused"] else "󰏤", cmd_of("toggle"), verb="Resume" if p["paused"] else "Pause",
-                        keywords=["pause", "resume", "reprendre"]))
+                        keywords=["pause", "resume"]))
         print(json.dumps(out))
         return
     _, presets = load_config()
@@ -480,13 +480,13 @@ def items():
         icon = icons.get(cls.lower()) or icons.get(cls.lower().split(".")[-1]) or "󰖯"
         out.append(item("window:" + c["address"], str(c["title"])[:80],
                         "Window · %s · with its own audio" % cls, icon, cmd_of("start", *target),
-                        keywords=["window", "fenêtre", str(c.get("class", ""))], actions=audio_actions(*target),
+                        keywords=["window", str(c.get("class", ""))], actions=audio_actions(*target),
                         highlight=window_rect(c, mons)))
     for m in mons:
         target = ("--monitor", m["name"])
         out.append(item("monitor:" + m["name"], "Screen " + m["name"],
                         "%sx%s · %s · with desktop audio" % (m.get("width"), m.get("height"), m.get("description", "")[:40]),
-                        "󰍹", cmd_of("start", *target), keywords=["screen", "écran", "monitor"], actions=audio_actions(*target),
+                        "󰍹", cmd_of("start", *target), keywords=["screen", "monitor"], actions=audio_actions(*target),
                         highlight=monitor_rect(m)))
     out.append(item("region", "Region…", "Select an area · with desktop audio", "󰩭", cmd_of("start", "--region"),
                     keywords=["region", "zone", "area"], actions=audio_actions("--region")))

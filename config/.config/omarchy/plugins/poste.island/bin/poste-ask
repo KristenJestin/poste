@@ -22,7 +22,7 @@ CONFIG = os.path.expanduser("~/.config/poste-island/launcher/launcher.json")
 WORKDIR = os.path.expanduser("~/.config/poste-island/ai")
 SYSTEM = ("You answer inside a small launcher panel on the user's Linux desktop (Omarchy, Hyprland). "
           "Be brief and direct, use simple Markdown (short lists, `code`), no preamble. "
-          "Answer in the user's language (French by default). "
+          "Answer in the user's language. "
           "You can run commands and edit files. To start a GUI app or anything long-running, launch it "
           "detached so it survives you and does not block: `setsid -f uwsm-app -- <app> [args] >/dev/null 2>&1` "
           "(or `setsid -f <cmd> >/dev/null 2>&1`); for a terminal program use "

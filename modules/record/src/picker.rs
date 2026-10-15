@@ -109,7 +109,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn entiers_comme_python() {
+    fn integers_like_python() {
         assert_eq!(as_int("0x1f"), Some(31));
         assert_eq!(as_int(" 42 "), Some(42));
         assert_eq!(as_int("0123"), Some(0x123)); // fallback to hexadecimal
@@ -120,7 +120,7 @@ mod tests {
     }
 
     #[test]
-    fn choix_de_la_fenetre() {
+    fn window_choice() {
         let list = "12[HC>]kitty[HT>]shell[HE>]55aa[HA>]34[HC>]Unity[HT>]Project[HE>]0x5581[HA>]";
         assert_eq!(
             select(list, as_int("0x5581")).as_deref(),

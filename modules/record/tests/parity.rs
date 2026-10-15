@@ -25,7 +25,7 @@ const CLIENTS: &str = r#"[
 const PRESETS: &str = r#"{
  "defaults": {"dir": "~/Videos", "fps": 60, "quality": "very_high", "codec": "auto", "container": "mp4", "cursor": true},
  "presets": [
-  {"id": "unity", "name": "Unity", "subtitle": "Unity editor · FMOD · 1080p60 · no cursor", "icon": "unityhub", "keywords": ["unity", "jeu"],
+  {"id": "unity", "name": "Unity", "subtitle": "Unity editor · FMOD · 1080p60 · no cursor", "icon": "unityhub", "keywords": ["unity", "game"],
    "window": {"class": "^Unity$"}, "audioSource": "app", "audioAppName": "FMOD Ex App", "resolution": "1920x1080", "cursor": false, "dir": "~/Videos/Unity"},
   {"id": "screen", "monitor": "DP-1", "audioSource": "desktop+mic", "container": "mkv", "fps": 30},
   {"id": "zone"},
@@ -70,11 +70,7 @@ macro_rules! need_python {
 fn both(b: &Bench, args: &[&str]) -> (String, String) {
     let py = b.python(args).output().unwrap();
     let rs = b.rust(args).output().unwrap();
-    assert_eq!(
-        py.status.code(),
-        rs.status.code(),
-        "code de sortie de {args:?}"
-    );
+    assert_eq!(py.status.code(), rs.status.code(), "exit code of {args:?}");
     (text(&py), text(&rs))
 }
 
@@ -169,7 +165,7 @@ fn status_and_items_during_a_recording() {
 fn help_identical_without_command_or_unknown_command() {
     need_python!();
     let b = Bench::new();
-    for args in [&[][..], &["nimporte"][..], &["start"][..]] {
+    for args in [&[][..], &["nonsense"][..], &["start"][..]] {
         let py = b.python(args).output().unwrap();
         let rs = b.rust(args).output().unwrap();
         assert_eq!(py.status.code(), Some(2));
@@ -213,9 +209,9 @@ fn play(b: &Bench, rust: bool, args: &[&str], mode: &str, notify: bool) -> Run {
                     .map(|n| format!("Unity/{n}")),
             )
             .chain(
-                file_names(&b.videos.join("Sous"))
+                file_names(&b.videos.join("Sub"))
                     .into_iter()
-                    .map(|n| format!("Sous/{n}")),
+                    .map(|n| format!("Sub/{n}")),
             )
             .collect(),
         pick: pick.map(|p| {
@@ -230,11 +226,11 @@ fn play(b: &Bench, rust: bool, args: &[&str], mode: &str, notify: bool) -> Run {
 fn same_start(b: &Bench, args: &[&str], mode: &str, notify: bool) -> Run {
     let py = play(b, false, args, mode, notify);
     let rs = play(b, true, args, mode, notify);
-    assert_eq!(py.code, rs.code, "code de {args:?}");
-    assert_eq!(py.stdout, rs.stdout, "sortie de {args:?}");
-    assert_eq!(py.journal, rs.journal, "journal de {args:?}");
+    assert_eq!(py.code, rs.code, "code of {args:?}");
+    assert_eq!(py.stdout, rs.stdout, "output of {args:?}");
+    assert_eq!(py.journal, rs.journal, "journal of {args:?}");
     assert_eq!(py.files, rs.files, "files of {args:?}");
-    assert_eq!(py.pick, rs.pick, "pick de {args:?}");
+    assert_eq!(py.pick, rs.pick, "pick of {args:?}");
     rs
 }
 
@@ -335,9 +331,9 @@ fn start_config_particular_defaults() {
     assert!(r.journal.contains("-f\t59.94") && r.journal.contains("-cursor\tno"));
     assert!(!r.journal.contains("aac"));
     // Folder whose parent exists: created.
-    b.presets(r#"{"defaults": {"dir": "~/Videos/Sous"}}"#);
+    b.presets(r#"{"defaults": {"dir": "~/Videos/Sub"}}"#);
     let r = same_start(&b, &["start", "--monitor", "DP-1"], "quick", true);
-    assert!(r.journal.contains("Sous/Screen DP-1 STAMP.mp4"));
+    assert!(r.journal.contains("Sub/Screen DP-1 STAMP.mp4"));
     // Very long target name or full of forbidden characters.
     b.presets("{}");
     let long = "é".repeat(100) + "/\\:*?";

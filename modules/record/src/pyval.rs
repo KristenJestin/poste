@@ -177,7 +177,7 @@ mod tests {
     }
 
     #[test]
-    fn verite() {
+    fn python_truthiness() {
         assert!(!truthy(&json!(0)));
         assert!(!truthy(&json!("")));
         assert!(!truthy(&json!([])));
@@ -186,7 +186,7 @@ mod tests {
     }
 
     #[test]
-    fn chemins() {
+    fn python_paths() {
         assert_eq!(dirname("/a/b/c.mp4"), "/a/b");
         assert_eq!(dirname("c.mp4"), "");
         assert_eq!(dirname("/c"), "/");
@@ -197,7 +197,7 @@ mod tests {
     }
 
     #[test]
-    fn arrondi_au_pair() {
+    fn rounds_half_to_even() {
         assert_eq!(py_round(0.5), 0);
         assert_eq!(py_round(1.5), 2);
         assert_eq!(py_round(2.5), 2);
@@ -205,7 +205,7 @@ mod tests {
     }
 
     #[test]
-    fn dumps_comme_python() {
+    fn dumps_like_python() {
         let v = json!({"a": [1, 2], "b": "é\u{f044b}\"\n\u{7f}"});
         // Key order: serde_json sorts; here we only test the separators and the escaping.
         assert_eq!(

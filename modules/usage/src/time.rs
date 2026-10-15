@@ -157,7 +157,7 @@ mod tests {
     }
 
     #[test]
-    fn durees() {
+    fn durations() {
         assert_eq!(duration(35 * 60), "35 min");
         assert_eq!(duration(125 * 60), "2 h 05");
     }
