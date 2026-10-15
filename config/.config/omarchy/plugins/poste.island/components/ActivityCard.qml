@@ -1,13 +1,13 @@
 import QtQuick
 import Quickshell.Widgets
 
-// Une activité de l'île dépliée, sous sa bulle (survol ou clic) :
-//   minuteur : heure de fin, grand temps restant, pause / annuler, +1 min, et
-//     la progression qui fait le tour du bord ;
-//   IA : la question, où elle en est (ou le début de la réponse), Ouvrir et
-//     arrêter / désépingler ;
-//   batterie : la jauge, le pourcentage et le temps estimé ;
-//   musique : pochette, titre, artiste, progression, précédent / lecture / suivant.
+// An island activity unfolded, under its bubble (hover or click):
+//   timer: end time, big time left, pause / cancel, +1 min, and
+//     the progress that goes around the edge;
+//   AI: the question, where it stands (or the start of the answer), Open and
+//     stop / unpin;
+//   battery: the gauge, the percentage and the estimated time;
+//   music: cover, title, artist, progress, previous / play / next.
 Rectangle {
   id: card
   required property var host
@@ -19,7 +19,7 @@ Rectangle {
   readonly property var battery: host.battery
   readonly property var device: activity ? activity.device || null : null
   readonly property var obs: host.obs
-  // Source du bloc « batterie » : la batterie du portable ou un périphérique.
+  // Source of the 'battery' block: the laptop's battery or a device.
   readonly property var batSrc: kind === "device" && device
     ? { percent: device.percent, charging: device.charging, color: device.color, glyph: device.glyph, label: device.name }
     : { percent: battery.percent, charging: battery.charging, color: battery.color, glyph: battery.glyph, label: battery.timeText() || (battery.charging ? "Charging" : "") }
@@ -29,7 +29,7 @@ Rectangle {
   signal done()
 
   width: kind === "ai" ? 360 : kind === "music" ? 360 : kind === "obs" ? 330 : 320
-  // Musique sans durée connue (YouTube…) : pas de barre de progression, carte plus courte.
+  // Music without a known duration (YouTube…): no progress bar, shorter card.
   height: kind === "obs" ? 132 : kind === "timer" ? 132 : kind === "battery" || kind === "device" ? 64 : kind === "music" ? (musicCard.length > 0 ? 132 : 100) : aiCol.implicitHeight + 28
   radius: kind === "battery" || kind === "device" ? height / 2 : 28
   color: host.colorIsland
@@ -87,7 +87,7 @@ Rectangle {
       anchors.left: parent.left
       anchors.leftMargin: 22
       anchors.verticalCenter: parent.verticalCenter
-      visible: !card.isReminder   // un rappel d'Omarchy ne se met pas en pause
+      visible: !card.isReminder   // an Omarchy reminder cannot be paused
       glyph: card.timer && card.timer.done ? "󰑐" : card.timer && card.timer.paused ? "󰐊" : "󰏤"
       onActivated: {
         if (card.timer.done) card.host.addToTimer(card.timer.id, 60000)
@@ -142,7 +142,7 @@ Rectangle {
         onActivated: { card.host.cancelTimer(card.timer.id); card.done() }
       }
     }
-    // +1 min, discret sous le bouton de gauche
+    // +1 min, discreet under the left button
     Text {
       anchors.left: parent.left
       anchors.leftMargin: 26
@@ -213,7 +213,7 @@ Rectangle {
     Text {
       width: parent.width
       visible: !!card.conv && !card.conv.busy && text !== ""
-      // Début de la réponse, sans la mise en forme Markdown.
+      // Start of the answer, without the Markdown formatting.
       text: card.conv ? String(card.conv.answerText || "").replace(/[*_`#>\[\]]/g, "").replace(/\(https?:[^)]*\)/g, "").trim() : ""
       wrapMode: Text.Wrap
       maximumLineCount: 3
@@ -276,7 +276,7 @@ Rectangle {
         font.pixelSize: 12
       }
     }
-    // Pause / reprise (enregistrement) à gauche, arrêt à droite.
+    // Pause / resume (recording) on the left, stop on the right.
     RoundButton {
       anchors.left: parent.left
       anchors.leftMargin: 20
@@ -294,7 +294,7 @@ Rectangle {
       fill: Qt.rgba(1, 0.27, 0.23, 0.22)
       onActivated: { card.obs.request(card.obs.recording ? "StopRecord" : "StopStream"); card.done() }
     }
-    // Tampon de replay actif : sauvegarder les dernières secondes.
+    // Replay buffer active: save the last seconds.
     Text {
       anchors.horizontalCenter: parent.horizontalCenter
       anchors.bottom: parent.bottom
@@ -315,11 +315,11 @@ Rectangle {
     anchors.fill: parent
     visible: card.kind === "music"
     readonly property var mpris: card.host.player
-    // Molette sur la carte : volume du lecteur, 5 % par cran.
+    // Wheel on the card: player volume, 5 % per notch.
     WheelHandler { onWheel: function(event) { card.host.wheelPlayerVolume(event.angleDelta.y) } }
     readonly property real length: mpris && mpris.lengthSupported ? mpris.length : 0
     property real position: 0
-    // MPRIS ne signale la position qu'aux sauts : on la relit tant que la carte est là.
+    // MPRIS only reports the position at jumps: it is read again as long as the card is there.
     Timer {
       interval: 500
       repeat: true
@@ -345,7 +345,7 @@ Rectangle {
         cache: false
         visible: status === Image.Ready
       }
-      // Niveau après un coup de molette, par-dessus la pochette.
+      // Level after a wheel notch, over the cover.
       Rectangle {
         anchors.fill: parent
         color: Qt.rgba(0, 0, 0, 0.55)
@@ -400,7 +400,7 @@ Rectangle {
         font.pixelSize: 11
       }
     }
-    // Bouton d'action d'un module (cœur des favoris), en haut à droite : le titre lui laisse la place.
+    // Action button of a module (favorites heart), at the top right: the title leaves it room.
     Glyph {
       id: cardHeart
       visible: card.host.playerHasAction
@@ -413,7 +413,7 @@ Rectangle {
       stroke: 1.75
       MouseArea { anchors.fill: parent; anchors.margins: -8; cursorShape: Qt.PointingHandCursor; onClicked: card.host.playerAction() }
     }
-    // Commandes, à droite sous le titre.
+    // Controls, on the right under the title.
     Row {
       anchors.right: parent.right
       anchors.rightMargin: 14
@@ -480,7 +480,7 @@ Rectangle {
         radius: 5
         color: card.batSrc.color
       }
-      // Pastille du niveau, avec un halo.
+      // Level pill, with a halo.
       Rectangle {
         id: knob
         x: Math.max(0, Math.min(parent.width - width, parent.width * parent.parent.p - width / 2))

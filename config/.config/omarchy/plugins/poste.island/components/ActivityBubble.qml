@@ -1,11 +1,11 @@
 import QtQuick
 import Quickshell.Widgets
 
-// Une activité de l'île (minuteur, conversation IA, batterie, musique,
-// dictée) en bulle, à
-// côté de l'île : « compact » = capsule, une info à gauche et une à droite
-// (anneau et temps restant) ; « minimal » = un rond (quand plusieurs
-// activités se partagent la place). La version dépliée est ActivityCard.qml.
+// An island activity (timer, AI conversation, battery, music,
+// dictation) as a bubble, next
+// to the island: 'compact' = capsule, one piece of info on the left and one on the right
+// (ring and time left); 'minimal' = a circle (when several
+// activities share the room). The unfolded version is ActivityCard.qml.
 Rectangle {
   id: bubble
   required property var host
@@ -21,7 +21,7 @@ Rectangle {
   readonly property var device: activity.device || null
   readonly property var obs: host.obs
 
-  // ------------------------------------------------ état de l'activité
+  // ------------------------------------------------ state of the activity
   readonly property real timerLeft: timer ? host.timerLeft(timer) : 0
   readonly property real progress: kind === "timer" ? (timer.done ? 1 : timer.duration > 0 ? timerLeft / timer.duration : 0)
     : kind === "battery" ? battery.percent : kind === "device" ? device.percent : 0
@@ -50,14 +50,14 @@ Rectangle {
     : Math.max(height, content.implicitWidth + 26)
   radius: height / 2
   color: host.colorIsland
-  // Même liseré que l'île : sans lui, la bulle paraît plus grande qu'elle.
+  // Same outline as the island: without it, the bubble looks bigger than it is.
   border.width: 1
   border.color: host.withAlpha(host.colorText, 0.07)
   Behavior on width { NumberAnimation { duration: 280 * bubble.host.motionScale; easing.type: Easing.OutQuint } }
 
   HoverHandler { id: hover }
-  // Molette sur la pastille média : volume du lecteur, 5 % par cran. Un
-  // handler ne bloque ni le clic ni le survol.
+  // Wheel on the media pill: player volume, 5 % per notch. A
+  // handler blocks neither the click nor the hover.
   WheelHandler {
     enabled: bubble.kind === "music"
     onWheel: function(event) { bubble.host.wheelPlayerVolume(event.angleDelta.y) }
@@ -72,7 +72,7 @@ Rectangle {
     }
   }
 
-  // Minuteur terminé : la bulle respire jusqu'au clic.
+  // Finished timer: the bubble breathes until the click.
   Rectangle {
     anchors.fill: parent
     radius: parent.radius
@@ -86,7 +86,7 @@ Rectangle {
     }
   }
 
-  // ------------------------------------------------ à gauche (ou seul, en rond)
+  // ------------------------------------------------ on the left (or alone, as a circle)
   Item {
     id: leading
     visible: bubble.kind !== "music"
@@ -98,14 +98,14 @@ Rectangle {
 
     ProgressRing {
       anchors.fill: parent
-      // Batterie en capsule : son icône plutôt que l'anneau.
+      // Battery as a capsule: its icon rather than the ring.
       visible: bubble.kind === "timer" || ((bubble.kind === "battery" || bubble.kind === "device") && !bubble.compact)
       progress: bubble.progress
       color: bubble.tint
       track: bubble.host.withAlpha(bubble.tint, 0.22)
       lineWidth: 2.6
     }
-    // OBS : un point rouge qui pulse (jaune et fixe en pause).
+    // OBS: a pulsing red dot (yellow and still when paused).
     Rectangle {
       id: recDot
       anchors.centerIn: parent
@@ -120,7 +120,7 @@ Rectangle {
         NumberAnimation { to: 1; duration: 650; easing.type: Easing.InOutSine }
       }
     }
-    // Périphérique : son icône (souris, clavier, casque), dans l'anneau en rond.
+    // Device: its icon (mouse, keyboard, headset), in the ring as a circle.
     Glyph {
       anchors.centerIn: parent
       visible: bubble.kind === "device"
@@ -129,7 +129,7 @@ Rectangle {
       fontFamily: bubble.host.fontFamily
       pixelSize: bubble.compact ? 16 : 10
     }
-    // Batterie en rond : le pourcentage dans l'anneau ; en capsule, l'éclair.
+    // Battery as a circle: the percentage in the ring; as a capsule, the bolt.
     Text {
       anchors.centerIn: parent
       visible: bubble.kind === "battery"
@@ -157,7 +157,7 @@ Rectangle {
     }
   }
 
-  // ------------------------------------------------ musique : pochette (+ onde en capsule)
+  // ------------------------------------------------ music: cover (+ wave as a capsule)
   ClippingRectangle {
     visible: bubble.kind === "music"
     x: bubble.compact ? 9 : (bubble.width - width) / 2
@@ -200,7 +200,7 @@ Rectangle {
     opacity: bubble.host.playerVolumeHintShown ? 0 : 1
     Behavior on opacity { NumberAnimation { duration: 120 } }
   }
-  // Niveau après un coup de molette, à la place de l'onde.
+  // Level after a wheel notch, in place of the wave.
   Text {
     visible: bubble.kind === "music" && bubble.compact
     opacity: bubble.host.playerVolumeHintShown ? 1 : 0
@@ -214,7 +214,7 @@ Rectangle {
     font.features: { "tnum": 1 }
   }
 
-  // Réponse prête, en rond : point dans le coin.
+  // Answer ready, as a circle: dot in the corner.
   Rectangle {
     visible: !bubble.compact && bubble.aiReady
     anchors.right: parent.right
@@ -224,7 +224,7 @@ Rectangle {
     color: bubble.conv && bubble.conv.lastError ? "#ff453a" : bubble.host.colorAccent
   }
 
-  // ------------------------------------------------ à droite (capsule)
+  // ------------------------------------------------ on the right (capsule)
   Row {
     id: content
     x: 11
@@ -233,7 +233,7 @@ Rectangle {
     opacity: bubble.compact && bubble.kind !== "music" ? 1 : 0
     visible: opacity > 0.01
     Behavior on opacity { NumberAnimation { duration: 160 } }
-    Item { width: 18; height: 18 }   // place de l'élément de gauche
+    Item { width: 18; height: 18 }   // place of the left element
     Text {
       anchors.verticalCenter: parent.verticalCenter
       width: Math.min(implicitWidth, 150)
@@ -245,7 +245,7 @@ Rectangle {
       font.weight: Font.DemiBold
       font.features: { "tnum": 1 }
     }
-    // Batterie sur secteur débranché : l'icône du profil d'alimentation en place.
+    // Battery on mains unplugged: the current power profile's icon.
     Glyph {
       anchors.verticalCenter: parent.verticalCenter
       visible: bubble.kind === "battery" && bubble.battery.profileGlyph !== ""

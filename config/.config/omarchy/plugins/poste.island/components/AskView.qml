@@ -2,16 +2,16 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 
-// Question à l'IA, dans l'île (« ai » + espace dans le lanceur, la pastille
-// IA, ou omarchy-shell poste.island ask "…"). Façon Quick AI de Raycast : la
-// réponse arrive au fil de l'eau sous la question ; une relance garde le
-// contexte mais n'affiche que le dernier échange. La conversation vit dans
-// AskService (host.ai), commune aux écrans : fermer la vue ne l'arrête pas.
+// Question to the AI, in the island ('ai' + space in the launcher, the AI
+// pill, or omarchy-shell poste.island ask "…"). Raycast Quick AI style: the
+// answer arrives as it comes under the question; a follow-up keeps the
+// context but only shows the last exchange. The conversation lives in
+// AskService (host.ai), common to the screens: closing the view does not stop it.
 //
-// Clavier : ↵ envoie, Échap ferme (l'IA continue en arrière-plan), Ctrl+.
-// arrête la réponse, Ctrl+N nouvelle conversation, Tab change de
-// fournisseur, Ctrl+C (sans texte sélectionné dans le champ) copie la
-// dernière réponse.
+// Keyboard: ↵ sends, Escape closes (the AI continues in the background), Ctrl+.
+// stops the answer, Ctrl+N new conversation, Tab changes
+// provider, Ctrl+C (without text selected in the field) copies the
+// last answer.
 Item {
   id: ask
   required property var host
@@ -19,8 +19,8 @@ Item {
   property real maxHeight: 600
   signal closeRequested()
   readonly property bool pinned: c.pinned
-  // Épingler : la conversation part dans la pastille de droite, la vue se ferme.
-  // Déjà épinglée : on la désépingle et on reste dans la vue.
+  // Pin: the conversation goes into the right-hand pill, the view closes.
+  // Already pinned: it is unpinned and we stay in the view.
   function pinRequested() {
     if (c.pinned) { c.pinned = false; return }
     if (messages.count === 0) return
@@ -29,15 +29,15 @@ Item {
   }
 
   readonly property var ai: host.ai
-  readonly property var c: ai.current   // la conversation affichée (AiConversation)
+  readonly property var c: ai.current   // the displayed conversation (AiConversation)
   readonly property var messages: c.messages
   readonly property bool busy: c.busy
 
-  // Ouverture : avec une question à envoyer, c'est une nouvelle conversation ;
-  // sans, on retrouve la conversation en cours (et sa réponse, même arrivée
-  // pendant que la vue était fermée).
-  // Ouverture (lanceur, commande ask) : toujours une conversation neuve ; les
-  // épinglées et celles qui travaillent restent dans leurs pastilles.
+  // Opening: with a question to send, it is a new conversation;
+  // without, the current conversation is found again (and its answer, even if it arrived
+  // while the view was closed).
+  // Opening (launcher, ask command): always a new conversation; the
+  // pinned ones and those that are working stay in their pills.
   function start(text, sendNow) {
     ai.newConversation()
     if (sendNow && String(text || "").trim() !== "") {
@@ -50,7 +50,7 @@ Item {
     scrollDown()
     Qt.callLater(function() { field.forceActiveFocus() })
   }
-  // Rouvrir une conversation existante (clic sur sa pastille).
+  // Reopen an existing conversation (click on its pill).
   function resume(conversation) {
     ai.show(conversation)
     field.text = ""
@@ -108,7 +108,7 @@ Item {
       font.weight: Font.DemiBold
       MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: ask.c.cycleProvider() }
     }
-    // Épingle : la vue reste ouverte pendant qu'on travaille ailleurs.
+    // Pin: the view stays open while one works elsewhere.
     Rectangle {
       id: pin
       anchors.right: parent.right
@@ -163,8 +163,8 @@ Item {
     }
   }
 
-  // Dernier échange seulement (comme le Quick AI de Raycast) : la question en
-  // petit, la réponse en dessous. Le contexte reste pour les relances.
+  // Last exchange only (like Raycast's Quick AI): the question in
+  // small, the answer below. The context stays for the follow-ups.
   readonly property int lastIndex: c.lastIndex
   readonly property string answerText: c.answerText
   readonly property bool answerError: c.lastError
@@ -199,8 +199,8 @@ Item {
         font.family: ask.host.uiFont
         font.pixelSize: 12
       }
-      // Chargement : lignes fantômes balayées par un reflet (Shimmer.qml), et ce
-      // que l'IA fait en ce moment (outil en cours) ou « Thinking… ».
+      // Loading: ghost rows swept by a reflection (Shimmer.qml), and what
+      // the AI is doing right now (tool in progress) or 'Thinking…'.
       Shimmer {
         x: 8
         width: parent.width - 16
