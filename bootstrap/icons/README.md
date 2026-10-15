@@ -1,45 +1,45 @@
-# icons : icônes Tabler à la place des glyphes Nerd Font
+# icons: Tabler icons in place of Nerd Font glyphs
 
-Le shell Omarchy dessine ses icônes (menu, barre, panneaux, plugins tiers) avec des glyphes
-Nerd Font de la famille `monospace`, c'est-à-dire FiraCode Nerd Font. L'île `poste.island`
-affiche, elle, des SVG Tabler. La police « Poste Nerd Font » donne le même dessin Tabler au
-reste du shell.
+The Omarchy shell draws its icons (menu, bar, panels, third-party plugins) with Nerd Font
+glyphs of the `monospace` family, that is FiraCode Nerd Font. The `poste.island` island
+shows Tabler SVGs instead. The 'Poste Nerd Font' font gives the same Tabler drawing to the
+rest of the shell.
 
-| Fichier | Rôle |
+| File | Role |
 | --- | --- |
-| `glyphs.tsv` | la table : point de code Nerd, icône Tabler, variante pleine, nom pour l'île, nom Nerd, où il sert |
-| `config/.local/share/fonts/poste/` | la police, versionnée telle quelle (six graisses de FiraCode Nerd Font 3.5.1) |
-| `config/.config/fontconfig/conf.d/60-poste-shell-icons.conf` | règle fontconfig qui donne la police au seul shell |
+| `glyphs.tsv` | the table: Nerd code point, Tabler icon, filled variant, name for the island, Nerd name, where it is used |
+| `config/.local/share/fonts/poste/` | the font, versioned as is (six weights of FiraCode Nerd Font 3.5.1) |
+| `config/.config/fontconfig/conf.d/60-poste-shell-icons.conf` | fontconfig rule that gives the font to the shell only |
 
-Les deux sont liés par `poste sys setup` comme le reste de `config/` : rien à générer ni à
-installer sur la machine.
+Both are linked by `poste sys setup` like the rest of `config/`: nothing to generate or
+install on the machine.
 
-## La police
+## The font
 
-Une copie de chaque graisse de FiraCode Nerd Font (Light à Bold), familles renommées. Les
-points de code de `glyphs.tsv` pointent vers les contours de la webfont `@tabler/icons-webfont`
-3.49.0 (MIT, licence à côté des TTF). Le texte, les autres glyphes et les métriques sont ceux
-de FiraCode (SIL Open Font License 1.1, sans nom réservé : `LICENSE-firacode` à côté des TTF). Graisse Light : Tabler en trait fin. Une grille Tabler de 24 vaut un em, centrée
-dans la cellule comme le fait le patcher Nerd Font.
+A copy of each weight of FiraCode Nerd Font (Light to Bold), families renamed. The
+code points of `glyphs.tsv` point to the outlines of the `@tabler/icons-webfont` webfont
+3.49.0 (MIT, license next to the TTFs). The text, the other glyphs and the metrics are those
+of FiraCode (SIL Open Font License 1.1, no reserved name: `LICENSE-firacode` next to the TTFs). Light weight: Tabler with a thin stroke. A 24 Tabler grid is one em, centered
+in the cell like the Nerd Font patcher does.
 
-## La règle fontconfig
+## The fontconfig rule
 
-Elle remplace `monospace` par `Poste Nerd Font` pour le seul processus `quickshell` (le shell).
-Les terminaux gardent FiraCode. Elle vit dans `conf.d`, jamais dans `fonts.conf` que
-`omarchy-font-set` réécrit. Pour revenir en arrière : supprimer le lien
-`~/.config/fontconfig/conf.d/60-poste-shell-icons.conf`, puis `omarchy restart shell`.
+It replaces `monospace` with `Poste Nerd Font` for the `quickshell` process only (the shell).
+Terminals keep FiraCode. It lives in `conf.d`, never in `fonts.conf` which
+`omarchy-font-set` rewrites. To go back: delete the link
+`~/.config/fontconfig/conf.d/60-poste-shell-icons.conf`, then `omarchy restart shell`.
 
-## Changer une icône
+## Changing an icon
 
-La police est un fichier figé : changer une icône veut dire la regénérer hors des PC, puis
-commiter les TTF. `glyphs.tsv` garde la correspondance, et `Glyphs.js` de l'île suit la même
-table (à changer aux deux endroits).
+The font is a frozen file: changing an icon means regenerating it away from the PCs, then
+committing the TTFs. `glyphs.tsv` keeps the correspondence, and the island's `Glyphs.js` follows the same
+table (to change in both places).
 
-## Limites
+## Limits
 
-- Le sélecteur de glyphes Nerd du shell (emojis) passe aussi par `monospace` : il montre l'icône
-  Tabler pour les points de code de la table.
-- Si `omarchy font set` choisit une autre police, le shell garde Poste Nerd Font (FiraCode)
-  tant que la règle est posée.
-- Un glyphe ajouté par une mise à jour d'Omarchy garde son dessin Nerd tant que la police n'est
-  pas regénérée.
+- The shell's Nerd glyph picker (emojis) also goes through `monospace`: it shows the Tabler
+  icon for the code points of the table.
+- If `omarchy font set` picks another font, the shell keeps Poste Nerd Font (FiraCode)
+  as long as the rule is in place.
+- A glyph added by an Omarchy update keeps its Nerd drawing until the font is
+  regenerated.

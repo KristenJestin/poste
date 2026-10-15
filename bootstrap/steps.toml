@@ -1,16 +1,16 @@
-# Étapes de mise en place de la machine, lues par `poste sys setup` / `status` / `done`.
-# Substitutions dans les textes et commandes : @HOME@ @USER@ @UID@ @GID@ @REPO@ @BOOTSTRAP@
-# (dossier bootstrap/ du dépôt). Les chemins `source`/`patch` sont relatifs à bootstrap/.
+# Steps to set up the machine, read by `poste sys setup` / `status` / `done`.
+# Substitutions in the texts and commands: @HOME@ @USER@ @UID@ @GID@ @REPO@ @BOOTSTRAP@
+# (bootstrap/ folder of the repository). The `source`/`patch` paths are relative to bootstrap/.
 #
-# Quatre familles :
-#   [[plugin]]  plugin tiers du shell Omarchy, épinglé à un commit, patch local facultatif
-#               (fait par poste, avec aperçu et confirmation)
-#   [[user]]    étape sans sudo : `check` (code 0 = déjà fait), sinon `run` (poste l'exécute)
-#   [[system]]  étape avec sudo : poste vérifie, AFFICHE les commandes, ne les lance jamais
-#   [[manual]]  étape à la main ; `check` facultatif, sinon `poste sys done <id>`
+# Four families:
+#   [[plugin]]  third-party plugin of the Omarchy shell, pinned to a commit, optional local patch
+#               (done by poste, with a preview and a confirmation)
+#   [[user]]    step without sudo: `check` (code 0 = already done), otherwise `run` (poste runs it)
+#   [[system]]  step with sudo: poste checks, PRINTS the commands, never runs them
+#   [[manual]]  step by hand; optional `check`, otherwise `poste sys done <id>`
 
-# ------------------------------------------------------------ plugins tiers (versions auditées)
-# poste.island, poste.notifications, poste.osd et poste.workspaces viennent de config/ (liens).
+# ------------------------------------------------------------ third-party plugins (audited versions)
+# poste.island, poste.notifications, poste.osd and poste.workspaces come from config/ (links).
 [[plugin]]
 id = "crmne.mpris"
 url = "https://github.com/crmne/omarchy-mpris"
@@ -30,8 +30,8 @@ commit = "eef3289"
 id = "omamail"
 url = "https://github.com/huacnlee/omamail"
 commit = "a7388fa" # tag v0.10.8
-# Tri des mails (dates texte ou nombre comptaient 0), touche Suppr, IA et agenda masqués,
-# attente au démarrage, style de l'île.
+# Mail sorting (text or number dates counted as 0), Delete key, AI and calendar hidden,
+# wait at startup, island style.
 patch = "patches/omamail-local.patch"
 
 [[plugin]]
@@ -43,85 +43,85 @@ commit = "6d68681"
 id = "io.github.smoothpixels.cursor-accent"
 url = "https://github.com/SmoothPixels/cursor-accent"
 commit = "97e001c"
-# recolor.py : option stroke_scale (contour plus fin).
+# recolor.py: stroke_scale option (thinner outline).
 patch = "patches/cursor-accent-stroke-scale.patch"
 
-# ------------------------------------------------------------ étapes utilisateur (sans sudo)
+# ------------------------------------------------------------ user steps (no sudo)
 [[file]]
 id = "cursor-accent-config"
-title = "config de cursor-accent (accent orange, contour fin)"
+title = "cursor-accent config (orange accent, thin outline)"
 target = "@HOME@/.local/state/cursor-accent/config.json"
 source = "files/cursor-accent-config.json"
-json = true # comparaison du JSON, pas des octets
+json = true # JSON comparison, not bytes
 
 [[user]]
 id = "cursor-accent-recolor"
-title = "recolorer le curseur avec le thème courant"
-# Pas d'état à vérifier : lancé seulement si le plugin ou sa config viennent d'être posés.
+title = "recolor the cursor with the current theme"
+# No state to check: run only if the plugin or its config has just been put in place.
 trigger = ["cursor-accent-config", "io.github.smoothpixels.cursor-accent"]
 run = [["sh", "-c", "python3 \"@HOME@/.config/omarchy/plugins/io.github.smoothpixels.cursor-accent/recolor.py\" \"$(omarchy-theme-current 2>/dev/null || echo unknown)\""]]
 
 [[user]]
 id = "omarchy-crash-watch-off"
-title = "omarchy-crash-watch.service désactivé"
+title = "omarchy-crash-watch.service disabled"
 check = ["sh", "-c", "! systemctl --user is-enabled --quiet omarchy-crash-watch.service && ! systemctl --user is-active --quiet omarchy-crash-watch.service"]
 run = [["systemctl", "--user", "disable", "--now", "omarchy-crash-watch.service"]]
 
 [[user]]
 id = "flea-default"
-title = "Flea gestionnaire de fichiers par défaut (dossiers, « Afficher dans le dossier », sélecteur)"
-# Idempotent : mimeapps.list, service D-Bus FileManager1, portals.conf. « flea --default off » revient en arrière.
+title = "Flea as default file manager (folders, 'Show in folder', picker)"
+# Idempotent: mimeapps.list, D-Bus service FileManager1, portals.conf. 'flea --default off' goes back.
 requires = "flea"
 check = ["sh", "-c", "[ \"$(xdg-mime query default inode/directory)\" = com.thisisgm.flea.desktop ]"]
 run = [["flea", "--default"], ["systemctl", "--user", "restart", "xdg-desktop-portal"]]
 
 [[user]]
 id = "theme-poste"
-title = "thème poste-theme"
+title = "poste-theme theme"
 requires = "omarchy"
 check = ["sh", "-c", "[ \"$(omarchy-theme-current | tr 'A-Z ' 'a-z-')\" = poste-theme ]"]
 run = [["omarchy", "theme", "set", "poste-theme"]]
 
 
-# ------------------------------------------------------------ étapes système (sudo, jamais lancées par poste)
+# ------------------------------------------------------------ system steps (sudo, never run by poste)
 [[system]]
 id = "polkit-systemd-creds"
-title = "règle polkit systemd-creds (Unity Hub / CLI sans mot de passe)"
+title = "systemd-creds polkit rule (Unity Hub / CLI without a password)"
 file = "/etc/polkit-1/rules.d/49-systemd-creds-@USER@.rules"
 source = "system/polkit-systemd-creds.rules"
-# rules.d n'est lisible que par root : poste ne peut pas vérifier, l'étape reste affichée
-# jusqu'à `poste sys done polkit-systemd-creds`.
+# rules.d is only readable by root: poste cannot check, the step stays shown
+# until `poste sys done polkit-systemd-creds`.
 
-# ------------------------------------------------------------ étapes manuelles
+# ------------------------------------------------------------ manual steps
 [[manual]]
 id = "gh-auth"
-title = "GitHub : gh auth login, puis gh auth setup-git"
+title = "GitHub: gh auth login, then gh auth setup-git"
 check = ["gh", "auth", "status"]
 
 [[manual]]
 id = "zen-theme"
-title = "Zen : Réglages, Apparence : choisir le thème interne sombre voulu"
+title = "Zen: Settings, Appearance: choose the wanted dark internal theme"
 
 [[manual]]
 id = "unity-login"
-title = "Unity Hub : se connecter (puis unity auth login pour la CLI si besoin)"
+title = "Unity Hub: sign in (then unity auth login for the CLI if needed)"
 
 [[manual]]
 id = "proton-bridge"
-title = "Proton Mail Bridge : lancer, se connecter ; Réglages : « Open on startup » ON, « Automatic updates » OFF. Noter le mot de passe Bridge (différent de celui de Proton)"
+title = "Proton Mail Bridge: start it, sign in; Settings: 'Open on startup' ON, 'Automatic updates' OFF. Note the Bridge password (different from the Proton one)"
 
 [[manual]]
 id = "omamail-backend"
-title = "Omamail (SUPER+SHIFT+M) : cliquer « Install backend » dans la fenêtre (release GitHub vérifiée par SHA256SUMS), puis ajouter le compte Proton avec le mot de passe Bridge (IMAP 127.0.0.1:1143 / SMTP 1025, STARTTLS : préréglage Proton)"
+title = "Omamail (SUPER+SHIFT+M): click 'Install backend' in the window (GitHub release checked with SHA256SUMS), then add the Proton account with the Bridge password (IMAP 127.0.0.1:1143 / SMTP 1025, STARTTLS: Proton preset)"
 
 [[manual]]
 id = "proton-vpn"
-title = "Proton VPN : se connecter depuis le panneau OmaProton (tuile VPN du control center de l'île) ou « protonvpn signin »"
+title = "Proton VPN: sign in from the OmaProton panel (VPN tile of the island's control center) or 'protonvpn signin'"
 
 [[manual]]
 id = "secrets"
-title = "Secrets non versionnés à restaurer : ~/.ssh, fichiers .env, ~/.npmrc, identifiants"
+title = "Unversioned secrets to restore: ~/.ssh, .env files, ~/.npmrc, credentials"
 
 [[manual]]
 id = "reboot-session"
-title = "Redémarrer la session pour tout valider"
+title = "Restart the session to validate everything"

@@ -1,5 +1,5 @@
-// Unity Hub / CLI chiffrent leurs identifiants avec systemd-creds : autorisé
-// sans mot de passe pour @USER@ en session locale active.
+// Unity Hub / CLI encrypt their credentials with systemd-creds: allowed
+// without a password for @USER@ in an active local session.
 polkit.addRule(function(action, subject) {
   if ((action.id == "io.systemd.credentials.encrypt" ||
        action.id == "io.systemd.credentials.decrypt") &&
