@@ -143,12 +143,14 @@ Item {
         }
         // D'où vient le son : l'appli (icône et nom). Clic : sa fenêtre passe
         // au premier plan (celle de l'onglet qui joue pour un navigateur).
-        // A player without a window, declared by a module (`player` in its island.json): the click
-        // opens the launcher on the extension it names (which closes this view).
+        // A module can name the player's app (`app` in the `player` block of its island.json) when
+        // its MPRIS has no DesktopEntry, or a launcher extension (`launcher`) for a player without a
+        // window: the click then opens the launcher there (which closes this view).
         Item {
           id: sourceChip
-          readonly property var entry: player.mpris && player.mpris.desktopEntry
-            ? DesktopEntries.heuristicLookup(String(player.mpris.desktopEntry)) : null
+          readonly property string app: player.host.playerApp !== "" ? player.host.playerApp
+            : (player.mpris ? String(player.mpris.desktopEntry || "") : "")
+          readonly property var entry: app !== "" ? DesktopEntries.heuristicLookup(app) : null
           readonly property string name: entry ? String(entry.name)
             : (player.mpris ? String(player.mpris.identity || "") : "")
           Layout.topMargin: 4
@@ -185,13 +187,13 @@ Item {
             hoverEnabled: true
             cursorShape: Qt.PointingHandCursor
             onClicked: {
-              if (player.host.playerSourceExt !== "") {
+              if (player.host.playerApp === "" && player.host.playerSourceExt !== "") {
                 player.host.openLauncherExtOn(player.host.focusedScreen, player.host.playerSourceExt)
                 return
               }
               var m = player.mpris
               focusProc.command = [Quickshell.env("HOME") + "/.config/omarchy/plugins/poste.island/bin/poste-focus-player",
-                String(m.desktopEntry || m.identity || ""), String(m.trackTitle || ""),
+                String(sourceChip.app || m.identity || ""), String(m.trackTitle || ""),
                 String((m.metadata || {})["xesam:url"] || "")]
               focusProc.running = true
               player.closeRequested()

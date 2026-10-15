@@ -120,6 +120,8 @@ Item {
   readonly property bool playerActionOn: playerExtras.actionOn
   readonly property string playerActionGlyph: playerHasAction ? (playerActionOn ? "󰋑" : "󰋕") : ""
   readonly property string playerSourceExt: playerExtras.launcher
+  // Desktop entry of the player's app, for a player whose MPRIS has no DesktopEntry.
+  readonly property string playerApp: playerExtras.app
   function playerAction() { if (playerHasAction) Quickshell.execDetached(playerExtras.like) }
 
   // ---------------------------------------------------------------- volume du lecteur

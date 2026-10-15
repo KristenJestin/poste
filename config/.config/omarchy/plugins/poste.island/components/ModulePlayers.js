@@ -13,7 +13,8 @@ function declaration(module, block) {
     quality: str(block.quality),
     starred: str(block.starred),
     like: Array.isArray(block.like) ? block.like.map(String) : [],
-    launcher: str(block.launcher)
+    launcher: str(block.launcher),
+    app: str(block.app)
   }
 }
 
@@ -27,13 +28,14 @@ function extras(players, bus, metadata) {
     var b = players[i].bus
     if (str(bus) !== "" && (bus === b || bus.indexOf(b + ".") === 0)) { decl = players[i]; break }
   }
-  if (!decl) return { detail: "", hasAction: false, actionOn: false, like: [], launcher: "" }
+  if (!decl) return { detail: "", hasAction: false, actionOn: false, like: [], launcher: "", app: "" }
   var hasAction = decl.starred !== "" && decl.like.length > 0
   return {
     detail: decl.quality !== "" ? String(meta[decl.quality] || "") : "",
     hasAction: hasAction,
     actionOn: hasAction && !!meta[decl.starred],
     like: hasAction ? decl.like : [],
-    launcher: decl.launcher
+    launcher: decl.launcher,
+    app: decl.app
   }
 }

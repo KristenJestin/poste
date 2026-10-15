@@ -11,7 +11,8 @@ TestCase {
     quality: "example:quality",
     starred: "example:starred",
     like: ["example", "like", "--toggle"],
-    launcher: "example"
+    launcher: "example",
+    app: "example-app"
   })
 
   function test_declaration_needs_a_bus() {
@@ -33,6 +34,7 @@ TestCase {
     verify(e.actionOn)
     compare(e.like, ["example", "like", "--toggle"])
     compare(e.launcher, "example")
+    compare(e.app, "example-app")
 
     e = ModulePlayers.extras(players, "org.mpris.MediaPlayer2.example", {})
     compare(e.detail, "")
@@ -53,6 +55,7 @@ TestCase {
     verify(!e.hasAction)
     verify(!e.actionOn)
     compare(e.launcher, "")
+    compare(e.app, "")
     verify(!ModulePlayers.extras([], "", null).hasAction)
   }
 

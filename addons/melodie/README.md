@@ -15,7 +15,8 @@ its data repository), and plugged in once `melodie` is in the `PATH` (`requires`
 - **Player card** (`island/island.json`, `player` block): for the MPRIS player
   `org.mpris.MediaPlayer2.melodie`, the stream quality under the artist (`melodie:quality`),
   the heart lit for a liked track (`melodie:starred`, toggled by `melodie like --toggle`), and
-  the sound source pill opens the launcher on the extension (Mélodie has no window of its own).
+  the sound source pill brings Mélodie's window up, or opens it (`app`: Mélodie's MPRIS has no
+  DesktopEntry, so the island is told which app it is).
   Everything else on the card (title, cover, progress, controls) is the island's generic card.
 - **Command**: `poste melodie <command>` passes the command as is to `melodie`.
 - **App**: `bootstrap/files/melodie.desktop` puts « Mélodie » (its window, `melodie-desktop`) among the
