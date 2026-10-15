@@ -1,0 +1,3 @@
+# Packages the voxtype add-on needs (merged with bootstrap/packages.toml when the add-on is chosen).
+[packages]
+voxtype-bin = "voxtype: dictation daemon, and voxtype-audio-bridge for the island's wave"

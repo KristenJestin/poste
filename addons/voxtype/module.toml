@@ -1,0 +1,8 @@
+name = "voxtype"
+requires = "voxtype"
+description = "voxtype dictation: SUPER+A (tap to toggle, hold to talk), dictation pill at the bottom of the screen"
+commands = [
+  { name = "press", description = "dictation key pressed (SUPER+A): starts recording, or stops it if already recording" },
+  { name = "release", description = "key released: held, stops recording; tapped, recording goes on" },
+  { name = "focus", description = "focus save|restore: remembers the focused window when recording starts and focuses it again before voxtype pastes" },
+]

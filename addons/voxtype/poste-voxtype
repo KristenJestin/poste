@@ -1,0 +1,61 @@
+#!/usr/bin/env bash
+# Add-on voxtype of poste: one key for both modes, and the paste back into the right window.
+#   press / release   SUPER+A (hypr/voxtype.lua): a short tap toggles, holding is push-to-talk
+#   focus save        voxtype's pre_recording_command: remembers the focused window
+#   focus restore     voxtype's pre_output_command: focuses it again before the paste
+# Anything else goes to voxtype as is.
+
+run="${XDG_RUNTIME_DIR:-/tmp}"
+TS="$run/voxtype-press-ts"
+FOCUS="$run/voxtype-focus-addr"
+# "SUPER still held": created at the press and removed by Hyprland once SUPER is released
+# (hypr/voxtype.lua). voxtype pastes with Ctrl+V: pasting while SUPER is held would send
+# SUPER+Ctrl+V, so focus restore waits for this file to go away.
+SUPER_HELD="$run/voxtype-super-held"
+THRESH_MS=250 # held longer than this: push-to-talk
+
+nowms() { echo $(($(date +%s%N) / 1000000)); }
+state() { voxtype status 2>/dev/null | head -1 | tr -d '[:space:]'; }
+addr_now() { hyprctl activewindow -j 2>/dev/null | jq -r '.address // empty'; }
+
+case "$1" in
+  press)
+    if [ "$(state)" = "recording" ]; then
+      # Already recording (an earlier tap): this press stops it.
+      rm -f "$TS"
+      exec voxtype record stop
+    fi
+    nowms >"$TS"
+    exec voxtype record start
+    ;;
+  release)
+    [ -f "$TS" ] || exit 0
+    held=$(($(nowms) - $(cat "$TS" 2>/dev/null || echo 0)))
+    rm -f "$TS"
+    # Held: push-to-talk, stop now. Short tap: recording goes on (toggle).
+    if [ "$held" -ge "$THRESH_MS" ] && [ "$(state)" = "recording" ]; then
+      exec voxtype record stop
+    fi
+    ;;
+  focus)
+    case "$2" in
+      save) addr_now >"$FOCUS" ;;
+      restore)
+        # Wait for SUPER to be released (10 s at most).
+        for _ in $(seq 100); do [ -e "$SUPER_HELD" ] || break; sleep 0.1; done
+        rm -f "$SUPER_HELD"
+        addr=$(cat "$FOCUS" 2>/dev/null)
+        rm -f "$FOCUS"
+        [ -n "$addr" ] || exit 0
+        # Already there: do not steal the focus for nothing.
+        [ "$(addr_now)" = "$addr" ] && exit 0
+        hyprctl dispatch "hl.dsp.focus({ window = \"address:$addr\" })" >/dev/null
+        ;;
+      *)
+        echo "usage: poste voxtype focus save|restore" >&2
+        exit 2
+        ;;
+    esac
+    ;;
+  *) exec voxtype "$@" ;;
+esac

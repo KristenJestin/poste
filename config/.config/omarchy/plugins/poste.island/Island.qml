@@ -536,50 +536,9 @@ Item {
     return Qt.formatDateTime(new Date(Number(ms)), "d MMM")
   }
 
-  // ---------------------------------------------------------------- voxtype
-  // Dictation state from the daemon's state file (idle, recording, streaming,
-  // transcribing) and live mic levels from its audio socket through the
-  // voxtype-audio-bridge sidecar (NDJSON {"peak","rms","vad"} frames). The
-  // voxtype OSD is disabled (osd.enabled = false); the bandeau shows it.
-  readonly property string voxStatePath: (Quickshell.env("XDG_RUNTIME_DIR") || "/tmp") + "/voxtype/state"
-  property string voxtypeState: "idle"
-  readonly property bool voxtypeListening: voxtypeState === "recording" || voxtypeState === "streaming"
-  readonly property bool voxtypeTranscribing: voxtypeState === "transcribing"
-  // The daemon may replace the file by rename, which a watch can miss: also
-  // re-read it a few times a second (a 9-byte file).
-  Timer { interval: 250; running: true; repeat: true; onTriggered: voxStateFile.reload() }
-  FileView {
-    id: voxStateFile
-    path: root.voxStatePath
-    watchChanges: true
-    printErrors: false
-    onFileChanged: reload()
-    onLoaded: root.voxtypeState = (text() || "idle").trim() || "idle"
-    onLoadFailed: root.voxtypeState = "idle"
-  }
-  // Niveau courant de voxtype, 0..1 (boosted: speech RMS is small). Le bridge envoie 100 images
-  // par seconde (fenêtres de 10 ms, source voxtype : src/audio/levels.rs), `rms` y vaut le pic de
-  // la fenêtre divisé par racine de 2. L'historique des barres est rempli par le bandeau.
-  property real voxtypeLevel: 0
-  Process {
-    id: voxBridge
-    running: root.voxtypeListening
-    command: ["voxtype-audio-bridge"]
-    stdout: SplitParser {
-      onRead: function(line) {
-        var frame
-        try { frame = JSON.parse(line) } catch (e) { return }
-        if (frame.rms === undefined) return
-        var level = Math.min(1, Math.sqrt(Math.max(0, Number(frame.rms))) * 2.2)
-        root.voxtypeLevel = level
-      }
-    }
-  }
-  onVoxtypeListeningChanged: if (!voxtypeListening) voxtypeLevel = 0
-
-  // Slot « dictation » : un module peut fournir sa propre source de dictée, affichée comme
-  // voxtype. Contrat de l'élément chargé : propriétés lues `listening` (micro ouvert),
-  // `transcribing` (fin en cours), `level` (niveau courant de 0 à 1, à l'échelle de voxtype ;
+  // Slot « dictation » : un add-on fournit la source de dictée (vocaline ou voxtype).
+  // Contrat de l'élément chargé : propriétés lues `listening` (micro ouvert),
+  // `transcribing` (fin en cours), `level` (niveau courant de 0 à 1 ;
   // la source le met à jour à son rythme et le lisse si elle est lente), `finals` (texte figé
   // de la dictée) et `partial` (phrase en cours). Le micro et l'onde vont en bas de l'écran actif,
   // le texte, s'il y en a, juste sous l'île (le bandeau, bandeau/).
@@ -609,12 +568,12 @@ Item {
     return null
   }
 
-  // La dictée en cours : voxtype ou la source du slot qui dicte.
-  readonly property bool voxListening: voxtypeListening || (!!dictation && dictation.listening)
-  readonly property bool voxTranscribing: voxtypeTranscribing || (!!dictation && dictation.transcribing)
+  // La dictée en cours : la source du slot qui dicte.
+  readonly property bool voxListening: !!dictation && dictation.listening
+  readonly property bool voxTranscribing: !!dictation && dictation.transcribing
   // Une seule onde pour toutes les sources : chacune ne donne que son niveau courant, que le
-  // bandeau échantillonne à la cadence de voxtype (bandeau/Bandeau.qml, « dictée »).
-  readonly property real voxLevel: dictation && dictation.listening ? Number(dictation.level) || 0 : voxtypeLevel
+  // bandeau échantillonne à cadence fixe (bandeau/Bandeau.qml, « dictée »).
+  readonly property real voxLevel: dictation && dictation.listening ? Number(dictation.level) || 0 : 0
   readonly property string dictationFinals: dictation ? String(dictation.finals || "") : ""
   readonly property string dictationPartial: dictation ? String(dictation.partial || "") : ""
   // La dictée s'affiche dans le bandeau : la pastille en bas, le texte sous l'île.
@@ -680,8 +639,8 @@ Item {
     running: root.voxListening
     command: ["sh", "-c", 'while :; do "$1" dictation-start || exit; done', "vox-loop", root.sfx]
   }
-  // Le son d'écoute tourne en boucle (voxLoop) ; à l'arrêt, « stop ». Même chose pour
-  // voxtype et pour la source du slot « dictation ».
+  // Le son d'écoute tourne en boucle (voxLoop) ; à l'arrêt, « stop ». Pour toute source du
+  // slot « dictation ».
   onVoxListeningChanged: if (!voxListening) Quickshell.execDetached([root.sfx, "dictation-stop"])
 
   // ---------------------------------------------------------------- AI usage

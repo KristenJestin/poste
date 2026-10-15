@@ -120,29 +120,8 @@ hl.unbind("SUPER + SHIFT + M")
 o.bind("SUPER + SHIFT + M", "Mail (Omamail)", "omarchy-shell shell toggle omamail '{}'")
 o.bind("SUPER + SHIFT + code:60", "Passwords", { launch = "proton-pass" })
 
--- Dictée : tap = toggle, maintien = push-to-talk.
--- Voxtype colle avec Ctrl+V : s'il le fait pendant que SUPER est encore tenu, ça
--- donne SUPER+Ctrl+V et rien ne se colle. On marque « SUPER tenu » à l'appui et
--- Hyprland (qui voit le clavier) retire la marque dès que SUPER est relâché ;
--- voxtype-focus restore attend cette disparition avant de coller.
-local super_held_file = (os.getenv("XDG_RUNTIME_DIR") or "/tmp") .. "/voxtype-super-held"
-local super_watch = nil
-local function super_down()
-  return hl.is_key_down(133) or hl.is_key_down(134) -- Super_L / Super_R (keycodes X11)
-end
-o.bind("SUPER + A", "Dictée (tap=toggle / maintien=PTT)", function()
-  local f = io.open(super_held_file, "w")
-  if f then f:close() end
-  if super_watch then super_watch:set_enabled(false) end
-  super_watch = hl.timer(function()
-    if not super_down() then
-      os.remove(super_held_file)
-      super_watch:set_enabled(false)
-    end
-  end, { timeout = 100, type = "repeat" })
-  hl.exec_cmd("voxtype-hold-toggle press")
-end)
-o.bind("SUPER + A", nil, "voxtype-hold-toggle release", { release = true })
+-- Dictation (SUPER+A): provided by the dictation add-on the machine chooses (vocaline or voxtype,
+-- ~/.local/share/poste/modules/<add-on>/hypr/, loaded by hyprland.lua).
 
 -- Envoyer la fenêtre sur un écran précis (SUPER+CTRL+ALT+flèche). Les écrans
 -- de chaque flèche sont propres à la machine : screen_keys, dans monitors.lua.

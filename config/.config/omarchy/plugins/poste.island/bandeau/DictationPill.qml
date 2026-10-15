@@ -2,7 +2,7 @@ import QtQuick
 import "../components"
 
 // La pastille de la dictée, seule en bas de l'écran actif, pareille pour toutes les sources
-// (SUPER+A voxtype, SUPER+Z Vocaline ou toute source du slot « dictation » de l'île) : le micro
+// (SUPER+A Vocaline ou voxtype, ou toute source du slot « dictation » de l'île) : le micro
 // gris clair, immobile, puis l'onde de la voix (14 barres, la plus récente à droite, depuis
 // l'historique des niveaux tenu par le bandeau) pendant l'écoute, ou trois points qui pulsent
 // pendant la transcription. L'aspect de l'île : son fond plein, sa hauteur, arrondi en pilule.

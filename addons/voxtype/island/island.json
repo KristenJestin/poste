@@ -1,0 +1,8 @@
+{
+  "slots": [
+    {
+      "slot": "dictation",
+      "file": "VoxtypeState.qml"
+    }
+  ]
+}

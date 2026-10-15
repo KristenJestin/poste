@@ -1,0 +1,20 @@
+# Steps of the vocaline add-on, merged with bootstrap/steps.toml when the add-on is chosen.
+
+[[manual]]
+id = "vocaline-package"
+title = "Vocaline: install the package of its latest GitHub release (sudo pacman -U vocaline-<version>-x86_64.pkg.tar.zst), in neither the repositories nor the AUR"
+check = ["test", "-x", "/usr/bin/vocaline"]
+
+[[user]]
+id = "vocaline-models"
+title = "Vocaline: dictation models (download)"
+requires = "vocaline"
+check = ["test", "-d", "@HOME@/.local/share/vocaline/models"]
+run = [["vocaline", "setup"]]
+
+[[user]]
+id = "vocaline-enable"
+title = "Vocaline: service enabled and started"
+requires = "vocaline"
+check = ["systemctl", "--user", "is-enabled", "--quiet", "vocaline.service"]
+run = [["systemctl", "--user", "daemon-reload"], ["systemctl", "--user", "enable", "--now", "vocaline.service"]]

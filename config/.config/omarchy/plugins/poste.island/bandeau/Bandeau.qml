@@ -150,7 +150,7 @@ Singleton {
 
   // ---------------------------------------------------------------- dictée
   // La pastille du bas dès que la dictée écoute ou transcrit, quelle que soit la source ; le
-  // texte sous l'île quand la source en donne un (Vocaline ; voxtype n'en donne pas).
+  // texte sous l'île quand la source en donne un (Vocaline).
   property bool dictationListening: false
   property bool dictationTranscribing: false
   property real dictationLevel: 0
@@ -165,7 +165,7 @@ Singleton {
   readonly property bool dictTextShown: dictActive && (dictFinals !== "" || dictPartial !== "")
 
   // Une seule onde pour toutes les sources : chacune ne donne que son niveau courant,
-  // échantillonné ici à la cadence de voxtype (100 par seconde) dans l'historique des barres, le
+  // échantillonné ici 100 fois par seconde dans l'historique des barres, le
   // plus récent en dernier. L'onde bouge donc pareil quelle que soit la source ; elle repart de
   // zéro à chaque dictée.
   readonly property int dictBars: 14

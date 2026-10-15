@@ -1,8 +1,8 @@
 name = "vocaline"
 requires = "vocaline"
-description = "Dictée Vocaline : SUPER+Z, pastille de dictée en bas de l'écran et texte dicté en direct sous l'île"
+description = "Dictée Vocaline : SUPER+A, pastille de dictée en bas de l'écran et texte dicté en direct sous l'île"
 commands = [
-  { name = "press", description = "appui sur la touche de dictée (SUPER+Z) : ouvre le micro" },
+  { name = "press", description = "appui sur la touche de dictée (SUPER+A) : ouvre le micro" },
   { name = "release", description = "relâchement : maintenu, arrête et colle ; tapé, la dictée continue" },
   { name = "status", description = "état du démon Vocaline" },
   { name = "watch", description = "flux d'évènements JSON, un par ligne (pour l'île)" },
