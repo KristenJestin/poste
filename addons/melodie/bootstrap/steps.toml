@@ -12,3 +12,23 @@ run = [["sh", "-c", "set -e; v=0.1.0; d=$(mktemp -d); trap 'rm -rf \"$d\"' EXIT;
 [[manual]]
 id = "melodie-login"
 title = "Mélodie: melodie login in a terminal (Navidrome server), once"
+
+# The app in the launcher (Mélodie's window) and the handler of melodie: addresses
+# (xdg-open melodie:album/<id>). Mélodie installs neither: the desktop adds them.
+[[file]]
+id = "melodie-desktop-entry"
+title = "Mélodie: app entry (melodie-desktop)"
+target = "@HOME@/.local/share/applications/melodie.desktop"
+source = "files/melodie.desktop"
+
+[[file]]
+id = "melodie-open-entry"
+title = "Mélodie: handler of melodie: addresses"
+target = "@HOME@/.local/share/applications/melodie-open.desktop"
+source = "files/melodie-open.desktop"
+
+[[user]]
+id = "melodie-scheme"
+title = "Mélodie: melodie: addresses open with melodie open"
+check = ["sh", "-c", "[ \"$(xdg-mime query default x-scheme-handler/melodie)\" = melodie-open.desktop ]"]
+run = [["xdg-mime", "default", "melodie-open.desktop", "x-scheme-handler/melodie"]]
