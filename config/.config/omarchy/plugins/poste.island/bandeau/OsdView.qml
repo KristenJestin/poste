@@ -1,11 +1,11 @@
 import QtQuick
 import "../components"
 
-// L'OSD du bandeau (volume, luminosité, micro, musique, alimentation) : une pilule, l'icône à
-// l'accent, puis la barre et sa valeur, ou le message (« Titre - Artiste » pour la musique).
-// Une seule place : un OSD qui en remplace un autre change sur place, la pilule s'élargit ou
-// se resserre (le contenu, posé à sa largeur finale, se découvre avec elle) et la barre glisse
-// vers la nouvelle valeur.
+// The banner's OSD (volume, brightness, microphone, music, power): a pill, the icon in
+// the accent, then the bar and its value, or the message ('Title - Artist' for music).
+// A single place: an OSD that replaces another changes in place, the pill widens or
+// narrows (the content, laid out at its final width, is revealed with it) and the bar slides
+// to the new value.
 Item {
   id: view
   required property var bandeau
@@ -20,8 +20,8 @@ Item {
   readonly property int maxMessageWidth: osd.media ? 440 : 300
   readonly property int fontSize: 14
 
-  // Ce que la pièce prend dans la pile (pour celles du dessous) : sa hauteur, à la proportion
-  // de sa présence.
+  // What the piece takes in the stack (for those below): its height, in proportion
+  // to its presence.
   property real presence: 0
   Component.onCompleted: presence = active ? 1 : 0
   function followActive() {
@@ -36,8 +36,8 @@ Item {
     NumberAnimation { id: presenceMove; target: view; property: "presence"; duration: 340; easing.type: Easing.OutQuint }
   }
   readonly property real space: (height + bandeau.gap) * presence
-  // La pièce n'apparaît que lorsque sa place peut la contenir (l'écart absorbe la fin de
-  // l'ouverture) ; en partant, elle s'efface avant que sa place se referme.
+  // The piece only appears when its place can contain it (the gap absorbs the end of
+  // the opening); when leaving, it fades before its place closes.
   readonly property bool shownIn: active && space >= height - 0.5
   readonly property bool live: opacity > 0.01
 
@@ -61,8 +61,8 @@ Item {
   width: Math.ceil(contentWidth + 2 * padX)
   height: 44
 
-  // Entrée : descend d'un peu plus haut, grandit un peu, apparaît. Sortie : s'efface,
-  // rapetisse, remonte un peu.
+  // Entry: comes down from a bit higher, grows a bit, appears. Exit: fades,
+  // shrinks, goes up a bit.
   opacity: shownIn ? 1 : 0
   scale: shownIn ? 1 : 0.94
   property real drop: shownIn ? 0 : -bandeau.gap
@@ -72,9 +72,9 @@ Item {
   Behavior on drop { NumberAnimation { duration: view.shownIn ? 340 : 220; easing.type: view.shownIn ? Easing.OutQuint : Easing.InCubic } }
   visible: live
 
-  // Largeur montrée : d'un OSD à l'autre, elle glisse vers la nouvelle largeur (le contenu est
-  // posé tout de suite à sa largeur finale et se découvre avec elle). Un OSD qui apparaît alors
-  // que rien n'était visible prend sa largeur d'emblée.
+  // Shown width: from one OSD to the next, it slides to the new width (the content is
+  // laid out right away at its final width and is revealed with it). An OSD that appears while
+  // nothing was visible takes its width right away.
   property real shownWidth: width
   onWidthChanged: {
     if (live) bandeau.animateTo(widthAnim, shownWidth, width)

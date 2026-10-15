@@ -2,15 +2,15 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 
-// Les conversations avec l'IA de l'île, communes à tous les écrans
-// (Island.qml : root.ai). Chacune est un AiConversation ; la vue IA
-// (AskView.qml) affiche `current`. Fermer la vue n'arrête rien : une
-// conversation qui travaille, dont la réponse attend, ou qu'on a épinglée
-// garde sa pastille en haut à droite (AiPill.qml, une par conversation, liste
-// `docked`). Une conversation ni épinglée, ni en cours, ni en attente
-// disparaît quand une autre prend sa place. Le fournisseur (Claude par
-// défaut, Codex…) passe par bin/poste-ask ; la liste se règle dans
-// launcher.json, clé "ai".
+// The conversations with the island's AI, common to all screens
+// (Island.qml: root.ai). Each one is an AiConversation; the AI view
+// (AskView.qml) displays `current`. Closing the view stops nothing: a
+// conversation that is working, whose answer is waiting, or that has been pinned
+// keeps its pill at the top right (AiPill.qml, one per conversation, list
+// `docked`). A conversation that is neither pinned, nor running, nor waiting
+// disappears when another takes its place. The provider (Claude by
+// default, Codex…) goes through bin/poste-ask; the list is set in
+// launcher.json, key "ai".
 Item {
   id: ai
   readonly property string bin: Quickshell.env("HOME") + "/.config/omarchy/plugins/poste.island/bin/poste-ask"
@@ -18,7 +18,7 @@ Item {
   // ---------------------------------------------------------------- providers
   property var providerIds: ["claude", "codex"]
   property var providerNames: ({ claude: "Claude", codex: "Codex" })
-  // Fournisseur des nouvelles conversations (le dernier choisi, sinon "default").
+  // Provider of the new conversations (the last chosen, otherwise "default").
   property string provider: "claude"
   property bool providerChosen: false
   FileView {
@@ -44,10 +44,10 @@ Item {
   property var conversations: []
   property int uidCounter: 0
   property var current: null
-  // Change quand une conversation change d'état (épinglée, en cours, en attente).
+  // Changes when a conversation changes state (pinned, running, waiting).
   property int stateRevision: 0
 
-  // Une vue IA est ouverte sur l'un des écrans (tenu à jour par AskView).
+  // An AI view is open on one of the screens (kept up to date by AskView).
   property int openViews: 0
   readonly property bool viewOpen: openViews > 0
   onViewOpenChanged: syncShown()
@@ -57,8 +57,8 @@ Item {
     stateRevision++
   }
 
-  // Les pastilles de droite : les conversations à garder sous la main, sauf
-  // celle qu'on est en train de lire. Plus récente à droite.
+  // The right-hand pills: the conversations to keep at hand, except
+  // the one being read. Most recent on the right.
   readonly property var docked: {
     stateRevision
     var out = []
@@ -80,8 +80,8 @@ Item {
     c.destroy()
     stateRevision++
   }
-  // Une conversation neuve devient la courante ; l'ancienne disparaît si elle
-  // n'a plus de raison d'être gardée.
+  // A new conversation becomes the current one; the old one disappears if it
+  // has no more reason to be kept.
   function newConversation() {
     var old = current
     var c = conversationComponent.createObject(ai, { uid: ++ai.uidCounter, service: ai, provider: ai.provider })
@@ -91,12 +91,12 @@ Item {
     c.unseenChanged.connect(bump)
     conversations = conversations.concat([c])
     current = c
-    // L'ancienne après : la vue n'est jamais sans conversation, même un instant.
+    // The old one afterwards: the view is never without a conversation, not even for a moment.
     if (old && disposable(old)) dispose(old)
     return c
   }
-  // Lancer une question en arrière-plan (commande askBg) : nouvelle
-  // conversation épinglée, sans toucher à celle affichée.
+  // Start a question in the background (askBg command): new
+  // pinned conversation, without touching the displayed one.
   function spawn(q, providerId) {
     q = String(q || "").trim()
     if (q === "") return null
@@ -110,8 +110,8 @@ Item {
     c.send(q)
     return c
   }
-  // Tout désépingler : les conversations au repos perdent leur pastille
-  // (épingle et « réponse prête ») ; celles qui travaillent la gardent.
+  // Unpin everything: the idle conversations lose their pill
+  // (pin and 'answer ready'); those that are working keep it.
   function unpinAll() {
     var n = 0
     for (var i = 0; i < conversations.length; i++) {
@@ -121,12 +121,12 @@ Item {
       c.unseen = false
       n++
     }
-    // Celles qui n'ont plus de raison d'être gardées disparaissent.
+    // Those that have no more reason to be kept disappear.
     var keep = conversations.slice()
     for (var j = 0; j < keep.length; j++) if (keep[j] !== current && disposable(keep[j])) dispose(keep[j])
     return n
   }
-  // Rouvrir une conversation (clic sur sa pastille).
+  // Reopen a conversation (click on its pill).
   function show(c) {
     if (!c || c === current) return
     var old = current
@@ -135,11 +135,11 @@ Item {
   }
 
   // ---------------------------------------------------------------- persistence
-  // Les conversations qui ont une pastille (épinglées, en cours, en attente)
-  // sont gardées dans ~/.local/state/poste-island/ai/conversations.json et
-  // reviennent au démarrage du shell, avec leur session chez le fournisseur
-  // (on peut continuer). Une réponse coupée par le redémarrage est marquée
-  // « Interrupted ». Texte en clair, sur cette machine seulement.
+  // The conversations that have a pill (pinned, running, waiting)
+  // are kept in ~/.local/state/poste-island/ai/conversations.json and
+  // come back at the shell's startup, with their session at the provider
+  // (one can continue). An answer cut by the restart is marked
+  // 'Interrupted'. Plain text, on this machine only.
   readonly property string stateDir: Quickshell.env("HOME") + "/.local/state/poste-island/ai"
   property bool restored: false
   FileView {
@@ -184,7 +184,7 @@ Item {
         var e = d.messages[m]
         c.messages.append({ role: e.role, text: String(e.text || ""), tool: "", error: !!e.error })
       }
-      if (d.busy) {   // coupée par le redémarrage
+      if (d.busy) {   // cut by the restart
         var last = c.messages.count - 1
         if (last >= 0 && c.messages.get(last).text === "") c.messages.setProperty(last, "text", "_Interrupted._")
       }
@@ -192,19 +192,19 @@ Item {
       c.pinned = !!d.pinned || !!d.busy
     }
     restored = true
-    // Une conversation courante vide, pour la prochaine ouverture.
+    // An empty current conversation, for the next opening.
     if (!current || current.messages.count > 0) newConversation()
   }
-  // Une conversation courante existe toujours, même avant le rechargement.
+  // A current conversation always exists, even before the reload.
   Component.onCompleted: if (!current) newConversation()
-  // Toute modification de texte d'une conversation gardée est aussi sauvée.
+  // Any text change in a kept conversation is also saved.
   Connections {
     target: ai.current
     function onRevisionChanged() { if (ai.restored && ai.current && (ai.current.pinned || ai.current.busy || ai.current.unseen)) saveTimer.restart() }
   }
 
-  // Ce que fait l'IA, selon l'outil en cours (claude stream-json, codex) ;
-  // aucun outil : elle réfléchit.
+  // What the AI is doing, according to the tool in progress (claude stream-json, codex);
+  // no tool: it is thinking.
   function toolLabel(name) {
     var n = String(name || "")
     if (n === "") return "Thinking…"

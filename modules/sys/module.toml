@@ -1,17 +1,17 @@
 name = "sys"
-description = "Gère le dépôt poste : construction, installation, état, git"
+description = "Manages the poste repository: build, install, status, git"
 commands = [
-  { name = "setup", description = "construit et installe poste et ses modules (--yes, --dry-run)" },
-  { name = "status", description = "état du dépôt, des modules installés et des fichiers posés" },
-  { name = "git", description = "lance git -C <dépôt> <args…>" },
-  { name = "cd", description = "affiche le chemin du dépôt" },
-  { name = "diff", description = "compare la config du dépôt à celle de ~ ([chemin])" },
-  { name = "add", description = "met un fichier de ~ sous gestion (déplacé dans config/, remplacé par un lien)" },
-  { name = "forget", description = "remet un fichier ordinaire à la place du lien" },
-  { name = "sync", description = "git pull --ff-only (dépôt et dépôt de données) puis setup (aperçu compris)" },
-  { name = "done", description = "marque une étape manuelle faite (<id>, --undo ; sans id : liste)" },
-  { name = "local", description = "fichiers de config gardés à cette machine (list, add <chemin>, remove <chemin>)" },
-  { name = "module", description = "modules désactivés sur cette machine (list, enable <nom>, disable <nom>)" },
-  { name = "override", description = "surcharges JSON de cette machine (list, set <chemin> <clé> <valeur>, unset <chemin> <clé>)" },
-  { name = "import-chezmoi", description = "importe la config gérée par chezmoi dans config/" },
+  { name = "setup", description = "builds and installs poste and its modules (--yes, --dry-run)" },
+  { name = "status", description = "state of the repository, the installed modules and the files put in place" },
+  { name = "git", description = "runs git -C <repository> <args…>" },
+  { name = "cd", description = "prints the path of the repository" },
+  { name = "diff", description = "compares the repository's config with the one in ~ ([path])" },
+  { name = "add", description = "puts a file of ~ under management (moved into config/, replaced by a link)" },
+  { name = "forget", description = "puts an ordinary file back in place of the link" },
+  { name = "sync", description = "git pull --ff-only (repository and data repository) then setup (preview included)" },
+  { name = "done", description = "marks a manual step done (<id>, --undo; without id: list)" },
+  { name = "local", description = "config files kept to this machine (list, add <path>, remove <path>)" },
+  { name = "module", description = "modules disabled on this machine (list, enable <name>, disable <name>)" },
+  { name = "override", description = "JSON overrides of this machine (list, set <path> <key> <value>, unset <path> <key>)" },
+  { name = "import-chezmoi", description = "imports the config managed by chezmoi into config/" },
 ]

@@ -1,4 +1,4 @@
-//! Petits utilitaires partagés : dépôt, empreintes.
+//! Small shared utilities: repository, fingerprints.
 
 use anyhow::{bail, Context, Result};
 use poste_core::{Config, Env};
@@ -7,29 +7,28 @@ use std::io::Read;
 use std::os::unix::fs::symlink;
 use std::path::{Path, PathBuf};
 
-/// Emplacement du clone du dépôt, lu dans config.toml (clé `repo`, écrite par `./setup`). Pour
-/// ce qui travaille sur le dépôt lui-même (git, import) ; ce qui s'installe se lit dans la
-/// racine (`crate::versions::root`).
+/// Location of the clone of the repository, read from config.toml (key `repo`, written by `./setup`). For
+/// what works on the repository itself (git, import); what gets installed is read from the
+/// root (`crate::versions::root`).
 pub fn clone(env: &Env, cfg: &Config) -> Result<PathBuf> {
     let Some(repo) = cfg.repo_path(env) else {
         bail!(
-            "dépôt inconnu : la clé `repo` manque dans {}. Lancez ./setup depuis le dépôt.",
+            "unknown repository: the `repo` key is missing in {}. Run ./setup from the repository.",
             env.config_file().display()
         );
     };
     if !repo.join("Cargo.toml").is_file() {
         bail!(
-            "le dépôt {} n'existe plus ou n'est pas un espace de travail Cargo",
+            "the repository {} no longer exists or is not a Cargo workspace",
             repo.display()
         );
     }
     Ok(repo)
 }
 
-/// Empreinte sha256 (hexadécimal) d'un fichier.
+/// sha256 fingerprint (hexadecimal) of a file.
 pub fn sha256_file(path: &Path) -> Result<String> {
-    let mut f =
-        std::fs::File::open(path).with_context(|| format!("lecture de {}", path.display()))?;
+    let mut f = std::fs::File::open(path).with_context(|| format!("reading {}", path.display()))?;
     let mut h = Sha256::new();
     let mut buf = [0u8; 64 * 1024];
     loop {
@@ -42,14 +41,14 @@ pub fn sha256_file(path: &Path) -> Result<String> {
     Ok(format!("{:x}", h.finalize()))
 }
 
-/// Début d'une empreinte, pour l'affichage.
+/// Start of a fingerprint, for display.
 pub fn short(hash: &str) -> &str {
     &hash[..hash.len().min(8)]
 }
 
-/// Sauvegarde ce qui se trouve à `dest` dans `backup/` sous un nom horodaté et renvoie
-/// ce chemin. Un fichier est copié, un lien est recréé tel quel, un dossier est déplacé
-/// (jamais supprimé sans copie complète). Ne touche pas à `dest` sauf pour un dossier.
+/// Backs up what is at `dest` into `backup/` under a timestamped name and returns
+/// that path. A file is copied, a link is recreated as is, a folder is moved
+/// (never deleted without a complete copy). Does not touch `dest` except for a folder.
 pub fn backup(env: &Env, dest: &Path, stamp: &str) -> Result<PathBuf> {
     let dir = env.backup_dir();
     std::fs::create_dir_all(&dir)?;
@@ -67,22 +66,22 @@ pub fn backup(env: &Env, dest: &Path, stamp: &str) -> Result<PathBuf> {
         n += 1;
     }
     let md = std::fs::symlink_metadata(dest)
-        .with_context(|| format!("sauvegarde de {}", dest.display()))?;
+        .with_context(|| format!("cannot back up {}", dest.display()))?;
     if md.file_type().is_symlink() {
         symlink(std::fs::read_link(dest)?, &bak)?;
     } else if md.is_dir() {
         if std::fs::rename(dest, &bak).is_err() {
-            // Autre système de fichiers : copie complète, puis seulement ensuite retrait.
+            // Other filesystem: complete copy, and only then removal.
             copy_tree(dest, &bak)?;
             std::fs::remove_dir_all(dest)?;
         }
     } else {
-        std::fs::copy(dest, &bak).with_context(|| format!("sauvegarde de {}", dest.display()))?;
+        std::fs::copy(dest, &bak).with_context(|| format!("cannot back up {}", dest.display()))?;
     }
     Ok(bak)
 }
 
-/// Copie récursive qui garde les liens tels quels.
+/// Recursive copy that keeps links as they are.
 pub fn copy_tree(src: &Path, dst: &Path) -> Result<()> {
     std::fs::create_dir_all(dst)?;
     for e in std::fs::read_dir(src)? {
@@ -94,23 +93,25 @@ pub fn copy_tree(src: &Path, dst: &Path) -> Result<()> {
         } else if ft.is_dir() {
             copy_tree(&s, &d)?;
         } else {
-            std::fs::copy(&s, &d).with_context(|| format!("copie de {}", s.display()))?;
+            std::fs::copy(&s, &d).with_context(|| format!("cannot copy {}", s.display()))?;
         }
     }
     Ok(())
 }
 
-/// Pose un lien symbolique en remplaçant atomiquement ce qui est à `dest`
-/// (fichier ou lien ; un dossier doit avoir été écarté avant).
+/// Puts a symbolic link in place, atomically replacing what is at `dest`
+/// (file or link; a folder must have been moved away before).
 pub fn replace_with_symlink(dest: &Path, target: &Path) -> Result<()> {
-    let parent = dest.parent().context("destination sans dossier parent")?;
+    let parent = dest
+        .parent()
+        .context("destination without a parent folder")?;
     std::fs::create_dir_all(parent)?;
-    let tmp = parent.join(format!(".poste-tmp-{}-lien", std::process::id()));
+    let tmp = parent.join(format!(".poste-tmp-{}-link", std::process::id()));
     let _ = std::fs::remove_file(&tmp);
-    symlink(target, &tmp).with_context(|| format!("création du lien {}", tmp.display()))?;
+    symlink(target, &tmp).with_context(|| format!("creating the link {}", tmp.display()))?;
     if let Err(e) = std::fs::rename(&tmp, dest) {
         let _ = std::fs::remove_file(&tmp);
-        return Err(e).with_context(|| format!("pose du lien {}", dest.display()));
+        return Err(e).with_context(|| format!("putting the link {} in place", dest.display()));
     }
     Ok(())
 }
@@ -120,7 +121,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn empreinte_connue() {
+    fn known_fingerprint() {
         let d = tempfile::tempdir().unwrap();
         let p = d.path().join("f");
         std::fs::write(&p, "abc").unwrap();

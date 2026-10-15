@@ -1,6 +1,6 @@
 [package]
 name = "poste-sys"
-description = "Module sys de poste : gestion du dépôt et installation"
+description = "Sys module of poste: repository management and installation"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

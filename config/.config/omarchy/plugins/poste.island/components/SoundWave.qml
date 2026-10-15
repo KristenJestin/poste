@@ -8,9 +8,9 @@ import QtQuick
 // instead of a vsync-driven animation: Qt only redraws when something moves,
 // so this keeps a playing wave from repainting the island at the display's
 // full refresh rate (360 Hz here) for bars a few pixels tall.
-// Hauteur implicite fixe (maxHeight) : une Row prend la hauteur de sa barre
-// la plus haute du moment, et dans un layout tout le bloc sautait de haut en
-// bas. La rangée est centrée dans ce conteneur fixe.
+// Fixed implicit height (maxHeight): a Row takes the height of its tallest bar
+// at the moment, and in a layout the whole block jumped up and
+// down. The row is centered in this fixed container.
 Item {
   id: wave
   property color color: "white"

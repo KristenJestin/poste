@@ -1,26 +1,26 @@
-# bootstrap : la machine décrite en données
+# bootstrap: the machine described as data
 
-Lu par `poste sys setup` (aperçu), `poste sys status` et `poste sys done`. Rien ici n'est un script.
+Read by `poste sys setup` (preview), `poste sys status` and `poste sys done`. Nothing here is a script.
 
-| Fichier | Contenu |
+| File | Content |
 | --- | --- |
-| `packages.toml` | paquets attendus (`nom = "à quoi il sert"`), comparés à `pacman -Qq` |
-| `steps.toml` | plugins tiers, fichiers, étapes utilisateur, étapes système, étapes manuelles |
-| `system/` | contenus des fichiers root (`@USER@`, `@UID@`, `@GID@`, `@HOME@` y sont remplacés) |
-| `files/` | contenus de fichiers utilisateur posés par poste (config de cursor-accent) |
-| `patches/` | patchs locaux de plugins tiers, appliqués par `git apply` |
-| `icons/` | icônes Tabler à la place des glyphes Nerd Font dans le shell : table des correspondances (voir [`icons/README.md`](icons/README.md)) |
+| `packages.toml` | expected packages (`name = "what it is for"`), compared with `pacman -Qq` |
+| `steps.toml` | third-party plugins, files, user steps, system steps, manual steps |
+| `system/` | contents of root files (`@USER@`, `@UID@`, `@GID@`, `@HOME@` are replaced in them) |
+| `files/` | contents of user files put in place by poste (cursor-accent config) |
+| `patches/` | local patches of third-party plugins, applied by `git apply` |
+| `icons/` | Tabler icons in place of Nerd Font glyphs in the shell: table of correspondences (see [`icons/README.md`](icons/README.md)) |
 
-Familles d'étapes (détail et commentaires dans `steps.toml`) :
+Step families (details and comments in `steps.toml`):
 
-- `[[plugin]]` : plugin du shell Omarchy épinglé à un commit (`omarchy plugin add`, `git checkout`),
-  patch facultatif (déjà appliqué = `git apply --reverse --check` réussit). Un plugin à une autre
-  version avec des fichiers modifiés, ou un patch qui ne s'applique plus, n'est pas touché : une
-  note l'indique.
-- `[[file]]` : fichier utilisateur posé s'il est absent ; s'il existe et diffère, il est laissé et signalé.
-- `[[user]]` : sans sudo. `check` (code 0 = déjà fait), sinon `run`, lancé par poste après confirmation.
-  `requires` = binaire nécessaire ; `trigger` = lancé seulement si l'une des étapes citées vient d'être faite.
-- `[[system]]` : avec sudo. Poste vérifie (contenu du fichier, ligne présente, commande `check`) et
-  AFFICHE les commandes dans un bloc copiable. Il ne lance jamais `sudo`. Un fichier illisible sans
-  root (polkit) reste « à vérifier » jusqu'à `poste sys done <id>`.
-- `[[manual]]` : à la main ; `check` facultatif, sinon `poste sys done <id>` (`--undo` pour annuler).
+- `[[plugin]]`: Omarchy shell plugin pinned to a commit (`omarchy plugin add`, `git checkout`),
+  optional patch (already applied = `git apply --reverse --check` succeeds). A plugin at another
+  version with modified files, or a patch that no longer applies, is left alone: a
+  note says so.
+- `[[file]]`: user file put in place if it is absent; if it exists and differs, it is left and reported.
+- `[[user]]`: without sudo. `check` (code 0 = already done), otherwise `run`, started by poste after confirmation.
+  `requires` = required binary; `trigger` = run only if one of the named steps has just been done.
+- `[[system]]`: with sudo. Poste checks (file content, line present, `check` command) and
+  PRINTS the commands in a copyable block. It never runs `sudo`. A file unreadable without
+  root (polkit) stays 'to check' until `poste sys done <id>`.
+- `[[manual]]`: by hand; optional `check`, otherwise `poste sys done <id>` (`--undo` to cancel).

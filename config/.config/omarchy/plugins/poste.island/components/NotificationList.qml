@@ -215,7 +215,7 @@ Item {
           visible: false
           Rectangle { anchors.fill: parent; radius: 10 }
         }
-        // Logos Claude / Codex : glyphes de police, gardés tels quels.
+        // Claude / Codex logos: font glyphs, kept as they are.
         Text {
           anchors.centerIn: parent
           visible: !!row.brand

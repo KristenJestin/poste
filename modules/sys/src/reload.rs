@@ -1,11 +1,11 @@
-//! Rechargement de l'île (`omarchy restart shell`) et de Hyprland (`hyprctl reload`)
-//! après `poste sys sync`, selon les fichiers changés par le pull.
+//! Reload of the island (`omarchy restart shell`) and of Hyprland (`hyprctl reload`)
+//! after `poste sys sync`, depending on the files changed by the pull.
 
 use anyhow::{Context, Result};
 use std::path::Path;
 use std::process::{Command, Stdio};
 
-/// Ce qu'il faut recharger.
+/// What must be reloaded.
 #[derive(Debug, Default, PartialEq, Eq)]
 pub struct Need {
     pub shell: bool,
@@ -17,8 +17,8 @@ impl Need {
         self.shell || self.hypr
     }
 
-    /// Ajoute ce que demande un chemin changé, relatif à la racine du dépôt (dépôt poste
-    /// ou dépôt de données, même disposition).
+    /// Adds what a changed path asks for, relative to the root of the repository (poste repository
+    /// or data repository, same layout).
     pub fn add_path(&mut self, path: &str) {
         let c: Vec<&str> = path.split('/').collect();
         match c.as_slice() {
@@ -27,7 +27,7 @@ impl Need {
             }
             ["config", ".config", "hypr", ..] => self.hypr = true,
             ["modules" | "addons", _, "island", ..] => self.shell = true,
-            // module.toml : ses `[[line]]` peuvent viser la config de Hyprland.
+            // module.toml: its `[[line]]` entries may target Hyprland's config.
             ["modules" | "addons", _, "hypr", ..] | ["modules" | "addons", _, "module.toml"] => {
                 self.hypr = true
             }
@@ -36,18 +36,18 @@ impl Need {
     }
 }
 
-/// Commit courant d'un dépôt.
+/// Current commit of a repository.
 pub fn head(dir: &Path) -> Result<String> {
     let out = Command::new("git")
         .arg("-C")
         .arg(dir)
         .args(["rev-parse", "HEAD"])
         .output()
-        .context("impossible de lancer git")?;
+        .context("cannot run git")?;
     Ok(String::from_utf8_lossy(&out.stdout).trim().to_string())
 }
 
-/// Ajoute à `need` les fichiers changés entre deux commits.
+/// Adds to `need` the files changed between two commits.
 pub fn add_changes(need: &mut Need, dir: &Path, from: &str, to: &str) -> Result<()> {
     if from.is_empty() || from == to {
         return Ok(());
@@ -57,14 +57,14 @@ pub fn add_changes(need: &mut Need, dir: &Path, from: &str, to: &str) -> Result<
         .arg(dir)
         .args(["diff", "--name-only", from, to])
         .output()
-        .context("impossible de lancer git")?;
+        .context("cannot run git")?;
     for l in String::from_utf8_lossy(&out.stdout).lines() {
         need.add_path(l);
     }
     Ok(())
 }
 
-/// Un enregistrement d'écran tourne (redémarrer l'île le couperait).
+/// A screen recording is running (restarting the island would cut it).
 fn recording() -> bool {
     Command::new("pgrep")
         .args(["-f", "gpu-screen-recorder"])
@@ -76,12 +76,12 @@ fn recording() -> bool {
 fn launch(args: &[&str]) {
     match Command::new(args[0]).args(&args[1..]).status() {
         Ok(s) if s.success() => {}
-        _ => eprintln!("poste sys : `{}` a échoué", args.join(" ")),
+        _ => eprintln!("poste sys: `{}` failed", args.join(" ")),
     }
 }
 
-/// Recharge ce que `need` demande : sans `yes`, après confirmation. L'île n'est jamais
-/// redémarrée pendant un enregistrement d'écran.
+/// Reloads what `need` asks for: without `yes`, after confirmation. The island is never
+/// restarted during a screen recording.
 pub fn apply(
     need: &Need,
     yes: bool,
@@ -98,13 +98,13 @@ pub fn apply(
     if need.hypr {
         cmds.push("hyprctl reload");
     }
-    let list = cmds.join("` et `");
+    let list = cmds.join("` and `");
     if dry_run {
-        println!("\nSimulation : rechargement non lancé (`{list}`).");
+        println!("\nDry run: reload not run (`{list}`).");
         return Ok(());
     }
-    if !yes && !confirm(&format!("\nRecharger maintenant (`{list}`) ? [o/N] "))? {
-        println!("Pour recharger plus tard : `{list}`.");
+    if !yes && !confirm(&format!("\nReload now (`{list}`)? [y/N] "))? {
+        println!("To reload later: `{list}`.");
         return Ok(());
     }
     if need.hypr {
@@ -113,7 +113,7 @@ pub fn apply(
     if need.shell {
         if recording() {
             println!(
-                "Enregistrement d'écran en cours : île non redémarrée, lancez `omarchy restart shell` une fois fini."
+                "Screen recording in progress: island not restarted, run `omarchy restart shell` once it is over."
             );
         } else {
             launch(&["omarchy", "restart", "shell"]);

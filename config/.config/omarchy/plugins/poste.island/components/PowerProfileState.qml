@@ -2,24 +2,24 @@ import QtQuick
 import Quickshell.Io
 import Quickshell.Services.UPower
 
-// Le profil d'alimentation (power-profiles-daemon), pour l'île (Island.qml : root.powerProfile).
-// Lu dans le singleton PowerProfiles de Quickshell (D-Bus) : il suit tout changement, d'où
-// qu'il vienne (bascule d'Omarchy au débranchement, menu d'Omarchy, powerprofilesctl).
-// La présence du démon et la liste des profils viennent de omarchy-powerprofiles-list (vide :
-// pas de démon, rien n'est montré). Le choix passe par omarchy-powerprofiles-set <ac|battery>
-// <profil>, qui le retient pour cette source d'alimentation, comme le panneau d'Omarchy ;
-// jamais powerprofilesctl set. Pour tester sans toucher au vrai profil :
+// The power profile (power-profiles-daemon), for the island (Island.qml: root.powerProfile).
+// Read from Quickshell's PowerProfiles singleton (D-Bus): it follows every change, from
+// wherever it comes (Omarchy's switch on unplugging, Omarchy's menu, powerprofilesctl).
+// The presence of the daemon and the list of profiles come from omarchy-powerprofiles-list (empty:
+// no daemon, nothing is shown). The choice goes through omarchy-powerprofiles-set <ac|battery>
+// <profile>, which remembers it for this power source, like Omarchy's panel;
+// never powerprofilesctl set. To test without touching the real profile:
 //   omarchy-shell poste.island profileSim "power-saver" | "balanced" | "performance" | "off"
-// (les trois profils sont alors offerts, et un choix ne change que la simulation).
+// (the three profiles are then offered, and a choice only changes the simulation).
 Item {
   id: state
 
-  // Profils de la machine, dans l'ordre d'Omarchy (économie, équilibré, performance).
+  // The machine's profiles, in Omarchy's order (power saver, balanced, performance).
   property var profiles: []
   readonly property bool present: simulated || profiles.length > 0
   readonly property var shownProfiles: simulated ? ["power-saver", "balanced", "performance"] : profiles
 
-  // Simulation (commande profileSim).
+  // Simulation (profileSim command).
   property bool simulated: false
   property string simProfile: "balanced"
 
@@ -32,14 +32,14 @@ Item {
     if (name === "performance") return "󰓅"
     return "󰊚"
   }
-  // Libellé court (tuile du centre de contrôle) et complet (OSD).
+  // Short label (control center tile) and full label (OSD).
   function shortLabel(name) { return name === "power-saver" ? "Saver" : name === "performance" ? "Perf" : "Balanced" }
   function label(name) { return name === "power-saver" ? "Power saver" : name === "performance" ? "Performance" : "Balanced" }
   readonly property string glyph: glyphOf(active)
 
-  // Un changement de profil (pas la première lecture) : l'île montre l'OSD. Le singleton lit
-  // D-Bus après le démarrage de l'île, et la liste arrive après lui : les premières secondes
-  // ne comptent pas.
+  // A profile change (not the first reading): the island shows the OSD. The singleton reads
+  // D-Bus after the island starts, and the list arrives after it: the first seconds
+  // do not count.
   signal switched(string name)
   property string seen: ""
   property bool armed: false
@@ -60,9 +60,9 @@ Item {
   }
   Process {
     id: setProc
-    onExited: function(code) { if (code !== 0) console.warn("omarchy-powerprofiles-set a échoué (" + code + ")") }
+    onExited: function(code) { if (code !== 0) console.warn("omarchy-powerprofiles-set failed (" + code + ")") }
   }
-  // Le profil suivant de la machine (après le dernier, le premier).
+  // The machine's next profile (after the last, the first).
   function cycle() {
     var list = shownProfiles
     if (list.length === 0) return
@@ -77,19 +77,19 @@ Item {
       waitForEnd: true
       onStreamFinished: {
         var list = String(text || "").split("\n").map(function(l) { return l.trim() }).filter(function(l) { return l !== "" })
-        // Une lecture vide de passage (le démon redémarre) garde la liste connue.
+        // An empty reading in passing (the daemon restarts) keeps the known list.
         if (list.length > 0 || state.profiles.length === 0) state.profiles = list
       }
     }
   }
   Component.onCompleted: refresh()
-  // Le démon peut ne pas être prêt au démarrage de l'île : liste relue tant qu'elle est vide.
+  // The daemon may not be ready when the island starts: list read again as long as it is empty.
   Timer { interval: 30000; repeat: true; running: state.profiles.length === 0; onTriggered: state.refresh() }
 
   // "power-saver", "balanced", "performance", "off"
   function simulate(spec) {
     var name = String(spec || "").trim()
-    // Fin de simulation : retour au vrai profil, sans OSD.
+    // End of simulation: back to the real profile, without OSD.
     if (name === "off" || name === "") { seen = liveProfile; simulated = false; return "off" }
     if (["power-saver", "balanced", "performance"].indexOf(name) < 0) return "unknown profile"
     if (!simulated) { simProfile = liveProfile; simulated = true }

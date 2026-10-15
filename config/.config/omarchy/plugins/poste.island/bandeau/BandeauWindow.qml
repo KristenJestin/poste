@@ -2,18 +2,18 @@ import QtQuick
 import Quickshell
 import Quickshell.Wayland
 
-// La fenêtre du bandeau sur un écran : tout l'écran, taille fixe (une pièce qui arrive ou
-// part ne change que le contenu, le compositeur ne retaille jamais la surface), au-dessus de
-// tout, sans clavier. La souris traverse partout sauf sur les cartes de notification.
+// The banner's window on a screen: the whole screen, fixed size (a piece that arrives or
+// leaves only changes the content, the compositor never resizes the surface), above
+// everything, without keyboard. The mouse goes through everywhere except on the notification cards.
 //
-// En haut, la pile, juste sous le bord bas de l'île telle qu'elle est dessinée : elle suit son
-// ressort image par image, donc descend sous une vue qui s'ouvre et remonte quand elle se
-// referme, sans jamais la recouvrir. Du haut vers le bas : le texte dicté, l'OSD, les
-// notifications. Chaque pièce garde la place qu'elle prend (`space`, animée), celles du
-// dessous glissent quand elle arrive ou part. L'OSD et le texte dicté vont sur l'écran actif ;
-// une notification reste sur l'écran où elle est apparue (règle du service).
+// At the top, the stack, just under the bottom edge of the island as it is drawn: it follows its
+// spring frame by frame, so it goes down under a view that opens and goes up when it
+// closes, without ever covering it. From top to bottom: the dictated text, the OSD, the
+// notifications. Each piece keeps the place it takes (`space`, animated), those
+// below slide when it arrives or leaves. The OSD and the dictated text go to the active screen;
+// a notification stays on the screen where it appeared (rule of the service).
 //
-// En bas de l'écran actif, seule : la pastille de la dictée.
+// At the bottom of the active screen, alone: the dictation pill.
 PanelWindow {
   id: win
   required property var bandeau
@@ -21,7 +21,7 @@ PanelWindow {
   readonly property string screenName: screen ? String(screen.name) : ""
   readonly property bool focused: bandeau.focusedScreen === "" || bandeau.focusedScreen === screenName
 
-  // Haut de la pile : un écart sous l'île de cet écran (le haut de l'écran sans île).
+  // Top of the stack: a gap under this screen's island (the top of the screen without an island).
   readonly property real stackTop: (bandeau.islandEdges[screenName] || 0) + bandeau.islandGap
 
   visible: dictation.live || osdView.live || notifs.live || pill.live
@@ -34,9 +34,9 @@ PanelWindow {
   WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
   mask: Region { item: hitArea }
 
-  // Seule zone qui prend la souris : les cartes de notification, plus l'écart au-dessus (une
-  // carte qui entre descend de là). Enfant direct de la fenêtre, pour que le masque suive quand
-  // la pile monte ou descend.
+  // Only area that takes the mouse: the notification cards, plus the gap above (a
+  // card that comes in goes down from there). Direct child of the window, so that the mask follows when
+  // the stack goes up or down.
   Item {
     id: hitArea
     x: notifs.x

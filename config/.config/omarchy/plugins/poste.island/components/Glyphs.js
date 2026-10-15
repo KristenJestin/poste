@@ -1,9 +1,9 @@
 .pragma library
-// Glyphes Nerd Font de l'île -> icônes Tabler (assets/tabler, MIT).
-// Même table que la police « Poste Nerd Font » du shell (bootstrap/icons/glyphs.tsv) :
-// changer une icône ici, la changer aussi là-bas.
-// Glyph.qml affiche l'icône quand elle est ici, sinon le glyphe d'origine. Une ligne
-// n'apparaît ici que si son SVG (et sa variante -filled si besoin) est dans assets/tabler.
+// Island Nerd Font glyphs -> Tabler icons (assets/tabler, MIT).
+// Same table as the shell's 'Poste Nerd Font' font (bootstrap/icons/glyphs.tsv):
+// change an icon here, change it there too.
+// Glyph.qml shows the icon when it is here, otherwise the original glyph. A line
+// only appears here if its SVG (and its -filled variant if needed) is in assets/tabler.
 var icons = {
   "": "layout-grid",               // E62A custom-windows
   "": "volume",                    // E638 seti-audio
@@ -151,10 +151,10 @@ var icons = {
   "󱚾": "wifi"                       // F16BE md-wifi_cog
 }
 
-// Pleines par défaut (commandes média, cœur plein) ; le contour seul y paraît trop maigre.
+// Filled by default (media controls, filled heart); the outline alone looks too thin there.
 var solid = { "󰈑": 1, "󰋑": 1, "󰏤": 1, "󰐊": 1, "󰑟": 1, "󰒭": 1, "󰒮": 1, "󰓛": 1 }
 
-// Chemin de l'icône sous assets/ (« tabler/microphone »), ou "".
+// Path of the icon under assets/ ('tabler/microphone'), or "".
 function iconFor(glyph) {
   var name = icons[String(glyph || "")] || ""
   return name !== "" ? "tabler/" + name : ""

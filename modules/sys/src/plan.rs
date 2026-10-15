@@ -1,4 +1,4 @@
-//! Ce que le dépôt veut installer, et ce qu'il faut faire pour y arriver.
+//! What the repository wants to install, and what must be done to get there.
 
 use crate::manifest::Manifest;
 use crate::util::sha256_file;
@@ -6,10 +6,10 @@ use anyhow::{bail, Context, Result};
 use poste_core::{Card, Env};
 use std::path::{Path, PathBuf};
 
-/// Un fichier à poser : source dans le dépôt, destination dans le système.
+/// A file to put in place: source in the repository, destination in the system.
 #[derive(Debug, Clone)]
 pub struct Item {
-    /// Module propriétaire (`poste` pour l'aiguillage).
+    /// Owner module (`poste` for the dispatcher).
     pub module: String,
     pub src: PathBuf,
     pub dest: PathBuf,
@@ -17,19 +17,19 @@ pub struct Item {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Action {
-    /// La destination n'existe pas.
+    /// The destination does not exist.
     Create,
-    /// Posé par nous, à remplacer (`by_hand` : modifié à la main depuis).
+    /// Put in place by us, to replace (`by_hand`: edited by hand since).
     Update { by_hand: bool },
-    /// Déjà identique et suivi.
+    /// Already identical and tracked.
     Unchanged,
-    /// Déjà identique mais pas encore suivi : on l'enregistre sans rien écrire.
+    /// Already identical but not tracked yet: it is recorded without writing anything.
     Adopt,
-    /// Existe, diffère, et ne vient pas de nous : on n'y touche pas.
+    /// Exists, differs, and does not come from us: we do not touch it.
     Conflict,
 }
 
-/// Un module du dépôt : `modules/<dir>/` contenant un `module.toml`.
+/// A module of the repository: `modules/<dir>/` holding a `module.toml`.
 #[derive(Debug, Clone)]
 pub struct RepoModule {
     pub name: String,
@@ -61,7 +61,7 @@ pub fn repo_addons(repo: &Path) -> Result<Vec<RepoModule>> {
         .iter()
         .find(|a| modules.iter().any(|m| m.name == a.name))
     {
-        bail!("add-on « {} » has the name of a module", a.name);
+        bail!("add-on '{}' has the name of a module", a.name);
     }
     Ok(addons)
 }
@@ -82,7 +82,7 @@ fn read_modules(dir: &Path) -> Result<Vec<RepoModule>> {
         let name = card.name.unwrap_or(dirname.clone());
         if name != dirname || !poste_core::modules::valid_name(&name) {
             bail!(
-                "{} : le nom « {name} » doit être valide et égal au nom du dossier « {dirname} »",
+                "{}: the name '{name}' must be valid and equal to the folder name '{dirname}'",
                 card_file.display()
             );
         }
@@ -116,10 +116,10 @@ pub fn enabled_modules(repo: &Path, env: &Env) -> Result<Vec<RepoModule>> {
     Ok(out)
 }
 
-/// Tous les fichiers (récursivement) sous `dir`, triés.
+/// All the files (recursively) under `dir`, sorted.
 fn files_under(dir: &Path, out: &mut Vec<PathBuf>) -> Result<()> {
     let mut entries: Vec<_> = std::fs::read_dir(dir)
-        .with_context(|| format!("lecture de {}", dir.display()))?
+        .with_context(|| format!("reading {}", dir.display()))?
         .flatten()
         .map(|e| e.path())
         .collect();
@@ -134,7 +134,7 @@ fn files_under(dir: &Path, out: &mut Vec<PathBuf>) -> Result<()> {
     Ok(())
 }
 
-/// La liste de tout ce que le dépôt veut poser.
+/// The list of everything the repository wants to put in place.
 pub fn desired(repo: &Path, env: &Env) -> Result<Vec<Item>> {
     let release = repo.join("target/release");
     let mut items = vec![Item {
@@ -145,9 +145,9 @@ pub fn desired(repo: &Path, env: &Env) -> Result<Vec<Item>> {
     for m in enabled_modules(repo, env)? {
         let base = env.modules_dir().join(&m.name);
         let prog = format!("poste-{}", m.name);
-        // Module en Rust (Cargo.toml) : binaire construit. Module-script (python, shell…) :
-        // le programme `poste-<nom>` du dossier du module, copié tel quel. Une version
-        // installée n'a plus de Cargo.toml : un module sans script y est un binaire construit.
+        // Rust module (Cargo.toml): built binary. Script module (python, shell…):
+        // the program `poste-<name>` of the module folder, copied as is. An installed
+        // version no longer has a Cargo.toml: a module without a script there is a built binary.
         let script = m.dir.join(&prog);
         let src = if m.dir.join("Cargo.toml").is_file() || !script.is_file() {
             release.join(&prog)
@@ -164,14 +164,14 @@ pub fn desired(repo: &Path, env: &Env) -> Result<Vec<Item>> {
             src: m.dir.join("module.toml"),
             dest: base.join("module.toml"),
         });
-        // Dossiers facultatifs copiés tels quels (`bin/` : programmes annexes du module).
+        // Optional folders copied as is (`bin/`: auxiliary programs of the module).
         for sub in ["island", "hypr", "bin", "systemd"] {
             let root = m.dir.join(sub);
             if root.is_dir() {
                 let mut files = Vec::new();
                 files_under(&root, &mut files)?;
                 for f in files {
-                    let rel = f.strip_prefix(&m.dir).expect("sous le dossier du module");
+                    let rel = f.strip_prefix(&m.dir).expect("under the module folder");
                     items.push(Item {
                         module: m.name.clone(),
                         src: f.clone(),
@@ -243,7 +243,7 @@ mod tests {
     }
 
     #[test]
-    fn classement() {
+    fn ranking() {
         let d = tempfile::tempdir().unwrap();
         let none = Manifest::default();
 
@@ -257,23 +257,23 @@ mod tests {
             Action::Unchanged
         );
 
-        // Différent et inconnu : on n'y touche pas.
-        let it = item(d.path(), "a", "autre");
+        // Different and unknown: we do not touch it.
+        let it = item(d.path(), "a", "other");
         assert_eq!(classify(&it, &none).unwrap(), Action::Conflict);
-        // Différent, posé par nous et intact : mise à jour.
+        // Different, put in place by us and intact: update.
         assert_eq!(
-            classify(&it, &entry_for(&it, "autre")).unwrap(),
+            classify(&it, &entry_for(&it, "other")).unwrap(),
             Action::Update { by_hand: false }
         );
-        // Différent, posé par nous puis modifié à la main.
+        // Different, put in place by us then edited by hand.
         assert_eq!(
-            classify(&it, &entry_for(&it, "ancien")).unwrap(),
+            classify(&it, &entry_for(&it, "old")).unwrap(),
             Action::Update { by_hand: true }
         );
     }
 
     #[test]
-    fn liste_du_depot_avec_dossiers_facultatifs() {
+    fn repository_list_with_optional_folders() {
         let d = tempfile::tempdir().unwrap();
         let repo = d.path().join("repo");
         let m = repo.join("modules/foo");
@@ -282,7 +282,7 @@ mod tests {
         fs::write(m.join("module.toml"), "name = \"foo\"\n").unwrap();
         fs::write(m.join("island/sub/x.qml"), "").unwrap();
         fs::write(m.join("hypr/foo.conf"), "").unwrap();
-        // Dossier sans module.toml : ignoré.
+        // Folder without module.toml: ignored.
         fs::create_dir_all(repo.join("modules/bar")).unwrap();
 
         let env = Env::with_home(d.path().join("home"));
@@ -297,11 +297,11 @@ mod tests {
     }
 
     #[test]
-    fn binaire_ou_script_selon_le_module() {
+    fn binary_or_script_depending_on_the_module() {
         let d = tempfile::tempdir().unwrap();
         let repo = d.path().join("repo");
-        // Module en Rust dans le clone, module-script, et module en Rust d'une version
-        // installée (l'archive n'a pas son Cargo.toml).
+        // Rust module in the clone, script module, and Rust module of an installed
+        // version (the archive has no Cargo.toml).
         for (name, file) in [
             ("crate", Some("Cargo.toml")),
             ("script", Some("poste-script")),
@@ -407,11 +407,11 @@ mod tests {
     }
 
     #[test]
-    fn nom_different_du_dossier_refuse() {
+    fn name_different_from_folder_refused() {
         let d = tempfile::tempdir().unwrap();
         let m = d.path().join("modules/foo");
         fs::create_dir_all(&m).unwrap();
-        fs::write(m.join("module.toml"), "name = \"autre\"\n").unwrap();
+        fs::write(m.join("module.toml"), "name = \"other\"\n").unwrap();
         assert!(repo_modules(d.path()).is_err());
     }
 }

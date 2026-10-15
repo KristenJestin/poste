@@ -1,8 +1,8 @@
 import QtQuick
 import "Glyphs.js" as Glyphs
 
-// Un glyphe de l'île : l'icône Tabler qui lui correspond (Glyphs.js), sinon
-// le glyphe de la police d'origine. Même usage qu'un Text à glyphe.
+// An island glyph: the matching Tabler icon (Glyphs.js), otherwise
+// the glyph of the original font. Same use as a Text with a glyph.
 Item {
   id: g
   property string glyph: ""
@@ -12,7 +12,7 @@ Item {
   property real stroke: 2.5
   property bool filled: Glyphs.prefersFilled(glyph)
   readonly property string icon: Glyphs.iconFor(glyph)
-  // Réglages de Text acceptés pour garder les mêmes écritures (sans effet sur une icône).
+  // Text settings accepted to keep the same writings (no effect on an icon).
   property int horizontalAlignment: Text.AlignHCenter
   property int verticalAlignment: Text.AlignVCenter
   readonly property real contentWidth: implicitWidth
@@ -24,7 +24,7 @@ Item {
   Icon {
     anchors.centerIn: parent
     visible: g.icon !== ""
-    // Tabler a des variantes pleines (<nom>-filled) : prises pour « filled ».
+    // Tabler has filled variants (<name>-filled): taken for 'filled'.
     name: g.filled && g.icon.indexOf("tabler/") === 0 ? g.icon + "-filled" : g.icon
     color: g.color
     size: g.pixelSize

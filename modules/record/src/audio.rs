@@ -1,10 +1,10 @@
-//! Son : sources de gpu-screen-recorder, application de la fenêtre, nom de fichier.
+//! Sound: gpu-screen-recorder sources, window application, file name.
 
 use crate::hypr::{text, Obj};
 use crate::proc::{capture, prog, GSR};
 use std::time::Duration;
 
-/// Noms des applis qui jouent du son (`gpu-screen-recorder --list-application-audio`).
+/// Names of the apps that play sound (`gpu-screen-recorder --list-application-audio`).
 fn app_audio_names() -> Vec<String> {
     capture(
         &prog(GSR),
@@ -20,7 +20,7 @@ fn app_audio_names() -> Vec<String> {
     .unwrap_or_default()
 }
 
-/// Choix du nom PipeWire d'après une liste : la classe, la classe initiale ou le premier mot du titre.
+/// Choice of the PipeWire name from a list: the class, the initial class or the first word of the title.
 pub fn match_app_audio(client: &Obj, names: &[String]) -> Option<String> {
     let title = text(client, "title");
     let first = title.split(' ').next().unwrap_or("").to_string();
@@ -37,12 +37,12 @@ pub fn match_app_audio(client: &Obj, names: &[String]) -> Option<String> {
     None
 }
 
-/// Le nom PipeWire de l'appli d'une fenêtre (« Zen », « Unity »…), si elle joue du son.
+/// The PipeWire name of a window's app ("Zen", "Unity"…), if it plays sound.
 pub fn app_audio_for(client: &Obj) -> Option<String> {
     match_app_audio(client, &app_audio_names())
 }
 
-/// `audio_sources(audio, app)` : l'argument `-a` de gpu-screen-recorder (vide : pas de son).
+/// `audio_sources(audio, app)`: the `-a` argument of gpu-screen-recorder (empty: no sound).
 pub fn audio_sources(audio: &str, app: Option<&str>) -> String {
     let audio = if audio.is_empty() { "none" } else { audio };
     if audio.contains('|')
@@ -67,7 +67,7 @@ pub fn audio_sources(audio: &str, app: Option<&str>) -> String {
     parts.join("|")
 }
 
-/// Nom de fichier sûr (60 caractères au plus), « Recording » si rien ne reste.
+/// Safe file name (60 characters at most), "Recording" if nothing remains.
 pub fn slug(text: &str) -> String {
     let mut spaced = String::new();
     let mut in_run = false;
@@ -131,7 +131,7 @@ mod tests {
         );
         assert_eq!(audio_sources("default_output", Some("x")), "default_output");
         assert_eq!(audio_sources("alsa_input.x", None), "alsa_input.x");
-        assert_eq!(audio_sources("inconnu", None), "");
+        assert_eq!(audio_sources("unknown", None), "");
     }
 
     #[test]

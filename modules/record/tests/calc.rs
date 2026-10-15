@@ -1,5 +1,5 @@
-//! Calculs purs (son, noms de fichier, rectangles, recherche de fenêtre, commandes du lanceur)
-//! comparés, sur les mêmes entrées, à ceux du script Python d'origine.
+//! Pure calculations (sound, file names, rectangles, window search, launcher commands)
+//! compared, on the same inputs, with those of the original Python script.
 
 mod common;
 
@@ -42,9 +42,9 @@ fn python_calc(input: &Value) -> Value {
 }
 
 #[test]
-fn calculs_identiques_au_script_python() {
+fn calculations_identical_to_the_python_script() {
     if !python_available() {
-        eprintln!("python3 absent : test ignoré");
+        eprintln!("python3 missing: test skipped");
         return;
     }
     let mut audio = Vec::new();
@@ -68,7 +68,7 @@ fn calculs_identiques_au_script_python() {
         "a|b",
         "x:y",
         "Desktop",
-        "mic+inconnu",
+        "mic+unknown",
     ] {
         for app in [json!(null), json!(""), json!("FMOD Ex App"), json!("Zen")] {
             audio.push(json!([a, app]));
@@ -80,11 +80,11 @@ fn calculs_identiques_au_script_python() {
         "   ",
         "A/B",
         "a:b*c?d\"e<f>g|h",
-        "  espaces   multiples  ",
+        "  spaces   multiple  ",
         "///",
-        "tab\tet\nretour",
+        "tab\tand\nreturn",
         "é".repeat(70).as_str(),
-        &format!("{} fin", "x".repeat(59)),
+        &format!("{} end", "x".repeat(59)),
         "Screen DP-1",
         "a\u{a0}b",
         "Preset · é",
@@ -110,7 +110,7 @@ fn calculs_identiques_au_script_python() {
     ]);
     let clients = json!([
         {"address": "a", "workspace": {"id": 1}, "at": [1, 2], "size": [3, 4], "class": "Unity", "title": "Un", "mapped": true},
-        {"address": "b", "workspace": {"id": 4}, "at": [5, 6], "size": [7, 8], "class": "unity", "title": "Deux"},
+        {"address": "b", "workspace": {"id": 4}, "at": [5, 6], "size": [7, 8], "class": "unity", "title": "Two"},
         {"address": "c", "workspace": {"id": 7}, "at": [0, 0], "size": [1, 1], "class": "Other"},
         {"address": "d", "workspace": {"id": -98}, "at": [0, 0], "size": [100, 50], "class": "zen", "title": "Zen x", "mapped": false},
         {"address": "e", "workspace": {"id": 0}, "at": [0, 0], "size": [20, 20], "class": "x"},
@@ -119,7 +119,7 @@ fn calculs_identiques_au_script_python() {
         {"address": "h", "workspace": {"id": 1.0}, "at": [1.5, 2], "size": [3, 4], "class": "float"}
     ]);
     let matches = json!([
-        {"class": "^Unity$"}, {"class": "unity"}, {"title": "deux"}, {"class": "^Unity$", "title": "^Un$"},
+        {"class": "^Unity$"}, {"class": "unity"}, {"title": "two"}, {"class": "^Unity$", "title": "^Un$"},
         {"class": "nope"}, {}, {"class": ""}, {"class": "x|zen"}, {"title": "(?i)ZEN"}
     ]);
     let app_audio = json!([
@@ -142,7 +142,7 @@ fn calculs_identiques_au_script_python() {
         "audio": audio, "slug": slugs, "monitors": monitors, "clients": clients, "matches": matches,
         "app_audio": app_audio, "cmd_of": cmds
     });
-    // window_rect utilise ses propres écrans : on les passe à Python par la même clé.
+    // window_rect uses its own screens: we pass them to Python through the same key.
     let mut py_input = input.clone();
     py_input["monitors"] = mons_for_windows.clone();
     let py_windows = python_calc(&py_input)["window_rect"].clone();
@@ -154,7 +154,7 @@ fn calculs_identiques_au_script_python() {
         .map(|a| json!(audio_sources(a[0].as_str().unwrap(), a[1].as_str())))
         .collect();
     assert_eq!(py["audio"], json!(rs));
-    // Noms de fichier
+    // File names
     let rs: Vec<Value> = input["slug"]
         .as_array()
         .unwrap()
@@ -162,13 +162,13 @@ fn calculs_identiques_au_script_python() {
         .map(|s| json!(slug(s.as_str().unwrap())))
         .collect();
     assert_eq!(py["slug"], json!(rs));
-    // Rectangles d'écran
+    // Screen rectangles
     let rs: Vec<Value> = objs(&monitors)
         .iter()
         .map(|m| serde_json::to_value(monitor_rect(m)).unwrap())
         .collect();
     assert_eq!(py["monitor_rect"], json!(rs));
-    // Rectangles de fenêtre (avec les autres écrans)
+    // Window rectangles (with the other screens)
     let mons = objs(&mons_for_windows);
     let rs: Vec<Value> = objs(&clients)
         .iter()
@@ -179,7 +179,7 @@ fn calculs_identiques_au_script_python() {
         })
         .collect();
     assert_eq!(py_windows, json!(rs));
-    // Recherche de fenêtre
+    // Window search
     let all = objs(&clients);
     let rs: Vec<Value> = matches
         .as_array()
@@ -192,7 +192,7 @@ fn calculs_identiques_au_script_python() {
         })
         .collect();
     assert_eq!(py["find_window"], json!(rs));
-    // Son de l'application d'une fenêtre
+    // Sound of a window's application
     let rs: Vec<Value> = app_audio
         .as_array()
         .unwrap()
@@ -208,7 +208,7 @@ fn calculs_identiques_au_script_python() {
         })
         .collect();
     assert_eq!(py["app_audio"], json!(rs));
-    // Commandes du lanceur
+    // Launcher commands
     let rs: Vec<Value> = cmds
         .as_array()
         .unwrap()

@@ -1,5 +1,5 @@
-//! `poste` : aiguillage mince. `poste <module> <args…>` exécute `poste-<module> <args…>`.
-//! Seuls `help`, `--help` et `--version` sont connus ici ; aucun nom de module n'est codé.
+//! `poste`: thin dispatcher. `poste <module> <args…>` runs `poste-<module> <args…>`.
+//! Only `help`, `--help` and `--version` are known here; no module name is hard-coded.
 
 use poste_core::{modules, Config, Env, Module};
 use std::ffi::OsString;
@@ -11,13 +11,13 @@ fn main() -> ExitCode {
     let env = match Env::from_process() {
         Ok(e) => e,
         Err(e) => {
-            eprintln!("poste : {e:#}");
+            eprintln!("poste: {e:#}");
             return ExitCode::from(1);
         }
     };
-    // Une config illisible ne doit pas empêcher d'utiliser les modules du PATH.
+    // An unreadable config must not prevent using the modules of the PATH.
     let cfg = Config::load(&env).unwrap_or_else(|e| {
-        eprintln!("poste : avertissement : {e:#}");
+        eprintln!("poste: warning: {e:#}");
         Config::default()
     });
 
@@ -42,19 +42,19 @@ fn main() -> ExitCode {
         Some(name) => match modules::find(&env, &cfg, name) {
             Some(m) => run(&m, args.collect()),
             None => {
-                eprintln!("poste : module « {name} » introuvable.\n");
+                eprintln!("poste: module '{name}' not found.\n");
                 print_modules(&env, &cfg, true);
                 ExitCode::from(127)
             }
         },
         None => {
-            eprintln!("poste : nom de module invalide (non UTF-8).");
+            eprintln!("poste: invalid module name (not UTF-8).");
             ExitCode::from(2)
         }
     }
 }
 
-/// Remplace le processus par le module (Unix) ; sinon le lance et transmet son code.
+/// Replaces the process with the module (Unix); otherwise runs it and passes on its code.
 fn run(m: &Module, args: Vec<OsString>) -> ExitCode {
     let mut cmd = Command::new(&m.program);
     cmd.args(args);
@@ -62,39 +62,36 @@ fn run(m: &Module, args: Vec<OsString>) -> ExitCode {
     {
         use std::os::unix::process::CommandExt;
         let err = cmd.exec();
-        eprintln!(
-            "poste : impossible de lancer {} : {err}",
-            m.program.display()
-        );
+        eprintln!("poste: cannot run {}: {err}", m.program.display());
         ExitCode::from(126)
     }
     #[cfg(not(unix))]
     match cmd.status() {
         Ok(s) => ExitCode::from(s.code().unwrap_or(1) as u8),
         Err(e) => {
-            eprintln!("poste : impossible de lancer {} : {e}", m.program.display());
+            eprintln!("poste: cannot run {}: {e}", m.program.display());
             ExitCode::from(126)
         }
     }
 }
 
 fn print_help(env: &Env, cfg: &Config) {
-    println!("poste {VERSION} : environnement de travail\n");
-    println!("Usage :");
-    println!("  poste <module> [args…]   exécute poste-<module> avec ces arguments");
-    println!("  poste help [module]      cette aide, ou les commandes d'un module");
+    println!("poste {VERSION}: work environment\n");
+    println!("Usage:");
+    println!("  poste <module> [args…]   runs poste-<module> with these arguments");
+    println!("  poste help [module]      this help, or the commands of a module");
     println!("  poste --version\n");
     print_modules(env, cfg, false);
 }
 
-/// Liste les modules ; `to_stderr` pour le message d'erreur d'un module inconnu.
+/// Lists the modules; `to_stderr` for the error message of an unknown module.
 fn print_modules(env: &Env, cfg: &Config, to_stderr: bool) {
     let mods = modules::list(env, cfg);
     let mut out = String::new();
     if mods.is_empty() {
-        out.push_str("Aucun module trouvé.\n");
+        out.push_str("No module found.\n");
     } else {
-        out.push_str("Modules disponibles :\n");
+        out.push_str("Available modules:\n");
         let width = mods
             .iter()
             .map(|m| m.name.chars().count())
@@ -113,15 +110,15 @@ fn print_modules(env: &Env, cfg: &Config, to_stderr: bool) {
 
 fn help_module(env: &Env, cfg: &Config, name: &str) -> ExitCode {
     let Some(m) = modules::find(env, cfg, name) else {
-        eprintln!("poste : module « {name} » introuvable.\n");
+        eprintln!("poste: module '{name}' not found.\n");
         print_modules(env, cfg, true);
         return ExitCode::from(127);
     };
     println!("poste {name}  {}", m.description());
-    println!("programme : {}", env.display(&m.program));
+    println!("program: {}", env.display(&m.program));
     if let Some(card) = &m.card {
         if !card.commands.is_empty() {
-            println!("\nCommandes :");
+            println!("\nCommands:");
             let width = card
                 .commands
                 .iter()
@@ -133,6 +130,6 @@ fn help_module(env: &Env, cfg: &Config, name: &str) -> ExitCode {
             }
         }
     }
-    println!("\nDétails : poste {name} --help");
+    println!("\nDetails: poste {name} --help");
     ExitCode::SUCCESS
 }

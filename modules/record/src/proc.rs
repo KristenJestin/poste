@@ -1,6 +1,6 @@
-//! Lancement des programmes extérieurs (hyprctl, slurp, gpu-screen-recorder, notifications,
-//! xdg-open). Trois d'entre eux sont remplaçables par une variable d'environnement
-//! RÉSERVÉE AUX TESTS : `POSTE_RECORD_GSR`, `POSTE_RECORD_HYPRCTL`, `POSTE_RECORD_NOTIFY`.
+//! Launching of outside programs (hyprctl, slurp, gpu-screen-recorder, notifications,
+//! xdg-open). Three of them can be replaced by an environment variable
+//! RESERVED FOR TESTS: `POSTE_RECORD_GSR`, `POSTE_RECORD_HYPRCTL`, `POSTE_RECORD_NOTIFY`.
 
 use std::ffi::OsString;
 use std::io::Read;
@@ -12,15 +12,15 @@ pub const GSR: (&str, &str) = ("POSTE_RECORD_GSR", "gpu-screen-recorder");
 pub const HYPRCTL: (&str, &str) = ("POSTE_RECORD_HYPRCTL", "hyprctl");
 pub const NOTIFY: (&str, &str) = ("POSTE_RECORD_NOTIFY", "omarchy-notification-send");
 
-/// Le programme à lancer : la variable d'environnement de test si elle est définie.
+/// The program to launch: the test environment variable if it is set.
 pub fn prog(p: (&str, &str)) -> OsString {
     std::env::var_os(p.0)
         .filter(|v| !v.is_empty())
         .unwrap_or_else(|| p.1.into())
 }
 
-/// `subprocess.run(..., capture_output=True, text=True, timeout=t).stdout` :
-/// `None` si le programme est introuvable ou dépasse le délai (il est alors tué).
+/// `subprocess.run(..., capture_output=True, text=True, timeout=t).stdout`:
+/// `None` if the program cannot be found or exceeds the timeout (it is then killed).
 pub fn capture(program: &OsString, args: &[&str], timeout: Duration) -> Option<String> {
     let mut child = Command::new(program)
         .args(args)
@@ -52,7 +52,7 @@ pub fn capture(program: &OsString, args: &[&str], timeout: Duration) -> Option<S
     Some(String::from_utf8_lossy(&buf).into_owned())
 }
 
-/// Lance un programme dans sa propre session, sans attendre (`start_new_session=True`).
+/// Launches a program in its own session, without waiting (`start_new_session=True`).
 pub fn spawn_detached(
     program: &OsString,
     args: &[OsString],
@@ -62,7 +62,7 @@ pub fn spawn_detached(
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null());
-    // SAFETY : `setsid` est sûr entre `fork` et `exec`.
+    // SAFETY: `setsid` is safe between `fork` and `exec`.
     unsafe {
         c.pre_exec(|| {
             libc::setsid();
@@ -72,8 +72,8 @@ pub fn spawn_detached(
     c.spawn()
 }
 
-/// `notify(summary, body, exec_args, urgency)` : `omarchy-notification-send`, 5 s au plus.
-/// Un échec est sans conséquence.
+/// `notify(summary, body, exec_args, urgency)`: `omarchy-notification-send`, 5 s at most.
+/// A failure has no consequence.
 pub fn notify(summary: &str, body: &str, exec_args: Option<&[String]>, urgency: &str) {
     let mut c = Command::new(prog(NOTIFY));
     c.args([
@@ -113,7 +113,7 @@ pub fn notify(summary: &str, body: &str, exec_args: Option<&[String]>, urgency: 
 
 /// Date locale `%Y-%m-%d %H-%M-%S` (`time.strftime`).
 pub fn stamp() -> String {
-    // SAFETY : `localtime_r` et `strftime` écrivent dans des tampons locaux valides.
+    // SAFETY: `localtime_r` and `strftime` write into valid local buffers.
     unsafe {
         let t = libc::time(std::ptr::null_mut());
         let mut tm: libc::tm = std::mem::zeroed();

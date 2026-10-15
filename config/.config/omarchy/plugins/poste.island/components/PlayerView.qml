@@ -22,8 +22,8 @@ Item {
   readonly property bool canSeek: !!(mpris && mpris.canSeek && length > 0)
   property real position: 0
   property bool dragging: false
-  // Volume de l'application : le curseur remplace les commandes après un clic
-  // sur le haut-parleur, et leur rend la place après 2,5 s sans interaction.
+  // Application volume: the slider replaces the controls after a click
+  // on the speaker, and gives them their room back after 2.5 s without interaction.
   property bool volumeOpen: false
   readonly property bool volumeAvailable: host.playerVolume >= 0
   onVolumeAvailableChanged: if (!volumeAvailable) volumeOpen = false
@@ -141,8 +141,8 @@ Item {
           font.pixelSize: 11
           font.features: { "tnum": 1 }
         }
-        // D'où vient le son : l'appli (icône et nom). Clic : sa fenêtre passe
-        // au premier plan (celle de l'onglet qui joue pour un navigateur).
+        // Where the sound comes from: the app (icon and name). Click: its window comes
+        // to the front (that of the playing tab for a browser).
         // A module can name the player's app (`app` in the `player` block of its island.json) when
         // its MPRIS has no DesktopEntry, or a launcher extension (`launcher`) for a player without a
         // window: the click then opens the launcher there (which closes this view).
@@ -199,8 +199,8 @@ Item {
               player.closeRequested()
             }
           }
-          // Pas de fenêtre (réduite dans la barre des tâches, par exemple un lecteur de bureau) :
-          // on demande au lecteur de se réafficher, sinon on relance l'appli.
+          // No window (minimized to the task bar, for example a desktop player):
+          // the player is asked to show itself again, otherwise the app is relaunched.
           Process {
             id: focusProc
             onExited: function(code) {
@@ -355,7 +355,7 @@ Item {
         }
       }
 
-      // Haut-parleur discret, à droite des commandes : clic pour le curseur.
+      // Discreet speaker, to the right of the controls: click for the slider.
       Glyph {
         id: speaker
         visible: player.volumeAvailable && !player.volumeOpen
@@ -372,13 +372,13 @@ Item {
           onClicked: { player.volumeOpen = true; volumeIdle.restart() }
         }
       }
-      // Curseur compact, à la place des commandes.
+      // Compact slider, in place of the controls.
       Item {
         anchors.fill: parent
         opacity: player.volumeOpen ? 1 : 0
         visible: opacity > 0
         Behavior on opacity { NumberAnimation { duration: 160 * player.host.motionScale } }
-        // Le glyphe du curseur (clic) ramène les commandes.
+        // The slider's glyph (click) brings the controls back.
         LevelSlider {
           anchors.verticalCenter: parent.verticalCenter
           width: parent.width

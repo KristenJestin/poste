@@ -1,8 +1,8 @@
-//! Mise en place de la machine décrite par `bootstrap/` : paquets, étapes système (affichées,
-//! jamais lancées), étapes utilisateur (faites par poste après confirmation), étapes manuelles.
+//! Setup of the machine described by `bootstrap/`: packages, system steps (printed,
+//! never run), user steps (done by poste after confirmation), manual steps.
 //!
-//! Aucune étape ne lance `sudo`. Les données sont dans `bootstrap/packages.toml` et
-//! `bootstrap/steps.toml` ; les contenus de fichiers root dans `bootstrap/system/`.
+//! No step runs `sudo`. The data is in `bootstrap/packages.toml` and
+//! `bootstrap/steps.toml`; the contents of root files in `bootstrap/system/`.
 
 use anyhow::{bail, Context, Result};
 use poste_core::{time, Config, Env};
@@ -12,10 +12,10 @@ use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
-/// Variable réservée aux tests : programme (sans argument) lancé à la place de `pacman -Qq`.
+/// Variable reserved for tests: program (without arguments) run in place of `pacman -Qq`.
 pub const TEST_PACMAN_VAR: &str = "POSTE_TEST_PACMAN_QQ";
 
-// ------------------------------------------------------------------ données
+// ------------------------------------------------------------------ data
 
 #[derive(Debug, Default, Deserialize)]
 struct PackagesFile {
@@ -95,12 +95,12 @@ struct ManualStep {
     check: Vec<String>,
 }
 
-/// Contexte : chemins et substitutions (`@HOME@`, `@USER@`, `@UID@`, `@GID@`, `@REPO@`,
-/// `@BOOTSTRAP@`, et `@DATA@` : le dépôt de données de la machine, vide sans lui).
+/// Context: paths and substitutions (`@HOME@`, `@USER@`, `@UID@`, `@GID@`, `@REPO@`,
+/// `@BOOTSTRAP@`, and `@DATA@`: the machine's data repository, empty without it).
 pub struct Ctx<'a> {
     env: &'a Env,
     dir: PathBuf,
-    /// `bootstrap/` du dépôt de données, s'il est déclaré et existe.
+    /// `bootstrap/` of the data repository, if declared and existing.
     data_dir: Option<PathBuf>,
     /// `bootstrap/` of each add-on listed in `addons`, when it has one.
     addon_dirs: Vec<PathBuf>,
@@ -166,8 +166,7 @@ impl<'a> Ctx<'a> {
 
     fn read_source(&self, rel: &str) -> Result<String> {
         let p = self.dir.join(rel);
-        let s =
-            std::fs::read_to_string(&p).with_context(|| format!("lecture de {}", p.display()))?;
+        let s = std::fs::read_to_string(&p).with_context(|| format!("reading {}", p.display()))?;
         Ok(self.sub(&s))
     }
 
@@ -182,7 +181,7 @@ fn read_steps(dir: &Path) -> Result<Steps> {
         return Ok(Steps::default());
     }
     let s = std::fs::read_to_string(&p)?;
-    toml::from_str(&s).with_context(|| format!("lecture de {}", p.display()))
+    toml::from_str(&s).with_context(|| format!("reading {}", p.display()))
 }
 
 /// The steps of the repository, then those of the listed add-ons, then those of the data
@@ -231,8 +230,7 @@ fn read_packages(dir: &Path) -> Result<BTreeMap<String, String>> {
         return Ok(BTreeMap::new());
     }
     let s = std::fs::read_to_string(&p)?;
-    let f: PackagesFile =
-        toml::from_str(&s).with_context(|| format!("lecture de {}", p.display()))?;
+    let f: PackagesFile = toml::from_str(&s).with_context(|| format!("reading {}", p.display()))?;
     Ok(f.packages)
 }
 
@@ -247,18 +245,18 @@ fn load_packages(ctx: &Ctx) -> Result<BTreeMap<String, String>> {
 
 // ------------------------------------------------------------------ skip
 
-/// Ce que `skip` (config.toml) a retiré du bootstrap de cette machine.
+/// What `skip` (config.toml) removed from the bootstrap of this machine.
 #[derive(Debug, Default, PartialEq)]
 pub struct Skipped {
-    /// Identifiants retirés (ceux de `skip` qui existent, puis les étapes qui en dépendent).
+    /// Removed identifiers (those of `skip` that exist, then the steps that depend on them).
     pub ignored: Vec<String>,
-    /// Identifiants de `skip` qui ne sont ni un paquet ni une étape (faute de frappe ?).
+    /// Identifiers of `skip` that are neither a package nor a step (typo?).
     pub unknown: Vec<String>,
 }
 
-/// Retire des paquets et des étapes ce que `skip` désigne. Une étape utilisateur dont un
-/// `trigger` est sauté est sautée à son tour (elle suppose cette étape : recolorer un plugin
-/// absent échouerait), et ainsi de suite.
+/// Removes from the packages and steps what `skip` designates. A user step with a
+/// `trigger` that is skipped is skipped in turn (it assumes that step: recoloring an absent
+/// plugin would fail), and so on.
 fn apply_skip(
     skip: &[String],
     wanted: &mut BTreeMap<String, String>,
@@ -268,7 +266,7 @@ fn apply_skip(
     let mut gone: HashSet<String> = HashSet::new();
     for id in skip {
         if gone.contains(id) {
-            continue; // doublon
+            continue; // duplicate
         }
         let known = wanted.remove(id).is_some() | step_ids(steps).contains(id.as_str());
         if known {
@@ -315,7 +313,7 @@ fn step_ids(steps: &Steps) -> HashSet<&str> {
         .collect()
 }
 
-/// Paquets voulus et étapes, `skip` de la machine appliqué ; avertit des identifiants inconnus.
+/// Wanted packages and steps, the machine's `skip` applied; warns about unknown identifiers.
 fn load_wanted(ctx: &Ctx) -> Result<(BTreeMap<String, String>, Steps, Skipped)> {
     let cfg = Config::load(ctx.env)?;
     let mut wanted = load_packages(ctx)?;
@@ -323,40 +321,37 @@ fn load_wanted(ctx: &Ctx) -> Result<(BTreeMap<String, String>, Steps, Skipped)> 
     let sk = apply_skip(&cfg.skip, &mut wanted, &mut steps);
     for u in &sk.unknown {
         eprintln!(
-            "avertissement : « {u} » (config.toml, skip) n'est ni un paquet de packages.toml ni l'id d'une étape de steps.toml (faute de frappe ?)"
+            "warning: '{u}' (config.toml, skip) is neither a package of packages.toml nor the id of a step of steps.toml (typo?)"
         );
     }
     Ok((wanted, steps, sk))
 }
 
-/// Nature de chaque identifiant que `skip` peut désigner (paquets et étapes du bootstrap).
+/// Kind of each identifier that `skip` can designate (bootstrap packages and steps).
 pub fn skip_catalog(env: &Env, repo: &Path) -> Result<BTreeMap<String, &'static str>> {
     let ctx = Ctx::new(env, repo);
     let steps = load_steps(&ctx)?;
     let mut out: BTreeMap<String, &'static str> = BTreeMap::new();
     for k in load_packages(&ctx)?.into_keys() {
-        out.insert(k, "paquet");
+        out.insert(k, "package");
     }
     let kinds: [(Vec<&str>, &'static str); 5] = [
         (
             steps.plugin.iter().map(|s| s.id.as_str()).collect(),
             "plugin",
         ),
-        (
-            steps.file.iter().map(|s| s.id.as_str()).collect(),
-            "fichier",
-        ),
+        (steps.file.iter().map(|s| s.id.as_str()).collect(), "file"),
         (
             steps.user.iter().map(|s| s.id.as_str()).collect(),
-            "étape utilisateur",
+            "user step",
         ),
         (
             steps.system.iter().map(|s| s.id.as_str()).collect(),
-            "étape système",
+            "system step",
         ),
         (
             steps.manual.iter().map(|s| s.id.as_str()).collect(),
-            "étape manuelle",
+            "manual step",
         ),
     ];
     for (ids, kind) in kinds {
@@ -367,7 +362,7 @@ pub fn skip_catalog(env: &Env, repo: &Path) -> Result<BTreeMap<String, &'static 
     Ok(out)
 }
 
-/// Effet de `skip` sur ce dépôt, sans avertissement (pour `poste sys skip`).
+/// Effect of `skip` on this repository, without a warning (for `poste sys skip`).
 pub fn skip_effect(env: &Env, repo: &Path, skip: &[String]) -> Result<Skipped> {
     let ctx = Ctx::new(env, repo);
     let mut wanted = load_packages(&ctx)?;
@@ -378,15 +373,15 @@ pub fn skip_effect(env: &Env, repo: &Path, skip: &[String]) -> Result<Skipped> {
 fn print_skipped(sk: &Skipped) {
     if !sk.ignored.is_empty() {
         println!(
-            "\nignorés sur cette machine (config.toml, skip) : {}",
+            "\nignored on this machine (config.toml, skip): {}",
             sk.ignored.join(", ")
         );
     }
 }
 
-// ------------------------------------------------------------------ utilitaires
+// ------------------------------------------------------------------ utilities
 
-/// Lance une commande sans sortie ; vrai si elle se termine avec le code 0.
+/// Runs a command without output; true if it ends with code 0.
 fn succeeds(cmd: &[String]) -> bool {
     let Some((prog, args)) = cmd.split_first() else {
         return false;
@@ -420,15 +415,15 @@ fn is_marked(env: &Env, id: &str) -> bool {
     done_dir(env).join(id).is_file()
 }
 
-/// Paquets installés (`pacman -Qq`, ou le programme de test).
+/// Installed packages (`pacman -Qq`, or the test program).
 fn installed_packages() -> Result<HashSet<String>> {
     let out = match std::env::var_os(TEST_PACMAN_VAR) {
         Some(p) if !p.is_empty() => Command::new(p).output(),
         _ => Command::new("pacman").arg("-Qq").output(),
     }
-    .context("impossible de lancer pacman -Qq")?;
+    .context("cannot run pacman -Qq")?;
     if !out.status.success() {
-        bail!("pacman -Qq a échoué");
+        bail!("pacman -Qq failed");
     }
     Ok(String::from_utf8_lossy(&out.stdout)
         .lines()
@@ -437,7 +432,7 @@ fn installed_packages() -> Result<HashSet<String>> {
         .collect())
 }
 
-/// Paquets voulus qui ne sont pas installés (ordre alphabétique).
+/// Wanted packages that are not installed (alphabetical order).
 fn missing_of(wanted: &BTreeMap<String, String>, installed: &HashSet<String>) -> Vec<String> {
     wanted
         .keys()
@@ -446,13 +441,13 @@ fn missing_of(wanted: &BTreeMap<String, String>, installed: &HashSet<String>) ->
         .collect()
 }
 
-// ------------------------------------------------------------------ étapes système
+// ------------------------------------------------------------------ system steps
 
 #[derive(Debug, PartialEq)]
 enum Sys {
     Done,
     Todo(&'static str),
-    /// Non vérifiable sans root : reste affiché tant qu'il n'est pas marqué fait.
+    /// Cannot be checked without root: stays displayed until it is marked done.
     Unknown(&'static str),
     NotApplicable(String),
 }
@@ -464,34 +459,34 @@ fn sys_state(ctx: &Ctx, s: &SystemStep) -> Sys {
         }
     }
     if !s.when.is_empty() && !succeeds(&ctx.sub_cmd(&s.when)) {
-        return Sys::NotApplicable("sans objet sur cette machine".into());
+        return Sys::NotApplicable("not applicable on this machine".into());
     }
     let verified = if let (Some(file), Some(src)) = (&s.file, &s.source) {
         let want = match ctx.read_source(src) {
             Ok(w) => w,
-            Err(_) => return Sys::Unknown("source illisible"),
+            Err(_) => return Sys::Unknown("unreadable source"),
         };
         match std::fs::read_to_string(ctx.sub(file)) {
             Ok(c) if c.trim_end() == want.trim_end() => Sys::Done,
-            Ok(_) => Sys::Todo("contenu différent"),
-            Err(e) if e.kind() == ErrorKind::NotFound => Sys::Todo("fichier absent"),
-            Err(_) => Sys::Unknown("illisible sans root"),
+            Ok(_) => Sys::Todo("different content"),
+            Err(e) if e.kind() == ErrorKind::NotFound => Sys::Todo("file missing"),
+            Err(_) => Sys::Unknown("unreadable without root"),
         }
     } else if let (Some(file), Some(needle)) = (&s.file, &s.contains) {
         match std::fs::read_to_string(ctx.sub(file)) {
             Ok(c) if c.contains(&ctx.sub(needle)) => Sys::Done,
-            Ok(_) => Sys::Todo("ligne absente"),
-            Err(e) if e.kind() == ErrorKind::NotFound => Sys::Todo("fichier absent"),
-            Err(_) => Sys::Unknown("illisible sans root"),
+            Ok(_) => Sys::Todo("line missing"),
+            Err(e) if e.kind() == ErrorKind::NotFound => Sys::Todo("file missing"),
+            Err(_) => Sys::Unknown("unreadable without root"),
         }
     } else if !s.check.is_empty() {
         if succeeds(&ctx.sub_cmd(&s.check)) {
             Sys::Done
         } else {
-            Sys::Todo("à faire")
+            Sys::Todo("to do")
         }
     } else {
-        Sys::Unknown("non vérifiable")
+        Sys::Unknown("cannot be checked")
     };
     match verified {
         Sys::Unknown(_) if is_marked(ctx.env, &s.id) => Sys::Done,
@@ -499,7 +494,7 @@ fn sys_state(ctx: &Ctx, s: &SystemStep) -> Sys {
     }
 }
 
-/// Les lignes du bloc à copier pour une étape système.
+/// The lines of the block to copy for a system step.
 fn sys_commands(ctx: &Ctx, s: &SystemStep) -> Result<Vec<String>> {
     let mut out = Vec::new();
     if let (Some(file), Some(src)) = (&s.file, &s.source) {
@@ -523,7 +518,7 @@ fn sys_commands(ctx: &Ctx, s: &SystemStep) -> Result<Vec<String>> {
     Ok(out)
 }
 
-// ------------------------------------------------------------------ étapes utilisateur
+// ------------------------------------------------------------------ user steps
 
 #[derive(Debug, Clone)]
 enum Act {
@@ -535,7 +530,7 @@ impl Act {
     fn show(&self) -> String {
         match self {
             Act::Cmd(c) => c.join(" "),
-            Act::Write { target, .. } => format!("écrire {}", target.display()),
+            Act::Write { target, .. } => format!("write {}", target.display()),
         }
     }
 }
@@ -550,9 +545,9 @@ struct Todo {
 #[derive(Debug, Default)]
 pub struct UserPlan {
     todos: Vec<Todo>,
-    /// Étapes déclenchées seulement si l'une des étapes citées vient d'être faite.
+    /// Steps triggered only if one of the cited steps has just been done.
     triggered: Vec<(Vec<String>, Todo)>,
-    /// Ce qui est ignoré, ambigu ou différent : affiché, jamais touché.
+    /// What is ignored, ambiguous or different: shown, never touched.
     notes: Vec<String>,
 }
 
@@ -576,7 +571,7 @@ fn cmd(parts: &[&str]) -> Act {
     Act::Cmd(parts.iter().map(|s| s.to_string()).collect())
 }
 
-/// Classe un plugin tiers : rien à faire (`Ok(vec![])`), des actes, ou une note « à la main ».
+/// Classifies a third-party plugin: nothing to do (`Ok(vec![])`), acts, or a "by hand" note.
 fn plugin_acts(ctx: &Ctx, p: &Plugin) -> Result<Vec<Act>, String> {
     let dir = ctx.plugin_dir(&p.id);
     let patch = p
@@ -603,7 +598,7 @@ fn plugin_acts(ctx: &Ctx, p: &Plugin) -> Result<Vec<Act>, String> {
     if !dir.exists() {
         if !have(ctx.env, "omarchy") {
             return Err(format!(
-                "{} : absent, et la commande omarchy est introuvable",
+                "{}: absent, and the omarchy command cannot be found",
                 p.id
             ));
         }
@@ -616,7 +611,7 @@ fn plugin_acts(ctx: &Ctx, p: &Plugin) -> Result<Vec<Act>, String> {
     }
     if !dir.join(".git").exists() {
         return Err(format!(
-            "{} : dossier présent mais sans git, rien n'est touché",
+            "{}: folder present but without git, nothing is touched",
             p.id
         ));
     }
@@ -627,7 +622,7 @@ fn plugin_acts(ctx: &Ctx, p: &Plugin) -> Result<Vec<Act>, String> {
             .is_empty()
         {
             return Err(format!(
-                "{} : à {} au lieu de {} et fichiers modifiés (patch déjà posé ?) : à traiter à la main",
+                "{}: at {} instead of {} and files modified (patch already applied?): to handle by hand",
                 p.id,
                 &head[..head.len().min(7)],
                 p.commit
@@ -641,12 +636,12 @@ fn plugin_acts(ctx: &Ctx, p: &Plugin) -> Result<Vec<Act>, String> {
     }
     if let Some(pa) = &patch {
         if git_ok(&dir, &["apply", "--reverse", "--check", pa]) {
-            // déjà appliqué
+            // already applied
         } else if git_ok(&dir, &["apply", "--check", pa]) {
             acts.push(cmd(&["git", "-C", &d, "apply", pa]));
         } else {
             return Err(format!(
-                "{} : le patch ne s'applique plus (plugin mis à jour ?) : {pa}",
+                "{}: the patch no longer applies (plugin updated?): {pa}",
                 p.id
             ));
         }
@@ -671,7 +666,7 @@ fn user_plan(ctx: &Ctx, steps: &Steps) -> Result<UserPlan> {
             Ok(acts) if acts.is_empty() => {}
             Ok(acts) => plan.todos.push(Todo {
                 id: p.id.clone(),
-                title: format!("plugin {} à {}", p.id, p.commit),
+                title: format!("plugin {} at {}", p.id, p.commit),
                 acts,
             }),
             Err(note) => plan.notes.push(note),
@@ -683,7 +678,7 @@ fn user_plan(ctx: &Ctx, steps: &Steps) -> Result<UserPlan> {
         match std::fs::read_to_string(&target) {
             Ok(cur) if cur == content || (f.json && json_equal(&cur, &content)) => {}
             Ok(_) => plan.notes.push(format!(
-                "{} : {} diffère du dépôt, laissé tel quel (modifiez-le ou supprimez-le pour qu'il soit reposé)",
+                "{}: {} differs from the repository, left as is (edit or delete it so that it is put back)",
                 f.id,
                 target.display()
             )),
@@ -692,14 +687,14 @@ fn user_plan(ctx: &Ctx, steps: &Steps) -> Result<UserPlan> {
                 title: f.title.clone(),
                 acts: vec![Act::Write { target, content }],
             }),
-            Err(e) => plan.notes.push(format!("{} : {} illisible : {e}", f.id, target.display())),
+            Err(e) => plan.notes.push(format!("{}: {} unreadable: {e}", f.id, target.display())),
         }
     }
     for u in &steps.user {
         if let Some(r) = &u.requires {
             if !have(ctx.env, r) {
                 plan.notes.push(format!(
-                    "{} : ignoré, {r} introuvable (installez le paquet puis relancez)",
+                    "{}: ignored, {r} not found (install the package then run again)",
                     u.id
                 ));
                 continue;
@@ -722,28 +717,27 @@ fn user_plan(ctx: &Ctx, steps: &Steps) -> Result<UserPlan> {
 fn run_act(act: &Act) -> Result<()> {
     match act {
         Act::Cmd(c) => {
-            let (prog, args) = c.split_first().context("commande vide")?;
+            let (prog, args) = c.split_first().context("empty command")?;
             let st = Command::new(prog)
                 .args(args)
                 .status()
-                .with_context(|| format!("impossible de lancer {prog}"))?;
+                .with_context(|| format!("cannot run {prog}"))?;
             if !st.success() {
-                bail!("{} a échoué ({st})", c.join(" "));
+                bail!("{} failed ({st})", c.join(" "));
             }
             Ok(())
         }
         Act::Write { target, content } => {
-            let parent = target.parent().context("cible sans dossier parent")?;
+            let parent = target.parent().context("target without a parent folder")?;
             std::fs::create_dir_all(parent)?;
             let tmp = parent.join(format!(".poste-tmp-{}", std::process::id()));
             std::fs::write(&tmp, content)?;
-            std::fs::rename(&tmp, target)
-                .with_context(|| format!("écriture de {}", target.display()))
+            std::fs::rename(&tmp, target).with_context(|| format!("writing {}", target.display()))
         }
     }
 }
 
-/// Résultat de l'application des étapes utilisateur.
+/// Result of applying the user steps.
 #[derive(Debug, Default)]
 pub struct Applied {
     pub done: Vec<String>,
@@ -753,11 +747,11 @@ pub struct Applied {
 fn apply_user(plan: &UserPlan) -> Applied {
     let mut res = Applied::default();
     let run_todo = |t: &Todo, res: &mut Applied| {
-        println!("\n  {} : {}", t.id, t.title);
+        println!("\n  {}: {}", t.id, t.title);
         for a in &t.acts {
             println!("    $ {}", a.show());
             if let Err(e) = run_act(a) {
-                eprintln!("    échec : {e:#}");
+                eprintln!("    failure: {e:#}");
                 res.failed.push(t.id.clone());
                 return;
             }
@@ -775,7 +769,7 @@ fn apply_user(plan: &UserPlan) -> Applied {
     res
 }
 
-/// Les étapes déclenchées qui s'exécuteraient si leurs déclencheurs sont dans le plan.
+/// The triggered steps that would run if their triggers are in the plan.
 fn triggered_in_plan(plan: &UserPlan) -> Vec<&Todo> {
     plan.triggered
         .iter()
@@ -801,13 +795,13 @@ fn print_manual(ctx: &Ctx, steps: &Steps) {
     if pending.is_empty() {
         return;
     }
-    println!("\nÉtapes manuelles restantes (à faire à la main, puis `poste sys done <id>`)");
+    println!("\nManual steps left (to do by hand, then `poste sys done <id>`)");
     for m in pending {
         println!("  [{}] {}", m.id, ctx.sub(&m.title));
     }
 }
 
-/// `poste sys done [<id>] [--undo]` : marque une étape manuelle (ou système non vérifiable) faite.
+/// `poste sys done [<id>] [--undo]`: marks a manual step (or an unverifiable system step) done.
 pub fn done(env: &Env, repo: &Path, id: Option<&str>, undo: bool) -> Result<()> {
     let ctx = Ctx::new(env, repo);
     let steps = load_steps(&ctx)?;
@@ -820,46 +814,42 @@ pub fn done(env: &Env, repo: &Path, id: Option<&str>, undo: bool) -> Result<()> 
                 .system
                 .iter()
                 .filter(|s| {
-                    // seulement celles que poste ne peut pas vérifier
+                    // only those that poste cannot verify
                     s.check.is_empty() && s.contains.is_none() && s.file.is_some()
                 })
                 .map(|s| (s.id.as_str(), s.title.as_str())),
         )
         .collect();
     let Some(id) = id else {
-        println!("Étapes qui se marquent à la main :");
+        println!("Steps that are marked by hand:");
         for (i, t) in &known {
-            let mark = if is_marked(env, i) {
-                "fait"
-            } else {
-                "à faire"
-            };
+            let mark = if is_marked(env, i) { "done" } else { "to do" };
             println!("  [{i}] ({mark}) {}", ctx.sub(t));
         }
         return Ok(());
     };
     if !known.iter().any(|(i, _)| *i == id) {
         bail!(
-            "étape inconnue : {id}. Connues : {}",
+            "unknown step: {id}. Known: {}",
             known.iter().map(|(i, _)| *i).collect::<Vec<_>>().join(", ")
         );
     }
     let f = done_dir(env).join(id);
     if undo {
         match std::fs::remove_file(&f) {
-            Ok(()) => println!("{id} : de nouveau à faire"),
-            Err(e) if e.kind() == ErrorKind::NotFound => println!("{id} : n'était pas marqué fait"),
+            Ok(()) => println!("{id}: to do again"),
+            Err(e) if e.kind() == ErrorKind::NotFound => println!("{id}: was not marked done"),
             Err(e) => return Err(e.into()),
         }
     } else {
         std::fs::create_dir_all(done_dir(env))?;
         std::fs::write(&f, format!("{}\n", time::now_rfc3339()))?;
-        println!("{id} : marqué fait");
+        println!("{id}: marked done");
     }
     Ok(())
 }
 
-// ------------------------------------------------------------------ affichage commun
+// ------------------------------------------------------------------ common display
 
 struct Packages {
     missing: Vec<String>,
@@ -880,23 +870,23 @@ fn packages_report(wanted: &BTreeMap<String, String>) -> Result<Option<Packages>
 fn print_packages(wanted: &BTreeMap<String, String>) {
     println!("\nPaquets");
     match packages_report(wanted) {
-        Err(e) => println!("  vérification impossible : {e:#}"),
-        Ok(None) => println!("  aucun paquet déclaré"),
-        Ok(Some(p)) if p.missing.is_empty() => println!("  tous présents ({})", p.total),
+        Err(e) => println!("  check impossible: {e:#}"),
+        Ok(None) => println!("  no package declared"),
+        Ok(Some(p)) if p.missing.is_empty() => println!("  all present ({})", p.total),
         Ok(Some(p)) => {
             println!(
-                "  manquants ({}/{}) : {}",
+                "  missing ({}/{}): {}",
                 p.missing.len(),
                 p.total,
                 p.missing.join(" ")
             );
-            println!("  À lancer vous-même (poste ne l'exécute pas) :");
+            println!("  To run yourself (poste does not run it):");
             println!("    yay -S --needed {}", p.missing.join(" "));
         }
     }
 }
 
-/// Affiche les étapes système en attente ; renvoie leur nombre.
+/// Shows the pending system steps; returns their number.
 fn print_system(ctx: &Ctx, steps: &Steps) -> Result<usize> {
     let mut block: Vec<String> = Vec::new();
     let mut lines: Vec<String> = Vec::new();
@@ -905,36 +895,32 @@ fn print_system(ctx: &Ctx, steps: &Steps) -> Result<usize> {
             Sys::Done | Sys::NotApplicable(_) => {}
             st => {
                 let (tag, why) = match st {
-                    Sys::Todo(w) => ("à faire", w),
-                    Sys::Unknown(w) => ("à vérifier", w),
+                    Sys::Todo(w) => ("to do", w),
+                    Sys::Unknown(w) => ("to check", w),
                     _ => unreachable!(),
                 };
-                lines.push(format!(
-                    "  [{}] {} ({tag} : {why})",
-                    s.id,
-                    ctx.sub(&s.title)
-                ));
-                if tag == "à vérifier" {
+                lines.push(format!("  [{}] {} ({tag}: {why})", s.id, ctx.sub(&s.title)));
+                if tag == "to check" {
                     lines.push(format!(
-                        "      si c'est déjà fait : poste sys done {}",
+                        "      if it is already done: poste sys done {}",
                         s.id
                     ));
                 }
-                block.push(format!("# {} : {}", s.id, ctx.sub(&s.title)));
+                block.push(format!("# {}: {}", s.id, ctx.sub(&s.title)));
                 block.extend(sys_commands(ctx, s)?);
                 block.push(String::new());
             }
         }
     }
-    println!("\nÉtapes système (sudo : à lancer vous-même, poste ne le fait jamais)");
+    println!("\nSystem steps (sudo: to run yourself, poste never does it)");
     if lines.is_empty() {
-        println!("  rien à faire");
+        println!("  nothing to do");
         return Ok(0);
     }
     for l in &lines {
         println!("{l}");
     }
-    println!("\n  Bloc à copier :");
+    println!("\n  Block to copy:");
     println!("  ----------------------------------------");
     for l in &block {
         println!("{l}");
@@ -944,18 +930,18 @@ fn print_system(ctx: &Ctx, steps: &Steps) -> Result<usize> {
 }
 
 fn print_user_plan(plan: &UserPlan) {
-    println!("\nÉtapes utilisateur (faites par poste)");
+    println!("\nUser steps (done by poste)");
     if plan.todos.is_empty() {
-        println!("  rien à faire");
+        println!("  nothing to do");
     }
     for t in &plan.todos {
-        println!("  à faire  {} : {}", t.id, t.title);
+        println!("  to do  {}: {}", t.id, t.title);
         for a in &t.acts {
             println!("             $ {}", a.show());
         }
     }
     for t in triggered_in_plan(plan) {
-        println!("  ensuite  {} : {}", t.id, t.title);
+        println!("  then   {}: {}", t.id, t.title);
         for a in &t.acts {
             println!("             $ {}", a.show());
         }
@@ -965,10 +951,10 @@ fn print_user_plan(plan: &UserPlan) {
     }
 }
 
-// ------------------------------------------------------------------ points d'entrée
+// ------------------------------------------------------------------ entry points
 
-/// Phase « bootstrap » de `setup` : paquets, système, utilisateur (avec confirmation), manuel.
-/// Renvoie les étapes utilisateur appliquées et si une a échoué.
+/// "Bootstrap" phase of `setup`: packages, system, user (with confirmation), manual.
+/// Returns the user steps applied and whether one failed.
 pub fn setup(
     env: &Env,
     repo: &Path,
@@ -986,11 +972,11 @@ pub fn setup(
     let n = plan.todos.len();
     if n > 0 {
         if dry_run {
-            println!("\nSimulation (--dry-run) : étapes utilisateur non lancées");
-        } else if yes || confirm(&format!("\nLancer ces {n} étape(s) utilisateur ? [o/N] "))? {
+            println!("\nDry run (--dry-run): user steps not run");
+        } else if yes || confirm(&format!("\nRun these {n} user step(s)? [y/N] "))? {
             applied = apply_user(&plan);
         } else {
-            println!("Étapes utilisateur non lancées.");
+            println!("User steps not run.");
         }
     }
     print_manual(&ctx, &steps);
@@ -998,58 +984,58 @@ pub fn setup(
     Ok(applied)
 }
 
-/// Lignes de `poste sys status` pour paquets, étapes système, utilisateur et manuelles.
+/// Lines of `poste sys status` for packages, system, user and manual steps.
 pub fn status(env: &Env, repo: &Path) -> Result<()> {
     let ctx = Ctx::new(env, repo);
     let (wanted, steps, skipped) = load_wanted(&ctx)?;
     println!("\nPaquets");
     match packages_report(&wanted) {
-        Err(e) => println!("  vérification impossible : {e:#}"),
-        Ok(None) => println!("  aucun paquet déclaré"),
-        Ok(Some(p)) if p.missing.is_empty() => println!("  tous présents ({})", p.total),
+        Err(e) => println!("  check impossible: {e:#}"),
+        Ok(None) => println!("  no package declared"),
+        Ok(Some(p)) if p.missing.is_empty() => println!("  all present ({})", p.total),
         Ok(Some(p)) => {
-            println!("  manquants ({}/{}) :", p.missing.len(), p.total);
+            println!("  missing ({}/{}):", p.missing.len(), p.total);
             for m in &p.missing {
                 println!("    {m}");
             }
         }
     }
-    println!("\nÉtapes système");
+    println!("\nSystem steps");
     let mut any = false;
     for s in &steps.system {
         match sys_state(&ctx, s) {
             Sys::Todo(w) => {
                 any = true;
-                println!("  à faire      [{}] {} ({w})", s.id, ctx.sub(&s.title));
+                println!("  to do        [{}] {} ({w})", s.id, ctx.sub(&s.title));
             }
             Sys::Unknown(w) => {
                 any = true;
-                println!("  à vérifier   [{}] {} ({w})", s.id, ctx.sub(&s.title));
+                println!("  to check     [{}] {} ({w})", s.id, ctx.sub(&s.title));
             }
             _ => {}
         }
     }
     if !any {
-        println!("  rien en attente");
+        println!("  nothing pending");
     }
     let plan = user_plan(&ctx, &steps)?;
-    println!("\nÉtapes utilisateur");
+    println!("\nUser steps");
     if plan.todos.is_empty() && plan.notes.is_empty() {
-        println!("  rien en attente");
+        println!("  nothing pending");
     }
     for t in &plan.todos {
-        println!("  à faire  [{}] {}", t.id, t.title);
+        println!("  to do  [{}] {}", t.id, t.title);
     }
     for n in &plan.notes {
         println!("  note     {n}");
     }
     let manual = manual_pending(&ctx, &steps);
-    println!("\nÉtapes manuelles");
+    println!("\nManual steps");
     if manual.is_empty() {
-        println!("  toutes faites");
+        println!("  all done");
     }
     for m in manual {
-        println!("  à faire  [{}] {}", m.id, ctx.sub(&m.title));
+        println!("  to do  [{}] {}", m.id, ctx.sub(&m.title));
     }
     print_skipped(&skipped);
     Ok(())
@@ -1088,7 +1074,7 @@ mod tests {
     }
 
     #[test]
-    fn paquets_manquants() {
+    fn missing_packages() {
         let wanted: BTreeMap<String, String> = [("a", ""), ("b", ""), ("c", "")]
             .iter()
             .map(|(k, v)| (k.to_string(), v.to_string()))
@@ -1098,13 +1084,13 @@ mod tests {
     }
 
     #[test]
-    fn etapes_et_paquets_du_depot_de_donnees() {
+    fn steps_and_packages_of_the_data_repository() {
         let (d, repo, env) = fixture();
         write(&repo, "packages.toml", "[packages]\na = \"\"\n");
         write(
             &repo,
             "steps.toml",
-            "[[system]]\nid = \"s\"\ntitle = \"exemple\"\ncheck = [\"true\"]\n\
+            "[[system]]\nid = \"s\"\ntitle = \"example\"\ncheck = [\"true\"]\n\
              [[manual]]\nid = \"m\"\ntitle = \"m\"\n",
         );
         let data = d.path().join("data");
@@ -1114,10 +1100,10 @@ mod tests {
             fs::write(p, s).unwrap();
         };
         dw("packages.toml", "[packages]\nb = \"\"\n");
-        dw("system/x.line", "LIGNE @DATA@\n");
+        dw("system/x.line", "LINE @DATA@\n");
         dw(
             "steps.toml",
-            "[[system]]\nid = \"s\"\ntitle = \"vrai\"\nfile = \"/f\"\nline = \"system/x.line\"\n\
+            "[[system]]\nid = \"s\"\ntitle = \"real\"\nfile = \"/f\"\nline = \"system/x.line\"\n\
              [[manual]]\nid = \"n\"\ntitle = \"n\"\n",
         );
         fs::create_dir_all(env.config_file().parent().unwrap()).unwrap();
@@ -1131,15 +1117,15 @@ mod tests {
         let pk: Vec<_> = load_packages(&ctx).unwrap().into_keys().collect();
         assert_eq!(pk, ["a", "b"]);
         let steps = load_steps(&ctx).unwrap();
-        // Même id : l'étape du dépôt de données remplace celle du dépôt.
+        // Same id: the step of the data repository replaces the one of the repository.
         assert_eq!(steps.system.len(), 1);
-        assert_eq!(steps.system[0].title, "vrai");
+        assert_eq!(steps.system[0].title, "real");
         let ids: Vec<_> = steps.manual.iter().map(|m| m.id.as_str()).collect();
         assert_eq!(ids, ["m", "n"]);
-        // Source lue dans le bootstrap/ du dépôt de données, @DATA@ remplacé.
+        // Source read in the bootstrap/ of the data repository, @DATA@ replaced.
         let cmds = sys_commands(&ctx, &steps.system[0]).unwrap();
         assert!(
-            cmds[0].contains(&format!("LIGNE {}", data.display())),
+            cmds[0].contains(&format!("LINE {}", data.display())),
             "{cmds:?}"
         );
     }
@@ -1174,10 +1160,10 @@ mod tests {
     }
 
     #[test]
-    fn etat_systeme_fichier_ligne_et_marqueur() {
+    fn system_state_file_line_and_marker() {
         let (_d, repo, env) = fixture();
-        write(&repo, "system/r.rules", "règle pour @HOME@\n");
-        write(&repo, "system/l.line", "LIGNE-X\n");
+        write(&repo, "system/r.rules", "rule for @HOME@\n");
+        write(&repo, "system/l.line", "LINE-X\n");
         let ctx = Ctx::new(&env, &repo);
         let target = env.home.join("etc-r");
         let fstab = env.home.join("fstab");
@@ -1193,7 +1179,7 @@ id = "l"
 title = "l"
 file = "{f}"
 line = "system/l.line"
-contains = "LIGNE-X"
+contains = "LINE-X"
 after = ["sudo true"]
 [[system]]
 id = "c"
@@ -1210,16 +1196,16 @@ check = ["false"]
         ))
         .unwrap();
         let st = |i: usize| sys_state(&ctx, &steps.system[i]);
-        assert_eq!(st(0), Sys::Todo("fichier absent"));
-        fs::write(&target, "autre").unwrap();
-        assert_eq!(st(0), Sys::Todo("contenu différent"));
-        fs::write(&target, format!("règle pour {}\n", env.home.display())).unwrap();
+        assert_eq!(st(0), Sys::Todo("file missing"));
+        fs::write(&target, "other").unwrap();
+        assert_eq!(st(0), Sys::Todo("different content"));
+        fs::write(&target, format!("rule for {}\n", env.home.display())).unwrap();
         assert_eq!(st(0), Sys::Done);
         fs::write(&fstab, "x\n").unwrap();
-        assert_eq!(st(1), Sys::Todo("ligne absente"));
-        fs::write(&fstab, "x\nLIGNE-X\n").unwrap();
+        assert_eq!(st(1), Sys::Todo("line missing"));
+        fs::write(&fstab, "x\nLINE-X\n").unwrap();
         assert_eq!(st(1), Sys::Done);
-        assert_eq!(st(2), Sys::Todo("à faire"));
+        assert_eq!(st(2), Sys::Todo("to do"));
         assert!(matches!(st(3), Sys::NotApplicable(_)));
         let cmds = sys_commands(&ctx, &steps.system[0]).unwrap();
         assert!(cmds[0].starts_with("sudo tee ") && cmds[0].contains("<<'EOF'"));
@@ -1227,7 +1213,7 @@ check = ["false"]
             sys_commands(&ctx, &steps.system[1]).unwrap()[1],
             "sudo true"
         );
-        // Illisible : inconnu, puis fait une fois marqué.
+        // Unreadable: unknown, then done once marked.
         let p = env.home.join("secret");
         fs::write(&p, "x").unwrap();
         fs::set_permissions(&p, std::os::unix::fs::PermissionsExt::from_mode(0o000)).unwrap();
@@ -1245,19 +1231,19 @@ check = ["false"]
     }
 
     #[test]
-    fn marquer_fait_et_annuler() {
+    fn mark_done_and_undo() {
         let (_d, repo, env) = fixture();
         write(
             &repo,
             "steps.toml",
-            "[[manual]]\nid = \"m1\"\ntitle = \"faire m1\"\n[[manual]]\nid = \"m2\"\ntitle = \"m2\"\ncheck = [\"true\"]\n",
+            "[[manual]]\nid = \"m1\"\ntitle = \"do m1\"\n[[manual]]\nid = \"m2\"\ntitle = \"m2\"\ncheck = [\"true\"]\n",
         );
         let ctx = Ctx::new(&env, &repo);
         let steps = load_steps(&ctx).unwrap();
         assert_eq!(
             manual_pending(&ctx, &steps).len(),
             1,
-            "m2 vérifiée par sa commande"
+            "m2 checked by its command"
         );
         assert!(done(&env, &repo, Some("zzz"), false).is_err());
         done(&env, &repo, Some("m1"), false).unwrap();
@@ -1267,21 +1253,21 @@ check = ["false"]
     }
 
     #[test]
-    fn plugin_commit_patch_et_fichier() {
+    fn plugin_commit_patch_and_file() {
         let (_d, repo, env) = fixture();
         let ctx = Ctx::new(&env, &repo);
         let dir = ctx.plugin_dir("p");
         fs::create_dir_all(&dir).unwrap();
         sh(&dir, &["init", "-q"]);
-        fs::write(dir.join("f.txt"), "un\n").unwrap();
+        fs::write(dir.join("f.txt"), "one\n").unwrap();
         sh(&dir, &["add", "."]);
         sh(&dir, &["commit", "-q", "-m", "1"]);
         let head = git(&dir, &["rev-parse", "--short", "HEAD"]).unwrap();
-        // Patch : change « un » en « deux ».
+        // Patch: changes "one" into "two".
         write(
             &repo,
             "patches/p.patch",
-            "diff --git a/f.txt b/f.txt\n--- a/f.txt\n+++ b/f.txt\n@@ -1 +1 @@\n-un\n+deux\n",
+            "diff --git a/f.txt b/f.txt\n--- a/f.txt\n+++ b/f.txt\n@@ -1 +1 @@\n-one\n+two\n",
         );
         let plug = |commit: &str| Plugin {
             id: "p".into(),
@@ -1289,28 +1275,28 @@ check = ["false"]
             commit: commit.into(),
             patch: Some("patches/p.patch".into()),
         };
-        // Bon commit, patch à poser.
+        // Right commit, patch to apply.
         let acts = plugin_acts(&ctx, &plug(&head)).unwrap();
         assert_eq!(acts.len(), 1);
         run_act(&acts[0]).unwrap();
-        assert_eq!(fs::read_to_string(dir.join("f.txt")).unwrap(), "deux\n");
-        // Déjà posé : rien.
+        assert_eq!(fs::read_to_string(dir.join("f.txt")).unwrap(), "two\n");
+        // Already applied: nothing.
         assert!(plugin_acts(&ctx, &plug(&head)).unwrap().is_empty());
-        // Autre commit voulu et arbre modifié : note, rien à faire.
+        // Other commit wanted and tree modified: note, nothing to do.
         assert!(plugin_acts(&ctx, &plug("deadbee")).is_err());
-        // Patch qui ne s'applique plus.
-        fs::write(dir.join("f.txt"), "trois\n").unwrap();
+        // Patch that no longer applies.
+        fs::write(dir.join("f.txt"), "three\n").unwrap();
         assert!(plugin_acts(&ctx, &plug(&head)).is_err());
-        // Plugin absent sans omarchy : note.
+        // Absent plugin without omarchy: note.
         let mut p = plug(&head);
         p.id = "absent".into();
         assert_eq!(
             plugin_acts(&ctx, &p).is_ok(),
             have(&env, "omarchy"),
-            "absent : omarchy plugin add si omarchy existe, sinon note"
+            "absent: omarchy plugin add if omarchy exists, otherwise a note"
         );
 
-        // Fichier JSON : absent -> écrit ; même JSON mis en forme autrement -> rien ; différent -> note.
+        // JSON file: absent -> written; same JSON formatted otherwise -> nothing; different -> note.
         write(&repo, "files/c.json", "{\"a\": 1}\n");
         let target = env.home.join("x/c.json");
         let steps: Steps = toml::from_str(&format!(
@@ -1331,15 +1317,15 @@ check = ["false"]
     }
 
     #[test]
-    fn etapes_utilisateur_check_et_declencheur() {
+    fn user_steps_check_and_trigger() {
         let (_d, repo, env) = fixture();
         let ctx = Ctx::new(&env, &repo);
-        let marker = env.home.join("marqueur");
+        let marker = env.home.join("marker");
         let steps: Steps = toml::from_str(&format!(
             r#"
 [[user]]
-id = "fait"
-title = "déjà fait"
+id = "done"
+title = "already done"
 check = ["true"]
 run = [["false"]]
 [[user]]
@@ -1348,14 +1334,14 @@ title = "a"
 check = ["false"]
 run = [["touch", "{m}"]]
 [[user]]
-id = "apres"
-title = "après a"
+id = "after"
+title = "after a"
 trigger = ["a"]
 run = [["true"]]
 [[user]]
-id = "sans-bin"
+id = "no-bin"
 title = "x"
-requires = "binaire-qui-n-existe-pas"
+requires = "binary-that-does-not-exist"
 run = [["false"]]
 "#,
             m = marker.display()
@@ -1366,12 +1352,12 @@ run = [["false"]]
         assert_eq!(plan.notes.len(), 1);
         assert_eq!(triggered_in_plan(&plan).len(), 1);
         let r = apply_user(&plan);
-        assert_eq!(r.done, vec!["a", "apres"]);
+        assert_eq!(r.done, vec!["a", "after"]);
         assert!(r.failed.is_empty() && marker.is_file());
     }
 
     #[test]
-    fn skip_retire_paquets_etapes_et_dependantes() {
+    fn skip_removes_packages_steps_and_dependents() {
         let mut steps: Steps = toml::from_str(
             r#"
 [[plugin]]
@@ -1388,15 +1374,15 @@ id = "recolor"
 title = "t"
 trigger = ["cfg", "pl"]
 [[user]]
-id = "apres-recolor"
+id = "after-recolor"
 title = "t"
 trigger = ["recolor"]
 [[user]]
-id = "autre"
+id = "other"
 title = "t"
 trigger = ["cfg"]
 [[user]]
-id = "libre"
+id = "free"
 title = "t"
 [[system]]
 id = "sy"
@@ -1411,7 +1397,7 @@ title = "t"
             .iter()
             .map(|(k, v)| (k.to_string(), v.to_string()))
             .collect();
-        let skip: Vec<String> = ["gimp", "pl", "sy", "ma", "gimp", "faute", "faute"]
+        let skip: Vec<String> = ["gimp", "pl", "sy", "ma", "gimp", "typo", "typo"]
             .iter()
             .map(|s| s.to_string())
             .collect();
@@ -1419,17 +1405,21 @@ title = "t"
         assert_eq!(wanted.keys().collect::<Vec<_>>(), ["vlc"]);
         assert!(steps.plugin.is_empty() && steps.system.is_empty() && steps.manual.is_empty());
         let users: Vec<&str> = steps.user.iter().map(|u| u.id.as_str()).collect();
-        assert_eq!(users, ["autre", "libre"], "autre dépend de cfg, non sauté");
-        assert_eq!(steps.file.len(), 1, "cfg n'est pas sauté");
+        assert_eq!(
+            users,
+            ["other", "free"],
+            "other depends on cfg, not skipped"
+        );
+        assert_eq!(steps.file.len(), 1, "cfg is not skipped");
         assert_eq!(
             sk.ignored,
-            ["gimp", "pl", "sy", "ma", "recolor", "apres-recolor",]
+            ["gimp", "pl", "sy", "ma", "recolor", "after-recolor",]
         );
-        assert_eq!(sk.unknown, ["faute"]);
+        assert_eq!(sk.unknown, ["typo"]);
     }
 
     #[test]
-    fn skip_de_config_toml_pris_en_compte() {
+    fn skip_of_config_toml_is_taken_into_account() {
         let (_d, repo, env) = fixture();
         write(
             &repo,

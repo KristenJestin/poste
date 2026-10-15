@@ -1,14 +1,14 @@
-//! Fenêtres de 5 h et leurs indicateurs.
+//! 5 h windows and their indicators.
 //!
-//! Une fenêtre vient de l'historique des relevés : la limite de session (« Session (5-hour) »,
-//! « 5h window ») donne sa remise à zéro R, la fenêtre est [R - 5 h, R). Pic de pourcentage, et
-//! heure du premier relevé à 100 % (plafond atteint). Sans historique (avant qu'il existe, ou un
-//! trou), la fenêtre est estimée d'après les appels : elle commence au premier appel qui ne tombe
-//! dans aucune fenêtre (à l'heure pile en dessous pour Claude, dont les remises tombent à l'heure),
-//! et dure 5 h ; marquée `estimated`, sans pourcentage.
+//! A window comes from the history of the readings: the session limit ("Session (5-hour)",
+//! "5h window") gives its reset R, the window is [R - 5 h, R). Peak percentage, and
+//! time of the first reading at 100% (cap reached). Without history (before it existed, or a
+//! gap), the window is estimated from the calls: it starts at the first call that falls in
+//! no window (at the hour sharp below for Claude, whose resets fall on the hour),
+//! and lasts 5 h; marked `estimated`, without a percentage.
 //!
-//! Les appels ne sont que ceux des journaux de cette machine : un quota entamé ailleurs compte dans
-//! le pourcentage mais pas dans les appels.
+//! The calls are only those of this machine's logs: a quota started elsewhere counts in
+//! the percentage but not in the calls.
 
 use crate::calls::{Call, Tokens};
 use crate::history::Entry;
@@ -17,9 +17,9 @@ use serde_json::{json, Map, Value};
 use std::collections::{BTreeMap, HashSet};
 
 pub const FIVE_HOURS: i64 = 5 * 3600;
-/// Deux remises à zéro à moins de 2 min l'une de l'autre : la même fenêtre.
+/// Two resets less than 2 min apart: the same window.
 const SAME_RESET: i64 = 120;
-/// Tranche de temps pour compter les sessions en parallèle.
+/// Time slice to count parallel sessions.
 const SLOT: i64 = 300;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -29,11 +29,11 @@ pub struct Window {
     pub end: i64,
     pub estimated: bool,
     pub peak_percent: Option<f64>,
-    /// Heure du premier relevé à 100 %.
+    /// Time of the first reading at 100%.
     pub capped_at: Option<i64>,
 }
 
-/// La limite de 5 h d'un agent, d'après son libellé.
+/// The 5 h limit of an agent, from its label.
 pub fn is_session_limit(label: &str) -> bool {
     let l = label.to_lowercase();
     !l.contains("week")
@@ -44,7 +44,7 @@ pub fn is_session_limit(label: &str) -> bool {
             || l.starts_with("session"))
 }
 
-/// Les fenêtres connues par l'historique, triées par agent puis début.
+/// The windows known from the history, sorted by agent then start.
 pub fn history_windows(entries: &[Entry]) -> Vec<Window> {
     let mut out: Vec<Window> = Vec::new();
     for e in entries {
@@ -80,9 +80,9 @@ pub fn history_windows(entries: &[Entry]) -> Vec<Window> {
         }
     }
     out.sort_by(|a, b| a.agent.cmp(&b.agent).then(a.start.cmp(&b.start)));
-    // Une remise qui glisse d'un relevé à l'autre de plus de SAME_RESET donne deux fenêtres
-    // qui se recouvrent : la suivante commence à la fin de la précédente, pour qu'un appel ne
-    // compte que dans une.
+    // A reset that slides from one reading to the next by more than SAME_RESET gives two windows
+    // that overlap: the next one starts at the end of the previous one, so that a call
+    // counts in only one.
     for i in 1..out.len() {
         if out[i].agent == out[i - 1].agent && out[i].start < out[i - 1].end {
             out[i].start = out[i - 1].end;
@@ -91,7 +91,7 @@ pub fn history_windows(entries: &[Entry]) -> Vec<Window> {
     out
 }
 
-/// Fenêtres estimées pour les appels qu'aucune fenêtre de l'historique ne couvre.
+/// Estimated windows for the calls that no window of the history covers.
 pub fn estimate(calls: &[Call], known: &[Window]) -> Vec<Window> {
     let mut out: Vec<Window> = Vec::new();
     for c in calls {
@@ -115,7 +115,7 @@ pub fn estimate(calls: &[Call], known: &[Window]) -> Vec<Window> {
         } else {
             c.t
         };
-        // Pas de chevauchement avec une fenêtre connue ou déjà estimée.
+        // No overlap with a known or already estimated window.
         for w in known.iter().chain(out.iter()).filter(mine) {
             if w.start <= c.t && w.end > start {
                 start = start.max(w.end);
@@ -139,7 +139,7 @@ pub fn estimate(calls: &[Call], known: &[Window]) -> Vec<Window> {
     out
 }
 
-/// Toutes les fenêtres (historique et estimées) qui croisent [since, until), triées par début.
+/// All the windows (history and estimated) that cross [since, until), sorted by start.
 pub fn windows(
     entries: &[Entry],
     calls: &[Call],
@@ -168,7 +168,7 @@ pub struct Stats {
     pub calls: usize,
     pub subagent_calls: usize,
     pub sessions: usize,
-    /// Le plus de sessions qui ont fait un appel dans la même tranche de 5 min.
+    /// The most sessions that made a call in the same 5 min slice.
     pub parallel_max: usize,
     pub tokens: Tokens,
     pub by_effort: BTreeMap<String, Part>,
@@ -258,7 +258,7 @@ fn per_point(t: &Tokens, points: f64) -> Value {
 }
 
 impl Stats {
-    /// Points de quota dont les tokens peuvent être rapportés : le pic d'une fenêtre relevée.
+    /// Quota points whose tokens can be related: the peak of a recorded window.
     fn points(&self) -> f64 {
         if self.window.estimated {
             0.0
@@ -288,7 +288,7 @@ impl Stats {
     }
 }
 
-/// Les indicateurs de plusieurs fenêtres réunis (pour `compare`).
+/// The indicators of several windows gathered (for `compare`).
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct Summary {
     pub windows: usize,
@@ -299,7 +299,7 @@ pub struct Summary {
     pub subagent_calls: usize,
     pub parallel_max_sum: usize,
     pub tokens: Tokens,
-    /// Tokens et points des seules fenêtres relevées (pour les tokens par point).
+    /// Tokens and points of the recorded windows only (for the tokens per point).
     pub measured_tokens: Tokens,
     pub points: f64,
     pub by_effort: BTreeMap<String, Part>,
@@ -382,17 +382,17 @@ pub fn human(n: u64) -> String {
     } else {
         return n.to_string();
     };
-    format!("{v:.1}{unit}").replace('.', ",")
+    format!("{v:.1}{unit}")
 }
 
-/// Un nombre à virgule, à la française.
-pub fn fr(v: f64) -> String {
-    v.to_string().replace('.', ",")
+/// A decimal number, with a period.
+pub fn decimal(v: f64) -> String {
+    v.to_string()
 }
 
 pub fn tokens_line(t: &Tokens) -> String {
     format!(
-        "entrée {}, cache lu {}, cache écrit {}, sortie {} (raisonnement {})",
+        "input {}, cache read {}, cache written {}, output {} (reasoning {})",
         human(t.input),
         human(t.cache_read),
         human(t.cache_write),
@@ -401,18 +401,14 @@ pub fn tokens_line(t: &Tokens) -> String {
     )
 }
 
-/// `medium 80 %, high 20 %` (part des appels), du plus gros au plus petit.
+/// `medium 80 %, high 20 %` (share of the calls), from the biggest to the smallest.
 pub fn shares_line(map: &BTreeMap<String, Part>, calls: usize) -> String {
     let mut v: Vec<(&String, &Part)> = map.iter().collect();
     v.sort_by(|a, b| b.1.calls.cmp(&a.1.calls).then(a.0.cmp(b.0)));
     v.iter()
         .map(|(k, p)| {
-            let k = if k.as_str() == "unknown" {
-                "inconnu"
-            } else {
-                k.as_str()
-            };
-            format!("{k} {} %", fr(pct(p.calls as u64, calls as u64)))
+            let k = k.as_str();
+            format!("{k} {} %", decimal(pct(p.calls as u64, calls as u64)))
         })
         .collect::<Vec<_>>()
         .join(", ")
@@ -427,44 +423,44 @@ pub fn render(st: &Stats) -> String {
         time::local(w.end, "%H:%M")
     );
     if w.estimated {
-        head.push_str("  (estimée, sans relevé)");
+        head.push_str("  (estimated, no reading)");
     }
     if let Some(p) = w.peak_percent {
-        head.push_str(&format!("  pic {} %", fr(p)));
+        head.push_str(&format!("  peak {} %", decimal(p)));
     }
     if let Some(c) = w.capped_at {
         head.push_str(&format!(
-            "  plafond atteint après {}",
+            "  cap reached after {}",
             time::duration(c - w.start)
         ));
     }
     let mut out = format!(
-        "{head}\n  {} appels ({} de sous-agents), {} sessions, {} en parallèle au plus\n",
+        "{head}\n  {} calls ({} from sub-agents), {} sessions, {} in parallel at most\n",
         st.calls, st.subagent_calls, st.sessions, st.parallel_max
     );
     if st.calls > 0 {
-        out.push_str(&format!("  tokens : {}\n", tokens_line(&st.tokens)));
+        out.push_str(&format!("  tokens: {}\n", tokens_line(&st.tokens)));
         let pts = st.points();
         if pts > 0.0 {
             out.push_str(&format!(
-                "  par point de quota : sortie {}, total {}\n",
+                "  per quota point: output {}, total {}\n",
                 human((st.tokens.output as f64 / pts) as u64),
                 human((st.tokens.total() as f64 / pts) as u64)
             ));
         }
         out.push_str(&format!(
-            "  effort : {}\n",
+            "  effort: {}\n",
             shares_line(&st.by_effort, st.calls)
         ));
         out.push_str(&format!(
-            "  modèles : {}\n",
+            "  models: {}\n",
             shares_line(&st.by_model, st.calls)
         ));
     }
     out
 }
 
-/// Les mêmes indicateurs côte à côte, une ligne par indicateur.
+/// The same indicators side by side, one line per indicator.
 pub fn render_compare(a: (&str, &Summary), b: (&str, &Summary)) -> String {
     let rows = |s: &Summary| -> Vec<String> {
         let pp = |v: u64| {
@@ -475,15 +471,15 @@ pub fn render_compare(a: (&str, &Summary), b: (&str, &Summary)) -> String {
             }
         };
         vec![
-            format!("{} ({} estimées)", s.windows, s.estimated),
+            format!("{} ({} estimated)", s.windows, s.estimated),
             match s.capped_after_mean() {
-                Some(d) => format!("{} fois, après {} en moyenne", s.capped, time::duration(d)),
-                None if s.windows == s.estimated => "inconnu (aucun relevé)".into(),
-                None => "jamais".into(),
+                Some(d) => format!("{} times, after {} on average", s.capped, time::duration(d)),
+                None if s.windows == s.estimated => "unknown (no reading)".into(),
+                None => "never".into(),
             },
             format!("{} ({} de sous-agents)", s.calls, s.subagent_calls),
-            fr(s.mean(s.calls)),
-            fr(s.mean(s.parallel_max_sum)),
+            decimal(s.mean(s.calls)),
+            decimal(s.mean(s.parallel_max_sum)),
             human(s.tokens.input),
             human(s.tokens.cache_read),
             human(s.tokens.cache_write),
@@ -499,19 +495,19 @@ pub fn render_compare(a: (&str, &Summary), b: (&str, &Summary)) -> String {
         ]
     };
     let labels = [
-        "fenêtres de 5 h",
-        "plafond atteint",
-        "appels",
-        "appels par fenêtre",
-        "sessions en parallèle",
-        "entrée",
-        "cache lu",
-        "cache écrit",
-        "sortie",
-        "raisonnement",
-        "tokens par point",
-        "effort (appels)",
-        "modèles (appels)",
+        "5 h windows",
+        "cap reached",
+        "calls",
+        "calls per window",
+        "parallel sessions",
+        "input",
+        "cache read",
+        "cache written",
+        "output",
+        "reasoning",
+        "tokens per point",
+        "effort (calls)",
+        "models (calls)",
     ];
     let (ra, rb) = (rows(a.1), rows(b.1));
     let wa = ra
@@ -573,10 +569,10 @@ mod tests {
     }
 
     const H: i64 = 3600;
-    const T0: i64 = 1_700_000_000 - 1_700_000_000 % 3600; // à l'heure pile
+    const T0: i64 = 1_700_000_000 - 1_700_000_000 % 3600; // on the hour sharp
 
     #[test]
-    fn libelles_de_session() {
+    fn session_labels() {
         assert!(is_session_limit("Session (5-hour)"));
         assert!(is_session_limit("5h window"));
         assert!(!is_session_limit("Weekly (7-day)"));
@@ -584,7 +580,7 @@ mod tests {
     }
 
     #[test]
-    fn fenetre_relevee_pic_et_plafond() {
+    fn recorded_window_peak_and_cap() {
         let reset = T0 + 5 * H;
         let e = vec![
             entry(T0 + 600, "claude", 10.0, reset),
@@ -617,15 +613,15 @@ mod tests {
     }
 
     #[test]
-    fn fenetres_estimees_avant_l_historique() {
+    fn estimated_windows_before_the_history() {
         let reset = T0 + 20 * H;
         let e = vec![entry(T0 + 16 * H, "claude", 30.0, reset)];
         let calls = vec![
-            call(T0 + 1800, "s1", None, 1),       // fenêtre estimée T0 → T0 + 5 h
-            call(T0 + 4 * H, "s1", None, 1),      // même fenêtre
-            call(T0 + 5 * H + 60, "s1", None, 1), // nouvelle : T0 + 5 h
-            call(T0 + 13 * H, "s1", None, 1), // T0 + 13 h, coupée au début de la fenêtre relevée (15 h)
-            call(T0 + 16 * H, "s1", None, 1), // couverte par l'historique
+            call(T0 + 1800, "s1", None, 1),       // estimated window T0 → T0 + 5 h
+            call(T0 + 4 * H, "s1", None, 1),      // same window
+            call(T0 + 5 * H + 60, "s1", None, 1), // new one: T0 + 5 h
+            call(T0 + 13 * H, "s1", None, 1), // T0 + 13 h, cut at the start of the recorded window (15 h)
+            call(T0 + 16 * H, "s1", None, 1), // covered by the history
         ];
         let w = windows(&e, &calls, None, 0, i64::MAX);
         let got: Vec<(i64, i64, bool)> = w
@@ -642,7 +638,7 @@ mod tests {
     }
 
     #[test]
-    fn resume_et_comparaison() {
+    fn summary_and_comparison() {
         let reset = T0 + 5 * H;
         let e = vec![entry(T0 + 3 * H, "claude", 100.0, reset)];
         let calls = vec![
@@ -656,17 +652,17 @@ mod tests {
         assert_eq!(s.capped_after_mean(), Some(3 * H));
         let j = s.to_json();
         assert_eq!(j["calls_per_window"], 1.0);
-        // Seule la fenêtre relevée compte pour les tokens par point : 100 de sortie / 100 points.
+        // Only the recorded window counts for the tokens per point: 100 of output / 100 points.
         assert_eq!(j["tokens_per_point"]["output"], 1);
         let text = render_compare(("A", &s), ("B", &Summary::default()));
-        assert!(text.contains("plafond atteint"));
-        assert!(text.contains("inconnu (aucun relevé)"));
+        assert!(text.contains("cap reached"));
+        assert!(text.contains("unknown (no reading)"));
     }
 
     #[test]
-    fn nombres_lisibles() {
+    fn readable_numbers() {
         assert_eq!(human(950), "950");
-        assert_eq!(human(12_345), "12,3 k");
-        assert_eq!(human(4_500_000), "4,5 M");
+        assert_eq!(human(12_345), "12.3 k");
+        assert_eq!(human(4_500_000), "4.5 M");
     }
 }

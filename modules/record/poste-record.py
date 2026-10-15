@@ -1,37 +1,37 @@
 #!/usr/bin/env python3
-"""Module record de poste : enregistrement d'écran avec gpu-screen-recorder, piloté par l'île.
-Se lance par `poste record <commande>`.
+"""Record module of poste: screen recording with gpu-screen-recorder, driven by the island.
+Run with `poste record <command>`.
 
-  poste record start --preset ID            un préréglage de record.json
-  poste record start --window ADDR [--audio A]   une fenêtre (adresse Hyprland)
-  poste record start --monitor NAME [--audio A]  un écran entier
-  poste record start --region [--audio A]        une zone choisie à la souris
-  poste record stop | pause | toggle            arrêter, pause / reprise, l'un ou l'autre
-  poste record status                           l'état en JSON
-  poste record watch                            une ligne JSON par changement d'état
-  poste record items                            la liste du lanceur (extension « Record »)
-  poste record open-dir | open-last [--preset ID]   le dossier, ou le dernier enregistrement
-  poste record hotkey                           SHIFT+PRINT : arrête l'enregistrement en cours,
-                                                sinon ouvre le lanceur de l'île sur « Record »
+  poste record start --preset ID            a preset of record.json
+  poste record start --window ADDR [--audio A]   a window (Hyprland address)
+  poste record start --monitor NAME [--audio A]  a whole screen
+  poste record start --region [--audio A]        a region picked with the mouse
+  poste record stop | pause | toggle            stop, pause / resume, one or the other
+  poste record status                           the state as JSON
+  poste record watch                            one JSON line per state change
+  poste record items                            the launcher list ("Record" extension)
+  poste record open-dir | open-last [--preset ID]   the folder, or the last recording
+  poste record hotkey                           SHIFT+PRINT: stops the recording in progress,
+                                                otherwise opens the island's launcher on "Record"
 
-Son (--audio) : none, app (le son de l'appli de la fenêtre), desktop, mic,
-desktop+mic, app+mic ; ou des sources gpu-screen-recorder brutes séparées
-par « | » (app:Unity|default_input).
+Sound (--audio): none, app (the sound of the window's app), desktop, mic,
+desktop+mic, app+mic; or raw gpu-screen-recorder sources separated
+by "|" (app:Unity|default_input).
 
-Préréglages : ~/.config/poste/record/presets.json (voir DEFAULT_CONFIG). Un
-préréglage choisit son son avec « audioSource » (mêmes valeurs que --audio) et,
-avec « app », peut donner « audioAppName » : le nom de l'appli dans PipeWire
-quand il diffère de sa classe de fenêtre (Unity s'annonce « FMOD Ex App »).
-« cursor » (true / false) montre ou cache la souris dans la vidéo.
-Une fenêtre passe par le portail de capture : le choix de la fenêtre est
-transmis au sélecteur par bin/poste-share-picker du module (fichier « pick » dans
-$XDG_RUNTIME_DIR/poste-record), donc sans clic. Un écran ou une zone passent
-directement par KMS, sans portail.
+Presets: ~/.config/poste/record/presets.json (see DEFAULT_CONFIG). A
+preset chooses its sound with "audioSource" (same values as --audio) and,
+with "app", can give "audioAppName": the name of the app in PipeWire
+when it differs from its window class (Unity announces itself as "FMOD Ex App").
+"cursor" (true / false) shows or hides the mouse in the video.
+A window goes through the capture portal: the choice of the window is
+passed to the picker by the module's bin/poste-share-picker ("pick" file in
+$XDG_RUNTIME_DIR/poste-record), so without a click. A screen or a region go
+directly through KMS, without the portal.
 
-Un processus surveillant (start --supervise) lance gpu-screen-recorder,
-attend sa fin, efface l'état et notifie : « Recording saved » (un clic ouvre
-le dossier) ou l'erreur. stop envoie SIGINT (gpu-screen-recorder finit le
-fichier), pause SIGUSR2."""
+A watching process (start --supervise) runs gpu-screen-recorder,
+waits for it to end, clears the state and notifies: "Recording saved" (a click opens
+the folder) or the error. stop sends SIGINT (gpu-screen-recorder finishes the
+file), pause SIGUSR2."""
 import json, os, re, signal, subprocess, sys, time
 
 HOME = os.path.expanduser("~")
@@ -43,7 +43,7 @@ CONFIG = os.path.join(os.environ.get("XDG_CONFIG_HOME") or os.path.join(HOME, ".
 VIDEOS = os.environ.get("XDG_VIDEOS_DIR") or os.path.join(HOME, "Videos")
 
 DEFAULT_CONFIG = {
-    "//": "Préréglages d'enregistrement (poste-record). window.class / window.title : expressions régulières Hyprland. audio : none, app, desktop, mic, desktop+mic, app+mic ou sources brutes (app:Unity|default_input). dir : dossier de sortie (~ accepté).",
+    "//": "Recording presets (poste-record). window.class / window.title: Hyprland regular expressions. audio: none, app, desktop, mic, desktop+mic, app+mic or raw sources (app:Unity|default_input). dir: output folder (~ accepted).",
     "defaults": {"dir": "~/Videos", "fps": 60, "quality": "very_high", "codec": "auto", "container": "mp4", "cursor": True},
     "presets": [],
 }
@@ -101,7 +101,7 @@ def public(st):
             "label": st.get("label", ""), "file": st.get("file", "")}
 
 
-# ---------------------------------------------------------------- cibles
+# ---------------------------------------------------------------- targets
 def clients():
     try:
         return json.loads(subprocess.run(["hyprctl", "clients", "-j"], capture_output=True, text=True, timeout=3).stdout)
@@ -125,7 +125,7 @@ def app_audio_names():
 
 
 def app_audio_for(client):
-    """Le nom PipeWire de l'appli d'une fenêtre (« Zen », « Unity »…), si elle joue du son."""
+    """The PipeWire name of a window's app ("Zen", "Unity"…), if it plays sound."""
     names = app_audio_names()
     keys = [str(client.get("class", "")), str(client.get("initialClass", "")), str(client.get("title", "")).split(" ")[0]]
     for k in keys:
@@ -140,7 +140,7 @@ def find_window(match):
     found = [c for c in clients() if c.get("mapped", True)
              and (not cls or re.search(cls, str(c.get("class", "")), re.I))
              and (not title or re.search(title, str(c.get("title", "")), re.I))]
-    # La plus grande : la fenêtre principale plutôt qu'une boîte de dialogue.
+    # The largest: the main window rather than a dialog box.
     found.sort(key=lambda c: -(c.get("size", [0, 0])[0] * c.get("size", [0, 0])[1]))
     return found[0] if found else None
 
@@ -213,9 +213,9 @@ def start(args):
     opts.setdefault("audio", "app" if target[0] == "window" else "desktop")
     if target[0] == "window":
         audio_app = app_audio_for(target[1]) if "app" in str(opts["audio"]).split("+") else None
-        # Une appli qui ne joue rien encore n'est pas listée : on vise le nom
-        # donné par le préréglage (« audioAppName » : Unity s'annonce « FMOD Ex App »),
-        # sinon sa classe ; gpu-screen-recorder la prend dès qu'elle émet du son.
+        # An app that is not playing anything yet is not listed: we aim at the name
+        # given by the preset ("audioAppName": Unity announces itself as "FMOD Ex App"),
+        # otherwise its class; gpu-screen-recorder takes it as soon as it emits sound.
         if opts.get("audioAppName"):
             audio_app = str(opts["audioAppName"])
         elif not audio_app and "app" in str(opts["audio"]).split("+"):
@@ -236,12 +236,12 @@ def start(args):
             geo = ""
         m = re.match(r"(-?\d+),(-?\d+) (\d+)x(\d+)", geo)
         if not m:
-            return 0   # choix annulé
+            return 0   # choice cancelled
         cmd += ["-w", "region", "-region", "%sx%s+%s+%s" % (m.group(3), m.group(4), m.group(1), m.group(2))]
 
     out_dir = os.path.expanduser(str(opts.get("dir") or VIDEOS))
     if not os.path.isdir(os.path.dirname(out_dir.rstrip("/")) or "/"):
-        out_dir = VIDEOS   # disque absent : dossier Vidéos
+        out_dir = VIDEOS   # disk absent: Videos folder
     os.makedirs(out_dir, exist_ok=True)
     stamp = time.strftime("%Y-%m-%d %H-%M-%S")
     out = os.path.join(out_dir, "%s %s.%s" % (slug(label), stamp, opts.get("container", "mp4")))
@@ -249,14 +249,14 @@ def start(args):
             "-k", str(opts.get("codec", "auto")), "-fm", "cfr", "-cursor", "yes" if opts.get("cursor", True) else "no",
             "-fallback-cpu-encoding", "yes", "-o", out]
     if opts.get("container", "mp4") == "mp4":
-        cmd += ["-ac", "aac"]   # lisible par les logiciels de montage (l'Opus en MP4 l'est mal)
+        cmd += ["-ac", "aac"]   # readable by editing software (Opus in MP4 is poorly supported)
     if opts.get("resolution"):
         cmd += ["-s", str(opts["resolution"])]
     sources = audio_sources(opts["audio"], audio_app)
     if sources:
         cmd += ["-a", sources]
 
-    # Le surveillant tourne détaché : il garde gpu-screen-recorder et nettoie à la fin.
+    # The watcher runs detached: it keeps gpu-screen-recorder and cleans up at the end.
     subprocess.Popen([sys.executable, os.path.realpath(__file__), "--supervise", json.dumps(
         {"cmd": cmd, "file": out, "label": label})], start_new_session=True,
         stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -306,7 +306,7 @@ def open_dir(preset_id=None):
 
 
 def finished_videos(d):
-    """Les vidéos terminées d'un dossier (pas celle en cours d'enregistrement)."""
+    """The finished videos of a folder (not the one being recorded)."""
     st = read_state()
     busy = st.get("file") if st else None
     try:
@@ -365,13 +365,13 @@ def watch():
         cur = public(read_state())
         key = (cur.get("recording"), cur.get("paused"), cur.get("label"))
         if key != last or cur.get("recording"):
-            # En cours : une ligne par seconde, pour recaler le chrono de l'île.
+            # In progress: one line per second, to resynchronize the island's timer.
             print(json.dumps(cur), flush=True)
             last = key
         time.sleep(1 if cur.get("recording") else 0.5)
 
 
-# ---------------------------------------------------------------- lanceur
+# ---------------------------------------------------------------- launcher
 def cmd_of(*args):
     return " ".join(["poste", "record"] + ["'%s'" % a.replace("'", "'\\''") for a in args])
 
@@ -386,7 +386,7 @@ def item(id_, name, subtitle, icon, command, verb="Record", keywords=(), actions
 
 
 def monitor_rect(m):
-    """Rectangle logique d'un écran (rotation et échelle comprises)."""
+    """Logical rectangle of a screen (rotation and scale included)."""
     scale = float(m.get("scale") or 1)
     w, h = m.get("width", 0) / scale, m.get("height", 0) / scale
     if int(m.get("transform", 0)) % 2 == 1:
@@ -395,8 +395,8 @@ def monitor_rect(m):
 
 
 def window_rect(c, mons):
-    """Rectangle d'une fenêtre, seulement si son bureau est affiché quelque part
-    (l'île encadre la cible choisie dans le lanceur)."""
+    """Rectangle of a window, only if its workspace is shown somewhere
+    (the island frames the target chosen in the launcher)."""
     ws = (c.get("workspace") or {}).get("id")
     shown = any(ws in ((m.get("activeWorkspace") or {}).get("id"), (m.get("specialWorkspace") or {}).get("id")) for m in mons)
     if not shown:
@@ -406,7 +406,7 @@ def window_rect(c, mons):
 
 
 def desktop_icons():
-    """Classe de fenêtre -> icône, d'après les fichiers .desktop (StartupWMClass ou nom)."""
+    """Window class -> icon, from the .desktop files (StartupWMClass or name)."""
     icons = {}
     dirs = [os.path.join(HOME, ".local/share/applications"), "/usr/share/applications"]
     for d in dirs:
@@ -470,7 +470,7 @@ def items():
         out.append(item("preset:" + p["id"], p.get("name", p["id"]), "Preset · " + p["subtitle"] if p.get("subtitle") else "Preset",
                         p.get("icon", "󰑋"), cmd_of("start", *target), keywords=["preset"] + list(p.get("keywords", [])),
                         actions=audio_actions(*target, preset=p["id"]), highlight=hl))
-        out[-1]["badge"] = "󰓎"   # pastille « préréglage » sur l'icône dans le lanceur
+        out[-1]["badge"] = "󰓎"   # "preset" badge on the icon in the launcher
     icons = desktop_icons()
     for c in clients():
         if not c.get("mapped", True) or not c.get("title"):
@@ -494,7 +494,7 @@ def items():
 
 
 def hotkey():
-    """SHIFT+PRINT : arrête l'enregistrement en cours, sinon ouvre le lanceur sur « Record »."""
+    """SHIFT+PRINT: stops the recording in progress, otherwise opens the launcher on "Record"."""
     if read_state():
         return stop()
     return subprocess.call(["omarchy-shell", "poste.island", "launcherIn", "record"])

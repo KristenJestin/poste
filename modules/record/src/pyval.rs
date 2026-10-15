@@ -1,12 +1,12 @@
-//! Petites équivalences Python utilisées pour rester identique au script d'origine :
-//! `str()`, vérité d'une valeur JSON, `json.dumps`, `os.path.*`, `round`.
+//! Small Python equivalents used to stay identical to the original script:
+//! `str()`, truth of a JSON value, `json.dumps`, `os.path.*`, `round`.
 
 use serde::Serialize;
 use serde_json::ser::{Formatter, Serializer};
 use serde_json::Value;
 use std::io;
 
-/// `str(valeur)` d'une valeur JSON chargée par `json.load`.
+/// `str(value)` of a JSON value loaded by `json.load`.
 pub fn py_str(v: &Value) -> String {
     match v {
         Value::Null => "None".into(),
@@ -31,12 +31,12 @@ pub fn py_str(v: &Value) -> String {
     }
 }
 
-/// `str(valeur.get(clé, défaut))`.
+/// `str(value.get(key, default))`.
 pub fn py_str_opt(v: Option<&Value>, default: &str) -> String {
     v.map(py_str).unwrap_or_else(|| default.to_string())
 }
 
-/// `bool(valeur)` en Python.
+/// Python's `bool(value)`.
 pub fn truthy(v: &Value) -> bool {
     match v {
         Value::Null => false,
@@ -52,7 +52,7 @@ pub fn truthy_opt(v: Option<&Value>) -> bool {
     v.is_some_and(truthy)
 }
 
-/// `a == b` en Python pour des valeurs JSON (1 == 1.0, `None` égal à `None`).
+/// Python's `a == b` for JSON values (1 == 1.0, `None` equal to `None`).
 pub fn py_eq(a: Option<&Value>, b: Option<&Value>) -> bool {
     fn norm(v: Option<&Value>) -> Option<&Value> {
         v.filter(|x| !x.is_null())
@@ -65,12 +65,12 @@ pub fn py_eq(a: Option<&Value>, b: Option<&Value>) -> bool {
     }
 }
 
-/// `round(x)` de Python 3 : arrondi au pair le plus proche sur les demi-valeurs.
+/// Python 3's `round(x)`: rounds to the nearest even on half values.
 pub fn py_round(x: f64) -> i64 {
     x.round_ties_even() as i64
 }
 
-/// `texte[:n]` en Python (n caractères, pas n octets).
+/// Python's `text[:n]` (n characters, not n bytes).
 pub fn head_chars(s: &str, n: usize) -> String {
     s.chars().take(n).collect()
 }
@@ -91,7 +91,7 @@ pub fn basename(p: &str) -> String {
     p[p.rfind('/').map(|i| i + 1).unwrap_or(0)..].to_string()
 }
 
-/// `os.path.join(a, b)` pour un `b` relatif.
+/// `os.path.join(a, b)` for a relative `b`.
 pub fn join(a: &str, b: &str) -> String {
     if b.starts_with('/') || a.is_empty() {
         b.to_string()
@@ -102,7 +102,7 @@ pub fn join(a: &str, b: &str) -> String {
     }
 }
 
-/// Formateur qui reproduit `json.dumps` (séparateurs `, ` et `: `, `ensure_ascii`).
+/// Formatter that reproduces `json.dumps` (separators `, ` and `: `, `ensure_ascii`).
 struct Py;
 
 impl Formatter for Py {
@@ -153,11 +153,11 @@ impl Formatter for Py {
     }
 }
 
-/// `json.dumps(valeur)`.
+/// `json.dumps(value)`.
 pub fn dumps<T: Serialize>(v: &T) -> String {
     let mut out = Vec::new();
     let mut ser = Serializer::with_formatter(&mut out, Py);
-    v.serialize(&mut ser).expect("sérialisation JSON");
+    v.serialize(&mut ser).expect("JSON serialization");
     String::from_utf8(out).expect("JSON en UTF-8")
 }
 
@@ -207,7 +207,7 @@ mod tests {
     #[test]
     fn dumps_comme_python() {
         let v = json!({"a": [1, 2], "b": "é\u{f044b}\"\n\u{7f}"});
-        // Ordre des clés : serde_json trie ; on ne teste ici que les séparateurs et l'échappement.
+        // Key order: serde_json sorts; here we only test the separators and the escaping.
         assert_eq!(
             dumps(&v),
             "{\"a\": [1, 2], \"b\": \"\\u00e9\\udb81\\udc4b\\\"\\n\\u007f\"}"

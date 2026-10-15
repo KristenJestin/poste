@@ -3,11 +3,11 @@ import Quickshell
 import Quickshell.Io
 import "ModulePlayers.js" as ModulePlayers
 
-// Découverte des morceaux d'île fournis par les modules poste, sans connaître aucun module.
+// Discovery of the island pieces provided by the poste modules, without knowing any module.
 //
-// Chaque module installé peut avoir, dans ~/.local/share/poste/modules/<nom>/island/ :
-//   launcher.json  entrées / extensions / moteurs du lanceur (même format que la config du lanceur)
-//   island.json    { "slots": [ { "slot": "<nom du slot>", "file": "Fichier.qml" } ],
+// Each installed module may have, in ~/.local/share/poste/modules/<name>/island/:
+//   launcher.json  launcher entries / extensions / engines (same format as the launcher config)
+//   island.json    { "slots": [ { "slot": "<slot name>", "file": "File.qml" } ],
 //                    "player": { … } }
 // "player" declares what the player card can show for one MPRIS player, without any QML
 // (see Island.qml): "bus" (its MPRIS bus name, required), "quality" (metadata key of a short
@@ -15,14 +15,14 @@ import "ModulePlayers.js" as ModulePlayers
 // "like" (command run by the heart), "app" (desktop entry of the player's app, when its MPRIS
 // has no DesktopEntry: the sound source pill shows it and brings its window up or opens it),
 // "launcher" (launcher extension opened by the pill instead, for a player without a window).
-// Slots que l'île charge (voir Island.qml) : « capture »
-// (source d'enregistrement pour la pastille de capture), « dictation » (source de dictée pour
-// la pastille de dictée en bas de l'écran et le texte sous l'île).
+// Slots that the island loads (see Island.qml): 'capture'
+// (recording source for the capture pill), 'dictation' (dictation source for
+// the dictation pill at the bottom of the screen and the text under the island).
 //
-// Exposé : launcherDocs [{ module, data }], slots { <slot>: [url de fichier, …] },
+// Exposed: launcherDocs [{ module, data }], slots { <slot>: [file url, …] },
 // players [{ module, bus, quality, starred, like, launcher }].
-// Re-lecture au démarrage, puis à chaque changement sous le dossier des modules (inotifywait,
-// avec une courte temporisation). Module absent : rien n'est ajouté, aucune trace.
+// Read again at startup, then at each change under the modules folder (inotifywait,
+// with a short delay). Module absent: nothing is added, no trace.
 Item {
   id: reg
   readonly property string dir: (Quickshell.env("XDG_DATA_HOME") || (Quickshell.env("HOME") + "/.local/share")) + "/poste/modules"
@@ -32,7 +32,7 @@ Item {
   property var players: []
   property string signature: ""
 
-  // Lit les fichiers et les affiche en un seul document JSON (les erreurs de lecture sont ignorées).
+  // Reads the files and prints them as a single JSON document (read errors are ignored).
   readonly property string script: [
     "import json, os, sys",
     "root = sys.argv[1]",
@@ -71,7 +71,7 @@ Item {
       var declared = m.island && Array.isArray(m.island.slots) ? m.island.slots : []
       for (var k = 0; k < declared.length; k++) {
         var s = declared[k]
-        // Un nom de fichier simple, dans le dossier island du module.
+        // A simple file name, in the module's island folder.
         if (!s || !s.slot || !s.file || !/^[A-Za-z0-9_.-]+\.qml$/.test(String(s.file))) continue
         if (!map[s.slot]) map[s.slot] = []
         map[s.slot].push("file://" + m.dir + "/" + s.file)
@@ -95,7 +95,7 @@ Item {
   }
   Component.onCompleted: rescan()
 
-  // Surveille le dossier des modules ; s'il n'existe pas encore, nouvel essai plus tard.
+  // Watches the modules folder; if it does not exist yet, tries again later.
   Timer { id: debounce; interval: 400; onTriggered: reg.rescan() }
   Process {
     id: watcher

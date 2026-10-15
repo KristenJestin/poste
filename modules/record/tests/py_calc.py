@@ -1,5 +1,5 @@
-"""Calculs du script Python d'origine, pour les comparer à ceux de la version Rust.
-Lit un JSON sur l'entrée standard, écrit les résultats en JSON. Usage : py_calc.py <poste-record.py>"""
+"""Calculations of the original Python script, to compare them with those of the Rust version.
+Reads a JSON on the standard input, writes the results as JSON. Usage: py_calc.py <poste-record.py>"""
 import json, sys
 from importlib.machinery import SourceFileLoader
 from importlib.util import module_from_spec, spec_from_loader

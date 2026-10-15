@@ -3,13 +3,13 @@ import QtTest
 import "../../config/.config/omarchy/plugins/poste.island/components"
 import "../../config/.config/omarchy/plugins/poste.island/components/WorkspaceGroups.js" as WorkspaceGroups
 
-// Groupes de la barre de l'île avec un faux Hyprland : trois écrans, 1-5 à
-// gauche, 11-13 au milieu, 21-25 à droite.
+// Groups of the island's bar with a fake Hyprland: three screens, 1-5 on the
+// left, 11-13 in the middle, 21-25 on the right.
 TestCase {
   name: "WorkspaceGroups"
   when: windowShown
 
-  // Faux hôte : ce que WorkspaceStrip lit de l'île.
+  // Fake host: what WorkspaceStrip reads from the island.
   QtObject {
     id: host
     property var activeWorkspaces: ({ "DP-1": 1, "DP-2": 11, "DP-3": 21 })
@@ -37,14 +37,14 @@ TestCase {
     host.visitingWorkspaces = {}
   }
 
-  // Le milieu et la droite disparus : Hyprland pose 11, 12, 13 et 25 à gauche.
+  // The middle and the right gone: Hyprland puts 11, 12, 13 and 25 on the left.
   function leftOnly() {
     host.activeWorkspaces = { "DP-1": 1 }
     host.windowCounts = { 1: 1, 2: 1, 11: 1, 12: 1, 13: 1, 25: 1 }
     host.visitingWorkspaces = { "DP-1": [25, 11, 13, 12] }
   }
 
-  // Ce que la barre affiche, « | » pour un séparateur.
+  // What the bar shows, '|' for a separator.
   function shown(cells) {
     return cells.map(function(id) { return id === 0 ? "|" : String(((id - 1) % 10) + 1) }).join(" ")
   }
@@ -67,7 +67,7 @@ TestCase {
   }
 
   function test_visitors_from_a_lower_screen() {
-    // Écran du milieu resté seul : ceux de gauche et de droite y arrivent.
+    // Middle screen left alone: those of the left and of the right arrive there.
     compare(shown(WorkspaceGroups.cells({}, 11, 10, [21, 2, 1])), "1 2 3 4 5 | 1 2 | 1")
   }
 

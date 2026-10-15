@@ -1,5 +1,5 @@
 {
-  "//": "Préréglages d'enregistrement (module record : poste record, extension « Record » du lanceur, SHIFT+PRINT). window.class / window.title : expressions régulières Hyprland. audioSource : none, app (le son de l'appli de la fenêtre), desktop, mic, desktop+mic, app+mic, ou sources gpu-screen-recorder brutes (app:Unity|default_input). audioAppName (facultatif, avec audioSource app) : nom de l'appli dans le son du PC (PipeWire) quand il diffère de sa classe, voir pw-dump | jq '.[].info.props[\"application.name\"]'. cursor : true / false, souris visible ou cachée dans la vidéo. dir : dossier de sortie ; s'il est sur un disque absent, ~/Videos.",
+  "//": "Recording presets (record module: poste record, \"Record\" extension of the launcher, SHIFT+PRINT). window.class / window.title: Hyprland regular expressions. audioSource: none, app (the sound of the window's app), desktop, mic, desktop+mic, app+mic, or raw gpu-screen-recorder sources (app:Unity|default_input). audioAppName (optional, with audioSource app): name of the app in the PC's sound (PipeWire) when it differs from its class, see pw-dump | jq '.[].info.props[\"application.name\"]'. cursor: true / false, mouse visible or hidden in the video. dir: output folder; if it is on an absent disk, ~/Videos.",
   "defaults": {
     "dir": "~/Videos",
     "fps": 60,

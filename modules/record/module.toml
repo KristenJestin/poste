@@ -1,22 +1,22 @@
 name = "record"
-description = "Enregistrement d'écran (gpu-screen-recorder) piloté par l'île : préréglages, fenêtres, écrans, zone"
+description = "Screen recording (gpu-screen-recorder) driven by the island: presets, windows, screens, region"
 commands = [
-  { name = "start", description = "démarre : start --preset ID | --window ADDR | --monitor NOM | --region [--audio A]" },
-  { name = "stop", description = "arrête l'enregistrement en cours (le fichier est terminé proprement)" },
-  { name = "pause", description = "met en pause" },
-  { name = "resume", description = "reprend" },
-  { name = "toggle", description = "pause ou reprise" },
-  { name = "status", description = "état en JSON (recording, paused, label, file…)" },
-  { name = "watch", description = "une ligne JSON par changement d'état (pour l'île)" },
-  { name = "items", description = "liste de l'extension « Record » du lanceur (JSON)" },
-  { name = "hotkey", description = "SHIFT+PRINT : arrête l'enregistrement en cours, sinon ouvre le lanceur sur Record" },
-  { name = "open-dir", description = "ouvre le dossier des enregistrements (--preset ID)" },
-  { name = "open-last", description = "ouvre le dernier enregistrement (--preset ID)" },
+  { name = "start", description = "starts: start --preset ID | --window ADDR | --monitor NAME | --region [--audio A]" },
+  { name = "stop", description = "stops the recording in progress (the file is finished cleanly)" },
+  { name = "pause", description = "pauses" },
+  { name = "resume", description = "resumes" },
+  { name = "toggle", description = "pause or resume" },
+  { name = "status", description = "state as JSON (recording, paused, label, file…)" },
+  { name = "watch", description = "one JSON line per state change (for the island)" },
+  { name = "items", description = "list of the launcher's \"Record\" extension (JSON)" },
+  { name = "hotkey", description = "SHIFT+PRINT: stops the recording in progress, otherwise opens the launcher on Record" },
+  { name = "open-dir", description = "opens the recordings folder (--preset ID)" },
+  { name = "open-last", description = "opens the last recording (--preset ID)" },
 ]
 
-# Ligne posée par `poste sys setup` dans un fichier sans inclusion : le sélecteur de partage
-# d'écran de xdg-desktop-portal-hyprland choisit seul la fenêtre demandée par `poste record`.
-# bin/poste-share-picker est un script court qui lance `poste-record share-picker` (chemin stable).
+# Line put by `poste sys setup` in a file without includes: the screen-share picker
+# of xdg-desktop-portal-hyprland picks alone the window requested by `poste record`.
+# bin/poste-share-picker is a short script that runs `poste-record share-picker` (stable path).
 [[line]]
 file = "~/.config/hypr/xdph.conf"
 line = "screencopy:custom_picker_binary = {modules}/record/bin/poste-share-picker"

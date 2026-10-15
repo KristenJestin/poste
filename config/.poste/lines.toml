@@ -1,9 +1,9 @@
-# Lignes de base posées par `poste sys setup` dans des fichiers sans inclusion (propriétaire
-# « config » dans installed.json). Même format que les [[line]] d'un module.toml ;
-# `{home}` = dossier personnel, `{modules}` = ~/.local/share/poste/modules.
+# Base lines put by `poste sys setup` in files without an include (owner
+# 'config' in installed.json). Same format as the [[line]] of a module.toml;
+# `{home}` = home folder, `{modules}` = ~/.local/share/poste/modules.
 #
-# xdph.conf n'est plus un lien vers le dépôt : c'est un fichier ordinaire dont poste ne gère que
-# les lignes ci-dessous et celles des modules (ex. custom_picker_binary du module record).
+# xdph.conf is no longer a link to the repository: it is an ordinary file of which poste only manages
+# the lines below and those of the modules (e.g. custom_picker_binary of the record module).
 
 [[line]]
 file = "~/.config/hypr/xdph.conf"

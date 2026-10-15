@@ -1,8 +1,8 @@
 #!/bin/sh
-# Sélecteur de partage d'écran de xdg-desktop-portal-hyprland (ligne `screencopy:custom_picker_binary`
-# posée par `poste sys setup`). Chemin stable ; le travail est fait par `poste-record share-picker`
-# (Rust), installé à côté dans le dossier du module. Si le binaire manque, on passe la main au
-# sélecteur habituel, comme le ferait le sélecteur lui-même quand il n'a rien à faire.
+# Screen-share picker of xdg-desktop-portal-hyprland (line `screencopy:custom_picker_binary`
+# put by `poste sys setup`). Stable path; the work is done by `poste-record share-picker`
+# (Rust), installed next to it in the module folder. If the binary is missing, we hand over to the
+# usual picker, as the picker itself would when it has nothing to do.
 dir=$(dirname "$0")
 if [ -x "$dir/../poste-record" ]; then
   exec "$dir/../poste-record" share-picker "$@"

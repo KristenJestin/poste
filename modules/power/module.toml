@@ -1,11 +1,11 @@
 name = "power"
-description = "Alertes batterie (faible, critique, branché mais ça se vide) et disque presque plein, par un démon utilisateur léger"
+description = "Battery alerts (low, critical, plugged in but draining) and almost full disk, through a light user daemon"
 commands = [
-  { name = "status", description = "batterie, secteur, disques, seuils et alertes déjà envoyées" },
-  { name = "test", description = "envoie une notification d'exemple (même style que les vraies alertes)" },
-  { name = "check", description = "une passe : lit l'état et envoie les alertes dues (ce que fait le démon toutes les minutes)" },
-  { name = "watch", description = "le démon : une passe toutes les 60 s (lancé par l'unité systemd poste-power.service)" },
+  { name = "status", description = "battery, mains, disks, thresholds and alerts already sent" },
+  { name = "test", description = "sends a sample notification (same style as the real alerts)" },
+  { name = "check", description = "one pass: reads the state and sends the alerts that are due (what the daemon does every minute)" },
+  { name = "watch", description = "the daemon: one pass every 60 s (started by the systemd unit poste-power.service)" },
 ]
 
-# Unité systemd utilisateur posée et activée par `poste sys setup` (fichier dans systemd/).
+# User systemd unit installed and enabled by `poste sys setup` (file in systemd/).
 units = ["poste-power.service"]

@@ -1,4 +1,4 @@
-//! Binaire `poste-usage` (`poste usage …`) : voir la bibliothèque.
+//! Binary `poste-usage` (`poste usage …`): see the library.
 
 fn main() {
     let argv: Vec<String> = std::env::args().skip(1).collect();

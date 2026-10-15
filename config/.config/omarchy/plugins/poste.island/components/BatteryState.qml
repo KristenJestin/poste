@@ -1,23 +1,23 @@
 import QtQuick
 import Quickshell.Services.UPower
 
-// La batterie, pour l'activité de l'île (Island.qml : root.battery). Rien sur
-// un PC sans batterie (UPower ne voit pas de batterie de portable). Sinon,
-// à côté de l'île si elle est basse (sous 30 %, jaune ; sous 10 %, rouge), et
-// 6 s au débranchement, avec l'icône du profil d'alimentation en place dans la
-// bulle. Toujours dans le centre de contrôle. Pour
-// tester ailleurs (« discharging 80 » joue le débranchement) :
+// The battery, for the island activity (Island.qml: root.battery). Nothing on
+// a PC without a battery (UPower sees no laptop battery). Otherwise,
+// next to the island if it is low (below 30 %, yellow; below 10 %, red), and
+// 6 s after unplugging, with the icon of the current power profile in the
+// bubble. Always in the control center. To
+// test elsewhere ('discharging 80' plays the unplugging):
 //   omarchy-shell poste.island batterySim "charging 75" | "low 15" | "critical 6" | "off"
 Item {
   id: battery
   readonly property var dev: UPower.displayDevice
-  // Le profil d'alimentation (PowerProfileState.qml), posé par Island.qml.
+  // The power profile (PowerProfileState.qml), set by Island.qml.
   property var profile: null
-  // Juste après le débranchement, le profil à montrer avec elle (vide sinon, et sans
-  // power-profiles-daemon) ; la bulle basse ou critique qui reste ne le porte pas.
+  // Right after the unplugging, the profile to show with it (empty otherwise, and without
+  // power-profiles-daemon); the low or critical bubble that remains does not carry it.
   readonly property string profileGlyph: flash && !charging && profile && profile.present ? profile.glyph : ""
 
-  // Simulation (commande batterySim).
+  // Simulation (batterySim command).
   property bool simulated: false
   property real simPercent: 0.75
   property bool simCharging: true
@@ -30,34 +30,34 @@ Item {
     return p > 1 ? p / 100 : p
   }
   readonly property bool charging: simulated ? simCharging : !UPower.onBattery
-  // Secondes jusqu'à pleine charge ou batterie vide (0 : inconnu).
+  // Seconds until full charge or empty battery (0: unknown).
   readonly property real secondsLeft: simulated ? (simCharging ? 900 : 5400)
     : (dev ? Number(charging ? dev.timeToFull : dev.timeToEmpty) || 0 : 0)
   readonly property string level: percent <= 0.10 ? "critical" : percent <= 0.30 ? "low" : "ok"
 
   readonly property color color: charging ? "#30d158" : level === "critical" ? "#ff453a" : level === "low" ? "#ffd60a" : "#f2f2f2"
 
-  // Affichage passager après un événement.
+  // Passing display after an event.
   property bool flash: false
   Timer { id: flashTimer; interval: 6000; onTriggered: battery.flash = false }
   function pulse() { if (present) { flash = true; flashTimer.restart() } }
-  // Au démarrage, UPower remplit onBattery après coup : ce premier passage n'est pas un
-  // débranchement, les premières secondes ne comptent pas.
+  // At startup, UPower fills onBattery after the fact: this first pass is not an
+  // unplugging, the first seconds do not count.
   property bool armed: false
   Timer { interval: 3000; running: true; onTriggered: battery.armed = true }
   onChargingChanged: if (armed) pulse()
   onLevelChanged: if (!charging && level !== "ok") pulse()
 
-  // À côté de l'île : basse (sous 30 %), ou juste après le débranchement (le
-  // temps de voir le profil pris sur batterie). Sinon, elle n'est que dans le
-  // centre de contrôle (même pas au branchement).
+  // Next to the island: low (below 30 %), or just after the unplugging (the
+  // time to see the profile taken on battery). Otherwise, it is only in the
+  // control center (not even on plugging in).
   readonly property bool showing: present && (level !== "ok" || (flash && !charging))
 
-  // Icône selon le niveau (onze crans), ou l'éclair en charge.
+  // Icon according to the level (eleven steps), or the bolt while charging.
   readonly property string glyph: charging ? "󰂄"
     : ["󰂎", "󰁺", "󰁻", "󰁼", "󰁽", "󰁾", "󰁿", "󰂀", "󰂁", "󰂂", "󰁹"][Math.max(0, Math.min(10, Math.round(percent * 10)))]
 
-  // « ~15 min », « 2 h 10 »
+  // '~15 min', '2 h 10'
   function timeText() {
     var s = Math.round(secondsLeft)
     if (s <= 0) return ""

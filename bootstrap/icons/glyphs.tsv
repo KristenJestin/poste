@@ -1,10 +1,10 @@
-# Glyphes Nerd Font utilisés par Omarchy et ses plugins -> icônes Tabler.
-# Correspondance de la police « Poste Nerd Font » du shell (config/.local/share/fonts/poste) et de Glyphs.js de l'île.
-# Colonnes (tabulations) : code, tabler, plein, île, nom Nerd, où.
-#   tabler : nom de l'icône Tabler ; « - » = glyphe gardé tel quel (pas d'équivalent correct).
-#   plein  : 1 = variante pleine de Tabler (commandes média, cœur plein…).
-#   île    : vide = même icône dans l'île ; sinon le nom que l'île garde (sens propre à l'île).
-#   où     : fichiers qui l'utilisent (menu = omarchy-menu.jsonc), pour mémoire.
+# Nerd Font glyphs used by Omarchy and its plugins -> Tabler icons.
+# Correspondence of the shell's 'Poste Nerd Font' font (config/.local/share/fonts/poste) and the island's Glyphs.js.
+# Columns (tabs): code, tabler, filled, island, Nerd name, where.
+#   tabler: name of the Tabler icon; '-' = glyph kept as is (no good equivalent).
+#   filled: 1 = filled Tabler variant (media controls, filled heart…).
+#   island: empty = same icon in the island; otherwise the name the island keeps (meaning specific to the island).
+#   where: files that use it (menu = omarchy-menu.jsonc), for the record.
 E302	-	0		weather-day_cloudy	panels/weather
 E308	cloud-rain	0		weather-day_rain	panels/weather
 E30A	cloud-snow	0		weather-day_snow	panels/weather
@@ -48,19 +48,19 @@ E84E	-	0		dev-ocaml	menu
 E860	-	0		dev-phoenix	menu
 E8DA	brand-vscode	0		dev-vscode	menu
 E8EF	-	0		dev-zig	menu
-E900	-	0		dev-cobol	menu (police omarchy, iconFont)
-E901	-	0		dev-cpanel	menu (police omarchy, iconFont)
-E902	-	0		dev-datadog	menu (police omarchy, iconFont)
-E903	-	0		dev-datatables	menu (police omarchy, iconFont)
-E904	-	0		dev-delphi	menu (police omarchy, iconFont)
-E905	-	0		dev-detaspace	menu (police omarchy, iconFont)
-E906	-	0		dev-discloud	menu (police omarchy, iconFont)
-E907	-	0		dev-dovecot	menu (police omarchy, iconFont)
-E908	-	0		dev-duckdb	menu (police omarchy, iconFont)
-E90A	-	0		dev-dynatrace	menu (police omarchy, iconFont)
-E90B	-	0		dev-entityframeworkcore	menu (police omarchy, iconFont)
-E90C	-	0		dev-expo	menu (police omarchy, iconFont)
-E90D	-	0		dev-fiber	menu (police omarchy, iconFont)
+E900	-	0		dev-cobol	menu (omarchy font, iconFont)
+E901	-	0		dev-cpanel	menu (omarchy font, iconFont)
+E902	-	0		dev-datadog	menu (omarchy font, iconFont)
+E903	-	0		dev-datatables	menu (omarchy font, iconFont)
+E904	-	0		dev-delphi	menu (omarchy font, iconFont)
+E905	-	0		dev-detaspace	menu (omarchy font, iconFont)
+E906	-	0		dev-discloud	menu (omarchy font, iconFont)
+E907	-	0		dev-dovecot	menu (omarchy font, iconFont)
+E908	-	0		dev-duckdb	menu (omarchy font, iconFont)
+E90A	-	0		dev-dynatrace	menu (omarchy font, iconFont)
+E90B	-	0		dev-entityframeworkcore	menu (omarchy font, iconFont)
+E90C	-	0		dev-expo	menu (omarchy font, iconFont)
+E90D	-	0		dev-fiber	menu (omarchy font, iconFont)
 EA74	info-circle	0		cod-info	menu
 EA78	device-desktop-down	0		cod-desktop_download	menu
 EA7B	file	0		cod-file	io.github.honeyspoons.localsend,menu

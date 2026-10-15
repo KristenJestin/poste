@@ -1,8 +1,8 @@
 import QtQuick
 
-// Progression qui fait le tour du bord d'une carte arrondie (minuteur
-// déplié) : une piste discrète, et la part restante qui part du milieu du
-// haut, dans le sens des aiguilles.
+// Progress that goes around the edge of a rounded card (unfolded
+// timer): a discreet track, and the remaining part that starts from the middle of the
+// top, clockwise.
 Canvas {
   id: border
   property real progress: 0
@@ -15,13 +15,13 @@ Canvas {
   onWidthChanged: requestPaint()
   onHeightChanged: requestPaint()
 
-  // Trace le contour sur une longueur `len` (tout le tour si len >= périmètre).
+  // Draws the outline over a length `len` (the whole way around if len >= perimeter).
   function trace(ctx, len) {
     var lw = lineWidth / 2, w = width - lineWidth, h = height - lineWidth
     var r = Math.min(radius, w / 2, h / 2)
     var x0 = lw, y0 = lw
     var arc = Math.PI * r / 2
-    // Segments : [longueur, fonction de tracé partiel]
+    // Segments: [length, partial drawing function]
     var segs = [
       [w / 2 - r, function(f) { ctx.lineTo(x0 + w / 2 + (w / 2 - r) * f, y0) }],
       [arc, function(f) { ctx.arc(x0 + w - r, y0 + r, r, -Math.PI / 2, -Math.PI / 2 + Math.PI / 2 * f) }],

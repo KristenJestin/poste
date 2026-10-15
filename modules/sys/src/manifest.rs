@@ -1,4 +1,4 @@
-//! `installed.json` : la liste de ce que `poste sys setup` a posé.
+//! `installed.json`: the list of what `poste sys setup` put in place.
 
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
@@ -12,21 +12,21 @@ pub struct Entry {
     pub installed_at: String,
 }
 
-/// Une ligne posée par `poste sys setup` dans un fichier sans inclusion.
+/// A line put in place by `poste sys setup` in a file without includes.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct LineEntry {
     pub file: String,
     pub line: String,
-    /// Module propriétaire (`config` pour `config/.poste/lines.toml`).
+    /// Owner module (`config` for `config/.poste/lines.toml`).
     pub module: String,
     pub installed_at: String,
 }
 
-/// Une unité systemd utilisateur activée par `poste sys setup`.
+/// A systemd user unit enabled by `poste sys setup`.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct UnitEntry {
     pub unit: String,
-    /// Module propriétaire.
+    /// Owner module.
     pub module: String,
     pub installed_at: String,
 }
@@ -44,15 +44,14 @@ pub struct Manifest {
 impl Manifest {
     pub fn load(file: &Path) -> Result<Self> {
         match std::fs::read_to_string(file) {
-            Ok(t) => {
-                serde_json::from_str(&t).with_context(|| format!("{} illisible", file.display()))
-            }
+            Ok(t) => serde_json::from_str(&t)
+                .with_context(|| format!("{} is unreadable", file.display())),
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(Self::default()),
-            Err(e) => Err(e).with_context(|| format!("lecture de {}", file.display())),
+            Err(e) => Err(e).with_context(|| format!("reading {}", file.display())),
         }
     }
 
-    /// Écriture atomique (fichier temporaire puis renommage).
+    /// Atomic write (temporary file then rename).
     pub fn save(&self, file: &Path) -> Result<()> {
         if let Some(dir) = file.parent() {
             std::fs::create_dir_all(dir)?;
@@ -68,7 +67,7 @@ impl Manifest {
         self.files.iter().find(|e| e.path == p)
     }
 
-    /// Ajoute ou remplace l'entrée d'un chemin.
+    /// Adds or replaces the entry of a path.
     pub fn upsert(&mut self, entry: Entry) {
         match self.files.iter_mut().find(|e| e.path == entry.path) {
             Some(e) => *e = entry,
@@ -91,7 +90,7 @@ mod tests {
     }
 
     #[test]
-    fn aller_retour_et_remplacement() {
+    fn round_trip_and_replacement() {
         let d = tempfile::tempdir().unwrap();
         let f = d.path().join("sous/installed.json");
         assert!(Manifest::load(&f).unwrap().files.is_empty());

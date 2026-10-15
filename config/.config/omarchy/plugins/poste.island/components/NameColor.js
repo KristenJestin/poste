@@ -1,10 +1,10 @@
-// Couleur stable tirée d'un nom : même nom, même couleur, d'une fois sur
-// l'autre. Sert à tout ce qui n'a pas de couleur attitrée : un nouveau modèle
-// dans la vue Usage, un agent inconnu dans le centre de contrôle.
+// Stable color drawn from a name: same name, same color, from one time to
+// the next. Used for everything that has no assigned color: a new model
+// in the Usage view, an unknown agent in the control center.
 .pragma library
 
-// Hachage du nom au dixième de degré : Opus, Sonnet, Fable et Haiku tombent
-// à plus de 75° les uns des autres.
+// Hashing of the name to a tenth of a degree: Opus, Sonnet, Fable and Haiku land
+// more than 75° apart.
 function hue(name) {
   name = String(name || "")
   var h = 0

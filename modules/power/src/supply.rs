@@ -1,8 +1,8 @@
-//! Lecture de `/sys/class/power_supply/*` (dossier remplaçable par `POSTE_POWER_SUPPLY_DIR`,
-//! RÉSERVÉE AUX TESTS : faux arbre en dossier temporaire).
+//! Reading of `/sys/class/power_supply/*` (folder replaceable by `POSTE_POWER_SUPPLY_DIR`,
+//! RESERVED FOR TESTS: fake tree in a temporary folder).
 //!
-//! Seules les alimentations du SYSTÈME comptent : une pile de périphérique (souris, clavier :
-//! `scope` = `Device`, ex. `hidpp_battery_0`) n'est jamais « la batterie » de la machine.
+//! Only the SYSTEM supplies count: a peripheral's battery (mouse, keyboard:
+//! `scope` = `Device`, e.g. `hidpp_battery_0`) is never the machine's 'battery'.
 
 use std::path::{Path, PathBuf};
 
@@ -19,7 +19,7 @@ pub fn supply_dir() -> PathBuf {
 pub enum Status {
     Charging,
     Discharging,
-    /// « Not charging » : branché mais le chargeur ne charge pas (limite de charge, ou chargeur insuffisant).
+    /// 'Not charging': plugged in but the charger does not charge (charge limit, or weak charger).
     NotCharging,
     Full,
     Unknown,
@@ -38,15 +38,15 @@ impl Status {
 
     pub fn label(self) -> &'static str {
         match self {
-            Self::Charging => "en charge",
-            Self::Discharging => "se décharge",
-            Self::NotCharging => "ne charge pas",
-            Self::Full => "pleine",
-            Self::Unknown => "état inconnu",
+            Self::Charging => "charging",
+            Self::Discharging => "discharging",
+            Self::NotCharging => "not charging",
+            Self::Full => "full",
+            Self::Unknown => "unknown state",
         }
     }
 
-    /// Vrai quand la batterie reçoit de l'énergie (ou est pleine) : pas d'alerte de niveau.
+    /// True when the battery receives energy (or is full): no level alert.
     pub fn is_charging(self) -> bool {
         matches!(self, Self::Charging | Self::Full)
     }
@@ -55,10 +55,10 @@ impl Status {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Battery {
     pub name: String,
-    /// Pourcentage 0 à 100.
+    /// Percentage 0 to 100.
     pub level: u8,
     pub status: Status,
-    /// Énergie restante en µWh (`energy_now`, ou `charge_now` x `voltage_now`), pour mesurer le débit réel.
+    /// Remaining energy in µWh (`energy_now`, or `charge_now` x `voltage_now`), to measure the real rate.
     pub energy_uwh: Option<u64>,
 }
 
@@ -82,13 +82,13 @@ fn energy_uwh(dir: &Path) -> Option<u64> {
     if let Some(e) = read_u64(dir, "energy_now") {
         return Some(e);
     }
-    // µAh x µV = pWh ; / 1e6 pour des µWh.
+    // µAh x µV = pWh; / 1e6 for µWh.
     let c = read_u64(dir, "charge_now")?;
     let v = read_u64(dir, "voltage_now")?;
     Some((c as u128 * v as u128 / 1_000_000) as u64)
 }
 
-/// Lit batterie et secteur. Aucune batterie système : `battery` vaut `None`.
+/// Reads battery and mains. No system battery: `battery` is `None`.
 pub fn read_supplies(root: &Path) -> Supplies {
     let mut names: Vec<_> = match std::fs::read_dir(root) {
         Ok(rd) => rd.flatten().map(|e| e.path()).collect(),
@@ -129,9 +129,9 @@ pub fn read_supplies(root: &Path) -> Supplies {
     out
 }
 
-/// Débit réel de décharge en W entre deux mesures (positif : la batterie se vide).
-/// `None` si l'intervalle est nul. La mesure d'énergie est la seule vérité : le statut et
-/// `power_now` peuvent mentir (chargeur USB-C instable).
+/// Real discharge rate in W between two measures (positive: the battery is draining).
+/// `None` if the interval is zero. The energy measure is the only truth: the status and
+/// `power_now` can lie (unstable USB-C charger).
 pub fn drain_watts(prev_uwh: u64, now_uwh: u64, secs: f64) -> Option<f64> {
     if secs <= 0.0 {
         return None;
@@ -153,7 +153,7 @@ pub mod tests {
     }
 
     #[test]
-    fn batterie_et_secteur() {
+    fn battery_and_mains() {
         let t = tempfile::tempdir().unwrap();
         put(t.path(), "AC", &[("type", "Mains"), ("online", "1")]);
         put(
@@ -166,7 +166,7 @@ pub mod tests {
                 ("energy_now", "30000000"),
             ],
         );
-        // Pile de souris : ignorée.
+        // Mouse battery: ignored.
         put(
             t.path(),
             "hidpp_battery_0",
@@ -187,7 +187,7 @@ pub mod tests {
     }
 
     #[test]
-    fn sans_batterie_ni_dossier() {
+    fn without_battery_or_folder() {
         let t = tempfile::tempdir().unwrap();
         put(t.path(), "AC", &[("type", "Mains"), ("online", "0")]);
         put(
@@ -201,7 +201,7 @@ pub mod tests {
     }
 
     #[test]
-    fn energie_depuis_charge_et_tension() {
+    fn energy_from_charge_and_voltage() {
         let t = tempfile::tempdir().unwrap();
         put(
             t.path(),
@@ -221,7 +221,7 @@ pub mod tests {
 
     #[test]
     fn debit() {
-        // 1 Wh perdu en 300 s = 12 W.
+        // 1 Wh lost in 300 s = 12 W.
         let w = drain_watts(31_000_000, 30_000_000, 300.0).unwrap();
         assert!((w - 12.0).abs() < 1e-9);
         assert!(drain_watts(1, 2, 60.0).unwrap() < 0.0);

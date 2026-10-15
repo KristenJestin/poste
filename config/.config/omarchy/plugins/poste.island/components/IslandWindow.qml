@@ -10,8 +10,8 @@ import Quickshell.Widgets
 PanelWindow {
   id: window
   required property var host
-  // Fenêtre plein écran, transparente, qui ne réserve aucune place : sans ces
-  // trois lignes, elle couvre les écrans de blanc et descend sous la barre.
+  // Full-screen, transparent window that reserves no room: without these
+  // three lines, it covers the screens in white and goes under the bar.
   color: "transparent"
   surfaceFormat.opaque: false
   exclusionMode: ExclusionMode.Ignore
@@ -49,9 +49,9 @@ PanelWindow {
     function onToggleMenuOn(name) { if (name === window.screenName) window.view = window.menuOpen ? "rest" : "menu" }
     function onOpenAskOn(name, text, sendNow) {
       if (name !== window.screenName) return
-      // Conversation neuve d'abord, vue ensuite : sinon la vue affiche un
-      // instant l'ancienne conversation courante et la marque « lue » (une
-      // réponse épinglée perdait son « Answer ready »).
+      // New conversation first, view afterwards: otherwise the view shows for a
+      // moment the old current conversation and marks it 'read' (a pinned
+      // answer lost its 'Answer ready').
       askView.start(text, sendNow)
       window.view = "ask"
     }
@@ -59,13 +59,13 @@ PanelWindow {
     function onOpenLauncherExtOn(name, ext) {
       if (name !== window.screenName) return
       window.view = "launcher"
-      // Après la remise à zéro du lanceur à son ouverture.
+      // After the launcher's reset when it opens.
       Qt.callLater(function() { launcherView.enterExtension(ext) })
     }
     function onToggleNotificationsOn(name) { if (name === window.screenName) window.view = window.notificationsOpen ? "rest" : "notifications" }
   }
 
-  // « Advanced settings… » of a module: Omarchy's own panel, under the island.
+  // 'Advanced settings…' of a module: Omarchy's own panel, under the island.
   function openNative(id) {
     view = "rest"
     host.toggleNativePanel(id, screenName)
@@ -81,35 +81,35 @@ PanelWindow {
     host.reportEdge(screenName, edge)
   }
 
-  // Bord bas de l'île telle qu'elle est dessinée (ressort compris) : la pile du bandeau
-  // (notifications, OSD, texte dicté) se pose juste en dessous et le suit image par image.
+  // Bottom edge of the island as it is drawn (spring included): the banner's stack
+  // (notifications, OSD, dictated text) sits just below and follows it frame by frame.
   readonly property real edge: island.y + island.height
   onEdgeChanged: host.reportEdge(screenName, edge)
 
-  // Tout l'écran, transparent : d'ordinaire seule la bulle prend la souris
-  // (mask), mais une vue au clavier exclusif capte tout l'écran (voir catcher).
+  // The whole screen, transparent: usually only the bubble takes the mouse
+  // (mask), but a view with exclusive keyboard captures the whole screen (see catcher).
   anchors { top: true; bottom: true; left: true; right: true }
   WlrLayershell.namespace: "poste-island"
   // Overlay, above the dim (Top) whatever order the two surfaces mapped in.
   WlrLayershell.layer: WlrLayer.Overlay
   // The launcher needs the keyboard the moment it opens (a mapped surface
   // switched to OnDemand isn't focused by Hyprland), so it takes it exclusively.
-  // Exclusif seulement à l'ouverture (le temps que Hyprland donne le clavier),
-  // puis « à la demande » sous le focus grab : il garde le clavier sur l'île
-  // et referme au clic extérieur sur n'importe quel écran (l'exclusif bloque
-  // les clics partout et désactive le grab).
+  // Exclusive only at opening (the time for Hyprland to give the keyboard),
+  // then 'on demand' under the focus grab: it keeps the keyboard on the island
+  // and closes on an outside click on any screen (exclusive blocks
+  // clicks everywhere and disables the grab).
   WlrLayershell.keyboardFocus: exclusiveOpen && !focusGrab.armed ? WlrKeyboardFocus.Exclusive
     : surfaceOpen ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
-  // Vues au clavier exclusif (pour taper dès l'ouverture) : Hyprland ne
-  // donne alors la souris à aucune autre surface, ni fenêtre ni voile, et ne
-  // signale pas le clic extérieur au focus grab. L'île capte donc elle-même
-  // tout l'écran, et un clic hors de la bulle la referme.
+  // Views with exclusive keyboard (to type right at opening): Hyprland then
+  // gives the mouse to no other surface, neither window nor veil, and does not
+  // report the outside click to the focus grab. The island therefore captures
+  // the whole screen itself, and a click outside the bubble closes it.
   readonly property bool exclusiveOpen: launcherOpen || menuOpen || moduleOpen || controlsOpen || shelfOpen || askOpen || usageOpen
   readonly property bool dimWanted: surfaceOpen
-  // Zones souris : l'île et la bande des activités ; plus la carte dépliée
-  // quand une activité l'est.
-  // Zones souris : l'île, les deux bandes d'activités et leur carte dépliée
-  // (un élément vide quand rien n'est déplié).
+  // Mouse areas: the island and the activity strip; plus the unfolded card
+  // when an activity is unfolded.
+  // Mouse areas: the island, the two activity strips and their unfolded card
+  // (an empty element when nothing is unfolded).
   Region {
     id: islandRegion
     item: island
@@ -131,7 +131,7 @@ PanelWindow {
     onPressed: window.view = "rest"
   }
 
-  // Clic ailleurs, sur n'importe quel écran : l'île se referme.
+  // Click elsewhere, on any screen: the island closes.
   HyprlandFocusGrab {
     id: focusGrab
     windows: [window]
@@ -146,10 +146,10 @@ PanelWindow {
   }
   onSurfaceOpenChanged: if (!surfaceOpen) focusGrab.armed = false
 
-  // Enregistrement d'écran (OBS) : une
-  // pastille à part, juste à gauche de l'île, dans la hauteur de la barre (ne
-  // déborde pas sur les fenêtres). Les états qui durent (musique, batterie)
-  // viennent après elle, plus à gauche. Survol de la partie OBS : sa carte.
+  // Screen recording (OBS): a
+  // separate pill, just to the left of the island, within the height of the bar (does not
+  // overflow onto the windows). The lasting states (music, battery)
+  // come after it, further left. Hover over the OBS part: its card.
   Item {
     id: capture
     readonly property bool rec: !!window.host.obs && window.host.obs.active
@@ -211,8 +211,8 @@ PanelWindow {
         }
       }
     }
-    // Carte OBS au survol (un instant) de la pastille ; reste tant que la
-    // souris est sur la pastille ou la carte.
+    // OBS card on hover (for a moment) of the pill; stays as long as the
+    // mouse is on the pill or the card.
     HoverHandler { id: captureHover }
     property bool cardOpen: false
     Timer { interval: 320; running: captureHover.hovered && capture.rec && !capture.cardOpen; onTriggered: capture.cardOpen = true }
@@ -389,8 +389,8 @@ PanelWindow {
         }
       }
 
-      // OBS : pastille à gauche (capture). Musique et autres
-      // activités : de part et d'autre de l'île (ActivityStrip.qml).
+      // OBS: pill on the left (capture). Music and other
+      // activities: on either side of the island (ActivityStrip.qml).
     }
 
     // ---------------------------------------------------------------- controls
@@ -667,9 +667,9 @@ PanelWindow {
     }
   }
 
-  // Activités en cours (ActivityStrip.qml), de part et d'autre de l'île : à
-  // droite ce qui travaille en fond (minuteurs, IA), à gauche ce qui dure
-  // (musique, batterie). Elles s'effacent quand l'île montre une vue.
+  // Ongoing activities (ActivityStrip.qml), on either side of the island: on the
+  // right what works in the background (timers, AI), on the left what lasts
+  // (music, battery). They fade when the island shows a view.
   ActivityStrip {
     id: activities
     host: window.host

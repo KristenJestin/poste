@@ -7,66 +7,66 @@ import Quickshell.Services.Pipewire
 import qs.Commons
 import "file:///usr/share/omarchy/shell/plugins/osd/OsdModel.js" as OsdModel
 
-// Le bandeau : ce qui passe sur l'écran (notifications, OSD, dictée), d'un seul aspect, celui de
-// l'île (fond plein, texte clair, icône à l'accent, arrondi en pilule).
+// The banner: what passes on the screen (notifications, OSD, dictation), with a single look, that of
+// the island (solid background, light text, accent icon, pill-shaped rounding).
 //
-// Un seul objet pour tout le shell : poste.island l'importe par `import "bandeau"`,
-// poste.notifications et poste.osd par `import "../poste.island/bandeau"`. Les trois chemins
-// mènent au même dossier, donc au même singleton (vérifié avec une config Quickshell jetable,
-// dossier lié et fichiers liés un par un comme sur la machine). Il tient l'état et dessine une
-// fenêtre par écran (BandeauWindow.qml), créée au premier usage.
+// A single object for the whole shell: poste.island imports it with `import "bandeau"`,
+// poste.notifications and poste.osd with `import "../poste.island/bandeau"`. The three paths
+// lead to the same folder, hence to the same singleton (checked with a throwaway Quickshell config,
+// linked folder and files linked one by one like on the machine). It holds the state and draws one
+// window per screen (BandeauWindow.qml), created on first use.
 //
-// Deux endroits :
-// - Juste sous l'île, une pile qui suit son bord bas (celui de la vue ouverte s'il y en a une) :
-//   du haut vers le bas, le texte dicté, l'OSD, puis les notifications (trois au plus, la plus
-//   récente en haut). L'île n'est jamais recouverte ni agrandie.
-// - En bas de l'écran actif, seule, la pastille de la dictée : le micro et l'onde pendant
-//   l'écoute, les points pendant la transcription.
+// Two places:
+// - Just under the island, a stack that follows its bottom edge (that of the open view if there is one):
+//   from top to bottom, the dictated text, the OSD, then the notifications (three at most, the most
+//   recent on top). The island is never covered or enlarged.
+// - At the bottom of the active screen, alone, the dictation pill: the microphone and the wave while
+//   listening, the dots during the transcription.
 //
-// Qui l'alimente :
-// - OSD : poste.osd (clone de omarchy.osd) appelle showOsdPayload(payload JSON d'Omarchy).
-// - Volume : le bandeau suit lui-même la sortie par défaut de PipeWire (voir « volume »).
-// - Dictée : poste.island pose dictationListening, dictationTranscribing, dictationLevel (niveau
-//   courant de la source qui dicte), dictationFinals, dictationPartial.
-// - Bord de l'île : poste.island appelle setIslandEdge(écran, y) à chaque image du ressort.
-// - Notifications : poste.notifications s'inscrit avec attachNotifications(service). Le service
-//   garde toute sa logique (serveur, ne pas déranger, historique, écran du toast) ; il doit
-//   offrir popupModel, popupScreensRev, popupKey(row), popupOnScreen(key, écran),
-//   durationFor(urgence, expireTimeout), present(row) (ce que montre la carte, voir
+// Who feeds it:
+// - OSD: poste.osd (clone of omarchy.osd) calls showOsdPayload(Omarchy's JSON payload).
+// - Volume: the banner itself follows PipeWire's default output (see 'volume').
+// - Dictation: poste.island sets dictationListening, dictationTranscribing, dictationLevel (current
+//   level of the source that is dictating), dictationFinals, dictationPartial.
+// - Island edge: poste.island calls setIslandEdge(screen, y) at each frame of the spring.
+// - Notifications: poste.notifications registers with attachNotifications(service). The service
+//   keeps all its logic (server, do not disturb, history, toast screen); it must
+//   offer popupModel, popupScreensRev, popupKey(row), popupOnScreen(key, screen),
+//   durationFor(urgency, expireTimeout), present(row) (what the card shows, see
 //   NotificationView.qml), closePopup(i), invokePopupDefault(i), expirePopup(i).
 Singleton {
   id: root
 
   // ---------------------------------------------------------------- style
-  // Texte et accent de l'île (Island.qml : colorText, colorAccent). Le fond est un verre sombre :
-  // le fond du thème teinté de 6 % vers le texte, opaque à 86 %, flouté par Hyprland
-  // (looknfeel.lua) pour se détacher même d'une fenêtre noire.
+  // Text and accent of the island (Island.qml: colorText, colorAccent). The background is a dark glass:
+  // the theme's background tinted 6 % toward the text, 86 % opaque, blurred by Hyprland
+  // (looknfeel.lua) to stand out even from a black window.
   readonly property color colorSurface: Qt.tint(Color.background, withAlpha(Color.foreground, 0.06))
   readonly property real surfaceOpacity: 0.86
   readonly property color colorText: Qt.lighter(Color.foreground, 1.08)
-  // Gris opaque (texte mêlé au fond) : texte secondaire, phrase dictée en cours.
+  // Opaque grey (text mixed with the background): secondary text, sentence being dictated.
   readonly property color colorMuted: mix(colorText, colorSurface, 0.5)
   readonly property color colorAccent: Color.accent
   readonly property color colorUrgent: Color.urgent
   readonly property string fontFamily: "JetBrainsMono Nerd Font"
   readonly property int bottomMargin: 56
   readonly property int gap: 10
-  // Sous l'île : plus que les marges des fenêtres de Hyprland (gaps_out 10), sinon la première
-  // pièce commence pile sur le bord haut des fenêtres.
+  // Under the island: more than the margins of Hyprland's windows (gaps_out 10), otherwise the first
+  // piece starts right on the top edge of the windows.
   readonly property int islandGap: 20
   readonly property int maxNotifications: 3
-  // Plusieurs lignes : même arrondi partout.
+  // Several rows: same rounding everywhere.
   readonly property int blockRadius: 20
 
   function withAlpha(c, a) { return Qt.rgba(c.r, c.g, c.b, a) }
-  // `t` de la couleur a, le reste de b.
+  // `t` of color a, the rest of b.
   function mix(a, b, t) {
     return Qt.rgba(a.r * t + b.r * (1 - t), a.g * t + b.g * (1 - t), a.b * t + b.b * (1 - t), 1)
   }
 
-  // Changement de taille d'une pièce : `anim` (une NumberAnimation sur la taille montrée) repart
-  // de la valeur actuelle vers `target`, sauf si elle y va déjà ou y est. Repartir de là où on
-  // en est garde le mouvement continu quand le contenu change pendant l'animation.
+  // Size change of a piece: `anim` (a NumberAnimation on the shown size) restarts
+  // from the current value toward `target`, unless it is already going there or is there. Restarting from where it
+  // is keeps the movement continuous when the content changes during the animation.
   function animateTo(anim, current, target) {
     if (anim.running ? anim.to === target : current === target) return
     anim.stop()
@@ -78,30 +78,30 @@ Singleton {
   readonly property string focusedScreen: Hyprland.focusedMonitor ? String(Hyprland.focusedMonitor.name) : ""
 
   // ---------------------------------------------------------------- OSD
-  // Une seule place : un nouvel OSD remplace celui affiché, sur place (la barre glisse de
-  // l'ancienne valeur à la nouvelle), et son minuteur repart.
+  // A single place: a new OSD replaces the one shown, in place (the bar slides from
+  // the old value to the new one), and its timer restarts.
   property bool osdOpen: false
   property var osd: ({ iconKey: "", icon: "", message: "", hasProgress: false, value: 0, maxValue: 100, media: false, dim: false })
 
-  // `dim` : la barre passe en gris (sortie coupée).
+  // `dim`: the bar turns grey (output muted).
   function showOsd(icon, message, value, max, progressText, duration, dim) {
     var next = OsdModel.stateForShow(icon, message, value, max, progressText, duration)
     next.media = next.iconKey.indexOf("media") === 0 || next.iconKey.indexOf("player") === 0
     next.dim = !!dim
-    // L'état avant l'ouverture : un OSD neuf part de sa valeur, seul un OSD déjà là glisse.
+    // The state before opening: a new OSD starts from its value, only an OSD already there slides.
     osd = next
     osdOpen = true
     osdTimer.interval = Math.max(1, next.duration)
     if (next.duration > 0) osdTimer.restart()
     else osdTimer.stop()
   }
-  // Même lecture du payload que Osd.qml d'Omarchy (open()).
+  // Same reading of the payload as Omarchy's Osd.qml (open()).
   function showOsdPayload(payloadJson) {
     var p = null
     try { p = JSON.parse(payloadJson || "{}") } catch (e) { return false }
     if (!p || typeof p !== "object") return false
-    // Le volume vient de PipeWire (plus bas), jamais du payload : une seule source, donc
-    // jamais deux affichages ni deux états différents pour un même changement.
+    // The volume comes from PipeWire (below), never from the payload: a single source, so
+    // never two displays or two different states for the same change.
     if (String(p.icon || "").toLowerCase().indexOf("volume") === 0) return true
     showOsd(p.icon || "", p.message || "", p.value === undefined ? "" : String(p.value),
       p.max === undefined ? "100" : String(p.max), p.progressText || "",
@@ -118,17 +118,17 @@ Singleton {
   }
 
   // ---------------------------------------------------------------- volume
-  // Le volume de la sortie par défaut, lu dans PipeWire : il prend chaque changement, d'où
-  // qu'il vienne (touches, molette, application, pactl), ce que l'OSD des touches ne voit pas.
-  // Mêmes icônes que l'OSD de volume d'Omarchy (son script omarchy-audio-output-volume) :
-  // « volume-muted » quand la sortie est coupée ou à 0, sinon « volume-high ». Coupée, la
-  // barre garde son niveau mais passe en gris.
+  // The volume of the default output, read from PipeWire: it takes every change, from
+  // wherever it comes (keys, wheel, application, pactl), which the keys' OSD does not see.
+  // Same icons as Omarchy's volume OSD (its script omarchy-audio-output-volume):
+  // 'volume-muted' when the output is muted or at 0, otherwise 'volume-high'. Muted, the
+  // bar keeps its level but turns grey.
   readonly property var sink: Pipewire.defaultAudioSink
   PwObjectTracker { objects: [root.sink] }
   readonly property real sinkVolume: sink && sink.audio ? sink.audio.volume : -1
   readonly property bool sinkMuted: !!(sink && sink.audio && sink.audio.muted)
   readonly property bool sinkReady: !!(sink && sink.ready)
-  // La première lecture d'une sortie (démarrage, changement de sortie) est seulement retenue.
+  // The first reading of an output (startup, output change) is only kept.
   property var seenSink: null
   property real seenVolume: -1
   property bool seenMuted: false
@@ -148,9 +148,9 @@ Singleton {
   onSinkMutedChanged: volumeMoved()
   onSinkReadyChanged: volumeMoved()
 
-  // ---------------------------------------------------------------- dictée
-  // La pastille du bas dès que la dictée écoute ou transcrit, quelle que soit la source ; le
-  // texte sous l'île quand la source en donne un (Vocaline).
+  // ---------------------------------------------------------------- dictation
+  // The bottom pill as soon as the dictation listens or transcribes, whatever the source; the
+  // text under the island when the source gives some (Vocaline).
   property bool dictationListening: false
   property bool dictationTranscribing: false
   property real dictationLevel: 0
@@ -164,10 +164,10 @@ Singleton {
   readonly property string dictPartial: demoDictation ? demoPartial : dictationPartial
   readonly property bool dictTextShown: dictActive && (dictFinals !== "" || dictPartial !== "")
 
-  // Une seule onde pour toutes les sources : chacune ne donne que son niveau courant,
-  // échantillonné ici 100 fois par seconde dans l'historique des barres, le
-  // plus récent en dernier. L'onde bouge donc pareil quelle que soit la source ; elle repart de
-  // zéro à chaque dictée.
+  // A single wave for all the sources: each only gives its current level,
+  // sampled here 100 times per second into the bars' history, the
+  // most recent last. The wave therefore moves the same whatever the source; it restarts from
+  // zero at each dictation.
   readonly property int dictBars: 14
   property var dictLevels: []
   Timer {
@@ -182,9 +182,9 @@ Singleton {
   }
   onDictListeningChanged: if (!dictListening) dictLevels = []
 
-  // ---------------------------------------------------------------- bord de l'île
-  // Bord bas de l'île dessinée, par écran (poste.island, à chaque image du ressort). Sans île
-  // sur l'écran, la pile part du haut.
+  // ---------------------------------------------------------------- island edge
+  // Bottom edge of the drawn island, per screen (poste.island, at each frame of the spring). Without an island
+  // on the screen, the stack starts from the top.
   property var islandEdges: ({})
   function setIslandEdge(screenName, bottom) {
     var y = Math.max(0, Math.round(bottom))
@@ -196,14 +196,14 @@ Singleton {
   }
 
   // ---------------------------------------------------------------- notifications
-  // Le service s'inscrit ici, chaque fenêtre lit son modèle (NotificationView.qml).
+  // The service registers here, each window reads its model (NotificationView.qml).
   property var notifications: null
   function attachNotifications(service) { notifications = service }
   function detachNotifications(service) { if (notifications === service) notifications = null }
-  // Pendant la démo, les vraies notifications attendent (elles restent dans leur service).
+  // During the demo, the real notifications wait (they stay in their service).
   readonly property var source: demoRunning ? demoSource : notifications
 
-  // ---------------------------------------------------------------- fenêtres
+  // ---------------------------------------------------------------- windows
   Variants {
     model: Quickshell.screens
     delegate: Component {
@@ -215,15 +215,15 @@ Singleton {
     }
   }
 
-  // ---------------------------------------------------------------- démo
-  // omarchy-shell bandeau demo : un OSD de volume qui monte, un OSD de musique, deux
-  // notifications (dont une dont le texte s'allonge), une dictée (la pastille et son onde en bas,
-  // puis un texte sous l'île qui passe sur deux lignes), puis le volume coupé, tout inventé, sur
-  // l'écran actif (la démo le suit). Rien n'est envoyé au serveur de notifications ni écrit dans
-  // l'historique.
+  // ---------------------------------------------------------------- demo
+  // omarchy-shell bandeau demo: a rising volume OSD, a music OSD, two
+  // notifications (one of which has a text that grows longer), a dictation (the pill and its wave at the bottom,
+  // then a text under the island that goes onto two lines), then the volume muted, all invented, on
+  // the active screen (the demo follows it). Nothing is sent to the notification server or written to
+  // the history.
   property bool demoRunning: false
   property bool demoDictation: false
-  // Niveau inventé de la dictée de démo : une voix qui monte et retombe, 25 fois par seconde.
+  // Invented level of the demo dictation: a voice that rises and falls, 25 times per second.
   property real demoLevel: 0
   property real demoPhase: 0
   Timer {
@@ -244,10 +244,10 @@ Singleton {
     id: demoSource
     readonly property var popupModel: demoModel
     property int popupScreensRev: 0
-    // Clé unique d'un passage à l'autre (l'heure, comme le service) : une carte encore en
-    // train de partir ne peut pas être prise pour une nouvelle.
+    // Unique key from one run to the next (the time, like the service): a card still
+    // leaving cannot be mistaken for a new one.
     function popupKey(row) { return String(row.originalId) + ":" + String(row.timestamp) }
-    // Toute la démo suit l'écran actif, notifications comprises, comme l'OSD et la dictée.
+    // The whole demo follows the active screen, notifications included, like the OSD and the dictation.
     function popupOnScreen(key, screenName) { return root.focusedScreen === "" || root.focusedScreen === String(screenName) }
     function durationFor(urgency, expireTimeout) { return 6000 }
     function present(row) {
@@ -262,7 +262,7 @@ Singleton {
     demoModel.insert(0, { originalId: id, timestamp: Date.now(), app: "demo", appIcon: "",
       summary: summary, body: body, image: "", glyph: glyph, urgency: urgency, expireTimeout: 0 })
   }
-  // Une notification remplacée (même id) : son texte change sur place, la carte grandit.
+  // A replaced notification (same id): its text changes in place, the card grows.
   function demoBody(id, body) {
     for (var i = 0; i < demoModel.count; i++)
       if (demoModel.get(i).originalId === id) demoModel.setProperty(i, "body", body)
@@ -272,18 +272,18 @@ Singleton {
     function() { root.showOsd("volume", "", "45", "100", "", "1600") },
     function() { root.showOsd("volume", "", "62", "100", "", "1600") },
     function() {},
-    function() { root.showOsd("media-play", "Morceau inventé - Groupe exemple", "", "100", "", "2500") },
-    function() { root.demoNotify(1, "󰄬", "Compilation terminée", "exemple-api · 42 tests passés", 1) },
+    function() { root.showOsd("media-play", "Invented track - Example band", "", "100", "", "2500") },
+    function() { root.demoNotify(1, "󰄬", "Build finished", "example-api · 42 tests passed", 1) },
     function() {},
-    function() { root.demoNotify(2, "󰃰", "Rappel", "Réunion d'exemple dans dix minutes, salle de démonstration", 2) },
+    function() { root.demoNotify(2, "󰃰", "Reminder", "Example meeting in ten minutes, demo room", 2) },
     function() { root.demoDictation = true },
-    function() { root.demoPartial = "Il faut que" },
-    function() { root.demoPartial = "Il faut que je pense à renvoyer" },
-    function() { root.demoFinals = "Il faut que je pense à renvoyer le devis demain matin"; root.demoPartial = "" },
-    function() { root.demoBody(1, "exemple-api · 42 tests passés, trois avertissements à relire avant la mise en ligne") },
-    function() { root.demoPartial = "et à rappeler" },
-    function() { root.demoPartial = "et à rappeler le transporteur avant midi" },
-    function() { root.demoFinals = "Il faut que je pense à renvoyer le devis demain matin et à rappeler le transporteur avant midi"; root.demoPartial = "puis préparer le compte rendu de la réunion d'exemple pour toute l'équipe" },
+    function() { root.demoPartial = "I need to" },
+    function() { root.demoPartial = "I need to remember to resend" },
+    function() { root.demoFinals = "I need to remember to resend the quote tomorrow morning"; root.demoPartial = "" },
+    function() { root.demoBody(1, "example-api · 42 tests passed, three warnings to review before going live") },
+    function() { root.demoPartial = "and to call" },
+    function() { root.demoPartial = "and to call the carrier before noon" },
+    function() { root.demoFinals = "I need to remember to resend the quote tomorrow morning and to call the carrier before noon"; root.demoPartial = "then prepare the minutes of the example meeting for the whole team" },
     function() { root.showOsd("volume", "", "40", "100", "", "1600") },
     function() { root.showOsd("volume-muted", "", "40", "100", "", "1600", true) },
     function() { root.demoDictation = false },

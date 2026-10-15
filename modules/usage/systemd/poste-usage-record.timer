@@ -1,11 +1,11 @@
 [Unit]
-Description=poste usage : relevé des quotas toutes les 5 minutes
+Description=poste usage: reading of the quotas every 5 minutes
 Documentation=file://%h/Projects/poste/modules/usage/README.md
 
 [Timer]
 OnCalendar=*:0/5
 AccuracySec=30s
-# Pas de rattrapage : un relevé manqué pendant la veille ne sert à rien.
+# No catching up: a reading missed during sleep is useless.
 Persistent=false
 
 [Install]

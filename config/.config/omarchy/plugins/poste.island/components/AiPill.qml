@@ -1,22 +1,22 @@
 import QtQuick
 
-// Pastille d'une conversation IA, en haut à droite de l'écran (miroir des
-// minuteurs à gauche ; une par conversation, voir AskService.docked) : l'IA travaille (« Thinking… »,
-// « Searching the web… », avec le reflet du chargement), ou sa réponse
-// attend (« Answer ready », point d'accent), ou elle y est épinglée (sa
-// question). Clic : rouvre la conversation. Le ✕ au survol arrête l'IA si
-// elle travaille, sinon retire l'épingle.
+// Pill of an AI conversation, at the top right of the screen (mirror of the
+// timers on the left; one per conversation, see AskService.docked): the AI is working ('Thinking…',
+// 'Searching the web…', with the loading reflection), or its answer
+// is waiting ('Answer ready', accent dot), or it is pinned there (its
+// question). Click: reopens the conversation. The ✕ on hover stops the AI if
+// it is working, otherwise removes the pin.
 Rectangle {
   id: pill
   required property var host
-  required property var conv          // l'AiConversation qu'elle résume
+  required property var conv          // the AiConversation it summarizes
   readonly property bool ready: conv.unseen && !conv.busy
-  // Compacte (place manquante, voir IslandWindow) : l'icône seule, l'état en
-  // couleur ; au survol, son libellé dans une bulle dessous (la largeur ne
-  // change pas : la rangée ne doit pas glisser sur l'île).
+  // Compact (room missing, see IslandWindow): the icon alone, the state in
+  // color; on hover, its label in a bubble below (the width does not
+  // change: the row must not slide on the island).
   property bool compact: false
   readonly property bool small: compact
-  // Bulle affichée : la pastille ou la bulle elle-même est survolée.
+  // Bubble shown: the pill or the bubble itself is hovered.
   readonly property bool tipShown: small && (hover.hovered || tipHover.hovered)
   signal openRequested()
 
@@ -33,7 +33,7 @@ Rectangle {
     onClicked: pill.openRequested()
   }
 
-  // Compacte, réponse prête : badge d'accent dans le coin.
+  // Compact, answer ready: accent badge in the corner.
   Rectangle {
     visible: pill.small && pill.ready
     anchors.right: parent.right
@@ -55,7 +55,7 @@ Rectangle {
       color: pill.ready || (pill.small && pill.conv.busy) ? pill.host.colorAccent : pill.host.colorText
       fontFamily: pill.host.fontFamily
       pixelSize: 14
-      // Compacte et au travail : l'icône respire.
+      // Compact and working: the icon breathes.
       SequentialAnimation on opacity {
         running: pill.small && pill.conv.busy
         loops: Animation.Infinite
@@ -64,7 +64,7 @@ Rectangle {
         NumberAnimation { to: 1; duration: 700; easing.type: Easing.InOutSine }
       }
     }
-    // En cours : le libellé traversé par le reflet du chargement (Shimmer.qml).
+    // Running: the label crossed by the loading reflection (Shimmer.qml).
     Item {
       anchors.verticalCenter: parent.verticalCenter
       visible: pill.conv.busy && !pill.small
@@ -80,13 +80,13 @@ Rectangle {
         sweepX: -60 + parent.phase * (implicitWidth + 120)
       }
     }
-    // Épinglée, au repos : la question, pour savoir de quelle conversation il s'agit.
+    // Pinned, idle: the question, to know which conversation it is.
     Text {
       anchors.verticalCenter: parent.verticalCenter
       visible: pill.conv.pinned && !pill.conv.busy && !pill.ready && !pill.small
       width: Math.min(implicitWidth, 220)
-      // Coupé au milieu : début et fin de la question restent lisibles (deux
-      // questions qui commencent pareil se distinguent par leur fin).
+      // Cut in the middle: start and end of the question stay readable (two
+      // questions that start the same are told apart by their end).
       elide: Text.ElideMiddle
       text: pill.conv.question
       color: pill.host.colorText
@@ -108,7 +108,7 @@ Rectangle {
       width: 7; height: 7; radius: 3.5
       color: pill.conv.lastError ? "#e5484d" : pill.host.colorAccent
     }
-    // Au survol : ✕ arrête l'IA si elle travaille, sinon retire l'épingle.
+    // On hover: ✕ stops the AI if it is working, otherwise removes the pin.
     Rectangle {
       anchors.verticalCenter: parent.verticalCenter
       visible: (pill.conv.busy || pill.conv.pinned) && hover.hovered && !pill.small
@@ -125,7 +125,7 @@ Rectangle {
     }
   }
 
-  // Bulle du mode compact : libellé, et ✕ (arrêter ou désépingler).
+  // Compact mode bubble: label, and ✕ (stop or unpin).
   Rectangle {
     visible: pill.tipShown
     anchors.top: parent.bottom

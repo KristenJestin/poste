@@ -49,11 +49,11 @@
 --   },
 -- })
 
--- --- Réglages perso (repris d'Omarchy 3) ----------------------------------
--- Bordures fines et neutres (couleurs : hyprland_active_border / inactive du thème).
+-- --- Personal settings (taken from Omarchy 3) ----------------------------
+-- Thin, neutral borders (colors: the theme's hyprland_active_border / inactive).
 hl.config({ general = { border_size = 1 } })
 
--- Coins arrondis et flou type "Acrylic".
+-- Rounded corners and "Acrylic"-type blur.
 hl.config({
   decoration = {
     rounding = 8,
@@ -62,7 +62,7 @@ hl.config({
       size = 10,
       passes = 3,
       new_optimizations = true,
-      xray = true, -- le flou traverse les fenêtres -> rendu "Acrylic"
+      xray = true, -- the blur goes through the windows -> "Acrylic" look
       ignore_opacity = true,
       noise = 0.08,
       contrast = 0.9,
@@ -72,26 +72,26 @@ hl.config({
   },
 })
 
--- Glissé-fondu entre workspaces.
+-- Slide-fade between workspaces.
 hl.animation({ leaf = "workspaces", enabled = true, speed = 3.5, bezier = "easeOutQuint", style = "slidefade 15%" })
 
--- Intensité du voile sombre (dim_around) des menus.
+-- Strength of the dark veil (dim_around) of the menus.
 hl.config({ decoration = { dim_around = 0.55 } })
 
--- Transparence des fenêtres comme sous Omarchy 3 (Quattro : 0.985 / 0.96,
--- quasi opaque, le flou Acrylic ne se voyait plus). Actif / inactif.
+-- Window transparency as under Omarchy 3 (Quattro: 0.985 / 0.96,
+-- almost opaque, the Acrylic blur was no longer visible). Active / inactive.
 o.window({ tag = "default-opacity" }, { opacity = "0.97 0.9" })
 
--- Bandeau (poste.island/bandeau : notifications, OSD, texte dicté sous l'île, pastille de
--- dictée en bas) : verre sombre, flou des fenêtres réellement derrière (xray off), seulement
--- sous les pièces (ignore_alpha > alpha de l'ombre 0.38, < alpha du verre 0.86). Ses
--- apparitions sont animées dans l'île, pas par le compositeur.
+-- Banner (poste.island/bandeau: notifications, OSD, dictated text under the island, dictation
+-- pill at the bottom): dark glass, blur of the windows really behind (xray off), only
+-- under the pieces (ignore_alpha > alpha of the shadow 0.38, < alpha of the glass 0.86). Its
+-- appearances are animated in the island, not by the compositor.
 hl.layer_rule({ match = { namespace = "^poste-bandeau$" }, no_anim = true, blur = true, ignore_alpha = 0.45, xray = false })
 
--- Menu Omarchy (SUPER+ALT+ESPACE) : voile sombre derrière.
+-- Omarchy menu (SUPER+ALT+SPACE): dark veil behind.
 hl.layer_rule({ match = { namespace = "^omarchy-menu$" }, dim_around = true })
 
--- Panneaux natifs (Réseau, Bluetooth, Audio, VPN…) ouverts depuis l'île :
--- même voile que l'île dépliée et une petite apparition. La surface couvre
--- tout l'écran (la carte est dedans), d'où un popin léger plutôt qu'un slide.
+-- Native panels (Network, Bluetooth, Audio, VPN…) opened from the island:
+-- same veil as the unfolded island and a small appearance. The surface covers
+-- the whole screen (the card is inside), hence a light popin rather than a slide.
 hl.layer_rule({ match = { namespace = "^omarchy-keyboard-panel$" }, no_anim = false, animation = "popin 96%", dim_around = true })

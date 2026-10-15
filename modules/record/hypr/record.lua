@@ -1,9 +1,9 @@
--- Module record : raccourcis d'enregistrement d'écran (chargé par hyprland.lua).
--- Installé par `poste sys setup` dans ~/.local/share/poste/modules/record/hypr/.
+-- Record module: screen recording shortcuts (loaded by hyprland.lua).
+-- Installed by `poste sys setup` in ~/.local/share/poste/modules/record/hypr/.
 
--- SHIFT+PRINT : arrête l'enregistrement en cours ; sinon ouvre le lanceur de l'île sur « Record »
--- (préréglages, fenêtres, écrans, zone). gpu-screen-recorder, à la place d'OBS.
+-- SHIFT+PRINT: stops the recording in progress; otherwise opens the island's launcher on "Record"
+-- (presets, windows, screens, region). gpu-screen-recorder, in place of OBS.
 o.bind("SHIFT + PRINT", "Screen recording", "poste record hotkey")
 
--- ALT+PRINT : menu d'enregistrement d'écran d'Omarchy retiré.
+-- ALT+PRINT: Omarchy's screen recording menu removed.
 hl.unbind("ALT + PRINT")

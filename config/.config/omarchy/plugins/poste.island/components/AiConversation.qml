@@ -2,13 +2,13 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 
-// Une conversation avec l'IA de l'île : ses messages, sa session chez le
-// fournisseur, son processus (bin/poste-ask). Créée et rangée par
-// AskService.qml, affichée par AskView.qml, résumée par AiPill.qml.
+// A conversation with the island's AI: its messages, its session at the
+// provider, its process (bin/poste-ask). Created and stored by
+// AskService.qml, displayed by AskView.qml, summarized by AiPill.qml.
 Item {
   id: conv
   required property var service
-  property int uid: 0          // identifiant stable (activités de l'île)
+  property int uid: 0          // stable identifier (island activities)
   property string provider: "claude"
   readonly property string providerName: service.providerNames[provider] || provider
 
@@ -17,11 +17,11 @@ Item {
   property string sessionId: ""
   property bool busy: false
   property string lastAnswer: ""
-  // Réponse arrivée pendant qu'elle n'était pas affichée.
+  // Answer that arrived while it was not displayed.
   property bool unseen: false
-  // Épinglée : gardée dans sa pastille, à droite, même au repos.
+  // Pinned: kept in its pill, on the right, even when idle.
   property bool pinned: false
-  // Affichée en ce moment dans une vue IA.
+  // Currently displayed in an AI view.
   property bool shown: false
   onShownChanged: if (shown) unseen = false
 
@@ -61,8 +61,8 @@ Item {
     }
     busy = false
   }
-  // Changer de fournisseur : seulement sur une conversation vide (une
-  // conversation appartient à son fournisseur).
+  // Changing provider: only on an empty conversation (a
+  // conversation belongs to its provider).
   function cycleProvider() {
     if (busy || messages.count > 0) return
     var ids = service.providerIds

@@ -1,18 +1,18 @@
 import QtQuick
 import QtQuick.Effects
 
-// La petite île d'un minuteur, en haut à gauche de l'écran : son fond orange
-// (accent) se vide vers la gauche à mesure que le temps passe. Le texte est
-// sombre sur l'orange et clair sur le noir (deux couches, découpées à la
-// limite de la barre). Clic : déplie les commandes (+1 min, pause / reprise,
-// annuler) ; clic droit : pause. Terminé : pastille orange qui pulse, son en
-// boucle (Island.qml) ; un clic la ferme et coupe le son.
+// A timer's small island, at the top left of the screen: its orange (accent)
+// background empties to the left as time passes. The text is
+// dark on the orange and light on the black (two layers, cut at the
+// bar's limit). Click: unfolds the controls (+1 min, pause / resume,
+// cancel); right click: pause. Finished: pulsing orange pill, looping sound
+// (Island.qml); a click closes it and stops the sound.
 Rectangle {
   id: pill
   required property var host
   required property var timer
   property bool expanded: false
-  // Compacte (place manquante, voir IslandWindow) : le temps seul, sans libellé.
+  // Compact (room missing, see IslandWindow): the time alone, without a label.
   property bool compact: false
 
   readonly property double remaining: host.timerLeft(timer)
@@ -22,7 +22,7 @@ Rectangle {
   readonly property real fillWidth: done ? width : width * progress
 
   readonly property color light: host.colorText
-  readonly property color dark: host.colorAccentText   // lisible sur l'accent, quel qu'il soit
+  readonly property color dark: host.colorAccentText   // readable on the accent, whatever it is
 
   height: host.restHeight
   width: content.implicitWidth + 22
@@ -58,11 +58,11 @@ Rectangle {
     }
   }
 
-  // Contenu : temps, libellé, commandes. Dessiné deux fois (clair / sombre).
+  // Content: time, label, controls. Drawn twice (light / dark).
   component PillContent: Row {
     id: rowContent
     property color ink: "white"
-    property bool live: false      // la copie sombre n'est pas cliquable
+    property bool live: false      // the dark copy is not clickable
     spacing: 8
     Text {
       anchors.verticalCenter: parent.verticalCenter
@@ -108,7 +108,7 @@ Rectangle {
     }
   }
 
-  // Couche claire (sur le noir), avec les commandes cliquables.
+  // Light layer (on the black), with the clickable controls.
   PillContent {
     id: content
     anchors.centerIn: parent
@@ -116,7 +116,7 @@ Rectangle {
     live: true
   }
 
-  // Barre orange + couche sombre, découpées à la forme de la pastille.
+  // Orange bar + dark layer, cut to the shape of the pill.
   Item {
     id: fillLayer
     anchors.fill: parent
@@ -153,7 +153,7 @@ Rectangle {
     Rectangle { anchors.fill: parent; radius: pill.radius; color: "black" }
   }
 
-  // Terminé : respiration (voile clair) jusqu'au clic.
+  // Finished: breathing (light veil) until the click.
   Rectangle {
     anchors.fill: parent
     radius: parent.radius

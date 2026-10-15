@@ -1,14 +1,14 @@
-//! Lignes que les modules posent dans des fichiers sans inclusion.
+//! Lines that modules put in files without includes.
 //!
-//! Un module déclare dans `module.toml` des `[[line]] file = "…", line = "…"`. `setup` ajoute
-//! la ligne si elle manque et note le module propriétaire dans `installed.json` ; elle est
-//! retirée si le module ne la déclare plus (ou disparaît). Une ligne qui n'a pas été posée
-//! par nous n'est jamais modifiée ni retirée. Le dépôt peut aussi déclarer des lignes
-//! « de base » dans `config/.poste/lines.toml` (même format, propriétaire `config`).
+//! A module declares `[[line]] file = "…", line = "…"` in `module.toml`. `setup` adds
+//! the line if it is missing and notes the owner module in `installed.json`; it is
+//! removed if the module no longer declares it (or disappears). A line that was not put in place
+//! by us is never changed or removed. The repository can also declare "base" lines
+//! in `config/.poste/lines.toml` (same format, owner `config`).
 //!
-//! La clé d'une ligne est ce qui précède le premier `=` (ou la ligne entière) : deux modules
-//! qui veulent la même clé dans le même fichier sont en conflit, de même qu'une clé déjà
-//! présente avec une autre valeur que nous n'avons pas posée.
+//! The key of a line is what precedes the first `=` (or the whole line): two modules
+//! that want the same key in the same file are in conflict, as is a key already
+//! present with another value that we did not put in place.
 
 use crate::manifest::{LineEntry, Manifest};
 use crate::plan;
@@ -17,7 +17,7 @@ use poste_core::{time, Card, Env};
 use std::collections::{BTreeMap, HashSet};
 use std::path::{Path, PathBuf};
 
-/// Propriétaire des lignes de `config/.poste/lines.toml`.
+/// Owner of the lines of `config/.poste/lines.toml`.
 pub const BASE_OWNER: &str = "config";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -30,21 +30,21 @@ pub struct Spec {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Op {
-    /// Ajoute la ligne à la fin du fichier.
+    /// Adds the line at the end of the file.
     Add,
-    /// Remplace l'ancienne valeur que nous avions posée.
+    /// Replaces the old value that we had put in place.
     Replace { old: String },
-    /// Posée par nous et présente.
+    /// Put in place by us and present.
     Unchanged,
-    /// La même ligne existe déjà sans que nous l'ayons posée : laissée, non suivie.
+    /// The same line already exists without us having put it in place: left, not tracked.
     Foreign,
-    /// Rien n'est écrit ; raison affichée.
+    /// Nothing is written; reason shown.
     Conflict(String),
-    /// Posée par nous, plus déclarée : retirée.
+    /// Put in place by us, no longer declared: removed.
     Remove,
-    /// Posée par nous mais déjà disparue du fichier : on oublie seulement l'entrée.
+    /// Put in place by us but already gone from the file: only the entry is forgotten.
     Forget,
-    /// Fichier qu'on ne modifie pas (lien symbolique, illisible).
+    /// File that we do not modify (symbolic link, unreadable).
     Blocked(String),
 }
 
@@ -65,7 +65,7 @@ impl Step {
     }
 }
 
-/// Clé d'une ligne : ce qui précède le premier `=`, sinon la ligne entière.
+/// Key of a line: what precedes the first `=`, otherwise the whole line.
 pub fn key_of(line: &str) -> String {
     let t = line.trim();
     match t.split_once('=') {
@@ -85,7 +85,7 @@ fn resolve_file(env: &Env, owner: &str, s: &str) -> Result<PathBuf> {
         || !p.starts_with(&env.home)
         || p.components().any(|c| c.as_os_str() == "..")
     {
-        bail!("{owner} : le fichier « {s} » doit être sous ~ (sans « .. »)");
+        bail!("{owner}: the file '{s}' must be under ~ (without '..')");
     }
     Ok(p)
 }
@@ -99,7 +99,7 @@ fn specs_of(card: &Card, owner: &str, env: &Env, out: &mut Vec<Spec>) -> Result<
             .trim()
             .to_string();
         if line.is_empty() || line.contains('\n') {
-            bail!("{owner} : une [[line]] doit tenir sur une ligne non vide");
+            bail!("{owner}: a [[line]] must fit on one non-empty line");
         }
         let spec = Spec {
             module: owner.to_string(),
@@ -114,7 +114,7 @@ fn specs_of(card: &Card, owner: &str, env: &Env, out: &mut Vec<Spec>) -> Result<
     Ok(())
 }
 
-/// Les lignes voulues : celles des modules du dépôt, puis celles de `config/.poste/lines.toml`.
+/// The wanted lines: those of the modules of the repository, then those of `config/.poste/lines.toml`.
 pub fn desired(repo: &Path, env: &Env) -> Result<Vec<Spec>> {
     let mut out = Vec::new();
     for m in plan::enabled_modules(repo, env)? {
@@ -129,7 +129,7 @@ pub fn desired(repo: &Path, env: &Env) -> Result<Vec<Spec>> {
 }
 
 enum Content {
-    /// Fichier absent (ou sur le point de disparaître).
+    /// Missing file (or about to disappear).
     Missing,
     Text(String),
     Blocked(String),
@@ -142,21 +142,21 @@ fn read(file: &Path, vanishing: &HashSet<PathBuf>) -> Content {
     match std::fs::symlink_metadata(file) {
         Err(_) => Content::Missing,
         Ok(m) if m.file_type().is_symlink() => Content::Blocked(
-            "le fichier est un lien symbolique (écrire à travers modifierait sa cible)".into(),
+            "the file is a symbolic link (writing through it would change its target)".into(),
         ),
-        Ok(m) if !m.is_file() => Content::Blocked("ce n'est pas un fichier ordinaire".into()),
+        Ok(m) if !m.is_file() => Content::Blocked("it is not an ordinary file".into()),
         Ok(_) => match std::fs::read_to_string(file) {
             Ok(t) => Content::Text(t),
-            Err(e) => Content::Blocked(format!("illisible : {e}")),
+            Err(e) => Content::Blocked(format!("unreadable: {e}")),
         },
     }
 }
 
-/// Calcule ce qu'il faut faire. `vanishing` : fichiers sur le point d'être retirés (liens
-/// orphelins), vus comme absents.
+/// Computes what must be done. `vanishing`: files about to be removed (orphan
+/// links), seen as absent.
 pub fn plan(specs: &[Spec], manifest: &Manifest, vanishing: &HashSet<PathBuf>) -> Vec<Step> {
     let mut steps = Vec::new();
-    // Même (fichier, clé) voulu par plusieurs propriétaires ou valeurs : conflit pour tous.
+    // Same (file, key) wanted by several owners or values: conflict for all.
     let mut by_key: BTreeMap<(&Path, &str), Vec<&Spec>> = BTreeMap::new();
     for s in specs {
         by_key.entry((&s.file, &s.key)).or_default().push(s);
@@ -184,7 +184,7 @@ pub fn plan(specs: &[Spec], manifest: &Manifest, vanishing: &HashSet<PathBuf>) -
                 .map(|r| r.module.as_str())
                 .collect();
             steps.push(step(Op::Conflict(format!(
-                "la clé « {} » est aussi demandée par {}",
+                "the key '{}' is also asked for by {}",
                 s.key,
                 others.join(", ")
             ))));
@@ -218,14 +218,14 @@ pub fn plan(specs: &[Spec], manifest: &Manifest, vanishing: &HashSet<PathBuf>) -
                 old: e.line.clone(),
             })),
             (Some(l), _) => steps.push(step(Op::Conflict(format!(
-                "la clé existe déjà avec une autre valeur que nous n'avons pas posée : {}",
+                "the key already exists with another value that we did not put in place: {}",
                 l.trim()
             )))),
             (None, _) => steps.push(step(Op::Add)),
         }
     }
 
-    // Lignes que nous avions posées et que plus personne ne déclare.
+    // Lines that we had put in place and that nobody declares any more.
     for e in &manifest.lines {
         let file = PathBuf::from(&e.file);
         let key = key_of(&e.line);
@@ -259,14 +259,14 @@ pub fn plan(specs: &[Spec], manifest: &Manifest, vanishing: &HashSet<PathBuf>) -
 
 pub fn label(op: &Op) -> &'static str {
     match op {
-        Op::Add => "ajoutée",
-        Op::Replace { .. } => "remplacée",
-        Op::Unchanged => "en place",
-        Op::Foreign => "déjà là (non posée par poste, laissée)",
-        Op::Conflict(_) => "CONFLIT",
-        Op::Remove => "retirée",
-        Op::Forget => "déjà absente (oubliée)",
-        Op::Blocked(_) => "NON MODIFIÉ",
+        Op::Add => "added",
+        Op::Replace { .. } => "replaced",
+        Op::Unchanged => "in place",
+        Op::Foreign => "already there (not put by poste, left)",
+        Op::Conflict(_) => "CONFLICT",
+        Op::Remove => "removed",
+        Op::Forget => "already absent (forgotten)",
+        Op::Blocked(_) => "NOT MODIFIED",
     }
 }
 
@@ -278,7 +278,7 @@ pub fn print_plan(env: &Env, steps: &[Step]) {
     if shown.is_empty() {
         return;
     }
-    println!("\nLignes de module :");
+    println!("\nModule lines:");
     for s in shown {
         println!(
             "  {:<12} {}  {}  [{}]",
@@ -289,7 +289,7 @@ pub fn print_plan(env: &Env, steps: &[Step]) {
         );
         match &s.op {
             Op::Conflict(why) | Op::Blocked(why) => println!("               {why}"),
-            Op::Replace { old } => println!("               (ancienne valeur : {old})"),
+            Op::Replace { old } => println!("               (old value: {old})"),
             _ => {}
         }
     }
@@ -302,18 +302,18 @@ pub fn conflicts(steps: &[Step]) -> usize {
         .count()
 }
 
-/// Écrit `text` dans `file` (fichier temporaire voisin puis renommage), mêmes droits qu'avant.
+/// Writes `text` into `file` (neighbouring temporary file then rename), same permissions as before.
 fn write_atomic(file: &Path, text: &str) -> Result<()> {
-    let parent = file.parent().context("fichier sans dossier parent")?;
+    let parent = file.parent().context("file without a parent folder")?;
     std::fs::create_dir_all(parent)?;
-    let tmp = parent.join(format!(".poste-tmp-{}-ligne", std::process::id()));
+    let tmp = parent.join(format!(".poste-tmp-{}-line", std::process::id()));
     std::fs::write(&tmp, text)?;
     if let Ok(m) = std::fs::metadata(file) {
         let _ = std::fs::set_permissions(&tmp, m.permissions());
     }
     if let Err(e) = std::fs::rename(&tmp, file) {
         let _ = std::fs::remove_file(&tmp);
-        return Err(e).with_context(|| format!("écriture de {}", file.display()));
+        return Err(e).with_context(|| format!("writing {}", file.display()));
     }
     Ok(())
 }
@@ -328,8 +328,8 @@ fn remove_first(lines: &mut Vec<String>, wanted: &str) -> bool {
     }
 }
 
-/// Applique les étapes qui écrivent ; renvoie le nombre de lignes traitées. Sauvegarde un
-/// fichier existant avant de le modifier. Met à jour `manifest` (à enregistrer par l'appelant).
+/// Applies the steps that write; returns the number of lines handled. Backs up an
+/// existing file before changing it. Updates `manifest` (to be saved by the caller).
 pub fn apply(env: &Env, steps: &[Step], stamp: &str, manifest: &mut Manifest) -> Result<usize> {
     let mut files: Vec<&Path> = Vec::new();
     for s in steps.iter().filter(|s| s.writes()) {
@@ -341,8 +341,7 @@ pub fn apply(env: &Env, steps: &[Step], stamp: &str, manifest: &mut Manifest) ->
     for file in files {
         let existed = file.is_file();
         let old = if existed {
-            std::fs::read_to_string(file)
-                .with_context(|| format!("lecture de {}", file.display()))?
+            std::fs::read_to_string(file).with_context(|| format!("reading {}", file.display()))?
         } else {
             String::new()
         };
@@ -368,7 +367,7 @@ pub fn apply(env: &Env, steps: &[Step], stamp: &str, manifest: &mut Manifest) ->
         if dirty {
             if existed {
                 let bak = crate::util::backup(env, file, stamp)?;
-                println!("  sauvegarde : {}", env.display(&bak));
+                println!("  backup: {}", env.display(&bak));
             }
             let mut text = lines.join("\n");
             if !lines.is_empty() {
@@ -425,15 +424,15 @@ mod tests {
     }
 
     #[test]
-    fn cle_de_ligne() {
+    fn line_key() {
         assert_eq!(key_of("a:b = 1"), "a:b");
-        assert_eq!(key_of("  sans egal "), "sans egal");
+        assert_eq!(key_of("  no equals "), "no equals");
     }
 
     #[test]
-    fn ajout_idempotent_puis_retrait_sans_toucher_au_reste() {
+    fn add_is_idempotent_then_removal_touches_nothing_else() {
         let (_d, f, env) = setup();
-        fs::write(&f, "a = 1").unwrap(); // sans saut de ligne final
+        fs::write(&f, "a = 1").unwrap(); // without a final line break
         let mut m = Manifest::default();
         let s = [spec("rec", &f, "screencopy:picker = /x")];
         let st = run(&env, &s, &mut m);
@@ -444,11 +443,11 @@ mod tests {
         );
         assert_eq!(m.lines.len(), 1);
         assert_eq!(m.lines[0].module, "rec");
-        // Relance : rien à faire.
+        // Run again: nothing to do.
         let st = run(&env, &s, &mut m);
         assert_eq!(st[0].op, Op::Unchanged);
         assert_eq!(m.lines.len(), 1);
-        // Le module disparaît : sa ligne part, l'autre reste.
+        // The module disappears: its line goes, the other stays.
         let st = run(&env, &[], &mut m);
         assert_eq!(st[0].op, Op::Remove);
         assert_eq!(fs::read_to_string(&f).unwrap(), "a = 1\n");
@@ -456,17 +455,17 @@ mod tests {
     }
 
     #[test]
-    fn ligne_etrangere_jamais_touchee() {
+    fn foreign_line_never_touched() {
         let (_d, f, env) = setup();
         fs::write(&f, "k = 1\nautre = 2\n").unwrap();
         let mut m = Manifest::default();
-        // Identique mais pas posée par nous : laissée, non suivie, donc jamais retirée.
+        // Identical but not put in place by us: left, not tracked, so never removed.
         let st = run(&env, &[spec("rec", &f, "k = 1")], &mut m);
         assert_eq!(st[0].op, Op::Foreign);
         assert!(m.lines.is_empty());
         run(&env, &[], &mut m);
         assert_eq!(fs::read_to_string(&f).unwrap(), "k = 1\nautre = 2\n");
-        // Même clé, autre valeur : conflit, rien d'écrit.
+        // Same key, other value: conflict, nothing written.
         let st = run(&env, &[spec("rec", &f, "k = 9")], &mut m);
         assert!(matches!(st[0].op, Op::Conflict(_)));
         assert_eq!(fs::read_to_string(&f).unwrap(), "k = 1\nautre = 2\n");
@@ -474,7 +473,7 @@ mod tests {
     }
 
     #[test]
-    fn deux_modules_meme_cle_conflit() {
+    fn two_modules_same_key_conflict() {
         let (_d, f, env) = setup();
         let mut m = Manifest::default();
         let st = run(
@@ -488,7 +487,7 @@ mod tests {
     }
 
     #[test]
-    fn valeur_changee_remplace_la_ligne_posee() {
+    fn changed_value_replaces_the_line_put_in_place() {
         let (_d, f, env) = setup();
         let mut m = Manifest::default();
         run(&env, &[spec("rec", &f, "k = 1")], &mut m);
@@ -500,7 +499,7 @@ mod tests {
     }
 
     #[test]
-    fn ligne_deja_disparue_est_oubliee_et_lien_refuse() {
+    fn line_already_gone_is_forgotten_and_link_refused() {
         let (_d, f, env) = setup();
         let mut m = Manifest::default();
         run(&env, &[spec("rec", &f, "k = 1")], &mut m);
@@ -508,18 +507,18 @@ mod tests {
         let st = run(&env, &[], &mut m);
         assert_eq!(st[0].op, Op::Forget);
         assert!(m.lines.is_empty());
-        // Un fichier qui est un lien n'est jamais modifié.
-        let cible = f.with_file_name("cible");
-        fs::write(&cible, "").unwrap();
+        // A file that is a link is never modified.
+        let target_file = f.with_file_name("target_file");
+        fs::write(&target_file, "").unwrap();
         fs::remove_file(&f).unwrap();
-        std::os::unix::fs::symlink(&cible, &f).unwrap();
+        std::os::unix::fs::symlink(&target_file, &f).unwrap();
         let st = run(&env, &[spec("rec", &f, "k = 1")], &mut m);
         assert!(matches!(st[0].op, Op::Blocked(_)));
-        assert_eq!(fs::read_to_string(&cible).unwrap(), "");
+        assert_eq!(fs::read_to_string(&target_file).unwrap(), "");
     }
 
     #[test]
-    fn declarations_du_depot() {
+    fn repository_declarations() {
         let d = tempfile::tempdir().unwrap();
         let repo = d.path().join("repo");
         fs::create_dir_all(repo.join("modules/rec")).unwrap();
@@ -540,7 +539,7 @@ mod tests {
         assert_eq!(s[0].module, "rec");
         assert!(s[0].line.starts_with("k = /") && s[0].line.ends_with("home/p"));
         assert_eq!(s[1].module, BASE_OWNER);
-        // Hors de ~ : refusé.
+        // Outside ~: refused.
         fs::write(
             repo.join("modules/rec/module.toml"),
             "name = \"rec\"\n[[line]]\nfile = \"/etc/x\"\nline = \"a\"\n",

@@ -1,23 +1,23 @@
 import QtQuick
 
-// Défilement à la molette, à poser dans une ListView ou une Flickable :
-// `WheelScroll {}`. Qt fait défiler d'un cran par une animation qu'il
-// relance à chaque événement ; une molette haute résolution (G502) envoie
-// plusieurs petits événements par cran, et chaque relance perd ce qui restait
-// à parcourir, d'où un défilement très lent. Ici chaque événement avance d'un
-// pas fixe, cumulé jusqu'au bord.
+// Wheel scrolling, to put in a ListView or a Flickable:
+// `WheelScroll {}`. Qt scrolls by one notch with an animation that it
+// restarts at each event; a high-resolution wheel (G502) sends
+// several small events per notch, and each restart loses what was left
+// to travel, hence a very slow scrolling. Here each event advances by a
+// fixed step, accumulated up to the edge.
 WheelHandler {
   id: wheel
 
-  // Pixels par cran (angleDelta de 120).
+  // Pixels per notch (angleDelta of 120).
   property real step: 50
 
-  // La ListView ou la Flickable : posé dedans, le gestionnaire se retrouve sur
-  // son contentItem.
+  // The ListView or the Flickable: put inside it, the handler ends up on
+  // its contentItem.
   readonly property Item view: parent && parent.contentY === undefined ? parent.parent : parent
 
-  // Le gestionnaire passe avant la Flickable et accepte l'événement : elle ne
-  // le voit plus.
+  // The handler goes before the Flickable and accepts the event: it no
+  // longer sees it.
   acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
   target: null
 
@@ -31,7 +31,7 @@ WheelHandler {
   }
 
   onWheel: function(event) {
-    // Pavé tactile : déplacement au pixel ; molette : en crans.
+    // Touchpad: pixel movement; wheel: in notches.
     const dy = event.pixelDelta.y !== 0 ? -event.pixelDelta.y : -event.angleDelta.y / 120 * wheel.step
     if (dy !== 0) wheel.scrollBy(dy)
   }

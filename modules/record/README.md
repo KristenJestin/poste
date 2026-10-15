@@ -1,76 +1,76 @@
 # poste record
 
-Enregistrement d'écran avec `gpu-screen-recorder`, piloté par l'île. C'est une caisse Rust
-(`poste-record`, listée dans les `members` du `Cargo.toml` racine) : `poste sys setup` construit le
-binaire en release et l'installe dans `~/.local/share/poste/modules/record/poste-record`, et
-`poste record …` l'exécute. Le script Python d'origine reste dans le dépôt (`poste-record.py`,
-`poste-share-picker.py`) le temps de la validation en vrai ; il n'est pas installé.
+Screen recording with `gpu-screen-recorder`, driven by the island. It is a Rust crate
+(`poste-record`, listed in the `members` of the root `Cargo.toml`): `poste sys setup` builds the
+binary in release and installs it in `~/.local/share/poste/modules/record/poste-record`, and
+`poste record …` runs it. The original Python script stays in the repository (`poste-record.py`,
+`poste-share-picker.py`) while the validation for real goes on; it is not installed.
 
-## Commandes
+## Commands
 
-- `poste record start --preset ID` : un préréglage (voir plus bas).
-- `poste record start --window ADDR [--audio A]` : une fenêtre (adresse Hyprland).
-- `poste record start --monitor NOM [--audio A]` : un écran entier.
-- `poste record start --region [--audio A]` : une zone choisie à la souris.
-- `poste record stop | pause | resume | toggle` : arrêter (le fichier est terminé proprement),
-  mettre en pause, reprendre, ou basculer pause/reprise.
-- `poste record status` : état en JSON (`{"t": "status", "recording": false}` au repos).
-- `poste record watch` : une ligne JSON par changement d'état (lu par l'île).
-- `poste record items` : la liste de l'extension « Record » du lanceur (JSON).
-- `poste record hotkey` : SHIFT+PRINT. Arrête l'enregistrement en cours, sinon ouvre le lanceur
-  de l'île sur « Record ».
-- `poste record open-dir | open-last [--preset ID]` : le dossier, ou le dernier enregistrement.
+- `poste record start --preset ID`: a preset (see below).
+- `poste record start --window ADDR [--audio A]`: a window (Hyprland address).
+- `poste record start --monitor NAME [--audio A]`: a whole screen.
+- `poste record start --region [--audio A]`: a region picked with the mouse.
+- `poste record stop | pause | resume | toggle`: stop (the file is finished cleanly),
+  pause, resume, or toggle pause/resume.
+- `poste record status`: state as JSON (`{"t": "status", "recording": false}` at rest).
+- `poste record watch`: one JSON line per state change (read by the island).
+- `poste record items`: the list of the launcher's "Record" extension (JSON).
+- `poste record hotkey`: SHIFT+PRINT. Stops the recording in progress, otherwise opens the island's
+  launcher on "Record".
+- `poste record open-dir | open-last [--preset ID]`: the folder, or the last recording.
 
-Son (`--audio`) : `none`, `app` (le son de l'appli de la fenêtre), `desktop`, `mic`,
-`desktop+mic`, `app+mic`, ou des sources `gpu-screen-recorder` brutes séparées par `|`.
+Sound (`--audio`): `none`, `app` (the sound of the window's app), `desktop`, `mic`,
+`desktop+mic`, `app+mic`, or raw `gpu-screen-recorder` sources separated by `|`.
 
-## Préréglages (config utilisateur)
+## Presets (user config)
 
-`~/.config/poste/record/presets.json` (`XDG_CONFIG_HOME` respecté), versionné dans
-`config/.config/poste/record/presets.json` et posé par lien. Il était avant dans
-`~/.config/poste-island/record/presets.json` : déplacé sans changement de contenu ; l'ancien lien
-est repéré comme orphelin et retiré par `poste sys setup`. Le format est décrit dans le champ
-`"//"` du fichier (`defaults`, `presets`, `audioSource`, `audioAppName`, `cursor`, `dir`…).
+`~/.config/poste/record/presets.json` (`XDG_CONFIG_HOME` honoured), versioned in
+`config/.config/poste/record/presets.json` and put in place as a link. It used to be in
+`~/.config/poste-island/record/presets.json`: moved without changing its content; the old link
+is spotted as an orphan and removed by `poste sys setup`. The format is described in the
+`"//"` field of the file (`defaults`, `presets`, `audioSource`, `audioAppName`, `cursor`, `dir`…).
 
-## Ce que le module apporte à la machine
+## What the module brings to the machine
 
-| Où | Fichier du module | Rôle |
+| Where | File of the module | Role |
 | --- | --- | --- |
-| Hyprland | `hypr/record.lua` | SHIFT+PRINT vers `poste record hotkey`, `hl.unbind("ALT + PRINT")` |
-| Lanceur de l'île | `island/launcher.json` | extension `record` (mots-clés `rec`, `record`), avec `"highlight": true` : l'île encadre à l'écran la cible sélectionnée |
-| Île (slot `capture`) | `island/island.json`, `island/RecordState.qml` | état de l'enregistrement pour la pastille de capture et sa carte (partagées avec OBS, qui restent dans l'île) |
-| `xdph.conf` | ligne de `module.toml` (`[[line]]`) | `screencopy:custom_picker_binary` vers `bin/poste-share-picker` |
-| Programme annexe | `bin/poste-share-picker` | sélecteur de partage d'écran de xdg-desktop-portal-hyprland : script court (chemin stable pour la ligne `xdph.conf`) qui lance `poste-record share-picker`. Celui-ci répond seul avec la fenêtre demandée par `poste record` (fichier `pick.json` de moins de 20 s dans `$XDG_RUNTIME_DIR/poste-record`), sinon passe la main à `hyprland-preview-share-picker` (`exec`, mêmes arguments) |
+| Hyprland | `hypr/record.lua` | SHIFT+PRINT to `poste record hotkey`, `hl.unbind("ALT + PRINT")` |
+| Island launcher | `island/launcher.json` | extension `record` (keywords `rec`, `record`), with `"highlight": true`: the island frames the selected target on screen |
+| Island (slot `capture`) | `island/island.json`, `island/RecordState.qml` | recording state for the capture pill and its card (shared with OBS, which stays in the island) |
+| `xdph.conf` | line of `module.toml` (`[[line]]`) | `screencopy:custom_picker_binary` to `bin/poste-share-picker` |
+| Auxiliary program | `bin/poste-share-picker` | screen-share picker of xdg-desktop-portal-hyprland: short script (stable path for the `xdph.conf` line) that runs `poste-record share-picker`. The latter answers alone with the window requested by `poste record` (file `pick.json` less than 20 s old in `$XDG_RUNTIME_DIR/poste-record`), otherwise hands over to `hyprland-preview-share-picker` (`exec`, same arguments) |
 
-Sans le module, aucune de ces traces n'existe (ni raccourci, ni entrée de lanceur, ni ligne `xdph.conf`).
-`xdg-desktop-portal-hyprland` ne relit sa config qu'au démarrage : après avoir posé ou retiré la
-ligne, redémarrer le portail (`systemctl --user restart xdg-desktop-portal-hyprland`).
+Without the module, none of these traces exists (no shortcut, no launcher entry, no `xdph.conf` line).
+`xdg-desktop-portal-hyprland` only reads its config again at startup: after putting the
+line in place or removing it, restart the portal (`systemctl --user restart xdg-desktop-portal-hyprland`).
 
-## Fichiers
+## Files
 
-- `$XDG_RUNTIME_DIR/poste-record/` : `state.json` (enregistrement en cours), `pick.json`, `last.log`.
-- Notifications : « Recording saved » (un clic ouvre le dossier) ou l'erreur.
+- `$XDG_RUNTIME_DIR/poste-record/`: `state.json` (recording in progress), `pick.json`, `last.log`.
+- Notifications: "Recording saved" (a click opens the folder) or the error.
 
-## Développement
+## Development
 
-- `poste-record share-picker` est une sous-commande cachée (appelée par `bin/poste-share-picker`),
-  comme `poste-record --supervise '<json>'`, le superviseur détaché lancé par `start`
-  (`setsid`, il garde gpu-screen-recorder, écrit `state.json`, nettoie et notifie à la fin).
-- Variables d'environnement RÉSERVÉES AUX TESTS : `POSTE_RECORD_GSR` (remplace `gpu-screen-recorder`),
-  `POSTE_RECORD_HYPRCTL` (remplace `hyprctl`), `POSTE_RECORD_NOTIFY` (remplace
-  `omarchy-notification-send`), `POSTE_RECORD_SLURP` (remplace `slurp`).
-- Tests (`cargo test -p poste-record`) :
-  - `tests/parity.rs` et `tests/calc.rs` jouent les mêmes scénarios avec `poste-record.py` et avec le
-    binaire, sur les mêmes faux programmes (`tests/fakes/fake.sh`), et comparent sorties JSON (à
-    l'octet près), arguments de gpu-screen-recorder, notifications et fichiers créés. Sans `python3`,
-    ils sont ignorés.
-  - `tests/cycle.rs` : start, pause, resume, toggle, stop, notification, open-last, hotkey, échec de
-    gpu-screen-recorder, sélecteur de partage, avec un faux gpu-screen-recorder (jamais le vrai).
-- Écarts voulus avec le script Python (tous sans effet sur ses usages) : un pid absent ou nul dans
-  `state.json` n'est jamais signalé (le Python aurait visé son groupe de processus) ; un échec de
-  lancement de gpu-screen-recorder notifie « Recording failed » (le Python s'arrêtait en silence) ;
-  une expression régulière de préréglage invalide ne correspond à aucune fenêtre (le Python
-  plantait) ; une entrée mal formée de `presets.json` (préréglage sans `id`, élément qui n'est pas un
-  objet) est ignorée au lieu de faire échouer `items` ; un drapeau sans valeur (`--preset` en
-  dernier) donne un message et le code 1. Les expressions régulières sont celles de la caisse `regex`
-  (pas de retour arrière ni d'assertions avant/arrière, contrairement à `re`).
+- `poste-record share-picker` is a hidden subcommand (called by `bin/poste-share-picker`),
+  like `poste-record --supervise '<json>'`, the detached supervisor launched by `start`
+  (`setsid`, it keeps gpu-screen-recorder, writes `state.json`, cleans up and notifies at the end).
+- Environment variables RESERVED FOR TESTS: `POSTE_RECORD_GSR` (replaces `gpu-screen-recorder`),
+  `POSTE_RECORD_HYPRCTL` (replaces `hyprctl`), `POSTE_RECORD_NOTIFY` (replaces
+  `omarchy-notification-send`), `POSTE_RECORD_SLURP` (replaces `slurp`).
+- Tests (`cargo test -p poste-record`):
+  - `tests/parity.rs` and `tests/calc.rs` play the same scenarios with `poste-record.py` and with the
+    binary, on the same fake programs (`tests/fakes/fake.sh`), and compare JSON outputs (byte
+    for byte), gpu-screen-recorder arguments, notifications and created files. Without `python3`,
+    they are skipped.
+  - `tests/cycle.rs`: start, pause, resume, toggle, stop, notification, open-last, hotkey, failure of
+    gpu-screen-recorder, share picker, with a fake gpu-screen-recorder (never the real one).
+- Deliberate differences with the Python script (all without effect on its uses): a missing or zero pid in
+  `state.json` is never signalled (the Python would have targeted its process group); a failure to
+  launch gpu-screen-recorder notifies "Recording failed" (the Python stopped silently);
+  an invalid preset regular expression matches no window (the Python
+  crashed); a malformed entry of `presets.json` (preset without `id`, element that is not an
+  object) is ignored instead of making `items` fail; a flag without a value (`--preset` last)
+  gives a message and code 1. The regular expressions are those of the `regex` crate
+  (no backtracking or lookaround assertions, unlike `re`).

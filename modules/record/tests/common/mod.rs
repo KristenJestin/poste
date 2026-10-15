@@ -1,5 +1,5 @@
-//! Banc d'essai commun : HOME, XDG_RUNTIME_DIR et PATH temporaires, faux programmes extérieurs.
-//! Rien ne touche à la vraie session : ni gpu-screen-recorder, ni hyprctl, ni les notifications.
+//! Common test bench: temporary HOME, XDG_RUNTIME_DIR and PATH, fake outside programs.
+//! Nothing touches the real session: neither gpu-screen-recorder, nor hyprctl, nor notifications.
 #![allow(dead_code)]
 
 use std::path::{Path, PathBuf};
@@ -60,7 +60,7 @@ impl Bench {
         b
     }
 
-    /// Environnement commun, sans rien hériter de la session réelle.
+    /// Common environment, inheriting nothing from the real session.
     fn base(&self, mut c: Command) -> Command {
         c.env_clear()
             .env("HOME", &self.home)
@@ -75,7 +75,7 @@ impl Bench {
         c
     }
 
-    /// Le binaire Rust, avec les faux programmes désignés par les variables de test.
+    /// The Rust binary, with the fake programs designated by the test variables.
     pub fn rust(&self, args: &[&str]) -> Command {
         let mut c = self.base(Command::new(env!("CARGO_BIN_EXE_poste-record")));
         c.args(args)
@@ -88,14 +88,14 @@ impl Bench {
         c
     }
 
-    /// Le script Python d'origine, avec les mêmes faux programmes (par le PATH).
+    /// The original Python script, with the same fake programs (through the PATH).
     pub fn python(&self, args: &[&str]) -> Command {
         let mut c = self.base(Command::new("python3"));
         c.arg(manifest_dir().join("poste-record.py")).args(args);
         c
     }
 
-    /// Un script Python du dossier du module, avec le même environnement.
+    /// A Python script of the module folder, with the same environment.
     pub fn base_python_script(&self, script: &str, args: &[&str]) -> Command {
         let mut c = self.base(Command::new("python3"));
         c.arg(manifest_dir().join(script)).args(args);
@@ -124,7 +124,7 @@ impl Bench {
         self.run.join("poste-record/state.json")
     }
 
-    /// Attend qu'une condition soit vraie (5 s au plus, sondage toutes les 20 ms).
+    /// Waits for a condition to be true (5 s at most, polling every 20 ms).
     pub fn wait_for(&self, what: &str, f: impl Fn() -> bool) {
         let end = Instant::now() + Duration::from_secs(10);
         while Instant::now() < end {
@@ -134,26 +134,26 @@ impl Bench {
             std::thread::sleep(Duration::from_millis(20));
         }
         panic!(
-            "délai dépassé en attendant : {what}\njournal :\n{}",
+            "timeout while waiting for: {what}\njournal:\n{}",
             self.journal()
         );
     }
 
-    /// Attend que le faux gsr (mode hold) ait journalisé ses arguments et pris en charge ses
-    /// signaux : l'état est écrit dès son lancement, avant.
+    /// Waits for the fake gsr (hold mode) to have logged its arguments and taken over its
+    /// signals: the state is written as soon as it is launched, before.
     pub fn wait_gsr_ready(&self) {
-        self.wait_for("le faux gsr prêt", || {
+        self.wait_for("the fake gsr ready", || {
             self.journal().contains("gsr-ready\n")
         });
     }
 
-    /// Attend la notification finale du superviseur.
+    /// Waits for the supervisor's final notification.
     pub fn wait_notification(&self) {
-        self.wait_for("la notification", || {
+        self.wait_for("the notification", || {
             self.journal().contains("omarchy-notification-send\t")
         });
-        // Le superviseur nettoie avant de notifier : l'état a disparu.
-        self.wait_for("la fin de l'état", || !self.state_file().exists());
+        // The supervisor cleans up before notifying: the state has disappeared.
+        self.wait_for("the end of the state", || !self.state_file().exists());
     }
 
     pub fn empty_videos(&self) {
@@ -166,7 +166,7 @@ pub fn text(o: &Output) -> String {
     String::from_utf8_lossy(&o.stdout).into_owned()
 }
 
-/// Remplace les dates de nom de fichier (la seconde peut changer entre deux essais).
+/// Replaces the dates of file names (the second can change between two attempts).
 pub fn norm_stamps(s: &str) -> String {
     regex::Regex::new(r"\d{4}-\d\d-\d\d \d\d-\d\d-\d\d")
         .unwrap()

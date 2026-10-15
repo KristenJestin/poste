@@ -1,11 +1,11 @@
-//! Historique des relevés : `~/.local/state/poste/usage/history.jsonl`, une ligne par agent et par
-//! relevé, seulement quand ses limites ont changé depuis sa ligne précédente. Un seul écrivain :
-//! `poste usage record` (le minuteur `poste-usage-record.timer`, toutes les 5 minutes).
+//! History of the readings: `~/.local/state/poste/usage/history.jsonl`, one line per agent and per
+//! reading, only when its limits changed since its previous line. A single writer:
+//! `poste usage record` (the timer `poste-usage-record.timer`, every 5 minutes).
 //!
-//! Une ligne : `{"t", "agent", "limits": [{"label", "percent", "resetsAt"}]}`. `t` : heure du
-//! passage (UTC) ; `percent` : 0 à 100, une décimale ; `resetsAt` : remise à zéro (UTC) arrondie à la
-//! minute (le serveur la donne à la microseconde près et elle bouge d'un relevé à l'autre). Ni jeton,
-//! ni identifiant de compte.
+//! A line: `{"t", "agent", "limits": [{"label", "percent", "resetsAt"}]}`. `t`: time of the
+//! run (UTC); `percent`: 0 to 100, one decimal; `resetsAt`: reset (UTC) rounded to the
+//! minute (the server gives it to the microsecond and it moves from one reading to the next). No token,
+//! no account identifier.
 
 use crate::time;
 use anyhow::{Context, Result};
@@ -31,7 +31,7 @@ pub struct Entry {
     pub limits: Vec<Limit>,
 }
 
-/// `11` plutôt que `11.0` : comme les lignes écrites par jq.
+/// `11` rather than `11.0`: like the lines written by jq.
 fn compact_number<S: serde::Serializer>(v: &f64, s: S) -> Result<S::Ok, S::Error> {
     if v.fract() == 0.0 && v.abs() < 1e15 {
         s.serialize_i64(*v as i64)
@@ -40,7 +40,7 @@ fn compact_number<S: serde::Serializer>(v: &f64, s: S) -> Result<S::Ok, S::Error
     }
 }
 
-/// Remise à zéro arrondie à la minute ; illisible : gardée telle quelle.
+/// Reset rounded to the minute; unreadable: kept as is.
 fn round_reset(s: &str) -> String {
     match time::parse_iso(s) {
         Some(t) => time::iso((t + 30).div_euclid(60) * 60),
@@ -48,7 +48,7 @@ fn round_reset(s: &str) -> String {
     }
 }
 
-/// Le relevé du collecteur réduit à l'historique ; rien pour un agent en erreur ou sans limite.
+/// The collector's reading reduced to the history; nothing for an agent in error or without a limit.
 pub fn snapshot(agent: &str, record: &Value, now: i64) -> Option<Entry> {
     let status = record.get("usageStatusText").and_then(Value::as_str);
     if status.is_some_and(|s| !s.is_empty()) {
@@ -88,7 +88,7 @@ pub fn load(file: &Path) -> Vec<Entry> {
         .collect()
 }
 
-/// Ajoute les relevés dont les limites ont changé ; rend le nombre de lignes écrites.
+/// Adds the readings whose limits changed; returns the number of lines written.
 pub fn append_changed(file: &Path, snaps: &[Entry]) -> Result<usize> {
     let mut last: HashMap<String, Vec<Limit>> = HashMap::new();
     for e in load(file) {
@@ -102,13 +102,13 @@ pub fn append_changed(file: &Path, snaps: &[Entry]) -> Result<usize> {
         return Ok(0);
     }
     if let Some(dir) = file.parent() {
-        std::fs::create_dir_all(dir).with_context(|| format!("création de {}", dir.display()))?;
+        std::fs::create_dir_all(dir).with_context(|| format!("creating {}", dir.display()))?;
     }
     let mut f = std::fs::OpenOptions::new()
         .create(true)
         .append(true)
         .open(file)
-        .with_context(|| format!("ouverture de {}", file.display()))?;
+        .with_context(|| format!("cannot open {}", file.display()))?;
     let mut buf = String::new();
     for e in &fresh {
         buf.push_str(&serde_json::to_string(e)?);
@@ -118,7 +118,7 @@ pub fn append_changed(file: &Path, snaps: &[Entry]) -> Result<usize> {
     Ok(fresh.len())
 }
 
-/// Une ligne lisible : heure locale, agent, chaque limite et sa remise à zéro.
+/// A readable line: local time, agent, each limit and its reset.
 pub fn render(e: &Entry) -> String {
     let t = time::parse_iso(&e.t)
         .map(time::short)
@@ -130,7 +130,7 @@ pub fn render(e: &Entry) -> String {
             let reset = time::parse_iso(&l.resets_at)
                 .map(|r| format!(" ({})", time::short(r)))
                 .unwrap_or_default();
-            format!("{} {} %{reset}", l.label, crate::stats::fr(l.percent))
+            format!("{} {} %{reset}", l.label, crate::stats::decimal(l.percent))
         })
         .collect();
     format!("{t}  {}  {}", e.agent, limits.join(", "))
@@ -149,7 +149,7 @@ mod tests {
     }
 
     #[test]
-    fn instantane_arrondi_et_sans_erreur() {
+    fn snapshot_rounded_and_without_error() {
         let e = snapshot(
             "claude",
             &record(0.11, "2026-10-14T20:59:59.588385+00:00"),
@@ -160,18 +160,18 @@ mod tests {
         assert_eq!(e.limits[0].resets_at, "2026-10-14T21:00:00Z");
         assert_eq!(e.limits[1].label, "Fable Weekly");
         assert_eq!(e.limits[1].resets_at, "");
-        let err = json!({"usageStatusText": "Connexion expirée", "limits": []});
+        let err = json!({"usageStatusText": "Login expired", "limits": []});
         assert!(snapshot("claude", &err, 0).is_none());
         assert!(snapshot("x", &json!({"limits": []}), 0).is_none());
     }
 
     #[test]
-    fn une_ligne_seulement_quand_ca_change() {
+    fn one_line_only_when_it_changes() {
         let d = tempfile::tempdir().unwrap();
         let f = d.path().join("usage/history.jsonl");
         let a = snapshot("claude", &record(0.11, "2026-10-14T20:59:59.58+00:00"), 0).unwrap();
         assert_eq!(append_changed(&f, std::slice::from_ref(&a)).unwrap(), 1);
-        // Même relevé, remise qui bouge de quelques microsecondes : rien.
+        // Same reading, reset that moves by a few microseconds: nothing.
         let b = snapshot("claude", &record(0.11, "2026-10-14T20:59:59.91+00:00"), 300).unwrap();
         assert_eq!(append_changed(&f, &[b]).unwrap(), 0);
         let c = snapshot("claude", &record(0.13, "2026-10-14T20:59:59.91+00:00"), 600).unwrap();

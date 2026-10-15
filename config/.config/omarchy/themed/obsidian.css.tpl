@@ -1,11 +1,11 @@
-/* Omarchy, au style de l'île (poste.island) : fonds noirs profonds, Adwaita
- * Sans, accent seulement pour ce qui est actif ou cliquable, titres blancs
- * hiérarchisés par la taille, éléments arrondis en cartes, liserés discrets.
- * Modèle perso (~/.config/omarchy/themed), remplace celui d'Omarchy ; rendu
- * dans chaque coffre par omarchy-theme-set-obsidian (thème « Omarchy »). */
+/* Omarchy, in the island's style (poste.island): deep black backgrounds, Adwaita
+ * Sans, accent only for what is active or clickable, white headings
+ * ranked by size, elements rounded into cards, discreet outlines.
+ * Personal template (~/.config/omarchy/themed), replaces Omarchy's; rendered
+ * in each vault by omarchy-theme-set-obsidian ('Omarchy' theme). */
 
 .theme-dark, .theme-light {
-  /* Fonds : l'île (noir profond), les panneaux juste au-dessus */
+  /* Backgrounds: the island (deep black), the panels just above */
   --background-primary: {{ background }};
   --background-primary-alt: {{ lighter_background }};
   --background-secondary: {{ dark_background }};
@@ -18,7 +18,7 @@
   --background-modifier-form-field: color-mix(in srgb, {{ foreground }} 5%, transparent);
   --divider-color: color-mix(in srgb, {{ foreground }} 7%, transparent);
 
-  /* Texte */
+  /* Text */
   --text-normal: {{ foreground }};
   --text-muted: {{ dark_foreground }};
   --text-faint: {{ muted }};
@@ -26,7 +26,7 @@
   --text-selection: color-mix(in srgb, {{ accent }} 28%, transparent);
   --text-highlight-bg: color-mix(in srgb, {{ accent }} 22%, transparent);
 
-  /* Accent : liens, actif, curseur */
+  /* Accent: links, active, cursor */
   --text-accent: {{ accent }};
   --text-accent-hover: {{ accent }};
   --interactive-accent: {{ accent }};
@@ -43,13 +43,13 @@
   --checkbox-marker-color: #0b0b0c;
   --checkbox-radius: 6px;
 
-  /* Polices : celles de l'île */
+  /* Fonts: the island's */
   --font-interface-theme: "Adwaita Sans", "Inter", sans-serif;
   --font-text-theme: "Adwaita Sans", "Inter", sans-serif;
   --font-monospace-theme: "JetBrainsMono Nerd Font", "JetBrains Mono", monospace;
   --line-height-normal: 1.6;
 
-  /* Titres : blancs, hiérarchie par la taille */
+  /* Headings: white, hierarchy by size */
   --h1-color: {{ bright_foreground }};
   --h2-color: {{ bright_foreground }};
   --h3-color: {{ light_foreground }};
@@ -66,7 +66,7 @@
   --inline-title-color: {{ bright_foreground }};
   --inline-title-weight: 700;
 
-  /* Arrondis, comme les cartes de l'île */
+  /* Rounding, like the island's cards */
   --radius-s: 6px;
   --radius-m: 10px;
   --radius-l: 14px;
@@ -85,7 +85,7 @@
   --code-operator: {{ dark_foreground }};
   --code-punctuation: {{ dark_foreground }};
 
-  /* Tags : pastilles teintées d'accent */
+  /* Tags: accent-tinted pills */
   --tag-color: {{ accent }};
   --tag-color-hover: {{ accent }};
   --tag-background: color-mix(in srgb, {{ accent }} 12%, transparent);
@@ -94,22 +94,22 @@
   --tag-radius: 999px;
   --tag-padding-x: 0.6em;
 
-  /* Citations */
+  /* Quotes */
   --blockquote-border-color: {{ accent }};
   --blockquote-border-thickness: 3px;
   --blockquote-background-color: color-mix(in srgb, {{ foreground }} 3%, transparent);
 
-  /* Tableaux */
+  /* Tables */
   --table-border-color: color-mix(in srgb, {{ foreground }} 8%, transparent);
   --table-header-background: color-mix(in srgb, {{ foreground }} 4%, transparent);
   --table-header-weight: 600;
 
-  /* Erreurs, succès */
+  /* Errors, successes */
   --text-error: {{ red }};
   --text-success: {{ green }};
   --text-warning: {{ yellow }};
 
-  /* Graphe */
+  /* Graph */
   --graph-line: color-mix(in srgb, {{ foreground }} 14%, transparent);
   --graph-node: {{ dark_foreground }};
   --graph-node-focused: {{ accent }};
@@ -117,13 +117,13 @@
   --graph-node-attachment: {{ muted }};
   --graph-node-unresolved: {{ muted }};
 
-  /* Barres de défilement fines */
+  /* Thin scrollbars */
   --scrollbar-bg: transparent;
   --scrollbar-thumb-bg: color-mix(in srgb, {{ foreground }} 12%, transparent);
   --scrollbar-active-thumb-bg: color-mix(in srgb, {{ foreground }} 22%, transparent);
 }
 
-/* Blocs de code : cartes arrondies avec liseré */
+/* Code blocks: rounded cards with an outline */
 .markdown-rendered pre,
 .markdown-source-view.mod-cm6 .HyperMD-codeblock-bg {
   background: color-mix(in srgb, {{ foreground }} 4%, transparent);
@@ -138,20 +138,20 @@
   padding: 0.12em 0.4em;
 }
 
-/* Citations : barre d'accent arrondie, fond léger */
+/* Quotes: rounded accent bar, light background */
 .markdown-rendered blockquote {
   border-radius: 0 var(--radius-m) var(--radius-m) 0;
   padding: 0.6em 1em;
 }
 
-/* Encadrés (callouts) : cartes */
+/* Callouts: cards */
 .callout {
   border-radius: var(--radius-l);
   border: 1px solid color-mix(in srgb, rgb(var(--callout-color)) 25%, transparent);
   background: color-mix(in srgb, rgb(var(--callout-color)) 7%, transparent);
 }
 
-/* Barre latérale : la note ouverte en pastille d'accent */
+/* Sidebar: the open note as an accent pill */
 .nav-file-title, .nav-folder-title, .tree-item-self {
   border-radius: 8px;
 }
@@ -160,7 +160,7 @@
   color: {{ accent }};
 }
 
-/* Onglets */
+/* Tabs */
 .workspace-tab-header {
   border-radius: 10px 10px 0 0;
 }
@@ -171,7 +171,7 @@
   color: {{ accent }};
 }
 
-/* Palette de commandes, recherche rapide, fenêtres : l'île */
+/* Command palette, quick search, windows: the island */
 .prompt, .modal, .suggestion-container, .menu {
   background: {{ background }};
   border: 1px solid color-mix(in srgb, {{ foreground }} 9%, transparent);
@@ -186,14 +186,14 @@
   font-size: 1.05em;
 }
 
-/* Propriétés (en-tête YAML) : discrètes */
+/* Properties (YAML header): discreet */
 .metadata-container {
   border-radius: var(--radius-m);
   background: color-mix(in srgb, {{ foreground }} 3%, transparent);
   padding: 0.4em 0.6em;
 }
 
-/* Surlignage */
+/* Highlight */
 .markdown-rendered mark, .cm-highlight {
   border-radius: 4px;
   padding: 0 0.15em;

@@ -1,4 +1,4 @@
-//! `poste-sys` : gestion du dépôt poste (construction, installation, état, git).
+//! `poste-sys`: management of the poste repository (build, install, status, git).
 
 mod config;
 mod handoff;
@@ -31,7 +31,7 @@ use versions::Fetcher;
     name = "poste sys",
     bin_name = "poste sys",
     version,
-    about = "Gère le dépôt poste"
+    about = "Manages the poste repository"
 )]
 struct Cli {
     #[command(subcommand)]
@@ -40,113 +40,113 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Cmd {
-    /// Construit le dépôt en release puis installe poste et ses modules
+    /// Builds the repository in release then installs poste and its modules
     Setup {
-        /// Applique sans demander confirmation
+        /// Applies without asking for confirmation
         #[arg(short, long)]
         yes: bool,
-        /// Affiche le plan sans rien écrire
+        /// Shows the plan without writing anything
         #[arg(short = 'n', long)]
         dry_run: bool,
-        /// Ne touche pas à la config (binaires et fichiers des modules seulement)
+        /// Does not touch the config (binaries and module files only)
         #[arg(long)]
         no_config: bool,
-        /// Conflit de config : le dépôt gagne (l'ancien est sauvegardé), répétable
-        #[arg(long, value_name = "CHEMIN")]
+        /// Config conflict: the repository wins (the old one is backed up), repeatable
+        #[arg(long, value_name = "PATH")]
         take_repo: Vec<String>,
-        /// Conflit de config : le fichier de ~ est recopié dans le dépôt, répétable
-        #[arg(long, value_name = "CHEMIN")]
+        /// Config conflict: the file of ~ is copied into the repository, repeatable
+        #[arg(long, value_name = "PATH")]
         take_home: Vec<String>,
     },
-    /// Compare la config du dépôt à celle de ~ (un chemin, ou tous les écarts)
+    /// Compares the repository's config with the one in ~ (one path, or all the differences)
     Diff {
-        /// Chemin relatif à ~ (ou absolu, ou ~/…)
+        /// Path relative to ~ (or absolute, or ~/…)
         path: Option<String>,
     },
-    /// Met un fichier de ~ sous gestion : déplacé dans config/, remplacé par un lien
+    /// Puts a file of ~ under management: moved into config/, replaced by a link
     Add {
         path: String,
-        /// Montre ce qui serait fait sans rien écrire
+        /// Shows what would be done without writing anything
         #[arg(short = 'n', long)]
         dry_run: bool,
     },
-    /// Remet un fichier ordinaire à la place du lien (le dépôt garde son fichier)
+    /// Puts an ordinary file back in place of the link (the repository keeps its file)
     Forget { path: String },
-    /// Met à jour selon la source : dev, git pull du clone ; release, dernière version publiée (vérifiée). Puis git pull du dépôt de données, setup (aperçu compris), rechargement de l'île et de Hyprland si besoin
+    /// Updates according to the source: dev, git pull of the clone; release, latest published version (verified). Then git pull of the data repository, setup (preview included), reload of the island and Hyprland if needed
     Sync {
         #[arg(short, long)]
         yes: bool,
         #[arg(short = 'n', long)]
         dry_run: bool,
     },
-    /// Importe la config gérée par chezmoi dans config/ (état réel de la machine)
+    /// Imports the config managed by chezmoi into config/ (real state of the machine)
     ImportChezmoi {
-        /// Dossier source de chezmoi (défaut : celui de chezmoi)
+        /// Source folder of chezmoi (default: chezmoi's own)
         #[arg(long)]
         source: Option<std::path::PathBuf>,
-        /// Écrit le rapport sur la sortie, rien dans le dépôt
+        /// Writes the report to the output, nothing in the repository
         #[arg(short = 'n', long)]
         dry_run: bool,
     },
-    /// Marque une étape manuelle (ou système non vérifiable) faite ; sans id, les liste
+    /// Marks a manual step (or a system step that cannot be checked) done; without id, lists them
     Done {
         id: Option<String>,
-        /// Remet l'étape à faire
+        /// Puts the step back to do
         #[arg(long)]
         undo: bool,
     },
-    /// État du dépôt, des modules installés et des fichiers posés
+    /// State of the repository, the installed modules and the files put in place
     Status,
-    /// Lance `git -C <dépôt> <args…>`
+    /// Runs `git -C <repository> <args…>`
     Git {
         #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
         args: Vec<String>,
     },
-    /// Fichiers de config que cette machine garde à elle (config.toml, clé local)
+    /// Config files this machine keeps for itself (config.toml, key local)
     Local {
         #[command(subcommand)]
         action: Option<LocalCmd>,
     },
-    /// Surcharges JSON de cette machine (config.toml, [[override]]) : fichier généré, pas lié
+    /// JSON overrides of this machine (config.toml, [[override]]): generated file, not linked
     Override {
         #[command(subcommand)]
         action: Option<OverrideCmd>,
     },
-    /// Modules du dépôt non installés sur cette machine (config.toml, clé disabled)
+    /// Modules of the repository not installed on this machine (config.toml, key disabled)
     Module {
         #[command(subcommand)]
         action: Option<ModuleCmd>,
     },
     /// Add-ons of the repository and their state here (key addons, in poste.toml of the data repository)
     Addons,
-    /// Paquets et étapes du bootstrap ignorés sur cette machine (config.toml, clé skip)
+    /// Bootstrap packages and steps ignored on this machine (config.toml, key skip)
     Skip {
         #[command(subcommand)]
         action: Option<SkipCmd>,
     },
-    /// Bascule la machine : dev (le clone), release (la dernière version installée), ou une version (début du commit)
+    /// Switches the machine: dev (the clone), release (the latest installed version), or a version (start of the commit)
     Use {
-        /// dev, release, ou le début du commit d'une version installée
+        /// dev, release, or the start of the commit of an installed version
         target: String,
         #[arg(short, long)]
         yes: bool,
         #[arg(short = 'n', long)]
         dry_run: bool,
     },
-    /// Source, racine (current) et versions installées
+    /// Source, root (current) and installed versions
     Versions,
-    /// Suite de sync et de use, lancée par un ancien poste-sys qui passe la main (voir handoff)
+    /// Continuation of sync and use, run by an old poste-sys that hands over (see handoff)
     #[command(hide = true)]
     Finish {
         #[arg(short, long)]
         yes: bool,
-        /// Retire les anciennes versions après setup
+        /// Removes the old versions after setup
         #[arg(long)]
         prune: bool,
-        /// Le clone est déjà construit par celui qui passe la main
+        /// The clone is already built by the one that hands over
         #[arg(long)]
         skip_build: bool,
-        /// La racine d'avant : ce qu'il faut recharger est recalculé d'après les deux racines
+        /// The previous root: what must be reloaded is computed again from the two roots
         #[arg(long)]
         from: Option<std::path::PathBuf>,
         #[arg(long)]
@@ -154,55 +154,55 @@ enum Cmd {
         #[arg(long)]
         reload_hypr: bool,
     },
-    /// Affiche le chemin du dépôt (cd "$(poste sys cd)")
+    /// Prints the path of the repository (cd "$(poste sys cd)")
     Cd,
 }
 
 #[derive(Subcommand)]
 enum LocalCmd {
-    /// Liste les fichiers locaux
+    /// Lists the local files
     List,
-    /// Garde ce chemin de config/ à cette machine : setup ne le lie ni ne le touche
+    /// Keeps this path of config/ to this machine: setup neither links nor touches it
     Add { path: String },
-    /// Le remet sous la gestion du dépôt
+    /// Puts it back under the repository's management
     Remove { path: String },
 }
 
 #[derive(Subcommand)]
 enum OverrideCmd {
-    /// Liste les surcharges
+    /// Lists the overrides
     List,
-    /// Fixe une clé pointée (valeur JSON : 3600, true, "texte") dans un fichier JSON de config/
+    /// Sets a dotted key (JSON value: 3600, true, "text") in a JSON file of config/
     Set {
         path: String,
         key: String,
         #[arg(allow_hyphen_values = true)]
         value: String,
     },
-    /// Retire une surcharge (la dernière retirée relie le fichier au dépôt)
+    /// Removes an override (the last one removed links the file to the repository again)
     Unset { path: String, key: String },
 }
 
 #[derive(Subcommand)]
 enum ModuleCmd {
-    /// Liste les modules du dépôt et leur état ici
+    /// Lists the modules of the repository and their state here
     List,
-    /// Réactive un module (installé au prochain setup)
+    /// Enables a module again (installed at the next setup)
     Enable { name: String },
-    /// Désactive un module (retiré au prochain setup, avec aperçu)
+    /// Disables a module (removed at the next setup, with a preview)
     Disable { name: String },
 }
 
 #[derive(Subcommand)]
 enum SkipCmd {
-    /// Liste les identifiants ignorés
+    /// Lists the ignored identifiers
     List,
-    /// Ignore des paquets (packages.toml) ou des étapes (steps.toml) ici ; rien n'est désinstallé
+    /// Ignores packages (packages.toml) or steps (steps.toml) here; nothing is uninstalled
     Add {
         #[arg(required = true)]
         ids: Vec<String>,
     },
-    /// Cesse d'ignorer ces identifiants
+    /// Stops ignoring these identifiers
     Remove {
         #[arg(required = true)]
         ids: Vec<String>,
@@ -214,7 +214,7 @@ fn main() -> ExitCode {
     match run(cli) {
         Ok(code) => code,
         Err(e) => {
-            eprintln!("poste sys : {e:#}");
+            eprintln!("poste sys: {e:#}");
             ExitCode::from(1)
         }
     }
@@ -250,7 +250,7 @@ fn run(cli: Cli) -> Result<ExitCode> {
             )?;
             if done.config_changed {
                 println!(
-                    "\nConfig modifiée : pour la recharger, lancez vous-même `omarchy restart shell` et `hyprctl reload`."
+                    "\nConfig changed: to reload it, run `omarchy restart shell` and `hyprctl reload` yourself."
                 );
             }
             Ok(done.code)
@@ -258,7 +258,7 @@ fn run(cli: Cli) -> Result<ExitCode> {
         Cmd::Diff { path } => {
             let repo = versions::root(&env, &cfg)?;
             let Some(layout) = config::load(&repo, &env)? else {
-                bail!("pas de dossier config/ dans le dépôt");
+                bail!("no config/ folder in the repository");
             };
             config::diff(&layout, &env, path.as_deref())?;
             Ok(ExitCode::SUCCESS)
@@ -272,7 +272,7 @@ fn run(cli: Cli) -> Result<ExitCode> {
         Cmd::Forget { path } => {
             let repo = versions::root(&env, &cfg)?;
             let Some(layout) = config::load(&repo, &env)? else {
-                bail!("pas de dossier config/ dans le dépôt");
+                bail!("no config/ folder in the repository");
             };
             config::forget(&layout, &env, &path, &env.manifest_file())?;
             Ok(ExitCode::SUCCESS)
@@ -352,7 +352,7 @@ fn run(cli: Cli) -> Result<ExitCode> {
             #[cfg(unix)]
             {
                 use std::os::unix::process::CommandExt;
-                Err(anyhow::Error::new(cmd.exec()).context("impossible de lancer git"))
+                Err(anyhow::Error::new(cmd.exec()).context("cannot run git"))
             }
             #[cfg(not(unix))]
             {

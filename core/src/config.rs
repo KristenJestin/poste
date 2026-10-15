@@ -1,59 +1,59 @@
-//! Lecture de `~/.config/poste/config.toml`.
+//! Reading of `~/.config/poste/config.toml`.
 
 use crate::env::Env;
 use anyhow::{Context, Result};
 use serde::Deserialize;
 use std::path::{Path, PathBuf};
 
-/// Réglages de la machine versionnés dans le dépôt de données, à sa racine.
+/// Machine settings versioned in the data repository, at its root.
 pub const DATA_CONFIG: &str = "poste.toml";
 
-/// Configuration de poste. Les clés inconnues sont ignorées : d'autres
-/// modules ou étapes ultérieures peuvent en ajouter.
+/// Configuration of poste. Unknown keys are ignored: other
+/// modules or later steps may add some.
 #[derive(Debug, Default, Clone, Deserialize, PartialEq)]
 pub struct Config {
-    /// Emplacement du dépôt poste (écrit par `./setup`).
+    /// Location of the poste repository (written by `./setup`).
     #[serde(default)]
     pub repo: Option<String>,
-    /// D'où cette machine fait tourner poste : une version installée (`release`) ou le clone
-    /// du dépôt (`dev`, défaut). Écrit par `poste sys use`, propre à la machine.
+    /// Where this machine runs poste from: an installed version (`release`) or the clone
+    /// of the repository (`dev`, default). Written by `poste sys use`, specific to the machine.
     #[serde(default)]
     pub source: Source,
-    /// Dépôt des données de cette machine (`poste-data`, privé) : ses fichiers `config/` et ses
-    /// étapes `bootstrap/` se posent par-dessus ceux du dépôt, et son `poste.toml` complète
-    /// cette config (écrit par `./setup --data`).
+    /// Data repository of this machine (`poste-data`, private): its `config/` files and its
+    /// `bootstrap/` steps are put in place on top of those of the repository, and its `poste.toml` completes
+    /// this config (written by `./setup --data`).
     #[serde(default)]
     pub data: Option<String>,
-    /// Dossiers supplémentaires où chercher des modules.
+    /// Extra folders to look for modules in.
     #[serde(default)]
     pub modules: Vec<String>,
-    /// Chemins de `config/` (relatifs à `~`) que cette machine garde en fichiers à elle :
-    /// `poste sys setup` ne les lie pas et n'y touche jamais.
+    /// Paths of `config/` (relative to `~`) that this machine keeps as files of its own:
+    /// `poste sys setup` does not link them and never touches them.
     #[serde(default)]
     pub local: Vec<String>,
-    /// Modules du dépôt à ne pas installer sur cette machine (retirés s'ils l'étaient).
+    /// Modules of the repository not to install on this machine (removed if they were).
     #[serde(default)]
     pub disabled: Vec<String>,
     /// Add-ons of the repository (`addons/<name>/`) this machine uses: their bootstrap steps
     /// install the program, and the add-on is plugged in once the program is there.
     #[serde(default)]
     pub addons: Vec<String>,
-    /// Paquets (`bootstrap/packages.toml`) et étapes (`bootstrap/steps.toml`, par `id`) que cette
-    /// machine n'installe pas : ni exigés, ni proposés, ni comptés manquants. Rien n'est désinstallé.
+    /// Packages (`bootstrap/packages.toml`) and steps (`bootstrap/steps.toml`, by `id`) that this
+    /// machine does not install: neither required, nor offered, nor counted as missing. Nothing is uninstalled.
     #[serde(default)]
     pub skip: Vec<String>,
-    /// Surcharges JSON propres à cette machine (`[[override]]`).
+    /// JSON overrides specific to this machine (`[[override]]`).
     #[serde(default, rename = "override")]
     pub overrides: Vec<Override>,
 }
 
-/// Source de poste sur la machine (clé `source`).
+/// Source of poste on the machine (key `source`).
 #[derive(Debug, Default, Clone, Copy, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum Source {
-    /// Une version installée par `poste sys sync` (`~/.local/share/poste/versions/`).
+    /// A version installed by `poste sys sync` (`~/.local/share/poste/versions/`).
     Release,
-    /// Le clone du dépôt (clé `repo`) : fonctionnement d'avant les versions.
+    /// The clone of the repository (key `repo`): how it worked before versions.
     #[default]
     Dev,
 }
@@ -67,9 +67,9 @@ impl Source {
     }
 }
 
-/// `[[override]]` : un fichier JSON de `config/` qui n'est pas lié mais généré (contenu du dépôt
-/// plus ces valeurs). `set` : clés pointées (`"idle.lock" = 3600`) ; une table imbriquée
-/// (`idle.lock = 3600` sans guillemets) est aplatie en clés pointées.
+/// `[[override]]`: a JSON file of `config/` that is not linked but generated (content of the repository
+/// plus these values). `set`: dotted keys (`"idle.lock" = 3600`); a nested table
+/// (`idle.lock = 3600` without quotes) is flattened into dotted keys.
 #[derive(Debug, Default, Clone, Deserialize, PartialEq)]
 pub struct Override {
     pub path: String,
@@ -79,11 +79,11 @@ pub struct Override {
 
 impl Config {
     pub fn parse(text: &str) -> Result<Self> {
-        toml::from_str(text).context("config.toml invalide")
+        toml::from_str(text).context("invalid config.toml")
     }
 
-    /// Charge la configuration ; un fichier absent donne la configuration vide. Avec `data`, le
-    /// `poste.toml` du dépôt de données s'y ajoute (listes mises bout à bout, sans doublon).
+    /// Loads the configuration; a missing file gives the empty configuration. With `data`, the
+    /// `poste.toml` of the data repository is added to it (lists put end to end, without duplicates).
     pub fn load(env: &Env) -> Result<Self> {
         let mut cfg = Self::load_file(&env.config_file())?.unwrap_or_default();
         if let Some(data) = cfg.data_path(env) {
@@ -100,11 +100,11 @@ impl Config {
                 .with_context(|| file.display().to_string())
                 .map(Some),
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
-            Err(e) => Err(e).with_context(|| format!("lecture de {}", file.display())),
+            Err(e) => Err(e).with_context(|| format!("reading {}", file.display())),
         }
     }
 
-    /// Ajoute les réglages du dépôt de données ; `repo`, `data` et `source` restent ceux de la machine.
+    /// Adds the settings of the data repository; `repo`, `data` and `source` stay those of the machine.
     fn merge(&mut self, more: Self) {
         fn extend(a: &mut Vec<String>, b: Vec<String>) {
             for v in b {
@@ -121,7 +121,7 @@ impl Config {
         self.overrides.extend(more.overrides);
     }
 
-    /// Chemin du dépôt de données, `~` développé.
+    /// Path of the data repository, `~` expanded.
     pub fn data_path(&self, env: &Env) -> Option<PathBuf> {
         self.data
             .as_deref()
@@ -129,7 +129,7 @@ impl Config {
             .map(|r| env.expand(r))
     }
 
-    /// Chemin du dépôt, `~` développé.
+    /// Path of the repository, `~` expanded.
     pub fn repo_path(&self, env: &Env) -> Option<PathBuf> {
         self.repo
             .as_deref()
@@ -137,17 +137,17 @@ impl Config {
             .map(|r| env.expand(r))
     }
 
-    /// Ce module est-il désactivé sur cette machine ?
+    /// Is this module disabled on this machine?
     pub fn is_disabled(&self, name: &str) -> bool {
         self.disabled.iter().any(|d| d == name)
     }
 
-    /// Cet identifiant (paquet ou étape du bootstrap) est-il ignoré sur cette machine ?
+    /// Is this identifier (bootstrap package or step) ignored on this machine?
     pub fn is_skipped(&self, id: &str) -> bool {
         self.skip.iter().any(|d| d == id)
     }
 
-    /// Dossiers de modules déclarés, `~` développé.
+    /// Declared module folders, `~` expanded.
     pub fn module_dirs(&self, env: &Env) -> Vec<PathBuf> {
         self.modules.iter().map(|m| env.expand(m)).collect()
     }
@@ -158,9 +158,9 @@ mod tests {
     use super::*;
 
     #[test]
-    fn config_complete() {
+    fn full_config() {
         let c =
-            Config::parse("repo = \"~/Projects/poste\"\nmodules = [\"~/a\", \"/b\"]\nautre = 1\n")
+            Config::parse("repo = \"~/Projects/poste\"\nmodules = [\"~/a\", \"/b\"]\nother = 1\n")
                 .unwrap();
         let e = Env::with_home("/h");
         assert_eq!(c.repo_path(&e), Some(PathBuf::from("/h/Projects/poste")));
@@ -171,7 +171,7 @@ mod tests {
     }
 
     #[test]
-    fn local_et_disabled() {
+    fn local_and_disabled() {
         let c = Config::parse("local = [\".config/hypr/monitors.lua\"]\ndisabled = [\"record\"]\n")
             .unwrap();
         assert_eq!(c.local, [".config/hypr/monitors.lua"]);
@@ -182,12 +182,12 @@ mod tests {
     #[test]
     fn skip() {
         let c = Config::parse("skip = [\"gimp\", \"voxtype-model\"]\n").unwrap();
-        assert!(c.is_skipped("gimp") && !c.is_skipped("autre"));
+        assert!(c.is_skipped("gimp") && !c.is_skipped("other"));
         assert!(Config::parse("").unwrap().skip.is_empty());
     }
 
     #[test]
-    fn config_vide_et_absente() {
+    fn empty_and_missing_config() {
         assert_eq!(Config::parse("").unwrap(), Config::default());
         let dir = tempfile::tempdir().unwrap();
         let e = Env::with_home(dir.path());
@@ -195,7 +195,7 @@ mod tests {
     }
 
     #[test]
-    fn poste_toml_du_depot_de_donnees() {
+    fn poste_toml_of_the_data_repository() {
         let dir = tempfile::tempdir().unwrap();
         let e = Env::with_home(dir.path());
         let data = dir.path().join("data");
@@ -206,13 +206,13 @@ mod tests {
             "repo = \"~/poste\"\ndata = \"~/data\"\ndisabled = [\"power\"]\n",
         )
         .unwrap();
-        // Sans poste.toml : la config de la machine seule.
+        // Without poste.toml: the machine's config alone.
         let c = Config::load(&e).unwrap();
         assert_eq!(c.data_path(&e), Some(data.clone()));
         assert_eq!(c.disabled, ["power"]);
         std::fs::write(
             data.join(DATA_CONFIG),
-            "repo = \"/ailleurs\"\ndisabled = [\"power\", \"record\"]\nlocal = [\".x\"]\naddons = [\"player\"]\n",
+            "repo = \"/elsewhere\"\ndisabled = [\"power\", \"record\"]\nlocal = [\".x\"]\naddons = [\"player\"]\n",
         )
         .unwrap();
         let c = Config::load(&e).unwrap();
@@ -229,11 +229,11 @@ mod tests {
             Config::parse("source = \"release\"\n").unwrap().source,
             Source::Release
         );
-        assert!(Config::parse("source = \"autre\"\n").is_err());
+        assert!(Config::parse("source = \"other\"\n").is_err());
     }
 
     #[test]
-    fn config_invalide() {
+    fn invalid_config() {
         assert!(Config::parse("repo = [").is_err());
     }
 }

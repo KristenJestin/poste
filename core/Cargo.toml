@@ -1,6 +1,6 @@
 [package]
 name = "poste-core"
-description = "Bibliothèque commune de poste : chemins XDG, configuration, découverte des modules"
+description = "Common library of poste: XDG paths, configuration, module discovery"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

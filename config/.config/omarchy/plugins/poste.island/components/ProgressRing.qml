@@ -1,7 +1,7 @@
 import QtQuick
 
-// Anneau de progression (activités de l'île) : piste discrète, et l'arc de
-// `progress` (0 → 1) qui part du haut dans le sens des aiguilles.
+// Progress ring (island activities): discreet track, and the arc of
+// `progress` (0 → 1) that starts from the top, clockwise.
 Canvas {
   id: ring
   property real progress: 0

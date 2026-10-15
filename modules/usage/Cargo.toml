@@ -1,6 +1,6 @@
 [package]
 name = "poste-usage"
-description = "Module usage de poste : quotas des agents IA, historique et statistiques de consommation"
+description = "Usage module of poste: AI agent quotas, history and consumption statistics"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

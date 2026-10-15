@@ -19,16 +19,16 @@ source "$OMARCHY_PATH/default/bash/rc"
 # Make an alias for invoking commands you use constantly
 # alias p='python'
 
-# Node géré par Vite+ (met ses shims en tête du PATH). mise gère le reste
-# (dotnet, go…) via uwsm, donc on NE fait PAS `mise deactivate`.
+# Node managed by Vite+ (puts its shims at the head of the PATH). mise manages the rest
+# (dotnet, go…) through uwsm, so we do NOT run `mise deactivate`.
 [ -f "$HOME/.vite-plus/env" ] && . "$HOME/.vite-plus/env"
 
-# direnv : variables d'environnement par dossier (.envrc)
+# direnv: environment variables per folder (.envrc)
 command -v direnv >/dev/null && eval "$(direnv hook bash)"
 
 
-# bunx de Vite+ ne passe pas en mode "x" (bun lancé via un wrapper npm) : utiliser bun x.
+# Vite+'s bunx does not switch to "x" mode (bun started through an npm wrapper): use bun x.
 alias bunx='bun x'
 
-# Réglages propres à la machine (non versionnés).
+# Machine-specific settings (not versioned).
 [ -f "$HOME/.bashrc.local" ] && . "$HOME/.bashrc.local"

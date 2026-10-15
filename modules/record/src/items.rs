@@ -1,4 +1,4 @@
-//! `poste record items` : la liste de l'extension « Record » du lanceur de l'île.
+//! `poste record items`: the list of the island launcher's "Record" extension.
 
 use crate::env::{load_config, Env};
 use crate::hypr::{clients, mapped, monitor_rect, monitors, text, window_rect, Obj, Rect};
@@ -38,7 +38,7 @@ pub struct Item {
     pub badge: Option<String>,
 }
 
-/// `poste record 'a' 'b'` : arguments entre apostrophes pour le shell.
+/// `poste record 'a' 'b'`: arguments between quotes for the shell.
 pub fn cmd_of(args: &[&str]) -> String {
     let mut parts = vec!["poste".to_string(), "record".to_string()];
     parts.extend(
@@ -92,7 +92,7 @@ fn kw(words: &[&str]) -> Vec<Value> {
     words.iter().map(|w| Value::from(*w)).collect()
 }
 
-/// Les actions Ctrl+B d'une cible : sans son, bureau, bureau + micro, dernier, dossier.
+/// The Ctrl+B actions of a target: no sound, desktop, desktop + mic, last, folder.
 pub fn audio_actions(target: &[&str], preset: Option<&str>) -> Vec<SubAction> {
     let with = |audio: &str| {
         let mut a = vec!["start"];
@@ -119,7 +119,7 @@ pub fn audio_actions(target: &[&str], preset: Option<&str>) -> Vec<SubAction> {
     ]
 }
 
-/// Classe de fenêtre -> icône, d'après les fichiers .desktop (StartupWMClass ou nom).
+/// Window class -> icon, from the .desktop files (StartupWMClass or name).
 pub fn desktop_icons(env: &Env) -> HashMap<String, String> {
     let mut icons = HashMap::new();
     let dirs = [
@@ -164,7 +164,7 @@ pub fn desktop_icons(env: &Env) -> HashMap<String, String> {
     icons
 }
 
-/// Les deux entrées affichées pendant un enregistrement : Stop et Pause / Resume.
+/// The two entries shown during a recording: Stop and Pause / Resume.
 pub fn items_recording(label: &str, file: &str, paused: bool) -> Vec<Item> {
     let quoted = dirname(file).replace('\'', "'\\''");
     vec![
@@ -202,7 +202,7 @@ pub fn items_recording(label: &str, file: &str, paused: bool) -> Vec<Item> {
     ]
 }
 
-/// Les entrées au repos : préréglages, fenêtres, écrans, zone.
+/// The entries at rest: presets, windows, screens, region.
 pub fn items_idle(
     presets: &[Obj],
     wins: &[Obj],
@@ -326,7 +326,7 @@ pub fn items_idle(
     out
 }
 
-/// `items()` : la liste complète en JSON (une ligne), à afficher.
+/// `items()`: the complete list as JSON (one line), to display.
 pub fn items_json(env: &Env) -> String {
     let st = read_state(env);
     let out = if let Some(st) = st {

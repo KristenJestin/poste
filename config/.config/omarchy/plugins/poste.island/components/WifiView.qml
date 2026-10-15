@@ -2,10 +2,10 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 
-// Wi-Fi, grown inside the island from the control center's « Réseau » tile
+// Wi-Fi, grown inside the island from the control center's 'Network' tile
 // (macOS Control Center style). Data and actions go through bin/poste-wifi
 // (nmcli). Keys: ↑↓ move, Enter connects, Ctrl+B row actions, Esc / ← back
-// to the control center. « Réglages avancés… » opens Omarchy's own panel.
+// to the control center. 'Advanced settings…' opens Omarchy's own panel.
 Item {
   id: wifi
   required property var host

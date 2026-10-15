@@ -1,6 +1,6 @@
 #!/bin/bash
-# Capture d'écran d'Omarchy + son « snap » (poste-sfx) si un fichier a bien
-# été créé (pas de son quand on annule la sélection).
+# Omarchy screenshot + 'snap' sound (poste-sfx) if a file was actually
+# created (no sound when the selection is cancelled).
 dir="${OMARCHY_SCREENSHOT_DIR:-${XDG_PICTURES_DIR:-$HOME/Pictures}}"
 mark=$(mktemp)
 omarchy-capture-screenshot "$@"

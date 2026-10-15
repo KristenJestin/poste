@@ -1,12 +1,12 @@
-//! `poste sys sync` : met la machine à jour selon sa source.
+//! `poste sys sync`: updates the machine according to its source.
 //!
-//! - dev : `git pull --ff-only` dans le clone, `current` sur le clone, puis `setup` ;
-//! - release : dernière version publiée (téléchargée et vérifiée si besoin), `current` dessus,
-//!   puis `setup`, puis élagage des anciennes versions.
+//! - dev: `git pull --ff-only` in the clone, `current` on the clone, then `setup`;
+//! - release: latest published version (downloaded and verified if needed), `current` on it,
+//!   then `setup`, then pruning of the old versions.
 //!
-//! Dans les deux cas le dépôt de données (`data`) reste en git (`git pull --ff-only`). Ce qu'il
-//! faut recharger vient des fichiers changés : `git diff` pour un dépôt git, comparaison des
-//! deux racines pour un changement de version.
+//! In both cases the data repository (`data`) stays in git (`git pull --ff-only`). What
+//! must be reloaded comes from the changed files: `git diff` for a git repository, comparison of the
+//! two roots for a version change.
 
 use crate::reload::{self, Need};
 use crate::versions::{self, Fetcher};
@@ -16,18 +16,15 @@ use poste_core::{Config, Env, Source};
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode};
 
-/// Ce que `run` a fait : code de sortie et ce qu'il faut recharger.
+/// What `run` did: exit code and what must be reloaded.
 pub use versions::Switched as Synced;
 
-/// `git pull --ff-only` dans chaque dépôt ; renvoie le commit de chacun avant le pull.
+/// `git pull --ff-only` in each repository; returns the commit of each one before the pull.
 fn pull(dirs: &[PathBuf], dry_run: bool) -> Result<Vec<(PathBuf, String)>> {
     let mut before = Vec::new();
     for dir in dirs {
         if dry_run {
-            println!(
-                "Simulation : git pull --ff-only non lancé ({}).",
-                dir.display()
-            );
+            println!("Dry run: git pull --ff-only not run ({}).", dir.display());
             continue;
         }
         before.push((dir.clone(), reload::head(dir)?));
@@ -36,10 +33,10 @@ fn pull(dirs: &[PathBuf], dry_run: bool) -> Result<Vec<(PathBuf, String)>> {
             .arg(dir)
             .args(["pull", "--ff-only"])
             .status()
-            .context("impossible de lancer git")?;
+            .context("cannot run git")?;
         if !st.success() {
             bail!(
-                "git pull --ff-only a échoué dans {}, setup non lancé",
+                "git pull --ff-only failed in {}, setup not run",
                 dir.display()
             );
         }
@@ -47,14 +44,14 @@ fn pull(dirs: &[PathBuf], dry_run: bool) -> Result<Vec<(PathBuf, String)>> {
     Ok(before)
 }
 
-/// Le dépôt de données de la machine, s'il est déclaré (doit être un dépôt git).
+/// The machine's data repository, if declared (must be a git repository).
 fn data_repo(env: &Env, cfg: &Config) -> Result<Option<PathBuf>> {
     let Some(d) = cfg.data_path(env) else {
         return Ok(None);
     };
     if !d.join(".git").exists() {
         bail!(
-            "data = {} : pas un dépôt git (./setup --data <adresse> le clone)",
+            "data = {}: not a git repository (./setup --data <address> clones it)",
             d.display()
         );
     }
@@ -85,7 +82,7 @@ pub fn run(env: &Env, cfg: &Config, f: &Fetcher, yes: bool, dry_run: bool) -> Re
                 }
             }
             None => {
-                // Simulation sans la nouvelle version : rien d'autre à montrer.
+                // Simulation without the new version: nothing else to show.
                 return Ok(Synced {
                     code: ExitCode::SUCCESS,
                     need,
@@ -93,7 +90,7 @@ pub fn run(env: &Env, cfg: &Config, f: &Fetcher, yes: bool, dry_run: bool) -> Re
             }
         },
     };
-    // Changement de racine (nouvelle version, ou passage au clone) : fichiers comparés.
+    // Root change (new version, or switch to the clone): files compared.
     if let Some(o) = &old {
         versions::add_root_changes(&mut need, Some(o), &root)?;
     }
@@ -113,7 +110,7 @@ pub fn run(env: &Env, cfg: &Config, f: &Fetcher, yes: bool, dry_run: bool) -> Re
     handoff::complete(env, old.as_deref(), need, yes, prune, false)
 }
 
-/// Pour les messages : la racine lue, en clair.
+/// For messages: the root read, in plain words.
 pub fn describe_root(env: &Env, root: &Path) -> String {
     match versions::version_of(env, root) {
         Some(v) => format!("version {} ({})", v.short(), v.date),
@@ -134,8 +131,8 @@ mod tests {
     use std::fs;
     use std::os::unix::fs::symlink;
 
-    /// HOME temporaire d'une machine existante : clone dans `repo`, liens posés par l'ancien
-    /// `setup` (vers le clone, notés dans installed.json), un lien étranger et un fichier à soi.
+    /// Temporary HOME of an existing machine: clone in `repo`, links put in place by the old
+    /// `setup` (to the clone, noted in installed.json), a foreign link and a file of its own.
     struct Machine {
         d: tempfile::TempDir,
         env: Env,
@@ -148,15 +145,15 @@ mod tests {
         let repo = d.path().join("repo");
         make_root(&repo, "", "", "{}");
         fs::write(repo.join("Cargo.toml"), "[workspace]\n").unwrap();
-        fs::write(repo.join("config/.config/a/autre"), "o").unwrap();
-        fs::write(repo.join("config/.config/a/perso"), "dépôt").unwrap();
+        fs::write(repo.join("config/.config/a/other"), "o").unwrap();
+        fs::write(repo.join("config/.config/a/mine"), "repository").unwrap();
         fs::create_dir_all(env.config_file().parent().unwrap()).unwrap();
         fs::write(
             env.config_file(),
             format!("repo = \"{}\"\n", repo.display()),
         )
         .unwrap();
-        // Pas d'unité systemd dans ces racines : `systemctl` n'est jamais appelé.
+        // No systemd unit in these roots: `systemctl` is never called.
         Machine { d, env, repo }
     }
 
@@ -172,35 +169,35 @@ mod tests {
         }
     }
 
-    /// L'ancien `setup` : liens directs vers le clone, notés dans le manifeste.
+    /// The old `setup`: direct links to the clone, noted in the manifest.
     fn old_setup(m: &Machine) {
         crate::setup::run(&m.env, &m.repo, &opts()).unwrap();
-        let l = m.env.home.join(".config/a/neuf");
+        let l = m.env.home.join(".config/a/fresh");
         assert_eq!(
             fs::read_link(&l).unwrap(),
-            m.repo.join("config/.config/a/neuf")
+            m.repo.join("config/.config/a/fresh")
         );
     }
 
     #[test]
-    fn migration_dev_ne_remplace_que_les_liens_poses_par_setup() {
+    fn dev_migration_only_replaces_links_put_by_setup() {
         let m = machine();
         let home = m.env.home.clone();
         old_setup(&m);
-        // Un lien vers le clone que setup n'a pas noté (posé à la main) : jamais touché.
-        let autre = home.join(".config/a/autre");
-        fs::remove_file(&autre).unwrap();
-        symlink(m.repo.join("config/.config/a/autre"), &autre).unwrap();
+        // A link to the clone that setup did not note (put in place by hand): never touched.
+        let other = home.join(".config/a/other");
+        fs::remove_file(&other).unwrap();
+        symlink(m.repo.join("config/.config/a/other"), &other).unwrap();
         let mut man = Manifest::load(&m.env.manifest_file()).unwrap();
-        man.files.retain(|e| !e.path.ends_with("a/autre"));
+        man.files.retain(|e| !e.path.ends_with("a/other"));
         man.save(&m.env.manifest_file()).unwrap();
-        // Un fichier ordinaire différent : conflit, jamais écrasé.
-        let perso = home.join(".config/a/perso");
-        fs::remove_file(&perso).unwrap();
-        fs::write(&perso, "maison").unwrap();
+        // A different ordinary file: conflict, never overwritten.
+        let mine = home.join(".config/a/mine");
+        fs::remove_file(&mine).unwrap();
+        fs::write(&mine, "home").unwrap();
 
-        // Aperçu : le plan montre la vraie migration (lien noté reposé vers current, lien posé
-        // à la main laissé), et rien n'est écrit, ni current ni liens ni manifeste.
+        // Preview: the plan shows the real migration (noted link put back to current, link put in place
+        // by hand left), and nothing is written, neither current nor links nor manifest.
         let c = cfg(&m.env);
         let manifest_before = fs::read_to_string(m.env.manifest_file()).unwrap();
         let root = versions::ensure_current(&m.env, &c, true).unwrap();
@@ -217,9 +214,9 @@ mod tests {
                 .op
                 .clone()
         };
-        assert_eq!(op(".config/a/neuf"), crate::config::Op::Replace);
-        assert_eq!(op(".config/a/autre"), crate::config::Op::Done);
-        assert_eq!(op(".config/a/perso"), crate::config::Op::Conflict);
+        assert_eq!(op(".config/a/fresh"), crate::config::Op::Replace);
+        assert_eq!(op(".config/a/other"), crate::config::Op::Done);
+        assert_eq!(op(".config/a/mine"), crate::config::Op::Conflict);
         crate::setup::run(
             &m.env,
             &root,
@@ -232,8 +229,8 @@ mod tests {
         .unwrap();
         assert!(fs::symlink_metadata(m.env.current_link()).is_err());
         assert_eq!(
-            fs::read_link(home.join(".config/a/neuf")).unwrap(),
-            m.repo.join("config/.config/a/neuf")
+            fs::read_link(home.join(".config/a/fresh")).unwrap(),
+            m.repo.join("config/.config/a/fresh")
         );
         assert_eq!(
             fs::read_to_string(m.env.manifest_file()).unwrap(),
@@ -241,42 +238,42 @@ mod tests {
         );
         assert!(!m.env.backup_dir().exists());
 
-        // Pour de vrai : current -> clone, le lien noté repasse par current (ancien sauvegardé).
+        // For real: current -> clone, the noted link goes through current again (old one backed up).
         let root = versions::ensure_current(&m.env, &c, false).unwrap();
         assert_eq!(root, m.env.current_link());
         crate::setup::run(&m.env, &root, &opts()).unwrap();
         let cur = m.env.current_link();
         assert_eq!(
-            fs::read_link(home.join(".config/a/neuf")).unwrap(),
-            cur.join("config/.config/a/neuf")
+            fs::read_link(home.join(".config/a/fresh")).unwrap(),
+            cur.join("config/.config/a/fresh")
         );
         assert_eq!(
-            fs::read_link(&autre).unwrap(),
-            m.repo.join("config/.config/a/autre"),
-            "lien inconnu du manifeste : intact"
+            fs::read_link(&other).unwrap(),
+            m.repo.join("config/.config/a/other"),
+            "link unknown to the manifest: intact"
         );
-        assert_eq!(fs::read_to_string(&perso).unwrap(), "maison");
+        assert_eq!(fs::read_to_string(&mine).unwrap(), "home");
         let baks: Vec<String> = fs::read_dir(m.env.backup_dir())
             .unwrap()
             .flatten()
             .map(|e| e.file_name().to_string_lossy().into_owned())
             .collect();
-        assert!(baks.iter().any(|b| b.contains("neuf")), "{baks:?}");
+        assert!(baks.iter().any(|b| b.contains("fresh")), "{baks:?}");
         assert!(!baks
             .iter()
-            .any(|b| b.contains("autre") || b.contains("perso")));
-        // Relancé : rien à faire.
+            .any(|b| b.contains("other") || b.contains("mine")));
+        // Run again: nothing to do.
         let before = fs::read_to_string(m.env.manifest_file()).unwrap();
         crate::setup::run(&m.env, &root, &opts()).unwrap();
         assert_eq!(fs::read_to_string(m.env.manifest_file()).unwrap(), before);
     }
 
     #[test]
-    fn sync_release_installe_bascule_et_compare_les_racines() {
+    fn sync_release_installs_switches_and_compares_roots() {
         let m = machine();
         let home = m.env.home.clone();
         old_setup(&m);
-        // La machine passe en release : version publiée, téléchargée par le faux curl.
+        // The machine switches to release: published version, downloaded by the fake curl.
         let src = m.d.path().join("v1");
         make_root(&src, "1111111", "2026-10-01T10:00:00Z", "{}");
         let pubdir = m.d.path().join("pub");
@@ -285,7 +282,7 @@ mod tests {
         let f = Fetcher::with(&curl, "https://example.com/r");
         crate::machine::set_key(&m.env.config_file(), "source", "release").unwrap();
 
-        // Simulation : rien n'est installé ni basculé.
+        // Dry run: nothing is installed or switched.
         let s = run(&m.env, &cfg(&m.env), &f, true, true).unwrap();
         assert_eq!(format!("{:?}", s.code), format!("{:?}", ExitCode::SUCCESS));
         assert!(versions::installed(&m.env).is_empty());
@@ -294,29 +291,29 @@ mod tests {
         assert_eq!(format!("{:?}", s.code), format!("{:?}", ExitCode::SUCCESS));
         let v1 = m.env.versions_dir().join("1111111");
         assert_eq!(versions::current_target(&m.env), fs::canonicalize(&v1).ok());
-        // Liens migrés vers current (qui désigne la version), binaire de la version posé.
-        let link = home.join(".config/a/neuf");
+        // Links migrated to current (which points to the version), binary of the version put in place.
+        let link = home.join(".config/a/fresh");
         assert_eq!(
             fs::read_link(&link).unwrap(),
-            m.env.current_link().join("config/.config/a/neuf")
+            m.env.current_link().join("config/.config/a/fresh")
         );
         assert_eq!(
             fs::read_to_string(m.env.bin_dir().join("poste")).unwrap(),
             "bin 1111111"
         );
 
-        // Aperçu d'une bascule en release : les liens passent déjà par current, rien à relier
-        // même si la racine lue est une autre version que celle que current désigne.
+        // Preview of a switch to release: the links already go through current, nothing to re-link
+        // even if the root read is another version than the one current points to.
         let mut layout = crate::config::load(&v1, &m.env).unwrap().unwrap();
         layout.relink(&m.env.current_link());
         let plan = crate::config::plan(&layout, &m.env, &Default::default()).unwrap();
         assert!(plan
             .steps
             .iter()
-            .filter(|s| s.entry.rel == ".config/a/neuf")
+            .filter(|s| s.entry.rel == ".config/a/fresh")
             .all(|s| s.op == crate::config::Op::Done));
 
-        // Nouvelle version dont seule l'île d'un module change : île à recharger, pas Hyprland.
+        // New version where only a module's island changes: island to reload, not Hyprland.
         let src2 = m.d.path().join("v2");
         make_root(&src2, "2222222", "2026-10-02T10:00:00Z", "{\"x\":1}");
         publish(&src2, &pubdir);
@@ -326,17 +323,17 @@ mod tests {
             fs::read_to_string(m.env.modules_dir().join("rec/island/launcher.json")).unwrap(),
             "{\"x\":1}"
         );
-        // Rien de neuf : rien à recharger, aucun téléchargement de l'archive.
+        // Nothing new: nothing to reload, no download of the archive.
         let s = run(&m.env, &cfg(&m.env), &f, true, false).unwrap();
         assert!(!s.need.any());
         assert_eq!(versions::installed(&m.env).len(), 2);
 
-        // Retour en dev : current sur le clone, liens inchangés (ils passent par current).
+        // Back to dev: current on the clone, links unchanged (they go through current).
         let sw = versions::use_target(&m.env, &cfg(&m.env), &versions::Target::Dev, &f, &opts())
             .unwrap();
         assert!(
             sw.need.shell,
-            "l'île du clone diffère de celle de la version"
+            "the island of the clone differs from the one of the version"
         );
         assert_eq!(
             versions::current_target(&m.env),
@@ -345,9 +342,9 @@ mod tests {
         assert_eq!(cfg(&m.env).source, Source::Dev);
         assert_eq!(
             fs::read_link(&link).unwrap(),
-            m.env.current_link().join("config/.config/a/neuf")
+            m.env.current_link().join("config/.config/a/fresh")
         );
-        // Retour arrière sur la première version, par le début de son commit.
+        // Rollback to the first version, by the start of its commit.
         versions::use_target(
             &m.env,
             &cfg(&m.env),
@@ -358,7 +355,7 @@ mod tests {
         .unwrap();
         assert_eq!(versions::current_target(&m.env), fs::canonicalize(&v1).ok());
         assert_eq!(cfg(&m.env).source, Source::Release);
-        // Écrire dans le dépôt est refusé depuis une version installée.
+        // Writing into the repository is refused from an installed version.
         assert!(versions::ensure_writable(&m.env, &m.env.current_link(), "add").is_err());
     }
 }

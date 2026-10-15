@@ -1,7 +1,7 @@
-//! Parité avec le script Python d'origine (`poste-record.py`) : les mêmes scénarios sont joués
-//! par les deux programmes, avec les mêmes faux programmes extérieurs, et les sorties, les
-//! arguments de gpu-screen-recorder et les notifications sont comparés tels quels.
-//! Sans `python3`, ces tests sont ignorés.
+//! Parity with the original Python script (`poste-record.py`): the same scenarios are played
+//! by both programs, with the same fake outside programs, and the outputs, the
+//! gpu-screen-recorder arguments and the notifications are compared as they are.
+//! Without `python3`, these tests are skipped.
 
 mod common;
 use common::*;
@@ -32,7 +32,7 @@ const PRESETS: &str = r#"{
   {"id": "off", "enabled": false, "name": "Disabled"},
   {"id": "gone", "name": "Gone", "window": {"class": "^Nope$"}},
   {"id": "nomon", "name": "NoMon", "monitor": "DP-9"},
-  {"id": "titre", "name": "Par titre", "window": {"title": "terminal"}, "audioSource": "app+mic"},
+  {"id": "by-title", "name": "By title", "window": {"title": "terminal"}, "audioSource": "app+mic"},
   {"id": "raw", "name": "Raw", "monitor": "HDMI-A-1", "audioSource": "app:Unity|default_input", "codec": "h264", "quality": "high"},
   {"id": "it's", "name": "Quote'd", "subtitle": "", "monitor": "VIRT-1", "audioSource": "none"}
  ]
@@ -47,7 +47,7 @@ fn setup(b: &Bench) {
     std::fs::create_dir_all(&apps).unwrap();
     std::fs::write(
         apps.join("unity.desktop"),
-        "[Desktop Entry]\nIcon=unityhub\nStartupWMClass=Unity\n[Desktop Action x]\nIcon=autre\n",
+        "[Desktop Entry]\nIcon=unityhub\nStartupWMClass=Unity\n[Desktop Action x]\nIcon=other\n",
     )
     .unwrap();
     std::fs::write(apps.join("foo.desktop"), "[Desktop Entry]\nIcon=fooicon\n").unwrap();
@@ -61,7 +61,7 @@ fn setup(b: &Bench) {
 macro_rules! need_python {
     () => {
         if !python_available() {
-            eprintln!("python3 absent : test ignoré");
+            eprintln!("python3 missing: test skipped");
             return;
         }
     };
@@ -79,7 +79,7 @@ fn both(b: &Bench, args: &[&str]) -> (String, String) {
 }
 
 #[test]
-fn items_au_repos_identiques() {
+fn items_at_rest_identical() {
     need_python!();
     let b = Bench::new();
     setup(&b);
@@ -91,15 +91,15 @@ fn items_au_repos_identiques() {
 }
 
 #[test]
-fn items_sans_config_identiques() {
+fn items_without_config_identical() {
     need_python!();
     let b = Bench::new();
-    // Ni préréglages, ni hyprctl : seulement « Region… ».
+    // Neither presets nor hyprctl: only "Region…".
     let (py, rs) = both(&b, &["items"]);
     assert_eq!(py, rs);
     let b = Bench::new();
-    b.presets("pas du json");
-    b.fake("clients.json", "pas du json non plus");
+    b.presets("not json");
+    b.fake("clients.json", "not json either");
     let (py, rs) = both(&b, &["items"]);
     assert_eq!(py, rs);
 }
@@ -116,7 +116,7 @@ fn seed_state(b: &Bench, pid: u32, paused_at: Option<f64>) {
     .unwrap();
 }
 
-/// Un processus vivant qui sert de faux enregistreur (jamais signalé par ces tests).
+/// A living process that serves as a fake recorder (never signalled by these tests).
 fn sleeper() -> std::process::Child {
     std::process::Command::new("sleep")
         .arg("30")
@@ -125,7 +125,7 @@ fn sleeper() -> std::process::Child {
 }
 
 #[test]
-fn status_et_items_pendant_un_enregistrement() {
+fn status_and_items_during_a_recording() {
     need_python!();
     let b = Bench::new();
     setup(&b);
@@ -138,7 +138,7 @@ fn status_et_items_pendant_un_enregistrement() {
         assert_eq!(py, rs);
         let (py, rs) = both(&b, &["status"]);
         if paused.is_some() {
-            // En pause le temps est figé : texte identique à l'octet près.
+            // While paused the time is frozen: text identical byte for byte.
             assert_eq!(py, rs);
             assert!(py.contains("\"recordMs\": 7500"));
         } else {
@@ -153,20 +153,20 @@ fn status_et_items_pendant_un_enregistrement() {
             assert_eq!(strip(&py), strip(&rs));
         }
     }
-    // Processus disparu : au repos.
+    // Process gone: at rest.
     let _ = s.kill();
     let _ = s.wait();
     let (py, rs) = both(&b, &["status"]);
     assert_eq!(py, "{\"t\": \"status\", \"recording\": false}\n");
     assert_eq!(py, rs);
-    // Fichier d'état illisible : au repos aussi.
+    // Unreadable state file: at rest too.
     std::fs::write(b.state_file(), "{").unwrap();
     let (py, rs) = both(&b, &["status"]);
     assert_eq!(py, rs);
 }
 
 #[test]
-fn aide_identique_sans_commande_ou_commande_inconnue() {
+fn help_identical_without_command_or_unknown_command() {
     need_python!();
     let b = Bench::new();
     for args in [&[][..], &["nimporte"][..], &["start"][..]] {
@@ -186,7 +186,7 @@ struct Run {
     pick: Option<String>,
 }
 
-/// Joue `start` avec un implémentation, attend la fin du superviseur si `notify` est attendu.
+/// Plays `start` with one implementation, waits for the end of the supervisor if `notify` is expected.
 fn play(b: &Bench, rust: bool, args: &[&str], mode: &str, notify: bool) -> Run {
     b.clear_journal();
     b.empty_videos();
@@ -233,13 +233,13 @@ fn same_start(b: &Bench, args: &[&str], mode: &str, notify: bool) -> Run {
     assert_eq!(py.code, rs.code, "code de {args:?}");
     assert_eq!(py.stdout, rs.stdout, "sortie de {args:?}");
     assert_eq!(py.journal, rs.journal, "journal de {args:?}");
-    assert_eq!(py.files, rs.files, "fichiers de {args:?}");
+    assert_eq!(py.files, rs.files, "files of {args:?}");
     assert_eq!(py.pick, rs.pick, "pick de {args:?}");
     rs
 }
 
 #[test]
-fn start_preset_unity_identique() {
+fn start_unity_preset_identical() {
     need_python!();
     let b = Bench::new();
     setup(&b);
@@ -251,7 +251,7 @@ fn start_preset_unity_identique() {
 }
 
 #[test]
-fn start_cibles_et_sons_identiques() {
+fn start_targets_and_sounds_identical() {
     need_python!();
     let b = Bench::new();
     setup(&b);
@@ -259,7 +259,7 @@ fn start_cibles_et_sons_identiques() {
     let cases: Vec<Vec<&str>> = vec![
         vec!["start", "--preset", "screen"],
         vec!["start", "--preset", "zone"],
-        vec!["start", "--preset", "titre"],
+        vec!["start", "--preset", "by-title"],
         vec!["start", "--preset", "raw"],
         vec!["start", "--preset", "it's"],
         vec!["start", "--preset", "unity", "--audio", "none"],
@@ -287,13 +287,13 @@ fn start_cibles_et_sons_identiques() {
 }
 
 #[test]
-fn start_cas_limites_identiques() {
+fn start_edge_cases_identical() {
     need_python!();
     let b = Bench::new();
     setup(&b);
-    // Préréglage inconnu, fenêtre introuvable, fenêtre disparue : notification et code 1.
+    // Unknown preset, window not found, window gone: notification and code 1.
     for args in [
-        vec!["start", "--preset", "inconnu"],
+        vec!["start", "--preset", "unknown"],
         vec!["start", "--preset", "gone"],
         vec!["start", "--preset", "off"],
         vec!["start", "--window", "0xdead"],
@@ -303,16 +303,16 @@ fn start_cas_limites_identiques() {
         assert!(r.journal.contains("omarchy-notification-send"));
         assert!(!r.journal.contains("gpu-screen-recorder\t-w"));
     }
-    // Zone annulée : rien ne se passe, code 0.
+    // Region cancelled: nothing happens, code 0.
     let r = same_start(&b, &["start", "--region"], "quick", false);
     assert_eq!(r.code, Some(0));
     assert!(!r.journal.contains("gpu-screen-recorder\t-w"));
-    b.fake("slurp", "n'importe quoi");
+    b.fake("slurp", "anything");
     same_start(&b, &["start", "--region"], "quick", false);
 }
 
 #[test]
-fn start_echecs_identiques() {
+fn start_failures_identical() {
     need_python!();
     let b = Bench::new();
     setup(&b);
@@ -323,29 +323,29 @@ fn start_echecs_identiques() {
 }
 
 #[test]
-fn start_config_defauts_particuliers() {
+fn start_config_particular_defaults() {
     need_python!();
     let b = Bench::new();
     b.fake("monitors.json", MONITORS);
-    // Dossier sur un disque absent : repli sur ~/Videos ; conteneur mkv : pas d'AAC ; fps flottant.
+    // Folder on an absent disk: fallback to ~/Videos; mkv container: no AAC; floating fps.
     b.presets(
         r#"{"defaults": {"dir": "/mnt/absent-xyz/Records", "container": "mkv", "fps": 59.94, "cursor": null, "audio": "desktop+mic", "codec": "h264"}, "presets": []}"#,
     );
     let r = same_start(&b, &["start", "--monitor", "DP-1"], "quick", true);
     assert!(r.journal.contains("-f\t59.94") && r.journal.contains("-cursor\tno"));
     assert!(!r.journal.contains("aac"));
-    // Dossier dont le parent existe : créé.
+    // Folder whose parent exists: created.
     b.presets(r#"{"defaults": {"dir": "~/Videos/Sous"}}"#);
     let r = same_start(&b, &["start", "--monitor", "DP-1"], "quick", true);
     assert!(r.journal.contains("Sous/Screen DP-1 STAMP.mp4"));
-    // Nom de cible à ralonge ou plein de caractères interdits.
+    // Very long target name or full of forbidden characters.
     b.presets("{}");
     let long = "é".repeat(100) + "/\\:*?";
     same_start(&b, &["start", "--monitor", &long], "quick", true);
 }
 
 #[test]
-fn ouverture_du_dernier_enregistrement_identique() {
+fn opening_of_the_last_recording_identical() {
     need_python!();
     let b = Bench::new();
     setup(&b);
@@ -355,20 +355,20 @@ fn ouverture_du_dernier_enregistrement_identique() {
         f.set_modified(std::time::UNIX_EPOCH + std::time::Duration::from_secs(secs))
             .unwrap();
     };
-    // Aucun enregistrement : notification et code 1.
+    // No recording: notification and code 1.
     let (py, rs) = both(&b, &["open-last"]);
     assert_eq!(py, rs);
     let j = b.journal();
     assert_eq!(j.matches("No recording yet").count(), 2, "{j}");
-    // Avec des vidéos : la plus récente, y compris par préréglage.
-    touch(&b.videos, "ancien.mp4", 1_000_000_000);
+    // With videos: the most recent, including by preset.
+    touch(&b.videos, "old.mp4", 1_000_000_000);
     touch(&b.videos, "recent.MKV", 1_700_000_000);
     touch(&b.videos, "notes.txt", 1_800_000_000);
     touch(&b.videos.join("Unity"), "u.webm", 1_600_000_000);
     for args in [
         vec!["open-last"],
         vec!["open-last", "--preset", "unity"],
-        vec!["open-last", "--preset", "inconnu"],
+        vec!["open-last", "--preset", "unknown"],
         vec!["open-dir"],
         vec!["open-dir", "--preset", "unity"],
     ] {
@@ -382,7 +382,7 @@ fn ouverture_du_dernier_enregistrement_identique() {
         assert_eq!(py.status.code(), rs.status.code());
         assert_eq!(jp, b.journal(), "{args:?}");
     }
-    // Le fichier en cours d'enregistrement est exclu.
+    // The file being recorded is excluded.
     let mut s = sleeper();
     let busy = format!("{}/busy.mp4", b.videos.display());
     touch(&b.videos, "busy.mp4", 1_900_000_000);
@@ -406,7 +406,7 @@ fn ouverture_du_dernier_enregistrement_identique() {
 }
 
 #[test]
-fn hotkey_sans_enregistrement_ouvre_le_lanceur() {
+fn hotkey_without_recording_opens_the_launcher() {
     need_python!();
     let b = Bench::new();
     b.clear_journal();
@@ -420,7 +420,7 @@ fn hotkey_sans_enregistrement_ouvre_le_lanceur() {
 }
 
 #[test]
-fn selecteur_de_partage_identique() {
+fn share_picker_identical() {
     need_python!();
     let b = Bench::new();
     let list = "12[HC>]kitty[HT>]shell[HE>]55aa[HA>]34[HC>]Unity[HT>]Project[HE>]0x5581[HA>]";
@@ -435,7 +435,7 @@ fn selecteur_de_partage_identique() {
         (Some(r#""0x9999""#.into()), now),
         (Some(r#""0x5581""#.into()), now - 30.0),
         (Some("null".into()), now),
-        (Some(r#""pas un nombre""#.into()), now),
+        (Some(r#""not a number""#.into()), now),
         (None, now),
     ];
     for (address, at) in cases {
@@ -452,7 +452,7 @@ fn selecteur_de_partage_identique() {
                 .unwrap();
             }
             let mut c = if rust {
-                // Par le chemin stable posé dans xdph.conf : le raccourci shell du module.
+                // Through the stable path put in xdph.conf: the module's shell shortcut.
                 let mut c = b.rust(&["share-picker", "--arg"]);
                 c.env("XDPH_WINDOW_SHARING_LIST", list);
                 c
@@ -470,6 +470,6 @@ fn selecteur_de_partage_identique() {
                 std::fs::read_to_string(b.run.join("poste-record/picker.log")).ok(),
             ));
         }
-        assert_eq!(outs[0], outs[1], "adresse {address:?}, at {at}");
+        assert_eq!(outs[0], outs[1], "address {address:?}, at {at}");
     }
 }

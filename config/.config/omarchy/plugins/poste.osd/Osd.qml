@@ -2,11 +2,11 @@ import QtQuick
 import Quickshell.Io
 import "../poste.island/bandeau"
 
-// OSD de poste : clone de omarchy.osd (volume, luminosité, micro, musique, alimentation).
-// Omarchy y envoie tout ce qui vise omarchy.osd : shell.summon("omarchy.osd", payload) appelle
-// open(payload) d'un clone actif, et omarchy-osd passe par `omarchy-shell osd show <json>`
-// (même cible IPC « osd » qu'Omarchy). La lecture du payload reste celle d'Omarchy
-// (OsdModel.js, importé par le bandeau) ; seul le dessin change : l'OSD va dans le bandeau.
+// poste OSD: clone of omarchy.osd (volume, brightness, microphone, music, power).
+// Omarchy sends there everything aimed at omarchy.osd: shell.summon("omarchy.osd", payload) calls
+// open(payload) of an active clone, and omarchy-osd goes through `omarchy-shell osd show <json>`
+// (same 'osd' IPC target as Omarchy). The reading of the payload stays Omarchy's
+// (OsdModel.js, imported by the banner); only the drawing changes: the OSD goes in the banner.
 Item {
   id: root
 

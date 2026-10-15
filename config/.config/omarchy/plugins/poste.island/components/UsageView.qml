@@ -3,12 +3,12 @@ import Quickshell
 import Quickshell.Io
 import "NameColor.js" as NameColor
 
-// Détail de la consommation de Claude Code (ouvert depuis le bloc Claude Code
-// du centre de contrôle, ou `omarchy-shell poste.island usage`). Les chiffres
-// viennent de bin/poste-agent-usage (journaux de Claude Code) : total de la
-// fenêtre, part par modèle, tokens par heure, puis les sessions les plus
-// gourmandes ; Entrée ou clic sur une session déplie ses agents.
-// Touches : Tab session 5 h / semaine, ↑↓ choisir, Entrée déplier, Échap fermer.
+// Detail of Claude Code consumption (opened from the Claude Code block
+// of the control center, or `omarchy-shell poste.island usage`). The figures
+// come from bin/poste-agent-usage (Claude Code's logs): total of the
+// window, share per model, tokens per hour, then the most
+// greedy sessions; Enter or click on a session unfolds its agents.
+// Keys: Tab 5 h session / week, ↑↓ choose, Enter unfold, Escape close.
 Item {
   id: view
   required property var host
@@ -45,7 +45,7 @@ Item {
       onStreamFinished: {
         view.loading = false
         try { view.usage = JSON.parse(String(this.text)) } catch (e) { view.usage = null }
-        // La session la plus gourmande s'ouvre dépliée (ses agents).
+        // The most greedy session opens unfolded (its agents).
         var top = view.sessions[0]
         if (top && !Object.keys(view.expanded).length) { var e = {}; e[top.id] = true; view.expanded = e }
       }
@@ -60,10 +60,10 @@ Item {
     return String(n)
   }
   function share(n) { return totalTokens > 0 ? Math.round(n / totalTokens * 100) + " %" : "" }
-  // Couleur d'un modèle : tirée de son nom seul (NameColor.js), donc la même
-  // partout (session, semaine, agents), quels que soient les autres modèles.
+  // Color of a model: drawn from its name alone (NameColor.js), hence the same
+  // everywhere (session, week, agents), whatever the other models.
   function colorFor(model) { return NameColor.color(model) }
-  // Heure locale d'une date ISO : « 14:00 », ou « Sun 14:00 » sur la semaine.
+  // Local time of an ISO date: '14:00', or 'Sun 14:00' over the week.
   function clock(iso) {
     var d = new Date(String(iso || ""))
     if (isNaN(d.getTime())) return ""
@@ -82,7 +82,7 @@ Item {
     next[key] = !next[key]
     agentOpen = next
   }
-  // « 2 h 14 », « 35 min » : de `from` à `to` (ou maintenant).
+  // '2 h 14', '35 min': from `from` to `to` (or now).
   function duration(from, to) {
     var a = new Date(String(from || "")).getTime()
     var b = to ? new Date(String(to)).getTime() : host.clockDate.getTime()
@@ -121,7 +121,7 @@ Item {
     width: parent.width
     spacing: 14
 
-    // ------------------------------------------------ en-tête : fenêtre et quota
+    // ------------------------------------------------ header: window and quota
     Item {
       width: parent.width
       height: 26
@@ -171,7 +171,7 @@ Item {
       lines: [0.28, 1, 0.5, 1, 0.92, 0.84, 0.66]
     }
 
-    // ------------------------------------------------ total, part par modèle
+    // ------------------------------------------------ total, share per model
     Column {
       width: parent.width
       spacing: 8
@@ -179,7 +179,7 @@ Item {
       Row {
         spacing: 10
         Text {
-          text: view.usage ? view.fmt(view.totalTokens) : (view.loading ? "…" : "—")
+          text: view.usage ? view.fmt(view.totalTokens) : (view.loading ? "…" : "-")
           color: view.host.colorText
           font.family: view.host.uiFont
           font.pixelSize: 26
@@ -196,7 +196,7 @@ Item {
           }
         }
       }
-      // Barre empilée par modèle.
+      // Stacked bar per model.
       Row {
         width: parent.width
         height: 6
@@ -226,7 +226,7 @@ Item {
       }
     }
 
-    // ------------------------------------------------ tokens par heure
+    // ------------------------------------------------ tokens per hour
     Column {
       id: hoursCol
       width: parent.width
@@ -267,10 +267,10 @@ Item {
       }
     }
 
-    // ------------------------------------------------ frise : qui a tourné quand
-    // Une ligne par session (les 8 plus gourmandes), la fenêtre en 48 cases :
-    // une case pleine = cette session a consommé à ce moment-là, plus opaque
-    // quand elle a consommé plus, à la couleur du modèle qui domine la case.
+    // ------------------------------------------------ timeline: who ran when
+    // One row per session (the 8 most greedy), the window in 48 cells:
+    // a full cell = this session consumed at that moment, more opaque
+    // when it consumed more, in the color of the model that dominates the cell.
     Column {
       id: timelineCol
       width: parent.width
@@ -284,7 +284,7 @@ Item {
           for (var j = 0; j < rows[i].timeline.length; j++) m = Math.max(m, rows[i].timeline[j][1])
         return m
       }
-      // Position de « maintenant » dans la fenêtre (la semaine court jusqu'à sa remise à zéro).
+      // Position of 'now' in the window (the week runs until its reset).
       readonly property real nowAt: {
         if (!view.usage) return 1
         var a = new Date(view.usage.start).getTime(), b = new Date(view.usage.end).getTime()
@@ -331,7 +331,7 @@ Item {
           }
         }
       }
-      // Repères : début, maintenant, fin de la fenêtre.
+      // Marks: start, now, end of the window.
       Item {
         width: parent.width
         height: 14
@@ -428,7 +428,7 @@ Item {
             text: (row.open ? "▾ " : "▸ ") + "context " + view.fmt(row.modelData.mainContext) + " avg, " + view.fmt(row.modelData.maxContext) + " max"
               + "  ·  " + row.modelData.agentCount + " agents  ·  " + row.modelData.req + " requests  ·  " + view.since(row.modelData.last)
           }
-          // Agents de la session, dépliés.
+          // Agents of the session, unfolded.
           Item {
             width: parent.width
             height: row.open ? agentList.implicitHeight : 0
@@ -444,21 +444,21 @@ Item {
             topPadding: 4
             Repeater {
               model: row.modelData.agents
-              // Arbre façon explorateur : la conversation principale en tête,
-              // des traits qui la relient à ses agents, et chaque agent aux siens.
+              // Explorer-style tree: the main conversation first,
+              // lines that link it to its agents, and each agent to its own.
               delegate: Item {
                 id: agentRow
                 required property var modelData
                 readonly property int depth: modelData.depth || 0
                 readonly property bool open: !!view.agentOpen[row.modelData.id + "/" + (modelData.id || "main")]
-                // Abscisse du trait d'un niveau (1 : agents de la conversation).
+                // X of a level's line (1: agents of the conversation).
                 function railX(level) { return 12 + (level - 1) * 18 }
                 readonly property real indent: depth === 0 ? 0 : railX(depth) + 12
                 readonly property color line: view.host.withAlpha(view.host.colorText, 0.2)
                 width: rowCol.width
                 height: agentCol.implicitHeight
 
-                // Traits des niveaux au-dessus qui continuent plus bas.
+                // Lines of the levels above that continue further down.
                 Repeater {
                   model: agentRow.modelData.rails || []
                   delegate: Rectangle {
@@ -471,8 +471,8 @@ Item {
                     color: agentRow.line
                   }
                 }
-                // Son propre coude : du haut jusqu'au milieu de la ligne, puis vers la droite ;
-                // le trait continue s'il a encore des frères plus bas.
+                // Its own elbow: from the top down to the middle of the row, then to the right;
+                // the line continues if it still has siblings further down.
                 Rectangle {
                   visible: agentRow.depth > 0
                   x: agentRow.railX(agentRow.depth)
@@ -488,7 +488,7 @@ Item {
                   height: 1
                   color: agentRow.line
                 }
-                // Départ du trait vers ses propres agents (sous son détail s'il est ouvert).
+                // Start of the line toward its own agents (under its detail if it is open).
                 Rectangle {
                   visible: !!agentRow.modelData.hasChildren
                   x: agentRow.railX(agentRow.depth + 1)
@@ -505,7 +505,7 @@ Item {
                     id: head
                     width: parent.width
                     height: agentRow.depth === 0 ? 26 : 21
-                    // La conversation principale : un bandeau à part.
+                    // The main conversation: a separate banner.
                     Rectangle {
                       visible: agentRow.depth === 0
                       anchors.fill: parent
@@ -520,7 +520,7 @@ Item {
                       cursorShape: Qt.PointingHandCursor
                       onClicked: view.toggleAgent(row.modelData.id + "/" + (agentRow.modelData.id || "main"))
                     }
-                    // Ancre invisible : la pastille du modèle part toujours du même x.
+                    // Invisible anchor: the model pill always starts from the same x.
                     Item {
                       id: live
                       x: agentRow.indent + (agentRow.depth === 0 ? 6 : 0)
@@ -529,7 +529,7 @@ Item {
                       width: 0
                       height: 6
                     }
-                    // En cours : point vert à droite, devant la durée.
+                    // Running: green dot on the right, before the duration.
                     Rectangle {
                       id: liveDot
                       visible: !!agentRow.modelData.running
@@ -587,7 +587,7 @@ Item {
                         + view.fmt(agentRow.modelData.tokens) + "  ·  ctx " + view.fmt(agentRow.modelData.avgContext)
                     }
                   }
-                  // Détail d'un agent : qui l'a lancé, comment, ce qu'il fait, sa consigne.
+                  // Detail of an agent: who started it, how, what it does, its instruction.
                   Item {
                     width: parent.width
                     height: agentRow.open ? detailBox.height + 6 : 0

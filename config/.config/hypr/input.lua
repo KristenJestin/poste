@@ -56,8 +56,8 @@ hl.gesture({ fingers = 3, direction = "horizontal", action = "workspace" })
 -- hl.gesture({ fingers = 3, direction = "left", action = function() hl.dispatch(hl.dsp.focus({ direction = "l" })) end })
 -- hl.gesture({ fingers = 3, direction = "right", action = function() hl.dispatch(hl.dsp.focus({ direction = "r" })) end })
 
--- --- Réglages perso (repris d'Omarchy 3) ----------------------------------
--- Souris un peu moins sensible, sans accélération.
+-- --- Personal settings (taken from Omarchy 3) ----------------------------
+-- Mouse a bit less sensitive, without acceleration.
 hl.config({
   input = {
     sensitivity = -0.2,
@@ -65,9 +65,9 @@ hl.config({
   },
 })
 
--- Pointeurs intégrés du portable (sans effet sur le fixe) : plus rapides que la
--- souris du fixe, toujours sans accélération. 0,2 validé par Kris le 2026-10-11,
--- 0,65 choisi par Kris le 2026-10-12 au bureau (0,4 trop lent, 0,8 trop rapide).
+-- Built-in pointers of the laptop (no effect on the desktop): faster than the
+-- desktop's mouse, still without acceleration. 0.2 validated by Kris on 2026-10-11,
+-- 0.65 chosen by Kris on 2026-10-12 at the desk (0.4 too slow, 0.8 too fast).
 for _, name in ipairs({
   "snsl0035:00-2c2f:0035-touchpad",
   "snsl0035:00-2c2f:0035-mouse",
@@ -76,11 +76,11 @@ for _, name in ipairs({
   hl.device({ name = name, sensitivity = 0.65, accel_profile = "flat" })
 end
 
--- Pas de collage au clic molette (sélection primaire).
+-- No paste on middle click (primary selection).
 hl.config({ misc = { middle_click_paste = false } })
 
--- Pavé tactile (portable ; sans effet sur le fixe) : défilement naturel, clic
--- droit à deux doigts, défilement plus lent, et réglé par terminal.
+-- Touchpad (laptop; no effect on the desktop): natural scrolling, right
+-- click with two fingers, slower scrolling, and set per terminal.
 hl.config({
   input = {
     touchpad = {

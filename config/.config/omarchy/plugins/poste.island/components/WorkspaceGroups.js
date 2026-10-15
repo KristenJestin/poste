@@ -1,19 +1,19 @@
-// Ce que la barre d'un écran affiche : ses workspaces 1-10, puis, après un
-// séparateur, ceux d'autres écrans que Hyprland a posés ici (écran débranché
-// ou pris par un autre outil), un groupe par écran d'origine. L'écran
-// d'origine d'un workspace est son bloc de dizaines (workspace_monitors dans
-// monitors.lua) : 1-10 le premier écran, 11-20 le deuxième, etc.
+// What a screen's bar shows: its workspaces 1-10, then, after a
+// separator, those of other screens that Hyprland has put here (screen unplugged
+// or taken by another tool), one group per screen of origin. The screen
+// of origin of a workspace is its block of tens (workspace_monitors in
+// monitors.lua): 1-10 the first screen, 11-20 the second, etc.
 .pragma library
 
 function numeric(a, b) { return a - b }
 
-// Bloc de dizaines d'un workspace : 0 pour 1-10, 1 pour 11-20…
+// Block of tens of a workspace: 0 for 1-10, 1 for 11-20…
 function originSlot(id) {
   return Math.floor((id - 1) / 10)
 }
 
-// Workspaces propres à l'écran (ids globaux) : 1-5 toujours, au-delà ceux qui
-// existent (fenêtres) ou celui qui est affiché.
+// Workspaces of the screen itself (global ids): 1-5 always, beyond them those that
+// exist (windows) or the one displayed.
 function ownIds(windowCounts, activeId, offset) {
   var list = [1, 2, 3, 4, 5]
   for (var key in windowCounts) {
@@ -26,8 +26,8 @@ function ownIds(windowCounts, activeId, offset) {
   return list.map(function(n) { return offset + n })
 }
 
-// Cases à dessiner : ids globaux, 0 pour un séparateur. Chaque groupe de
-// workspaces de passage commence par un séparateur.
+// Cells to draw: global ids, 0 for a separator. Each group of
+// visiting workspaces starts with a separator.
 function cells(windowCounts, activeId, offset, visiting) {
   var list = ownIds(windowCounts, activeId, offset)
   var guests = (visiting || []).slice().sort(numeric)

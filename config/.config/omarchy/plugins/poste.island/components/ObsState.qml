@@ -2,10 +2,10 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 
-// OBS (Island.qml : root.obs), via bin/poste-obs watch : enregistrement,
-// diffusion, tampon de replay, scène. Le temps est relu chaque seconde par le
-// script et interpolé ici pour défiler sans à-coups. Un enregistrement fini :
-// notification « Recording saved », un clic ouvre son dossier.
+// OBS (Island.qml: root.obs), via bin/poste-obs watch: recording,
+// streaming, replay buffer, scene. The time is read again every second by the
+// script and interpolated here to run smoothly. A finished recording:
+// notification 'Recording saved', a click opens its folder.
 Item {
   id: obs
   readonly property string bin: Quickshell.env("HOME") + "/.config/omarchy/plugins/poste.island/bin/poste-obs"
@@ -19,10 +19,10 @@ Item {
   property string scene: ""
   property real recordMs: 0
   property real streamMs: 0
-  property double stampedAt: 0         // quand recordMs / streamMs ont été lus
+  property double stampedAt: 0         // when recordMs / streamMs were read
   readonly property bool active: connected && (recording || streaming)
 
-  // Temps affiché : la dernière valeur lue plus le temps écoulé depuis.
+  // Displayed time: the last value read plus the time elapsed since.
   property double now: Date.now()
   Timer { interval: 250; repeat: true; running: obs.active; onTriggered: obs.now = Date.now() }
   readonly property real recordElapsed: recording ? recordMs + (paused ? 0 : Math.max(0, now - stampedAt)) : 0
@@ -55,11 +55,11 @@ Item {
         }
       }
     }
-    // Le script se reconnecte seul ; s'il s'arrête quand même, on le relance.
+    // The script reconnects by itself; if it stops anyway, it is restarted.
     onExited: restartTimer.start()
   }
   Timer { id: restartTimer; interval: 5000; onTriggered: watcher.running = true }
 
-  // Commandes : StopRecord, ToggleRecordPause, SaveReplayBuffer, StopStream…
+  // Commands: StopRecord, ToggleRecordPause, SaveReplayBuffer, StopStream…
   function request(kind) { Quickshell.execDetached([bin, kind]) }
 }

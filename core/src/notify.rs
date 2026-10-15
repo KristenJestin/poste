@@ -1,16 +1,16 @@
-//! Notifications de bureau via `notify-send`.
+//! Desktop notifications through `notify-send`.
 
 use std::process::{Command, Stdio};
 
-/// Construit la commande `notify-send` (séparé de l'envoi pour être testable).
+/// Builds the `notify-send` command (separate from sending so it can be tested).
 pub fn command(summary: &str, body: &str) -> Command {
     let mut c = Command::new("notify-send");
     c.arg("--app-name=poste").arg("--").arg(summary).arg(body);
     c
 }
 
-/// Envoie une notification. Renvoie `false` si `notify-send` est absent ou échoue :
-/// une notification manquée ne doit jamais faire échouer un module.
+/// Sends a notification. Returns `false` if `notify-send` is missing or fails:
+/// a missed notification must never make a module fail.
 pub fn send(summary: &str, body: &str) -> bool {
     command(summary, body)
         .stdout(Stdio::null())
@@ -25,13 +25,13 @@ mod tests {
     use super::*;
 
     #[test]
-    fn arguments_de_la_commande() {
-        let c = command("Titre", "Corps");
+    fn command_arguments() {
+        let c = command("Title", "Body");
         assert_eq!(c.get_program(), "notify-send");
         let args: Vec<_> = c
             .get_args()
             .map(|a| a.to_string_lossy().into_owned())
             .collect();
-        assert_eq!(args, ["--app-name=poste", "--", "Titre", "Corps"]);
+        assert_eq!(args, ["--app-name=poste", "--", "Title", "Body"]);
     }
 }

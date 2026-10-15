@@ -8,7 +8,7 @@ its data repository), and plugged in once `melodie` is in the `PATH` (`requires`
 
 ## What it brings
 
-- **Launcher** (`island/launcher.json`): the « Music » extension, keyword `play` or `music`.
+- **Launcher** (`island/launcher.json`): the 'Music' extension, keyword `play` or `music`.
   Without typing, `melodie home --json` (mixes, then playlists); while typing,
   `melodie search --json`. The entries and their actions (play, shuffle, queue, mix, like, add to
   a playlist) come as they are from Mélodie, in the launcher's JSON format.
@@ -19,7 +19,7 @@ its data repository), and plugged in once `melodie` is in the `PATH` (`requires`
   MPRIS gives).
   Everything else on the card (title, cover, progress, controls) is the island's generic card.
 - **Command**: `poste melodie <command>` passes the command as is to `melodie`.
-- **App**: Mélodie's `install.sh` puts « Mélodie » (its window, `melodie-desktop`) among the
+- **App**: Mélodie's `install.sh` puts 'Mélodie' (its window, `melodie-desktop`) among the
   launcher's apps; `bootstrap/files/melodie-open.desktop` opens `melodie:` addresses
   (`xdg-open melodie:album/<id>`) with `melodie open`, which Mélodie does not install.
 
