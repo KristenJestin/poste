@@ -226,8 +226,9 @@ o.bind("PRINT", "Screenshot", os.getenv("HOME") .. "/.config/omarchy/plugins/pos
 
 
 
--- SUPER+E: Flea on the active terminal's folder (Nautilus stays installed).
-o.bind("SUPER + E", "File manager (cwd)", 'flea --gui "$(omarchy-cmd-terminal-cwd)"')
+-- SUPER+E: Strata on the active terminal's folder (Nautilus stays installed). Explicit
+-- path: an old Omarchy `strata` package may still be in /usr/bin, first in the PATH.
+o.bind("SUPER + E", "File manager (cwd)", { launch = '"$HOME/.local/bin/strata" "$(omarchy-cmd-terminal-cwd)"' })
 -- SUPER+SHIFT+M: Omamail mail (was: Spotify, uninstalled).
 hl.unbind("SUPER + SHIFT + M")
 o.bind("SUPER + SHIFT + M", "Mail (Omamail)", "omarchy-shell shell toggle omamail '{}'")
@@ -303,22 +304,6 @@ for key, spec in pairs({
   o.bind(key, spec[1], "omarchy-shell poste.island " .. spec[2])
 end
 
--- SUPER+D: Flea's file shelf (Shelf), opened under the island.
-o.bind("SUPER + D", "File shelf (Flea)", "flea shelf toggle")
-
--- flea --default: begin. Written by `flea --default`; `flea --default off` removes the block whole.
-hl.unbind("SUPER + SHIFT + F")
-o.bind("SUPER + SHIFT + F", "File manager", { launch = 'flea --gui' })
-hl.unbind("SUPER + ALT + SHIFT + F")
-o.bind("SUPER + ALT + SHIFT + F", "File manager (cwd)", { launch = 'flea --gui "$(omarchy-cmd-terminal-cwd)"' })
--- flea --default: end.
-
--- flea --picker: begin. Written by `flea --picker`; `flea --picker off` removes the block whole.
-o.window("com.thisisgm.flea.picker", { tag = "+floating-window" })
--- flea --picker: end.
-
--- SUPER+SHIFT+F and SUPER+ALT+SHIFT+F: removed, SUPER+E is enough (Flea on the
--- terminal's folder). The 'flea --default' block above is kept: without
--- it, `flea --default` (bootstrap) would rewrite it.
+-- SUPER+SHIFT+F and SUPER+ALT+SHIFT+F (Omarchy's file manager): removed, SUPER+E is enough.
 hl.unbind("SUPER + SHIFT + F")
 hl.unbind("SUPER + ALT + SHIFT + F")

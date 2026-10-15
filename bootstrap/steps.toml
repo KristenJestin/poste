@@ -67,13 +67,83 @@ title = "omarchy-crash-watch.service disabled"
 check = ["sh", "-c", "! systemctl --user is-enabled --quiet omarchy-crash-watch.service && ! systemctl --user is-active --quiet omarchy-crash-watch.service"]
 run = [["systemctl", "--user", "disable", "--now", "omarchy-crash-watch.service"]]
 
+# ------------------------------------------------------------ Strata, the file manager
+# A patched build of Strata (KristenJestin/strata, public), installed in ~/.local/bin. An old
+# Omarchy `strata` package may still be in /usr/bin and come first in the PATH: everything here
+# calls @HOME@/.local/bin/strata explicitly. Strata is a single instance: after an update, its
+# open windows keep the old binary until they are all closed.
+# Pinned release, never updated by itself: to update, change the tag, the sha256 of the archive
+# and the sha256 of the `strata` binary it holds, together (download the archive, check it, then
+# `sha256sum strata` on the extracted binary). The upstream desktop file
+# (files/strata/io.github.lgse.Strata.desktop) comes from the same tag.
 [[user]]
-id = "flea-default"
-title = "Flea as default file manager (folders, 'Show in folder', picker)"
-# Idempotent: mimeapps.list, D-Bus service FileManager1, portals.conf. 'flea --default off' goes back.
-requires = "flea"
-check = ["sh", "-c", "[ \"$(xdg-mime query default inode/directory)\" = com.thisisgm.flea.desktop ]"]
-run = [["flea", "--default"], ["systemctl", "--user", "restart", "xdg-desktop-portal"]]
+id = "strata"
+title = "Strata v1.0.0-local.3b24e32 (file manager) in ~/.local/bin"
+requires = "curl"
+check = ["sh", "-c", "echo 'd4cc68c81822b88dcb2e8e350a3335f536d90ad932ed801bb3a1e4ab93d2676c  @HOME@/.local/bin/strata' | sha256sum --check --status"]
+run = [["sh", "-c", "set -e; tag=v1.0.0-local.3b24e32; sum=2c936670d78edf7d4c09b09c6190a5bfd16174beedd4b8c60c4ce6566db880f4; d=$(mktemp -d); trap 'rm -rf \"$d\"' EXIT; curl -fsSL -o \"$d/strata.tar.gz\" \"https://github.com/KristenJestin/strata/releases/download/$tag/strata-x86_64.tar.gz\"; echo \"$sum  $d/strata.tar.gz\" | sha256sum --check --quiet; tar -xzf \"$d/strata.tar.gz\" -C \"$d\" strata; mkdir -p \"@HOME@/.local/bin\"; install -m 755 \"$d/strata\" \"@HOME@/.local/bin/.strata.new\"; mv -f \"@HOME@/.local/bin/.strata.new\" \"@HOME@/.local/bin/strata\""]]
+
+# The upstream desktop entry with the explicit path: it hides the one of a system package.
+[[file]]
+id = "strata-desktop"
+title = "Strata: desktop entry pointing to ~/.local/bin/strata"
+target = "@HOME@/.local/share/applications/io.github.lgse.Strata.desktop"
+source = "files/strata/io.github.lgse.Strata.desktop"
+
+[[user]]
+id = "strata-default"
+title = "Strata as the default file manager (folders)"
+check = ["sh", "-c", "[ \"$(xdg-mime query default inode/directory)\" = io.github.lgse.Strata.desktop ]"]
+run = [["xdg-mime", "default", "io.github.lgse.Strata.desktop", "inode/directory"]]
+
+# 'Show in folder' of browsers and GTK apps: org.freedesktop.FileManager1, activated on demand.
+# A single per-user provider of that name: any other file of ~/.local/share/dbus-1/services with
+# `Name=org.freedesktop.FileManager1` must be removed first (two are picked at random). Never
+# Strata's own "default file manager" setting: it writes a block in ~/.config/hypr/bindings.lua,
+# which is a link to this repository.
+[[file]]
+id = "strata-filemanager1"
+title = "Strata answers 'Show in folder' (D-Bus org.freedesktop.FileManager1)"
+target = "@HOME@/.local/share/dbus-1/services/io.github.lgse.Strata.FileManager1.service"
+source = "files/strata/io.github.lgse.Strata.FileManager1.service"
+
+[[user]]
+id = "strata-dbus-reload"
+title = "reload the D-Bus services of the session"
+trigger = ["strata-filemanager1"]
+run = [["gdbus", "call", "--session", "--dest", "org.freedesktop.DBus", "--object-path", "/org/freedesktop/DBus", "--method", "org.freedesktop.DBus.ReloadConfig"]]
+
+# Open and Save dialogs through the portal (Qt apps too: QT_QPA_PLATFORMTHEME in hyprland.lua).
+# Strata's own command: portal files in ~/.local/share, `FileChooser=strata;<previous>` in
+# ~/.config/xdg-desktop-portal/, then restarts the portal (open file dialogs close).
+# `~/.local/bin/strata --uninstall-portal` goes back.
+[[user]]
+id = "strata-portal"
+title = "Strata as the file chooser (Open / Save dialogs)"
+check = ["sh", "-c", "grep -qs '^Exec=@HOME@/.local/bin/strata --portal' '@HOME@/.local/share/dbus-1/services/org.freedesktop.impl.portal.desktop.strata.service' && cat \"${XDG_CONFIG_HOME:-@HOME@/.config}\"/xdg-desktop-portal/*portals.conf 2>/dev/null | grep -qE '^org\\.freedesktop\\.impl\\.portal\\.FileChooser=strata(;|$)'"]
+run = [["@HOME@/.local/bin/strata", "--install-portal"]]
+
+# The 'Send with Taildrop' action of Strata's context menu. Real files, not links of config/:
+# Strata refuses a linked manifest, script or action folder.
+[[file]]
+id = "strata-taildrop-action"
+title = "Strata: 'Send with Taildrop' action (manifest)"
+target = "@HOME@/.config/strata/actions/taildrop/action.toml"
+source = "files/strata/taildrop/action.toml"
+
+[[file]]
+id = "strata-taildrop-choices"
+title = "Strata: 'Send with Taildrop' action (devices)"
+target = "@HOME@/.config/strata/actions/taildrop/choices"
+source = "files/strata/taildrop/choices"
+mode = "755"
+
+[[file]]
+id = "strata-taildrop-run"
+title = "Strata: 'Send with Taildrop' action (script)"
+target = "@HOME@/.config/strata/actions/taildrop/run.sh"
+source = "files/strata/taildrop/run.sh"
+mode = "755"
 
 [[user]]
 id = "theme-poste"

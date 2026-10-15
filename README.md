@@ -145,10 +145,10 @@ each time root rights are needed, it prints the exact command to copy.
    - puts the config in place with symbolic links (conflicts with existing files: decided one by one, see [`modules/sys/README.md`](modules/sys/README.md));
    - compares `bootstrap/packages.toml` with `pacman -Qq` and prints the `yay -S --needed …` command for the missing packages;
    - prints in one copyable block the system (root) steps not done yet;
-   - offers the user steps (shell plugins at audited versions with their patches, cursor-accent config, steps of the chosen add-ons, Flea by default, theme) and does them after confirmation;
+   - offers the user steps (shell plugins at audited versions with their patches, cursor-accent config, steps of the chosen add-ons, the Strata file manager, theme) and does them after confirmation;
    - lists the manual steps that remain.
 3. Run the printed `yay -S --needed …` command yourself, then the `sudo` commands of the "System steps" block.
-4. Run `poste sys setup` again: the steps that depended on the packages (add-ons, Flea, theme…) are done now. Repeat until "nothing to do".
+4. Run `poste sys setup` again: the steps that depended on the packages (add-ons, Strata, theme…) are done now. Repeat until "nothing to do".
 5. Do the manual steps, marking them as you go (`poste sys done <id>`, `poste sys done` for the list; `--undo` to cancel). `poste sys status` sums up everything that remains.
 6. Reload: `omarchy restart shell` and `hyprctl reload`, or restart the session.
 
@@ -273,6 +273,29 @@ poste-data/
 - The island's launcher also reads `~/.config/poste-island/launcher/machine.json` (same format as
   `launcher.json`): the machine's own entries go there, put in place by `poste-data`.
 - `repo`, `data` and `source` stay in `config.toml`, never in `poste.toml`.
+
+## The file manager: Strata
+
+poste's file manager is [Strata](https://github.com/lgse/strata), in a patched build
+([KristenJestin/strata](https://github.com/KristenJestin/strata), branch `local`: the accent only
+on the selection, no upstream update offers, action submenus filled by a `choices` script).
+`poste sys setup` puts it in place, all in `~`, without root (steps in `bootstrap/steps.toml`):
+
+- the pinned release in `~/.local/bin/strata` (archive checked against its sha256 before
+  extracting; never updated by itself: change the tag and the two sums of the `strata` step);
+- its desktop entry in `~/.local/share/applications/`, pointing to that binary;
+- the default for folders (`xdg-mime … inode/directory`), the D-Bus `org.freedesktop.FileManager1`
+  service ('Show in folder' of browsers and GTK apps) and the file chooser of the portal (Open and
+  Save dialogs, through `strata --install-portal`; `--uninstall-portal` goes back);
+- the 'Send with Taildrop' action of its context menu (`~/.config/strata/actions/taildrop/`): a
+  submenu of the online devices of the tailnet, `tailscale file cp` of the selected files. Real files,
+  not links (Strata refuses linked actions). Needs the user to be a Tailscale operator
+  (`sudo tailscale set --operator=$USER`, once).
+
+Its libraries are in `bootstrap/packages.toml`. SUPER+E opens it on the active terminal's folder.
+poste always calls `~/.local/bin/strata` by its full path: an old Omarchy `strata` package may
+still be in `/usr/bin`, first in the `PATH`. Strata's own "default file manager" setting must not
+be used: it writes a block into `~/.config/hypr/bindings.lua`, a link to this repository.
 
 ## Repository layout
 

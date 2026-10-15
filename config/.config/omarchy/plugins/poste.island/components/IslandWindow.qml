@@ -32,12 +32,11 @@ PanelWindow {
   readonly property bool audioOpen: view === "audio"
   readonly property bool vpnOpen: view === "vpn"
   readonly property bool tailscaleOpen: view === "tailscale"
-  readonly property bool shelfOpen: view === "shelf"
   readonly property bool askOpen: view === "ask"
   readonly property bool usageOpen: view === "usage"
   // Control-center modules grown inside the island (level 2).
   readonly property bool moduleOpen: wifiOpen || bluetoothOpen || audioOpen || vpnOpen || tailscaleOpen
-  readonly property bool surfaceOpen: playerOpen || controlsOpen || notificationsOpen || launcherOpen || menuOpen || moduleOpen || shelfOpen || askOpen || usageOpen
+  readonly property bool surfaceOpen: playerOpen || controlsOpen || notificationsOpen || launcherOpen || menuOpen || moduleOpen || askOpen || usageOpen
   readonly property bool restPill: !surfaceOpen
 
   Connections {
@@ -104,7 +103,7 @@ PanelWindow {
   // gives the mouse to no other surface, neither window nor veil, and does not
   // report the outside click to the focus grab. The island therefore captures
   // the whole screen itself, and a click outside the bubble closes it.
-  readonly property bool exclusiveOpen: launcherOpen || menuOpen || moduleOpen || controlsOpen || shelfOpen || askOpen || usageOpen
+  readonly property bool exclusiveOpen: launcherOpen || menuOpen || moduleOpen || controlsOpen || askOpen || usageOpen
   readonly property bool dimWanted: surfaceOpen
   // Mouse areas: the island and the activity strip; plus the unfolded card
   // when an activity is unfolded.
@@ -248,7 +247,6 @@ PanelWindow {
     Behavior on y { NumberAnimation { duration: 300 * window.host.motionScale; easing.type: Easing.OutCubic } }
 
     readonly property real targetWidth: window.menuOpen ? 520
-      : window.shelfOpen ? 580
       : window.askOpen ? 620
       : window.usageOpen ? 600
       : window.launcherOpen ? 580
@@ -260,7 +258,6 @@ PanelWindow {
       : restRow.implicitWidth + 30
     // 16 px above the launcher, 12 px below its footer.
     readonly property real targetHeight: window.menuOpen ? menuView.implicitHeight + 32
-      : window.shelfOpen ? shelfView.implicitHeight + 16
       : window.askOpen ? askView.implicitHeight + 16
       : window.usageOpen ? usageView.implicitHeight + 32
       : window.launcherOpen ? launcherView.implicitHeight + 16
@@ -606,26 +603,6 @@ PanelWindow {
       Behavior on opacity { NumberAnimation { duration: opacity > 0.5 ? 70 : 180 * window.host.motionScale; easing.type: Easing.InOutQuad } }
       transformOrigin: Item.Top
       scale: window.usageOpen ? 1 : 0.96
-      Behavior on scale { NumberAnimation { duration: 320 * window.host.motionScale; easing.type: Easing.OutQuint } }
-      onCloseRequested: window.view = "rest"
-    }
-
-    // ---------------------------------------------------------------- shelf (Flea)
-    ShelfView {
-      id: shelfView
-      anchors.left: parent.left
-      anchors.right: parent.right
-      anchors.top: parent.top
-      anchors.margins: 16
-      height: implicitHeight
-      maxHeight: (window.screen ? window.screen.height * 0.62 : 600) - 16
-      host: window.host
-      active: window.shelfOpen
-      opacity: window.shelfOpen ? 1 : 0
-      visible: opacity > 0.01
-      Behavior on opacity { NumberAnimation { duration: opacity > 0.5 ? 70 : 180 * window.host.motionScale; easing.type: Easing.InOutQuad } }
-      transformOrigin: Item.Top
-      scale: window.shelfOpen ? 1 : 0.96
       Behavior on scale { NumberAnimation { duration: 320 * window.host.motionScale; easing.type: Easing.OutQuint } }
       onCloseRequested: window.view = "rest"
     }

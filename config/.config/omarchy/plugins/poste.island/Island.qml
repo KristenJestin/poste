@@ -22,7 +22,6 @@ import "components"
 import "components/ModulePlayers.js" as ModulePlayers
 import "components/WorkspaceGroups.js" as WorkspaceGroups
 import "bandeau"
-import "file:///usr/share/flea/shelf" as Flea
 
 Item {
   id: root
@@ -1029,64 +1028,6 @@ Item {
     }
   }
 
-
-  // ---------------------------------------------------------------- shelf (Flea)
-  // Flea's file shelf, shown by the island ('shelf' view): the stack, the
-  // pinned items and the latest captures come from Flea's logic
-  // (/usr/share/flea/shelf, flea package); the island only does the display.
-  // SUPER+D (flea shelf toggle) rings via summon.json.
-  readonly property bool shelfAvailable: shelfProbe.count > 0
-  FolderListModel {
-    id: shelfProbe
-    folder: "file:///usr/share/flea/shelf"
-    nameFilters: ["ShelfService.qml"]
-    showDirs: false
-  }
-  readonly property bool shelfDrawing: {
-    for (var k in islandStates) if (islandStates[k] && islandStates[k].view === "shelf") return true
-    return false
-  }
-  property var shelf: shelfLoader.item
-  property var shelfActions: shelfActionsLoader.item
-  Loader {
-    id: shelfLoader
-    active: root.shelfAvailable
-    sourceComponent: Flea.ShelfService {
-      drawing: root.shelfDrawing
-      onSummoned: root.openModuleOn(root.focusedScreen, "shelf")
-    }
-  }
-  Loader {
-    id: shelfActionsLoader
-    active: root.shelfAvailable
-    sourceComponent: Flea.ShelfActions {
-      fleaCommand: root.shelf ? root.shelf.fleaCommand : "flea"
-      onRan: if (root.shelf) root.shelf.reread()
-    }
-  }
-  // Everything that enters the Shelf stays there until it is removed: it
-  // is put there 'pinned' (Flea then removes nothing after a move or a
-  // zip), including what arrives through 'Add to shelf' in Flea.
-  function addToShelf(paths) { if (shelf && paths && paths.length) shelf.pinAll(paths, true) }
-  Connections {
-    target: root.shelf
-    ignoreUnknownSignals: true
-    function onPileChanged() {
-      // Only the new items: an item that is unpinned in order to
-      // be removed must not be pinned again in the meantime.
-      var items = root.shelf.pile && root.shelf.pile.items ? root.shelf.pile.items : []
-      var known = {}
-      var fresh = []
-      for (var i = 0; i < items.length; i++) {
-        known[items[i].path] = true
-        if (!items[i].pinned && !root.shelfKnown[items[i].path]) fresh.push(items[i].path)
-      }
-      root.shelfKnown = known
-      if (fresh.length) root.shelf.pinAll(fresh, true)
-    }
-  }
-  property var shelfKnown: ({})
-
   // ---------------------------------------------------------------- IPC
   // omarchy-shell poste.island player | close
   // omarchy-shell poste.island controls | notifications
@@ -1135,7 +1076,6 @@ Item {
       else root.setTimers(root.timers.filter(function(t) { return String(t.id) !== String(id) }))
       return "ok"
     }
-    function shelf(): string { root.openModuleOn(root.focusedScreen, "shelf"); return "ok" }
     // omarchy-shell poste.island usage: detail of Claude Code consumption.
     // omarchy-shell poste.island batterySim "charging 75" | "low 15" | "critical 6" | "off":
     // simulates a battery (to see its activity on a PC that has none).
@@ -1272,21 +1212,6 @@ Item {
           id: islandWindow
           host: root
           screen: screenScope.modelData
-        }
-
-        // Edge rail of the Shelf ('Edge rail' setting of Flea), middle screen.
-        Loader {
-          active: root.shelfAvailable && !!root.shelf && root.shelf.railEdge !== "off"
-            && String(screenScope.modelData.name) === root.primaryScreenName
-          sourceComponent: Flea.ShelfRail {
-            screen: screenScope.modelData
-            edge: root.shelf.railEdge
-            dwellMs: root.shelf.railDwellMs
-            held: root.shelf.count
-            accent: root.colorAccent
-            onDropped: function(paths) { root.addToShelf(paths) }
-            onOpened: root.openModuleOn(String(screenScope.modelData.name), "shelf")
-          }
         }
       }
     }

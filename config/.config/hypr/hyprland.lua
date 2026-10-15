@@ -55,6 +55,6 @@ require("default.hypr.toggles")
 -- Add any other personal Hyprland configuration below.
 -- o.window("qemu", { workspace = "5" })
 
--- Qt apps: file picker through the portal (so Flea), instead of the
+-- Qt apps: file picker through the portal (so Strata), instead of the
 -- GTK box they draw themselves with Omarchy's gtk3 theme.
 hl.env("QT_QPA_PLATFORMTHEME", "xdgdesktopportal")

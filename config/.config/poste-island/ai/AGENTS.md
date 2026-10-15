@@ -12,7 +12,7 @@ Hyprland 0.56, Quickshell shell with the personal island `poste.island`.
 - `devices`: batteries of wireless devices as JSON (keyboard, mouse, headset). `deviceSim "mouse 12"` / `batterySim "charging 75"`: simulations (`off` to stop).
 - Power profile (power-profiles-daemon): tile of the control center next to Network / Bluetooth / Sound (profile icon and name, a click goes to the next one, also on a desktop PC), profile icon in the battery bubble 6 s after unplugging, OSD in the banner at each change. `profile`: current profile and the machine's profiles (JSON). `profileSim "power-saver"`: simulation (`off` to stop). To change it: `omarchy-powerprofiles-set autodetect <profile>` (remembers it for mains or battery), only if the user asks; never `powerprofilesctl set`.
 - `usage` / `usageOf codex`: detail of Claude Code or Codex consumption (sessions, agents, models; script `bin/poste-agent-usage [session|week] [claude|codex]` as JSON).
-- `lock`: sound then lock. `launcher`, `shelf` (Files view), `menu`, `notifications`, `player`, `controls`, `close`.
+- `lock`: sound then lock. `launcher`, `menu`, `notifications`, `player`, `controls`, `close`.
 - `module wifi|bluetooth|audio|vpn`: opens that panel. `unread`: number of unread notifications.
 
 ## Sounds
@@ -36,7 +36,8 @@ Background player (MPRIS 'Mélodie'), also shown by the island. Playback command
 - In the island launcher: keyword `play` or `music`.
 
 ## Files
-- `flea --gui <folder>`: file manager. `flea shelf add <path>`: adds to the shelf (SUPER+D).
+- File manager: Strata, always by its full path (`~/.local/bin/strata <folder>`; a `strata` in `/usr/bin` may be an old package). SUPER+E opens it on the active terminal's folder. A single instance: never kill it, never start it to test something.
+- Its context menu has 'Send with Taildrop' (files to a device of the tailnet), from `~/.config/strata/actions/taildrop/`.
 
 ## AI agent quotas
 - `poste usage`: Claude Code quotas (5 h session, week), as a percentage, with the reset time. `poste usage codex`, `poste usage --all`, `--refresh` to redo the reading, `--json` for the raw data.

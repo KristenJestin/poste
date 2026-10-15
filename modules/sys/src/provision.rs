@@ -53,6 +53,8 @@ struct FileStep {
     source: String,
     #[serde(default)]
     json: bool,
+    /// Octal permissions of the written file (`"755"`), otherwise those of a new file.
+    mode: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -523,13 +525,22 @@ fn sys_commands(ctx: &Ctx, s: &SystemStep) -> Result<Vec<String>> {
 #[derive(Debug, Clone)]
 enum Act {
     Cmd(Vec<String>),
-    Write { target: PathBuf, content: String },
+    Write {
+        target: PathBuf,
+        content: String,
+        mode: Option<u32>,
+    },
 }
 
 impl Act {
     fn show(&self) -> String {
         match self {
             Act::Cmd(c) => c.join(" "),
+            Act::Write {
+                target,
+                mode: Some(m),
+                ..
+            } => format!("write {} (mode {m:o})", target.display()),
             Act::Write { target, .. } => format!("write {}", target.display()),
         }
     }
@@ -675,18 +686,36 @@ fn user_plan(ctx: &Ctx, steps: &Steps) -> Result<UserPlan> {
     for f in &steps.file {
         let target = PathBuf::from(ctx.sub(&f.target));
         let content = ctx.read_source(&f.source)?;
+        let mode = match f.mode.as_deref().map(|m| u32::from_str_radix(m, 8)) {
+            None => None,
+            Some(Ok(m)) if m <= 0o7777 => Some(m),
+            Some(_) => {
+                plan.notes
+                    .push(format!("{}: invalid mode {:?}", f.id, f.mode));
+                continue;
+            }
+        };
+        let write = Todo {
+            id: f.id.clone(),
+            title: f.title.clone(),
+            acts: vec![Act::Write {
+                target: target.clone(),
+                content: content.clone(),
+                mode,
+            }],
+        };
         match std::fs::read_to_string(&target) {
+            // Same content, other permissions: written again with the right mode.
+            Ok(cur) if cur == content && mode.is_some_and(|m| file_mode(&target) != Some(m)) => {
+                plan.todos.push(write)
+            }
             Ok(cur) if cur == content || (f.json && json_equal(&cur, &content)) => {}
             Ok(_) => plan.notes.push(format!(
                 "{}: {} differs from the repository, left as is (edit or delete it so that it is put back)",
                 f.id,
                 target.display()
             )),
-            Err(e) if e.kind() == ErrorKind::NotFound => plan.todos.push(Todo {
-                id: f.id.clone(),
-                title: f.title.clone(),
-                acts: vec![Act::Write { target, content }],
-            }),
+            Err(e) if e.kind() == ErrorKind::NotFound => plan.todos.push(write),
             Err(e) => plan.notes.push(format!("{}: {} unreadable: {e}", f.id, target.display())),
         }
     }
@@ -714,6 +743,14 @@ fn user_plan(ctx: &Ctx, steps: &Steps) -> Result<UserPlan> {
     Ok(plan)
 }
 
+/// Permission bits of a file (`None` if unreadable).
+fn file_mode(path: &Path) -> Option<u32> {
+    use std::os::unix::fs::PermissionsExt;
+    std::fs::metadata(path)
+        .ok()
+        .map(|m| m.permissions().mode() & 0o7777)
+}
+
 fn run_act(act: &Act) -> Result<()> {
     match act {
         Act::Cmd(c) => {
@@ -727,11 +764,19 @@ fn run_act(act: &Act) -> Result<()> {
             }
             Ok(())
         }
-        Act::Write { target, content } => {
+        Act::Write {
+            target,
+            content,
+            mode,
+        } => {
             let parent = target.parent().context("target without a parent folder")?;
             std::fs::create_dir_all(parent)?;
             let tmp = parent.join(format!(".poste-tmp-{}", std::process::id()));
             std::fs::write(&tmp, content)?;
+            if let Some(m) = mode {
+                use std::os::unix::fs::PermissionsExt;
+                std::fs::set_permissions(&tmp, std::fs::Permissions::from_mode(*m))?;
+            }
             std::fs::rename(&tmp, target).with_context(|| format!("writing {}", target.display()))
         }
     }
@@ -1313,6 +1358,74 @@ check = ["false"]
         assert!(plan.todos.is_empty() && plan.notes.is_empty());
         fs::write(&target, "{\"a\": 2}").unwrap();
         let plan = user_plan(&ctx, &steps).unwrap();
+        assert!(plan.todos.is_empty() && plan.notes.len() == 1);
+    }
+
+    #[test]
+    fn repository_bootstrap_is_valid() {
+        let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../bootstrap");
+        let packages = read_packages(&dir).unwrap();
+        assert!(packages.contains_key("gtk4"));
+        let steps = read_steps(&dir).unwrap();
+        let ids = step_ids(&steps);
+        assert!(ids.contains("strata"));
+        for f in &steps.file {
+            assert!(
+                dir.join(&f.source).is_file(),
+                "{}: missing {}",
+                f.id,
+                f.source
+            );
+            if let Some(m) = &f.mode {
+                assert!(u32::from_str_radix(m, 8).is_ok(), "{}: mode {m}", f.id);
+            }
+        }
+        for u in &steps.user {
+            for t in &u.trigger {
+                assert!(ids.contains(t.as_str()), "{}: unknown trigger {t}", u.id);
+            }
+        }
+    }
+
+    #[test]
+    fn file_with_mode() {
+        let (_d, repo, env) = fixture();
+        let ctx = Ctx::new(&env, &repo);
+        write(&repo, "files/run", "#!/bin/sh\necho @HOME@\n");
+        let target = env.home.join("a/b/run");
+        let steps: Steps = toml::from_str(&format!(
+            "[[file]]\nid=\"r\"\ntitle=\"r\"\ntarget=\"{}\"\nsource=\"files/run\"\nmode=\"755\"\n",
+            target.display()
+        ))
+        .unwrap();
+        // Absent: written, substituted, with its mode.
+        let plan = user_plan(&ctx, &steps).unwrap();
+        assert_eq!(plan.todos.len(), 1);
+        apply_user(&plan);
+        assert_eq!(
+            fs::read_to_string(&target).unwrap(),
+            format!("#!/bin/sh\necho {}\n", env.home.display())
+        );
+        assert_eq!(file_mode(&target), Some(0o755));
+        assert!(user_plan(&ctx, &steps).unwrap().todos.is_empty());
+        // Same content, mode lost: written again.
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(&target, fs::Permissions::from_mode(0o644)).unwrap();
+        let plan = user_plan(&ctx, &steps).unwrap();
+        assert_eq!(plan.todos.len(), 1);
+        apply_user(&plan);
+        assert_eq!(file_mode(&target), Some(0o755));
+        // Edited by the user: left as is, whatever its mode.
+        fs::write(&target, "mine\n").unwrap();
+        let plan = user_plan(&ctx, &steps).unwrap();
+        assert!(plan.todos.is_empty() && plan.notes.len() == 1);
+        // Invalid mode: a note, nothing written.
+        let bad: Steps = toml::from_str(&format!(
+            "[[file]]\nid=\"r\"\ntitle=\"r\"\ntarget=\"{}\"\nsource=\"files/run\"\nmode=\"9z\"\n",
+            env.home.join("bad").display()
+        ))
+        .unwrap();
+        let plan = user_plan(&ctx, &bad).unwrap();
         assert!(plan.todos.is_empty() && plan.notes.len() == 1);
     }
 
