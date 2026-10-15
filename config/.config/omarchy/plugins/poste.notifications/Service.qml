@@ -89,8 +89,8 @@ Item {
 
   function durationFor(urgency, expireTimeout) {
     switch (urgency) {
-    // Patch kris : une critique ne reste pas indéfiniment ; si elle est
-    // manquée, le point de l'île passe au rouge (non lue importante).
+    // Kris's patch: a critical one does not stay forever; if it is
+    // missed, the island's dot turns red (unread important).
     case NotificationUrgency.Critical:
       return criticalPopupDuration
     case NotificationUrgency.Low:
@@ -173,8 +173,8 @@ Item {
       return
     }
 
-    // Son (poste-sfx) : seulement pour les applis / urgences listées dans
-    // ~/.config/poste-island/sounds/sounds.json ; muet en mode Ne pas déranger.
+    // Sound (poste-sfx): only for the apps / urgencies listed in
+    // ~/.config/poste-island/sounds/sounds.json; muted in Do Not Disturb mode.
     Quickshell.execDetached([Quickshell.env("HOME") + "/.config/omarchy/plugins/poste.island/bin/poste-sfx", "notification",
       "--app", String(notification.appName || ""),
       "--urgency", ["low", "normal", "critical"][Number(snapshot.urgency)] || "normal"])
@@ -310,8 +310,8 @@ Item {
     removePopup(index, "dismiss")
   }
 
-  // Patch kris : fermer un toast (croix, clic droit) le compte aussi comme lu,
-  // comme un clic. Seul un toast qui expire tout seul reste non lu.
+  // Kris's patch: closing a toast (cross, right click) also counts it as read,
+  // like a click. Only a toast that expires by itself stays unread.
   function closePopup(index) {
     var entry = index >= 0 && index < popupModel.count ? popupModel.get(index) : null
     if (entry) markSeenUpTo(entry.timestamp)
@@ -500,9 +500,9 @@ Item {
     "  shift 2\n" +
     "done\n"
 
-  // Patch kris : cliquer un toast le compte comme lu. Le Notification Center
-  // (jankeesvw) ne connaît qu'un instant « vu » : on l'avance jusqu'à ce
-  // toast (lui et ceux arrivés avant deviennent lus), jamais en arrière.
+  // Kris's patch: clicking a toast counts it as read. The Notification Center
+  // (jankeesvw) only knows a 'seen' moment: it is advanced up to this
+  // toast (it and those that arrived before become read), never backwards.
   function markSeenUpTo(timestamp) {
     var ts = Math.floor(Number(timestamp) || 0)
     if (ts <= 0) return
@@ -513,9 +513,9 @@ Item {
   }
 
   function persistPopupFile(snapshot) {
-    // Patch kris : une notification éphémère ne laisse pas de fichier ; le
-    // Notification Center (jankeesvw) ne la récupère donc pas dans
-    // l'historique, et elle ne compte pas comme non lue.
+    // Kris's patch: an ephemeral notification leaves no file; the
+    // Notification Center (jankeesvw) therefore does not pick it up in
+    // the history, and it does not count as unread.
     if (snapshot && snapshot.ephemeral) return
     // The JSON travels as an argument, not through shell interpolation, so
     // summaries/bodies with quotes or backticks can't break the command. The
@@ -970,9 +970,9 @@ Item {
 
   // -------------------------------------------------------------- popup UI
   //
-  // Kris : les toasts sont dessinés par le bandeau (poste.island/bandeau), empilés juste sous
-  // l'île, avec l'OSD et le texte dicté. Le service y inscrit son modèle et garde toute la
-  // logique : à quel écran va un toast, combien de temps il reste, ce que fait un clic.
+  // Kris: the toasts are drawn by the banner (poste.island/bandeau), stacked just under
+  // the island, with the OSD and the dictated text. The service registers its model there and keeps all the
+  // logic: which screen a toast goes to, how long it stays, what a click does.
 
   readonly property string focusedScreenName: Hyprland.focusedMonitor ? String(Hyprland.focusedMonitor.name) : ""
 
@@ -997,9 +997,9 @@ Item {
     return owner === String(screenName)
   }
 
-  // Ce que montre la carte du bandeau pour une ligne du modèle (voir NotificationView.qml) :
-  // la tuile de marque (Claude Code, Codex), sinon l'image ou l'icône de l'application, sinon
-  // le glyphe ; le corps sans balises d'image.
+  // What the banner card shows for a row of the model (see NotificationView.qml):
+  // the brand tile (Claude Code, Codex), otherwise the image or the application's icon, otherwise
+  // the glyph; the body without image tags.
   function present(row) {
     var brand = AgentBrand.brand(row.summary, row.app, row.appIcon)
     var image = String(row.image || "")

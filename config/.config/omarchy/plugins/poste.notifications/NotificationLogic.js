@@ -82,7 +82,7 @@ function stripImageTags(text) {
 // `<br/>` into text stripImageTags chose to KEEP, and a kept tag may hold a `<` of
 // its own: `<x`, newline, `<img src="http://…">` is one tag named `x` to both the
 // stripper and Qt, until the rewrite splits it into `<x<br/>` and a live image tag
-// the input never contained. Measured against Qt 6.11.2 — the rewritten form
+// the input never contained. Measured against Qt 6.11.2: the rewritten form
 // fetches, the original does not. So strip again after, and what Qt parses is what
 // was checked last.
 function styledBody(body, app, appIcon) {
@@ -195,28 +195,28 @@ function snapshotOf(notification, timestamp) {
     image: n.image || "",
     glyph: glyphFromHints(n.hints),
     execArgv: execArgvFromHints(n.hints),
-    // Patch kris : un fichier reçu (Taildrop) arrive en « critique » mais
-    // n'est pas une alerte : affiché 15 s, puis historique (point non lu).
+    // Kris's patch: a received file (Taildrop) arrives as 'critical' but
+    // is not an alert: shown 15 s, then history (unread dot).
     urgency: isFileReceived(n) ? 1 : n.urgency,
     expireTimeout: isFileReceived(n) ? 15000 : expireTimeout,
-    // Patch kris : éphémère (retour d'action d'Omarchy, « transient ») :
-    // affichée mais jamais écrite sur disque, donc ni historique ni point
-    // « non lu » (voir persistPopupFile, isEphemeralNotification).
+    // Kris's patch: ephemeral (Omarchy action feedback, 'transient'):
+    // shown but never written to disk, hence neither history nor an
+    // 'unread' dot (see persistPopupFile, isEphemeralNotification).
     ephemeral: isEphemeralNotification(n),
     timestamp: timestamp === undefined ? Date.now() : timestamp
   }
 }
 
-// « Received <fichier> » / « Saved to … » : omarchy-tailscale-receive.
+// 'Received <file>' / 'Saved to …': omarchy-tailscale-receive.
 function isFileReceived(n) {
   return /^Received /.test(String(n.summary || "")) && /^Saved to /.test(String(n.body || ""))
 }
 
-// Gardée hors de l'historique seulement si on est sûr qu'elle ne sert qu'à
-// l'instant : un retour d'action d'Omarchy (omarchy-action : capture
-// d'écran…) ou un expéditeur qui le demande (« transient »). Pas les
-// notify-send anonymes : des scripts y envoient de vraies alertes. Jamais
-// une critique.
+// Kept out of the history only if we are sure it only serves
+// for the moment: an Omarchy action feedback (omarchy-action: screenshot
+// …) or a sender that asks for it ('transient'). Not anonymous
+// notify-send: scripts send real alerts through it. Never
+// a critical one.
 function isEphemeralNotification(n) {
   if (Number(n.urgency) === 2) return false
   var transient = false
