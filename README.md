@@ -1,64 +1,64 @@
 # poste
 
-`poste` est mon environnement de travail (Arch Linux, Hyprland, Omarchy), en Rust.
-Il a remplacé le dépôt de dotfiles géré par chezmoi : config, paquets et mise en place de la machine
-sont décrits ici.
+`poste` is my work environment (Arch Linux, Hyprland, Omarchy), in Rust.
+It replaced the dotfiles repository managed by chezmoi: config, packages and machine setup
+are described here.
 
-## L'aiguillage
+## The dispatcher
 
-`poste` est un aiguillage mince, comme git : `poste <module> <args…>` exécute le
-programme `poste-<module>` avec `<args…>` (remplacement de processus sur Unix, code de
-sortie transmis). Il ne connaît que `help`, `--help` et `--version` ; aucun nom de
-module n'est codé en dur.
+`poste` is a thin dispatcher, like git: `poste <module> <args…>` runs the
+program `poste-<module>` with `<args…>` (process replacement on Unix, exit
+code passed through). It only knows `help`, `--help` and `--version`; no module
+name is hard-coded.
 
-Recherche d'un module, dans l'ordre, le premier trouvé gagne :
+How a module is found, in order, the first hit wins:
 
-1. `~/.local/share/poste/modules/<nom>/poste-<nom>`
-2. chaque dossier de la clé `modules` de `~/.config/poste/config.toml`
-   (`poste-<nom>` directement, ou `<nom>/poste-<nom>`)
-3. le `PATH`
+1. `~/.local/share/poste/modules/<name>/poste-<name>`
+2. each folder of the `modules` key of `~/.config/poste/config.toml`
+   (`poste-<name>` directly, or `<name>/poste-<name>`)
+3. the `PATH`
 
-`XDG_DATA_HOME`, `XDG_CONFIG_HOME` et `XDG_STATE_HOME` sont respectés.
+`XDG_DATA_HOME`, `XDG_CONFIG_HOME` and `XDG_STATE_HOME` are honoured.
 
-`poste help` (ou `poste` seul) liste les modules trouvés à ce moment-là, avec la
-description de leur fiche. `poste help <module>` affiche les commandes de la fiche.
-Un module inconnu donne une erreur claire, la liste des modules et le code de sortie 127.
+`poste help` (or `poste` alone) lists the modules found at that moment, with the
+description from their card. `poste help <module>` shows the commands of the card.
+An unknown module gives a clear error, the list of modules and exit code 127.
 
 ### Configuration
 
-`~/.config/poste/config.toml` :
+`~/.config/poste/config.toml`:
 
 ```toml
-repo = "/chemin/du/depot"          # écrit par ./setup
-source = "release"                  # écrit par poste sys use : version installée, ou "dev" (le clone, défaut)
-modules = ["~/mes-modules"]         # facultatif : dossiers de modules supplémentaires
+repo = "/path/to/the/repository"   # written by ./setup
+source = "release"                  # written by poste sys use: an installed version, or "dev" (the clone, default)
+modules = ["~/my-modules"]          # optional: extra module folders
 ```
 
-### Fiche d'un module : `module.toml`
+### A module card: `module.toml`
 
-À côté du programme du module :
+Next to the module's program:
 
 ```toml
 name = "sys"
-description = "Gère le dépôt poste"
-commands = [{ name = "status", description = "état du dépôt" }]   # facultatif
+description = "Manages the poste repository"
+commands = [{ name = "status", description = "state of the repository" }]   # optional
 ```
 
 ## Modules
 
-| Module | Rôle |
+| Module | Role |
 | --- | --- |
-| [`sys`](modules/sys/README.md) | gère le dépôt : construction, installation, état, git. Toujours installé. |
-| [`record`](modules/record/README.md) | enregistrement d'écran (gpu-screen-recorder) piloté par l'île : préréglages, fenêtres, écrans, zone. |
-| [`usage`](modules/usage/README.md) | quotas des agents IA (Claude Code, Codex…) lus dans le collecteur d'Omarchy, leur historique, et la consommation relue dans les journaux des agents (appels, fenêtres de 5 h, comparaisons). |
-| [`power`](modules/power/README.md) | alertes batterie (faible, critique, branché mais ça se vide) et disque presque plein ; démon léger (portable). |
+| [`sys`](modules/sys/README.md) | manages the repository: build, install, status, git. Always installed. |
+| [`record`](modules/record/README.md) | screen recording (gpu-screen-recorder) driven by the island: presets, windows, screens, region. |
+| [`usage`](modules/usage/README.md) | AI agent quotas (Claude Code, Codex…) read from Omarchy's collector, their history, and the consumption read back from the agents' logs (calls, 5 h windows, comparisons). |
+| [`power`](modules/power/README.md) | battery alerts (low, critical, plugged in but draining) and almost-full disk; light daemon (laptops). |
 
-Un module est une application à part, dans `modules/<nom>/`, avec son `README.md`,
-son `AGENTS.md` et sa fiche `module.toml`. Son programme est soit une caisse Rust
-(`Cargo.toml`, listée dans `members` du `Cargo.toml` racine, binaire `poste-<nom>` construit en
-release), soit un script (`poste-<nom>` exécutable à la racine du module, en Python ou en shell,
-copié tel quel : pas de `Cargo.toml`, pas dans `members`). `poste` ne fait pas la différence : il
-exécute `~/.local/share/poste/modules/<nom>/poste-<nom>`.
+A module is a separate application, in `modules/<name>/`, with its `README.md`,
+its `AGENTS.md` and its `module.toml` card. Its program is either a Rust crate
+(`Cargo.toml`, listed in `members` of the root `Cargo.toml`, binary `poste-<name>` built in
+release), or a script (`poste-<name>` executable at the root of the module, in Python or shell,
+copied as is: no `Cargo.toml`, not in `members`). `poste` does not tell the difference: it
+runs `~/.local/share/poste/modules/<name>/poste-<name>`.
 
 A module can say `requires = "<program>"` in its `module.toml`: when that program is not in
 the `PATH`, `poste sys setup` leaves the module out (and removes it if it was installed).
@@ -88,124 +88,124 @@ stays installed. `poste sys addons` shows each add-on and its state on this mach
 
 Choose a single dictation add-on: `vocaline` and `voxtype` both take SUPER+A.
 
-### Ce que les modules apportent à la machine
+### What modules bring to the machine
 
-Un module peut fournir, à côté de son programme, des dossiers facultatifs copiés tels quels par
-`poste sys setup` dans `~/.local/share/poste/modules/<nom>/` (l'île et Hyprland les chargent sans
-connaître aucun module ; module absent, aucune trace) :
+Besides its program, a module can provide optional folders that `poste sys setup` copies as is into
+`~/.local/share/poste/modules/<name>/` (the island and Hyprland load them without
+knowing any module; module absent, no trace):
 
-- `island/` : pour l'île Quickshell (`config/.config/omarchy/plugins/poste.island`, composant `ModuleRegistry.qml`).
-  - `launcher.json` (format: [`docs/launcher-format.md`](docs/launcher-format.md)) : entrées, extensions et moteurs du lanceur, même format que
-    `~/.config/poste-island/launcher/launcher.json` (fusionné avec lui ; la config de l'utilisateur
-    gagne en cas d'id identique). Une extension peut avoir `"highlight": true` : l'île encadre à
-    l'écran la cible (`highlight: {x,y,w,h,window}`) de la ligne sélectionnée.
-  - `island.json` : `{"slots": [{"slot": "<nom>", "file": "Fichier.qml"}], "player": {…}}`.
+- `island/`: for the Quickshell island (`config/.config/omarchy/plugins/poste.island`, component `ModuleRegistry.qml`).
+  - `launcher.json` (format: [`docs/launcher-format.md`](docs/launcher-format.md)): launcher entries, extensions and engines, same format as
+    `~/.config/poste-island/launcher/launcher.json` (merged with it; the user's config
+    wins on an identical id). An extension can have `"highlight": true`: the island frames
+    on screen the target (`highlight: {x,y,w,h,window}`) of the selected row.
+  - `island.json`: `{"slots": [{"slot": "<name>", "file": "File.qml"}], "player": {…}}`.
     `player` declares, without any QML, what the player card shows for one MPRIS player:
     `bus` (its MPRIS bus name), `quality` (metadata key of the line under the artist), `starred`
     (boolean metadata key of the heart), `like` (command run by the heart), `app` (desktop entry
     of the player's app when its MPRIS has no DesktopEntry: the sound source pill brings its
     window up or opens it), `launcher` (launcher extension the pill opens instead, for a player
     without a window). Example: `addons/melodie/island/island.json`.
-    Slots chargés par l'île : `capture` (source d'enregistrement
-    de même interface qu'`ObsState.qml`, pour la pastille de capture) et `dictation` (source de
-    dictée : `listening`, `transcribing`, `level`, `finals`, `partial`, pour la pastille de dictée
-    en bas de l'écran et le texte sous l'île).
-  - Découverte au démarrage, puis rechargée à chaud (inotifywait sur le dossier des modules).
-- `hypr/*.lua` : morceaux de config Hyprland. `hyprland.lua` charge chaque
-  `modules/*/hypr/*.lua` (`loadfile` + `pcall` : une erreur est isolée et notifiée, le reste de la
-  config se charge).
-- `bin/` : programmes annexes du module.
-- `systemd/` et `units = [...]` dans `module.toml` : unités systemd utilisateur, activées par `poste sys setup`
-  (`systemctl --user enable --now`) et désactivées quand le module disparaît ou est désactivé (voir
-  [`modules/sys/README.md`](modules/sys/README.md), « Unités systemd »).
-- `[[line]]` dans `module.toml` : une ligne à poser dans un fichier sans inclusion (voir
-  [`modules/sys/README.md`](modules/sys/README.md), « Lignes de module »).
+    Slots loaded by the island: `capture` (recording source
+    with the same interface as `ObsState.qml`, for the capture pill) and `dictation` (dictation
+    source: `listening`, `transcribing`, `level`, `finals`, `partial`, for the dictation pill
+    at the bottom of the screen and the text under the island).
+  - Discovered at startup, then reloaded live (inotifywait on the modules folder).
+- `hypr/*.lua`: pieces of Hyprland config. `hyprland.lua` loads each
+  `modules/*/hypr/*.lua` (`loadfile` + `pcall`: an error is isolated and notified, the rest of the
+  config loads).
+- `bin/`: auxiliary programs of the module.
+- `systemd/` and `units = [...]` in `module.toml`: systemd user units, enabled by `poste sys setup`
+  (`systemctl --user enable --now`) and disabled when the module disappears or is disabled (see
+  [`modules/sys/README.md`](modules/sys/README.md), "Systemd units").
+- `[[line]]` in `module.toml`: a line to put in a file that has no include (see
+  [`modules/sys/README.md`](modules/sys/README.md), "Module lines").
 
-## Installer sur un PC neuf
+## Install on a new PC
 
-Point de départ : une Omarchy fraîche, connectée à Internet. `poste` ne lance jamais `sudo` :
-chaque fois qu'il faut un droit root, il affiche la commande exacte à copier.
+Starting point: a fresh Omarchy, connected to the Internet. `poste` never runs `sudo`:
+each time root rights are needed, it prints the exact command to copy.
 
-1. Rust et git (une seule fois, à la main) :
+1. Rust and git (once, by hand):
    ```bash
    sudo pacman -S --needed rust git
    ```
-2. Cloner le dépôt et lancer le premier setup (`~/.local/bin` doit être dans le `PATH`, c'est le cas sous Omarchy) :
+2. Clone the repository and run the first setup (`~/.local/bin` must be in the `PATH`, which is the case on Omarchy):
    ```bash
    git clone https://github.com/KristenJestin/poste.git ~/Projects/poste
    cd ~/Projects/poste
-   ./setup --dry-run   # aperçu complet, n'écrit rien (hors target/)
-   ./setup             # même chose en vrai, avec confirmations
-   ./setup --data <adresse de poste-data>   # idem, avec le dépôt de données de la machine
+   ./setup --dry-run   # full preview, writes nothing (outside target/)
+   ./setup             # the same for real, with confirmations
+   ./setup --data <address of poste-data>   # same, with the machine's data repository
    ```
-   `./setup` vérifie `cargo`, enregistre l'emplacement du dépôt (clé `repo`), construit en
-   release puis lance `poste sys setup`, qui :
-   - installe `poste` et ses modules ;
-   - pose la config par liens symboliques (conflits avec des fichiers existants : décidés un par un, voir [`modules/sys/README.md`](modules/sys/README.md)) ;
-   - compare `bootstrap/packages.toml` à `pacman -Qq` et affiche la commande `yay -S --needed …` des paquets manquants ;
-   - affiche en un bloc copiable les étapes système (root) non faites ;
-   - propose les étapes utilisateur (plugins du shell aux versions auditées avec leurs patchs, config de cursor-accent, étapes des add-ons choisis, Flea par défaut, thème) et les fait après confirmation ;
-   - liste les étapes manuelles restantes.
-3. Lancer vous-même la commande `yay -S --needed …` affichée, puis les commandes `sudo` du bloc « Étapes système ».
-4. Relancer `poste sys setup` : les étapes qui dépendaient des paquets (add-ons, Flea, thème…) se font maintenant. Recommencer jusqu'à « rien à faire ».
-5. Faire les étapes manuelles, en les marquant au fur et à mesure (`poste sys done <id>`, `poste sys done` pour la liste ; `--undo` pour annuler). `poste sys status` résume tout ce qui reste.
-6. Recharger : `omarchy restart shell` et `hyprctl reload`, ou redémarrer la session.
+   `./setup` checks `cargo`, records the location of the repository (key `repo`), builds in
+   release, then runs `poste sys setup`, which:
+   - installs `poste` and its modules;
+   - puts the config in place with symbolic links (conflicts with existing files: decided one by one, see [`modules/sys/README.md`](modules/sys/README.md));
+   - compares `bootstrap/packages.toml` with `pacman -Qq` and prints the `yay -S --needed …` command for the missing packages;
+   - prints in one copyable block the system (root) steps not done yet;
+   - offers the user steps (shell plugins at audited versions with their patches, cursor-accent config, steps of the chosen add-ons, Flea by default, theme) and does them after confirmation;
+   - lists the manual steps that remain.
+3. Run the printed `yay -S --needed …` command yourself, then the `sudo` commands of the "System steps" block.
+4. Run `poste sys setup` again: the steps that depended on the packages (add-ons, Flea, theme…) are done now. Repeat until "nothing to do".
+5. Do the manual steps, marking them as you go (`poste sys done <id>`, `poste sys done` for the list; `--undo` to cancel). `poste sys status` sums up everything that remains.
+6. Reload: `omarchy restart shell` and `hyprctl reload`, or restart the session.
 
-Ensuite, `poste sys setup` (ou `poste sys sync`, qui fait le `git pull`) suffit pour réinstaller après une
-modification. `--no-config` ne réinstalle que les binaires et saute toute la partie machine.
+After that, `poste sys setup` (or `poste sys sync`, which does the `git pull`) is enough to reinstall after a
+change. `--no-config` only reinstalls the binaries and skips the whole machine part.
 
-Posé par `poste sys setup` :
+Put in place by `poste sys setup`:
 
 - `~/.local/bin/poste`
-- `~/.local/share/poste/current` : lien vers la racine dont tout est lu (le clone, ou une version installée : « Versions installées » plus bas) ; les liens de config passent par lui
-- `~/.local/share/poste/modules/<nom>/` : `poste-<nom>`, `module.toml`, et `island/`, `hypr/`, `bin/`, `systemd/` s'ils existent
-- les lignes que les modules ajoutent dans des fichiers sans inclusion (par exemple `~/.config/hypr/xdph.conf`)
-- la liste de ce qui a été posé : `~/.local/state/poste/installed.json`
-- les anciennes versions remplacées : `~/.local/state/poste/backup/`
-- les étapes manuelles marquées faites : `~/.local/state/poste/done/<id>`
+- `~/.local/share/poste/current`: link to the root everything is read from (the clone, or an installed version: "Installed versions" below); the config links go through it
+- `~/.local/share/poste/modules/<name>/`: `poste-<name>`, `module.toml`, and `island/`, `hypr/`, `bin/`, `systemd/` if they exist
+- the lines modules add to files without includes (for example `~/.config/hypr/xdph.conf`)
+- the list of what was put in place: `~/.local/state/poste/installed.json`
+- the old versions that were replaced: `~/.local/state/poste/backup/`
+- the manual steps marked done: `~/.local/state/poste/done/<id>`
 
-## Versions installées (release) ou clone (dev)
+## Installed versions (release) or clone (dev)
 
-Tout ce que `poste sys setup` pose se lit dans une seule racine, le lien
-`~/.local/share/poste/current` : les liens de `~` visent `current/config/…`, les fichiers de modules
-et les binaires viennent de `current/`. Deux sources possibles, clé `source` de `config.toml` :
+Everything `poste sys setup` puts in place is read from a single root, the link
+`~/.local/share/poste/current`: the links in `~` point to `current/config/…`, the module files
+and the binaries come from `current/`. Two possible sources, key `source` of `config.toml`:
 
-- `dev` (défaut, le fonctionnement d'avant) : `current` désigne le clone (`repo`), `setup` construit
-  avec cargo, `sync` fait `git pull`. `poste sys versions` dit dans quel mode on est.
-- `release` : `current` désigne une version installée dans `~/.local/share/poste/versions/<commit>/`.
-  Ni clone ni Rust nécessaires. `sync` lit la somme de contrôle publiée, télécharge la dernière
-  archive si elle n'est pas déjà installée (`curl`), vérifie la somme avant d'extraire, fait pointer
-  `current` dessus, lance `setup`, recharge l'île et Hyprland si les fichiers qui les concernent
-  diffèrent entre l'ancienne et la nouvelle version, puis ne garde que les 3 versions les plus récentes
-  (jamais celle de `current`).
+- `dev` (default, how it worked before): `current` points to the clone (`repo`), `setup` builds
+  with cargo, `sync` does `git pull`. `poste sys versions` says which mode you are in.
+- `release`: `current` points to a version installed in `~/.local/share/poste/versions/<commit>/`.
+  Neither clone nor Rust needed. `sync` reads the published checksum, downloads the latest
+  archive if it is not already installed (`curl`), checks the checksum before extracting, points
+  `current` at it, runs `setup`, reloads the island and Hyprland if the files that concern them
+  differ between the old and the new version, then keeps only the 3 most recent versions
+  (never the one `current` points to).
 
 ```sh
-poste sys use release   # passe en release (télécharge la dernière version s'il n'y en a aucune)
-poste sys use dev       # revient au clone, pour essayer un changement en vrai
-poste sys use 1a2b3c4   # retour arrière : une version installée, par le début de son commit
-poste sys versions      # source, racine et versions installées
+poste sys use release   # switch to release (downloads the latest version if there is none)
+poste sys use dev       # back to the clone, to try a change for real
+poste sys use 1a2b3c4   # roll back: an installed version, by the start of its commit
+poste sys versions      # source, root and installed versions
 ```
 
-`use` écrit `source`, fait pointer `current`, lance `setup` puis propose de recharger l'île et
-Hyprland (`--yes` sans confirmation, `--dry-run` pour l'aperçu ; l'île n'est jamais redémarrée
-pendant un enregistrement d'écran). Après un retour arrière, le prochain `sync` revient à la
-dernière version.
+`use` writes `source`, points `current`, runs `setup`, then offers to reload the island and
+Hyprland (`--yes` without confirmation, `--dry-run` for the preview; the island is never restarted
+during a screen recording). After a rollback, the next `sync` goes back to the
+latest version.
 
-L'archive est construite par GitHub Actions (`.github/workflows/archive.yml`, conteneur Arch) à
-chaque push sur `main` et publiée dans la préversion `latest` (ses fichiers remplacés, son étiquette déplacée, jamais
-supprimée) : une adresse fixe, `…/releases/download/latest/poste-x86_64-linux.tar.gz`, et sa somme `….sha256`. Contenu
-(`.github/package.sh`) : la disposition du dépôt, réduite à ce que `setup` lit : `config/`,
-`bootstrap/`, de chaque module `module.toml`, `island/`, `hypr/`, `bin/`, `systemd/` et son programme
-s'il est un script, les binaires dans `target/release/`, et `VERSION` (commit, date). Pas de paquet
-pacman : un paquet ne peut pas poser de liens dans `~`, ce travail reste à `setup`.
+The archive is built by GitHub Actions (`.github/workflows/archive.yml`, Arch container) on
+each push to `main` and published in the `latest` prerelease (its files replaced, its tag moved, never
+deleted): a fixed address, `…/releases/download/latest/poste-x86_64-linux.tar.gz`, and its sum `….sha256`. Content
+(`.github/package.sh`): the layout of the repository, reduced to what `setup` reads: `config/`,
+`bootstrap/`, from each module `module.toml`, `island/`, `hypr/`, `bin/`, `systemd/` and its program
+if it is a script, the binaries in `target/release/`, and `VERSION` (commit, date). No
+pacman package: a package cannot put links in `~`, that job stays with `setup`.
 
-Passage d'une machine existante : rien ne change tant que `source` est absent, sinon que le premier
-`setup` pose `current` (vers le clone) et repasse par lui les liens de config qu'il avait posés vers
-le clone. Seuls les liens notés dans `installed.json` sont reposés, chacun sauvegardé d'abord dans
-`~/.local/state/poste/backup/` ; un lien posé à la main ou un fichier ordinaire n'est jamais touché.
-Ensuite `poste sys use release`.
+Moving an existing machine over: nothing changes as long as `source` is absent, except that the first
+`setup` puts `current` in place (pointing to the clone) and re-routes through it the config links it had put
+pointing to the clone. Only the links noted in `installed.json` are put again, each one backed up first in
+`~/.local/state/poste/backup/`; a link put by hand or an ordinary file is never touched.
+Then `poste sys use release`.
 
-Machine sans clone ni Rust (non essayé de bout en bout) :
+Machine without clone or Rust (not tried end to end):
 
 ```sh
 mkdir -p /tmp/poste && cd /tmp/poste
@@ -213,90 +213,90 @@ curl -fsSLO https://github.com/KristenJestin/poste/releases/download/latest/post
 tar -xzf poste-x86_64-linux.tar.gz && ./target/release/poste-sys use release
 ```
 
-En release, la racine est en lecture seule : `poste sys add` et `setup --take-home` (qui écrivent
-dans le dépôt) demandent de passer en dev.
+In release, the root is read-only: `poste sys add` and `setup --take-home` (which write
+into the repository) ask you to switch to dev.
 
-## Installer sur un autre PC
+## Install on another PC
 
-Le dépôt est le même partout : pas de profils par machine. Ce qui diffère se règle dans le dépôt de données de la machine (plus bas), ou dans
-`~/.config/poste/config.toml`, local à la machine et jamais versionné (`poste sys setup` ne l'écrit pas) :
+The repository is the same everywhere: no per-machine profiles. What differs is set in the machine's data repository (below), or in
+`~/.config/poste/config.toml`, local to the machine and never versioned (`poste sys setup` does not write it):
 
 ```toml
-local = [".config/hypr/monitors.lua"]     # fichiers de config/ que CETTE machine garde à elle
-disabled = ["record"]                      # modules du dépôt à ne pas installer ici
-skip = ["gimp", "omamail"]                 # paquets / étapes du bootstrap ignorés ici
+local = [".config/hypr/monitors.lua"]     # config/ files that THIS machine keeps for itself
+disabled = ["record"]                      # modules of the repository not to install here
+skip = ["gimp", "omamail"]                 # bootstrap packages / steps ignored here
 
-[[override]]                               # JSON : dépôt + quelques valeurs locales
+[[override]]                               # JSON: repository + a few local values
 path = ".config/omarchy/shell.json"
 set = { "idle.lock" = 3600 }
 ```
 
-- `local` : `setup` ne lie pas ces fichiers, ne les signale pas en conflit et ne les touche jamais ;
-  `status` les liste, `diff <chemin>` montre quand même l'écart. `poste sys local add|remove <chemin>`.
-- `disabled` : ces modules ne sont pas installés ; s'ils l'étaient, `setup` les retire proprement
-  (fichiers, `hypr/`, `island/`, lignes posées, unités systemd), avec aperçu. `poste sys module enable|disable <nom>`.
-- `skip` : noms de paquets de `bootstrap/packages.toml` ou `id` d'étapes de `bootstrap/steps.toml` à
-  sauter sur cette machine : ni exigés, ni proposés, ni comptés manquants dans `setup` et `status`
-  (une ligne « ignorés sur cette machine » le rappelle). Une étape qui se déclenche après une étape
-  ignorée l'est aussi. Un identifiant inconnu donne un avertissement. Rien n'est désinstallé.
+- `local`: `setup` does not link these files, does not report them as conflicts and never touches them;
+  `status` lists them, `diff <path>` still shows the difference. `poste sys local add|remove <path>`.
+- `disabled`: these modules are not installed; if they were, `setup` removes them cleanly
+  (files, `hypr/`, `island/`, lines put in place, systemd units), with a preview. `poste sys module enable|disable <name>`.
+- `skip`: package names of `bootstrap/packages.toml` or `id`s of steps of `bootstrap/steps.toml` to
+  skip on this machine: neither required, nor offered, nor counted as missing in `setup` and `status`
+  (an "ignored on this machine" line reminds you). A step that triggers after an ignored
+  step is ignored too. An unknown id gives a warning. Nothing is uninstalled.
   `poste sys skip list|add <id>…|remove <id>…`.
-- `[[override]]` : un fichier JSON de `config/` généré (dépôt + valeurs locales) au lieu d'être lié.
-  `poste sys override set <chemin> <clé> <valeur>`.
+- `[[override]]`: a JSON file of `config/` generated (repository + local values) instead of being linked.
+  `poste sys override set <path> <key> <value>`.
 
-À faire AVANT le premier `./setup` de la machine (créer le fichier à la main ou lancer
-`poste sys local add` / `module disable` / `skip add` après le premier `./setup --dry-run`), puis suivre « Installer sur un PC neuf ».
-Détail et règles : [`modules/sys/README.md`](modules/sys/README.md), « Réglages propres à la machine ».
+To do BEFORE the machine's first `./setup` (create the file by hand or run
+`poste sys local add` / `module disable` / `skip add` after the first `./setup --dry-run`), then follow "Install on a new PC".
+Details and rules: [`modules/sys/README.md`](modules/sys/README.md), "Machine-specific settings".
 
-### Dépôt de données de la machine (`poste-data`)
+### The machine's data repository (`poste-data`)
 
-Ce dépôt est public et générique. Ce qui est propre à une machine et doit survivre à une
-réinstallation (écrans, montages, adresses de services privés, étapes système de la machine)
-vit dans un second dépôt git, privé, un par machine : `poste-data`, sur le compte qui va avec la
-machine. Déclaré par `data = "<dossier>"` dans `~/.config/poste/config.toml`
-(`./setup --data <adresse git>` le clone à côté de poste et écrit la clé) :
+This repository is public and generic. What belongs to one machine and must survive a
+reinstall (screens, mounts, addresses of private services, the machine's system steps)
+lives in a second git repository, private, one per machine: `poste-data`, on the account that goes with the
+machine. Declared by `data = "<folder>"` in `~/.config/poste/config.toml`
+(`./setup --data <git address>` clones it next to poste and writes the key):
 
 ```text
 poste-data/
-  poste.toml           # mêmes clés que config.toml (disabled, skip, local, modules, [[override]]), ajoutées
-  config/              # comme config/ de poste ; même chemin : ce fichier remplace celui de poste
-    .poste/modes       # droits de ses fichiers (pas de link-dirs)
+  poste.toml           # same keys as config.toml (disabled, skip, local, modules, [[override]]), added
+  config/              # like poste's config/; same path: this file replaces poste's
+    .poste/modes       # permissions of its files (no link-dirs)
   bootstrap/
-    steps.toml         # étapes ajoutées ; même id : remplace celle de poste
-    packages.toml      # paquets ajoutés
+    steps.toml         # added steps; same id: replaces poste's
+    packages.toml      # added packages
 ```
 
-- Les chemins relatifs de ses étapes (`line`, `source`, `patch`) partent de son `bootstrap/` ;
-  `@DATA@` vaut son dossier.
-- Un fichier sous un dossier lié d'un bloc par poste (`link-dirs`) est refusé.
-- `poste sys sync` fait `git pull --ff-only` dans le dépôt de données dans les deux modes (et dans le clone en dev, ou la dernière version en release), puis `setup`, puis recharge l'île et Hyprland si le pull ou le changement de version les a touchés.
-- Le lanceur de l'île lit en plus `~/.config/poste-island/launcher/machine.json` (même format que
-  `launcher.json`) : les entrées propres à la machine y vont, posées par `poste-data`.
-- `repo`, `data` et `source` restent dans `config.toml`, jamais dans `poste.toml`.
+- The relative paths of its steps (`line`, `source`, `patch`) start from its `bootstrap/`;
+  `@DATA@` is its folder.
+- A file under a folder that poste links as a block (`link-dirs`) is refused.
+- `poste sys sync` does `git pull --ff-only` in the data repository in both modes (and in the clone in dev, or the latest version in release), then `setup`, then reloads the island and Hyprland if the pull or the version change touched them.
+- The island's launcher also reads `~/.config/poste-island/launcher/machine.json` (same format as
+  `launcher.json`): the machine's own entries go there, put in place by `poste-data`.
+- `repo`, `data` and `source` stay in `config.toml`, never in `poste.toml`.
 
-## Organisation du dépôt
+## Repository layout
 
 ```
-config/     la config de ~ (liens posés par poste sys setup)
-core/       poste-core : chemins XDG, config, découverte des modules, notifications
-poste/      l'aiguillage
-modules/    un dossier par module (sys, music, record, power, …)
-bootstrap/  paquets, étapes système/utilisateur/manuelles, patchs de plugins (lus par poste sys setup)
-tests/      tests QML de l'île (faux Hyprland, rendu hors écran)
-setup       premier lancement
-.github/    construction et publication de l'archive d'une version (package.sh, workflows/)
+config/     the config of ~ (links put in place by poste sys setup)
+core/       poste-core: XDG paths, config, module discovery, notifications
+poste/      the dispatcher
+modules/    one folder per module (sys, music, record, power, …)
+bootstrap/  packages, system/user/manual steps, plugin patches (read by poste sys setup)
+tests/      QML tests of the island (fake Hyprland, offscreen rendering)
+setup       first run
+.github/    build and publication of a version's archive (package.sh, workflows/)
 ```
 
-Vérifications avant commit : `cargo test` et `cargo clippy --all-targets -- -D warnings`. `cargo test` lance aussi
-les tests QML de `tests/island/` avec le `qmltestrunner` de Qt 6 (`QT_QPA_PLATFORM=offscreen`,
-aucune fenêtre ne s'ouvre) ; ils sont sautés si `qt6-declarative` n'est pas installé.
+Checks before a commit: `cargo test` and `cargo clippy --all-targets -- -D warnings`. `cargo test` also runs
+the QML tests of `tests/island/` with Qt 6's `qmltestrunner` (`QT_QPA_PLATFORM=offscreen`,
+no window opens); they are skipped if `qt6-declarative` is not installed.
 
-## La config
+## The config
 
-Le dossier `config/` reflète `~` (vrais noms, sans préfixes) et est posé par liens symboliques
-par `poste sys setup` (aperçu, sauvegardes, conflits tranchés un par un : voir
-[`modules/sys/README.md`](modules/sys/README.md)). `poste sys import-chezmoi` reprend la config
-gérée jusqu'ici par chezmoi. `bootstrap/` décrit le reste de la machine (paquets, plugins, étapes) : voir [`bootstrap/README.md`](bootstrap/README.md).
+The `config/` folder mirrors `~` (real names, no prefixes) and is put in place with symbolic links
+by `poste sys setup` (preview, backups, conflicts decided one by one: see
+[`modules/sys/README.md`](modules/sys/README.md)). `poste sys import-chezmoi` takes over the config
+managed so far by chezmoi. `bootstrap/` describes the rest of the machine (packages, plugins, steps): see [`bootstrap/README.md`](bootstrap/README.md).
 
-## À venir
+## Coming
 
-Commande de `poste sys` prévue, pas encore là : `install <module>`.
+A `poste sys` command planned, not there yet: `install <module>`.
