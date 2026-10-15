@@ -10,5 +10,5 @@
   de Vocaline) : `~/.config/vocaline/` vient du dépôt de données de la machine.
 - Aucun texte dicté dans un fichier, un journal ni un message de commit.
 - Le module ne connaît l'île que par `island/` (slot `dictation`) ; la touche est dans
-  `hypr/vocaline.lua`, jamais dans `config/`. SUPER+A (voxtype) ne doit pas changer.
+  `hypr/vocaline.lua`, jamais dans `config/`.
 - `poste-vocaline` reste un script shell court, sans dépendance.

@@ -1,13 +1,13 @@
 # poste vocaline
 
 Branche la dictée [Vocaline](https://github.com/KristenJestin/vocaline) sur le bureau : la touche
-SUPER+Z, la pastille de dictée en bas de l'écran actif (micro et onde, comme voxtype sur SUPER+A)
+SUPER+A, la pastille de dictée en bas de l'écran actif (micro et onde)
 et le texte dicté en direct juste sous l'île. Vocaline lui-même (démon, micro, moteur, collage)
 n'est pas dans poste : ce module ne fait que le relier à l'île et à Hyprland.
 
 ## Fonctionnement
 
-- SUPER+Z (`hypr/vocaline.lua`) : `poste vocaline press` à l'appui, `poste vocaline release` au
+- SUPER+A (`hypr/vocaline.lua`) : `poste vocaline press` à l'appui, `poste vocaline release` au
   relâchement. Maintenir pour parler, ou taper pour démarrer puis taper encore pour arrêter.
 - Rien ne s'écrit dans la fenêtre pendant qu'on parle : à l'arrêt, Vocaline colle toute la dictée
   d'un bloc dans la fenêtre de départ.
@@ -15,16 +15,15 @@ n'est pas dans poste : ce module ne fait que le relier à l'île et à Hyprland.
   `island/VocalineState.qml`, slot `dictation`) :
   - tout s'affiche dans le bandeau, sur l'écran actif : la pastille en bas, le texte sous l'île ;
   - `loading` et `listening` : la pastille avec le micro et l'onde (`level`), et le son d'écoute ;
-    l'onde est la même que celle de voxtype : le module ne donne que le niveau courant (`level`, mis
-    à l'échelle de voxtype et lissé entre deux évènements, car le démon en envoie 10 par seconde),
-    et le bandeau l'échantillonne à 100 par seconde, comme voxtype ;
+    le module ne donne que le niveau courant (`level`, mis à l'échelle de l'onde de l'île
+    et lissé entre deux évènements, car le démon en envoie 10 par seconde),
+    et le bandeau l'échantillonne à 100 par seconde ;
   - `stopping` : les points de fin, et le son de fin ;
   - sous l'île : les phrases figées (`final`), puis la phrase en cours (`partial`) en gris,
     trois lignes au plus (la fin reste visible) ;
   - `idle` : tout s'efface.
 - Démon absent ou flux coupé : l'île regarde toutes les 5 secondes si le socket est revenu, et ne
   s'y reconnecte qu'alors (rien au journal tant qu'il est absent).
-- voxtype (SUPER+A) continue de marcher à côté : la pastille montre celui qui dicte.
 
 ## Commandes
 

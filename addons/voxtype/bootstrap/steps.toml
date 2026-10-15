@@ -1,0 +1,30 @@
+# Steps of the voxtype add-on, merged with bootstrap/steps.toml when the add-on is chosen.
+
+# voxtype's config, written once: edit it freely afterwards, setup leaves it as it is. A machine
+# with its own config in its data repository skips this step (skip = ["voxtype-config"]).
+[[file]]
+id = "voxtype-config"
+title = "voxtype: config (Whisper small, key and paste driven by poste)"
+target = "@HOME@/.config/voxtype/config.toml"
+source = "files/config.toml"
+
+[[user]]
+id = "voxtype-service"
+title = "voxtype: systemd user service"
+requires = "voxtype"
+check = ["test", "-f", "@HOME@/.config/systemd/user/voxtype.service"]
+run = [["voxtype", "setup", "systemd"]]
+
+[[user]]
+id = "voxtype-model"
+title = "voxtype: Whisper small model (download)"
+requires = "voxtype"
+check = ["test", "-f", "@HOME@/.local/share/voxtype/models/ggml-small.bin"]
+run = [["voxtype", "setup", "--download", "--model", "small", "--quiet"]]
+
+[[user]]
+id = "voxtype-enable"
+title = "voxtype: service enabled and started"
+requires = "voxtype"
+check = ["systemctl", "--user", "is-enabled", "--quiet", "voxtype.service"]
+run = [["systemctl", "--user", "daemon-reload"], ["systemctl", "--user", "enable", "--now", "voxtype.service"]]

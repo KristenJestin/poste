@@ -62,27 +62,6 @@ trigger = ["cursor-accent-config", "io.github.smoothpixels.cursor-accent"]
 run = [["sh", "-c", "python3 \"@HOME@/.config/omarchy/plugins/io.github.smoothpixels.cursor-accent/recolor.py\" \"$(omarchy-theme-current 2>/dev/null || echo unknown)\""]]
 
 [[user]]
-id = "voxtype-service"
-title = "voxtype : service systemd utilisateur"
-requires = "voxtype"
-check = ["test", "-f", "@HOME@/.config/systemd/user/voxtype.service"]
-run = [["voxtype", "setup", "systemd"]]
-
-[[user]]
-id = "voxtype-model"
-title = "voxtype : modèle Parakeet v3 (téléchargement)"
-requires = "voxtype"
-check = ["test", "-d", "@HOME@/.local/share/voxtype/models/parakeet-tdt-0.6b-v3"]
-run = [["voxtype", "setup", "--download", "--model", "parakeet-tdt-0.6b-v3", "--quiet"]]
-
-[[user]]
-id = "voxtype-enable"
-title = "voxtype : service activé et démarré"
-requires = "voxtype"
-check = ["systemctl", "--user", "is-enabled", "--quiet", "voxtype.service"]
-run = [["systemctl", "--user", "daemon-reload"], ["systemctl", "--user", "enable", "--now", "voxtype.service"]]
-
-[[user]]
 id = "omarchy-crash-watch-off"
 title = "omarchy-crash-watch.service désactivé"
 check = ["sh", "-c", "! systemctl --user is-enabled --quiet omarchy-crash-watch.service && ! systemctl --user is-active --quiet omarchy-crash-watch.service"]

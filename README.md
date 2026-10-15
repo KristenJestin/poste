@@ -83,7 +83,10 @@ stays installed. `poste sys addons` shows each add-on and its state on this mach
 | Add-on | Plugs in |
 | --- | --- |
 | [`melodie`](addons/melodie/README.md) | the [Mélodie](https://github.com/KristenJestin/melodie) music player: launcher search, quality and heart on the player card. Installs the pinned release. |
-| [`vocaline`](addons/vocaline/README.md) | dictée Vocaline : SUPER+Z, pastille animée en bas de l'écran, texte dicté en direct sous l'île. The `vocaline` package is installed by hand. |
+| [`vocaline`](addons/vocaline/README.md) | the [Vocaline](https://github.com/KristenJestin/vocaline) dictation: SUPER+A, animated pill at the bottom of the screen, dictated text live under the island. The `vocaline` package is installed by hand. |
+| [`voxtype`](addons/voxtype/README.md) | the [voxtype](https://github.com/peteonrails/voxtype) dictation: SUPER+A (tap to toggle, hold to talk), animated pill at the bottom of the screen. Installs `voxtype-bin`, its config, model and service. |
+
+Choose a single dictation add-on: `vocaline` and `voxtype` both take SUPER+A.
 
 ### Ce que les modules apportent à la machine
 
@@ -141,10 +144,10 @@ chaque fois qu'il faut un droit root, il affiche la commande exacte à copier.
    - pose la config par liens symboliques (conflits avec des fichiers existants : décidés un par un, voir [`modules/sys/README.md`](modules/sys/README.md)) ;
    - compare `bootstrap/packages.toml` à `pacman -Qq` et affiche la commande `yay -S --needed …` des paquets manquants ;
    - affiche en un bloc copiable les étapes système (root) non faites ;
-   - propose les étapes utilisateur (plugins du shell aux versions auditées avec leurs patchs, config de cursor-accent, service et modèle voxtype, Flea par défaut, thème) et les fait après confirmation ;
+   - propose les étapes utilisateur (plugins du shell aux versions auditées avec leurs patchs, config de cursor-accent, étapes des add-ons choisis, Flea par défaut, thème) et les fait après confirmation ;
    - liste les étapes manuelles restantes.
 3. Lancer vous-même la commande `yay -S --needed …` affichée, puis les commandes `sudo` du bloc « Étapes système ».
-4. Relancer `poste sys setup` : les étapes qui dépendaient des paquets (voxtype, Flea, thème…) se font maintenant. Recommencer jusqu'à « rien à faire ».
+4. Relancer `poste sys setup` : les étapes qui dépendaient des paquets (add-ons, Flea, thème…) se font maintenant. Recommencer jusqu'à « rien à faire ».
 5. Faire les étapes manuelles, en les marquant au fur et à mesure (`poste sys done <id>`, `poste sys done` pour la liste ; `--undo` pour annuler). `poste sys status` résume tout ce qui reste.
 6. Recharger : `omarchy restart shell` et `hyprctl reload`, ou redémarrer la session.
 

@@ -1,0 +1,50 @@
+# voxtype config written by the poste voxtype add-on (only when missing: edit it freely).
+# Every option: voxtype's documentation. The key is SUPER+A, handled by Hyprland
+# (hypr/voxtype.lua of the add-on), so voxtype's own hotkey is off.
+
+state_file = "auto"
+
+[hotkey]
+enabled = false
+
+[audio]
+device = "default"
+sample_rate = 16000
+max_duration_secs = 600
+pause_media = true
+
+[whisper]
+model = "small"
+language = "fr"
+translate = false
+eager_processing = true
+eager_chunk_secs = 5.0
+
+[output]
+wait_for_modifier_release = true
+modifier_release_timeout_ms = 10000
+mode = "paste"
+paste_keys = "ctrl+v"
+restore_clipboard = true
+restore_clipboard_delay_ms = 400
+fallback_to_clipboard = true
+type_delay_ms = 0
+# The text goes to the window focused when the dictation started, not the one focused when
+# the transcription ends; then the island's paste sound.
+pre_recording_command = "@HOME@/.local/bin/poste voxtype focus save"
+pre_output_command = "@HOME@/.local/bin/poste voxtype focus restore"
+post_output_command = "@HOME@/.config/omarchy/plugins/poste.island/bin/poste-sfx dictation-paste"
+pre_type_delay_ms = 150
+
+[output.notification]
+on_recording_start = false
+on_recording_stop = false
+on_transcription = false
+
+# The island shows the dictation (slot "dictation" of the add-on).
+[osd]
+enabled = false
+
+[vad]
+enabled = true
+backend = "energy"
