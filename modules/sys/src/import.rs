@@ -778,7 +778,7 @@ fn render(r: &Report, nfiles: usize, ndirs: usize, source: &Path) -> String {
         "## Files where the machine differs from the chezmoi source\n"
     );
     if r.differs.is_empty() {
-        let _ = writeln!(s, "Aucun.\n");
+        let _ = writeln!(s, "None.\n");
     }
     for (t, d) in &r.differs {
         let _ = writeln!(s, "### `{t}`\n\n```diff\n{d}\n```\n");
@@ -789,7 +789,7 @@ fn render(r: &Report, nfiles: usize, ndirs: usize, source: &Path) -> String {
         "## Managed by chezmoi but absent from the machine (not imported)\n"
     );
     if r.absent.is_empty() && r.absent_dirs.is_empty() {
-        let _ = writeln!(s, "Aucun.\n");
+        let _ = writeln!(s, "None.\n");
     }
     for t in &r.absent {
         let _ = writeln!(s, "- `{t}`");
@@ -801,7 +801,7 @@ fn render(r: &Report, nfiles: usize, ndirs: usize, source: &Path) -> String {
 
     let _ = writeln!(s, "## `DA` entries of `chezmoi status`\n");
     if r.da.is_empty() {
-        let _ = writeln!(s, "Aucune.\n");
+        let _ = writeln!(s, "None.\n");
     } else {
         let _ = writeln!(s, "`D`: absent from the machine; `A`: `chezmoi apply` would create it. These are folders:\n");
         for d in &r.da {
@@ -815,7 +815,7 @@ fn render(r: &Report, nfiles: usize, ndirs: usize, source: &Path) -> String {
 
     let _ = writeln!(s, "## Refused for a secret (values never copied)\n");
     if r.secrets.is_empty() {
-        let _ = writeln!(s, "Aucun.\n");
+        let _ = writeln!(s, "None.\n");
     }
     for (t, hits) in &r.secrets {
         let _ = writeln!(s, "- `{t}`: not imported");
@@ -836,7 +836,7 @@ fn render(r: &Report, nfiles: usize, ndirs: usize, source: &Path) -> String {
         "## Imported files that mention a sensitive keyword without an obvious value (to review)\n"
     );
     if r.review.is_empty() {
-        let _ = writeln!(s, "Aucun.\n");
+        let _ = writeln!(s, "None.\n");
     }
     for (t, n) in &r.review {
         let _ = writeln!(s, "- `{t}`: {n} line(s)");
@@ -914,7 +914,7 @@ fn render(r: &Report, nfiles: usize, ndirs: usize, source: &Path) -> String {
 
     let _ = writeln!(s, "## Files of the chezmoi repository outside config\n");
     if r.bootstrap.is_empty() {
-        let _ = writeln!(s, "Aucun.");
+        let _ = writeln!(s, "None.");
     } else {
         let _ = writeln!(
             s,

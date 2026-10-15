@@ -644,11 +644,11 @@ mod tests {
         )
         .unwrap();
         fs::create_dir_all(env.config_file().parent().unwrap()).unwrap();
-        fs::write(env.config_file(), "# perso\nrepo = \"/r\"\n").unwrap();
+        fs::write(env.config_file(), "# mine\nrepo = \"/r\"\n").unwrap();
         skip_add(&env, &repo, &["gimp".into(), "m1".into(), "typo".into()]).unwrap();
         skip_add(&env, &repo, &["gimp".into()]).unwrap(); // idempotent
         let t = fs::read_to_string(env.config_file()).unwrap();
-        assert!(t.contains("# perso") && t.contains("repo = \"/r\""));
+        assert!(t.contains("# mine") && t.contains("repo = \"/r\""));
         assert_eq!(Config::parse(&t).unwrap().skip, ["gimp", "m1", "typo"]);
         skip_list(&env, &repo).unwrap();
         assert!(skip_remove(&env, &["gimp".into(), "absent".into()]).is_err());
@@ -666,13 +666,13 @@ mod tests {
         )
         .unwrap();
         fs::create_dir_all(env.config_file().parent().unwrap()).unwrap();
-        fs::write(env.config_file(), "# perso\nrepo = \"/r\"\n").unwrap();
+        fs::write(env.config_file(), "# mine\nrepo = \"/r\"\n").unwrap();
         assert!(override_set(&env, &repo, ".config/hypr/unknown.json", "a", "1").is_err());
         assert!(override_set(&env, &repo, ".config/hypr/s.json", "idle.lock.x", "1").is_err());
         override_set(&env, &repo, ".config/hypr/s.json", "idle.lock", "3600").unwrap();
         override_set(&env, &repo, ".config/hypr/s.json", "idle.name", "evening").unwrap();
         let t = fs::read_to_string(env.config_file()).unwrap();
-        assert!(t.contains("# perso"));
+        assert!(t.contains("# mine"));
         let c = Config::parse(&t).unwrap();
         assert_eq!(c.overrides.len(), 1);
         let sets = crate::overrides::sets_of(&c.overrides[0]).unwrap();
@@ -685,6 +685,6 @@ mod tests {
         assert!(c.overrides.is_empty());
         assert!(fs::read_to_string(env.config_file())
             .unwrap()
-            .contains("# perso"));
+            .contains("# mine"));
     }
 }

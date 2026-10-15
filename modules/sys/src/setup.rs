@@ -618,7 +618,7 @@ mod tests {
         )
         .unwrap();
         let home = env.home.clone();
-        fs::write(home.join(".config/x.conf"), "perso = 1\n").unwrap();
+        fs::write(home.join(".config/x.conf"), "mine = 1\n").unwrap();
         let o = Opts {
             take_repo: vec![".config/a/clash".into()],
             ..opts(true, false)
@@ -627,7 +627,7 @@ mod tests {
         let prog = env.modules_dir().join("rec/poste-rec");
         assert!(prog.is_file() && env.modules_dir().join("rec/hypr/rec.lua").is_file());
         let conf = fs::read_to_string(home.join(".config/x.conf")).unwrap();
-        assert!(conf.starts_with("perso = 1\n") && conf.contains("k:p = "));
+        assert!(conf.starts_with("mine = 1\n") && conf.contains("k:p = "));
         let before = fs::read_to_string(env.manifest_file()).unwrap();
         run(&env, &repo, &opts(true, false)).unwrap();
         assert_eq!(fs::read_to_string(env.manifest_file()).unwrap(), before);
@@ -637,7 +637,7 @@ mod tests {
         assert!(!env.modules_dir().join("rec").exists());
         assert_eq!(
             fs::read_to_string(home.join(".config/x.conf")).unwrap(),
-            "perso = 1\n"
+            "mine = 1\n"
         );
         let man = Manifest::load(&env.manifest_file()).unwrap();
         assert!(man.lines.is_empty() && man.files.iter().all(|e| e.module != "rec"));
@@ -717,7 +717,7 @@ mod tests {
         std::env::set_var("POSTE_SYS_TEST_SYSTEMCTL", &fake);
         module_rec(&repo);
         let home = env.home.clone();
-        fs::write(home.join(".config/x.conf"), "perso = 1\n").unwrap();
+        fs::write(home.join(".config/x.conf"), "mine = 1\n").unwrap();
         let o = Opts {
             take_repo: vec![".config/a/clash".into()],
             ..opts(true, false)
@@ -751,7 +751,7 @@ mod tests {
         assert!(fs::symlink_metadata(home.join(".config/systemd/user/poste-rec.service")).is_err());
         assert_eq!(
             fs::read_to_string(home.join(".config/x.conf")).unwrap(),
-            "perso = 1\n"
+            "mine = 1\n"
         );
         let man = Manifest::load(&env.manifest_file()).unwrap();
         assert!(man.units.is_empty() && man.lines.is_empty());

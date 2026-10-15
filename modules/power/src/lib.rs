@@ -97,7 +97,7 @@ pub fn pass(
 fn cmd_status(env: &Env, cfg: &Config) -> i32 {
     let sup = supply::read_supplies(&supply::supply_dir());
     let st = load_state(&state_file(env));
-    println!("Alimentation");
+    println!("Power supply");
     match &sup.battery {
         Some(b) => {
             println!(

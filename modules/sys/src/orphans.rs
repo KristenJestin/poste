@@ -276,7 +276,7 @@ mod tests {
             home.join(".config/a/fresh"),
         )
         .unwrap();
-        fs::write(home.join(".config/a/ordinary"), "perso").unwrap();
+        fs::write(home.join(".config/a/ordinary"), "mine").unwrap();
         symlink("/nowhere", home.join(".config/a/foreign")).unwrap();
         let layout = config::load(&repo, &env).unwrap().unwrap();
         let mut m = Manifest::default();

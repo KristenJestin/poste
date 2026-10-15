@@ -172,10 +172,10 @@ mod tests {
     /// The old `setup`: direct links to the clone, noted in the manifest.
     fn old_setup(m: &Machine) {
         crate::setup::run(&m.env, &m.repo, &opts()).unwrap();
-        let l = m.env.home.join(".config/a/neuf");
+        let l = m.env.home.join(".config/a/fresh");
         assert_eq!(
             fs::read_link(&l).unwrap(),
-            m.repo.join("config/.config/a/neuf")
+            m.repo.join("config/.config/a/fresh")
         );
     }
 
@@ -214,7 +214,7 @@ mod tests {
                 .op
                 .clone()
         };
-        assert_eq!(op(".config/a/neuf"), crate::config::Op::Replace);
+        assert_eq!(op(".config/a/fresh"), crate::config::Op::Replace);
         assert_eq!(op(".config/a/other"), crate::config::Op::Done);
         assert_eq!(op(".config/a/mine"), crate::config::Op::Conflict);
         crate::setup::run(
@@ -229,8 +229,8 @@ mod tests {
         .unwrap();
         assert!(fs::symlink_metadata(m.env.current_link()).is_err());
         assert_eq!(
-            fs::read_link(home.join(".config/a/neuf")).unwrap(),
-            m.repo.join("config/.config/a/neuf")
+            fs::read_link(home.join(".config/a/fresh")).unwrap(),
+            m.repo.join("config/.config/a/fresh")
         );
         assert_eq!(
             fs::read_to_string(m.env.manifest_file()).unwrap(),
@@ -244,8 +244,8 @@ mod tests {
         crate::setup::run(&m.env, &root, &opts()).unwrap();
         let cur = m.env.current_link();
         assert_eq!(
-            fs::read_link(home.join(".config/a/neuf")).unwrap(),
-            cur.join("config/.config/a/neuf")
+            fs::read_link(home.join(".config/a/fresh")).unwrap(),
+            cur.join("config/.config/a/fresh")
         );
         assert_eq!(
             fs::read_link(&other).unwrap(),
@@ -258,7 +258,7 @@ mod tests {
             .flatten()
             .map(|e| e.file_name().to_string_lossy().into_owned())
             .collect();
-        assert!(baks.iter().any(|b| b.contains("neuf")), "{baks:?}");
+        assert!(baks.iter().any(|b| b.contains("fresh")), "{baks:?}");
         assert!(!baks
             .iter()
             .any(|b| b.contains("other") || b.contains("mine")));
@@ -292,10 +292,10 @@ mod tests {
         let v1 = m.env.versions_dir().join("1111111");
         assert_eq!(versions::current_target(&m.env), fs::canonicalize(&v1).ok());
         // Links migrated to current (which points to the version), binary of the version put in place.
-        let link = home.join(".config/a/neuf");
+        let link = home.join(".config/a/fresh");
         assert_eq!(
             fs::read_link(&link).unwrap(),
-            m.env.current_link().join("config/.config/a/neuf")
+            m.env.current_link().join("config/.config/a/fresh")
         );
         assert_eq!(
             fs::read_to_string(m.env.bin_dir().join("poste")).unwrap(),
@@ -310,7 +310,7 @@ mod tests {
         assert!(plan
             .steps
             .iter()
-            .filter(|s| s.entry.rel == ".config/a/neuf")
+            .filter(|s| s.entry.rel == ".config/a/fresh")
             .all(|s| s.op == crate::config::Op::Done));
 
         // New version where only a module's island changes: island to reload, not Hyprland.
@@ -342,7 +342,7 @@ mod tests {
         assert_eq!(cfg(&m.env).source, Source::Dev);
         assert_eq!(
             fs::read_link(&link).unwrap(),
-            m.env.current_link().join("config/.config/a/neuf")
+            m.env.current_link().join("config/.config/a/fresh")
         );
         // Rollback to the first version, by the start of its commit.
         versions::use_target(

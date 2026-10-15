@@ -2102,7 +2102,7 @@ mod tests {
     #[test]
     fn add_refuses_secrets_and_respects_dry_run() {
         let f = fx();
-        f.put(".ssh/id_ed25519", "cle");
+        f.put(".ssh/id_ed25519", "key");
         f.put(".config/app/.env.local", "x");
         f.put(".claude/.credentials.json", "{}");
         f.put(".npmrc", "x");

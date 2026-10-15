@@ -626,7 +626,7 @@ pub(crate) mod tests {
     /// A version in `dir`: `VERSION`, a config, a module with an island.
     pub fn make_root(dir: &Path, commit: &str, date: &str, island: &str) {
         fs::create_dir_all(dir.join("config/.config/a")).unwrap();
-        fs::write(dir.join("config/.config/a/neuf"), "n").unwrap();
+        fs::write(dir.join("config/.config/a/fresh"), "n").unwrap();
         fs::create_dir_all(dir.join("modules/rec/island")).unwrap();
         fs::write(dir.join("modules/rec/module.toml"), "name = \"rec\"\n").unwrap();
         fs::write(dir.join("modules/rec/poste-rec"), "#!/bin/sh\n").unwrap();
@@ -721,7 +721,7 @@ pub(crate) mod tests {
 
         let v = fetch(&env, &f, false).unwrap().unwrap();
         assert_eq!(v.dir, env.versions_dir().join("aaaaaaa1"));
-        assert!(v.dir.join("config/.config/a/neuf").is_file());
+        assert!(v.dir.join("config/.config/a/fresh").is_file());
         assert_eq!(
             fs::read_to_string(v.dir.join(SUM_FILE)).unwrap().trim(),
             sum
@@ -748,7 +748,7 @@ pub(crate) mod tests {
         let f = Fetcher::with(&curl, "https://example.com/r");
         fetch(&env, &f, false).unwrap().unwrap();
         // Same commit, archive rebuilt (different content therefore different checksum).
-        fs::write(src.join("config/.config/a/neuf"), "redone").unwrap();
+        fs::write(src.join("config/.config/a/fresh"), "redone").unwrap();
         let second = publish(&src, &pubdir);
         assert_ne!(first, second);
         let v = fetch(&env, &f, false).unwrap().unwrap();
