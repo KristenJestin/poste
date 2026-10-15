@@ -1,5 +1,5 @@
-//! Bibliothèque commune de `poste` : chemins XDG, configuration,
-//! découverte des modules, notifications et petit utilitaire de temps.
+//! Common library of `poste`: XDG paths, configuration,
+//! module discovery, notifications and a small time utility.
 
 pub mod config;
 pub mod env;

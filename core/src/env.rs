@@ -1,10 +1,10 @@
-//! Environnement d'exécution : dossier personnel, dossiers XDG et PATH.
+//! Runtime environment: home folder, XDG folders and PATH.
 
 use anyhow::{Context, Result};
 use std::path::{Path, PathBuf};
 
-/// Emplacements dont dépend poste. Construit une fois, passé aux fonctions
-/// (ce qui permet de tester sans toucher au vrai environnement).
+/// Locations poste depends on. Built once, passed to the functions
+/// (which allows testing without touching the real environment).
 #[derive(Debug, Clone)]
 pub struct Env {
     pub home: PathBuf,
@@ -15,7 +15,7 @@ pub struct Env {
     pub path: Vec<PathBuf>,
 }
 
-/// Valeur d'une variable XDG si elle est définie et absolue, sinon le défaut.
+/// Value of an XDG variable if it is set and absolute, otherwise the default.
 fn xdg(var: &str, fallback: PathBuf) -> PathBuf {
     match std::env::var_os(var) {
         Some(v) if !v.is_empty() && Path::new(&v).is_absolute() => PathBuf::from(v),
@@ -24,12 +24,12 @@ fn xdg(var: &str, fallback: PathBuf) -> PathBuf {
 }
 
 impl Env {
-    /// Lit l'environnement du processus (`HOME`, `XDG_*`, `PATH`).
+    /// Reads the process environment (`HOME`, `XDG_*`, `PATH`).
     pub fn from_process() -> Result<Self> {
         let home = std::env::var_os("HOME")
             .filter(|h| !h.is_empty())
             .map(PathBuf::from)
-            .context("la variable HOME n'est pas définie")?;
+            .context("the HOME variable is not set")?;
         let path = std::env::var_os("PATH")
             .map(|p| {
                 std::env::split_paths(&p)
@@ -47,7 +47,7 @@ impl Env {
         })
     }
 
-    /// Environnement avec les dossiers par défaut sous `home` et un PATH vide.
+    /// Environment with the default folders under `home` and an empty PATH.
     pub fn with_home(home: impl Into<PathBuf>) -> Self {
         let home = home.into();
         Self {
@@ -60,7 +60,7 @@ impl Env {
         }
     }
 
-    /// `~/.local/bin` : où est posé le binaire `poste`.
+    /// `~/.local/bin`: where the `poste` binary is put.
     pub fn bin_dir(&self) -> PathBuf {
         self.home.join(".local/bin")
     }
@@ -70,13 +70,13 @@ impl Env {
         self.data_home.join("poste/modules")
     }
 
-    /// `$XDG_DATA_HOME/poste/versions` : une version installée par dossier (`<commit>/`).
+    /// `$XDG_DATA_HOME/poste/versions`: one installed version per folder (`<commit>/`).
     pub fn versions_dir(&self) -> PathBuf {
         self.data_home.join("poste/versions")
     }
 
-    /// `$XDG_DATA_HOME/poste/current` : lien vers la racine dont tout est lu (une version
-    /// installée, ou le clone du dépôt en mode dev).
+    /// `$XDG_DATA_HOME/poste/current`: link to the root everything is read from (an installed
+    /// version, or the clone of the repository in dev mode).
     pub fn current_link(&self) -> PathBuf {
         self.data_home.join("poste/current")
     }
@@ -96,17 +96,17 @@ impl Env {
         self.cache_home.join("poste")
     }
 
-    /// Liste de ce qui a été posé par `poste sys setup`.
+    /// List of what `poste sys setup` put in place.
     pub fn manifest_file(&self) -> PathBuf {
         self.state_dir().join("installed.json")
     }
 
-    /// Sauvegardes des fichiers remplacés.
+    /// Backups of the replaced files.
     pub fn backup_dir(&self) -> PathBuf {
         self.state_dir().join("backup")
     }
 
-    /// Développe un `~` ou `~/…` initial ; un chemin relatif reste relatif.
+    /// Expands a leading `~` or `~/…`; a relative path stays relative.
     pub fn expand(&self, s: &str) -> PathBuf {
         if s == "~" {
             self.home.clone()
@@ -117,7 +117,7 @@ impl Env {
         }
     }
 
-    /// Affiche un chemin avec `~` à la place du dossier personnel.
+    /// Shows a path with `~` in place of the home folder.
     pub fn display(&self, p: &Path) -> String {
         match p.strip_prefix(&self.home) {
             Ok(rest) if rest.as_os_str().is_empty() => "~".to_string(),
@@ -132,7 +132,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn chemins_par_defaut() {
+    fn default_paths() {
         let e = Env::with_home("/h");
         assert_eq!(
             e.modules_dir(),
@@ -159,16 +159,16 @@ mod tests {
     }
 
     #[test]
-    fn expansion_du_tilde() {
+    fn tilde_expansion() {
         let e = Env::with_home("/h");
         assert_eq!(e.expand("~/a/b"), PathBuf::from("/h/a/b"));
         assert_eq!(e.expand("~"), PathBuf::from("/h"));
         assert_eq!(e.expand("/x"), PathBuf::from("/x"));
-        assert_eq!(e.expand("~autre"), PathBuf::from("~autre"));
+        assert_eq!(e.expand("~other"), PathBuf::from("~other"));
     }
 
     #[test]
-    fn affichage_avec_tilde() {
+    fn display_with_tilde() {
         let e = Env::with_home("/h");
         assert_eq!(e.display(Path::new("/h/a")), "~/a");
         assert_eq!(e.display(Path::new("/etc/a")), "/etc/a");
