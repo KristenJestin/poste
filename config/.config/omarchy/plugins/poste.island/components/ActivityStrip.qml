@@ -1,23 +1,23 @@
 import QtQuick
 
-// Les activités en cours (façon Live Activities de l'iPhone), collées à
-// droite de l'île : la plus importante en capsule (une info à gauche, une à
-// droite), les suivantes en ronds, le surplus dans « +N ». Survol (un
-// instant) ou clic : la carte dépliée dessous (ActivityCard.qml).
+// The ongoing activities (iPhone Live Activities style), stuck to
+// the right of the island: the most important one as a capsule (one piece of info on the left, one on
+// the right), the next ones as circles, the surplus in '+N'. Hover (for a
+// moment) or click: the unfolded card below (ActivityCard.qml).
 //
-// Ordre : batterie (événement) ; minuteur terminé ; réponse IA prête ;
-// minuteurs en cours (le plus proche de la fin d'abord) ; IA au travail ;
-// IA épinglées ; minuteurs en pause.
+// Order: battery (event); finished timer; AI answer ready;
+// running timers (the closest to its end first); AI at work;
+// pinned AIs; paused timers.
 Item {
   id: strip
   required property var host
-  required property real roomRight     // largeur libre pour la bande (de son côté de l'île)
+  required property real roomRight     // free width for the strip (on its side of the island)
   required property real screenWidth
-  // Les activités de cette bande (vide : toutes). À droite de l'île, ce qui
-  // bouge (minuteurs, IA, dictée) ; à gauche, ce qui reste (musique, batterie).
+  // The activities of this strip (empty: all). To the right of the island, what
+  // moves (timers, AI, dictation); to the left, what stays (music, battery).
   property var kinds: []
-  // "right" : la bande part de l'île vers la droite ; "left" : vers la gauche
-  // (la plus importante reste collée à l'île).
+  // "right": the strip goes from the island to the right; "left": to the left
+  // (the most important one stays stuck to the island).
   property string side: "right"
   property bool hidden: false
   signal openConversation(var conv)
@@ -30,21 +30,21 @@ Item {
   visible: opacity > 0.01
   Behavior on opacity { NumberAnimation { duration: 200 } }
 
-  // ------------------------------------------------ les activités
+  // ------------------------------------------------ the activities
   readonly property var activities: {
     host.ai.stateRevision
     var out = []
-    // OBS : enregistrement ou diffusion en cours, toujours en tête.
+    // OBS: recording or streaming in progress, always first.
     if (host.obs && host.obs.active) out.push({ kind: "obs", key: "obs", rank: -2, order: 0 })
-    // Musique : pendant la lecture, et 30 s après une pause (puis elle part).
+    // Music: during playback, and 30 s after a pause (then it leaves).
     var p = host.player
     if (p && String(p.trackTitle || "") !== "" && (host.mediaPlaying || musicLinger))
       out.push({ kind: "music", key: "music", rank: host.mediaPlaying ? 3.5 : 6.5, order: 0 })
     var b = host.battery
-    // Batterie : seulement basse (sous 30 %) ou juste après un débranchement ;
-    // sinon elle est dans le centre de contrôle.
+    // Battery: only low (below 30 %) or just after an unplug;
+    // otherwise it is in the control center.
     if (b && b.showing) out.push({ kind: "battery", key: "battery", rank: 0, order: 0 })
-    // Périphériques sans fil sous 15 % (DevicesState.qml).
+    // Wireless devices below 15 % (DevicesState.qml).
     var lows = host.devices ? host.devices.low : []
     for (var d = 0; d < lows.length; d++) out.push({ kind: "device", key: "device:" + lows[d].key, device: lows[d], rank: 0.5, order: d })
     var ts = host.allTimers || []
@@ -60,12 +60,12 @@ Item {
                  rank: c.unseen && !c.busy ? 2 : c.busy ? 4 : 5, order: -c.uid })
     }
     if (kinds.length) out = out.filter(function(a) { return kinds.indexOf(a.kind) !== -1 })
-    // Tri stable (le sort de Qt ne l'est pas).
+    // Stable sort (Qt's is not).
     for (var k = 0; k < out.length; k++) out[k].index = k
     out.sort(function(a, b) { return (a.rank - b.rank) || (a.order - b.order) || (a.index - b.index) })
     return out
   }
-  // Musique en pause : encore 30 s à l'écran, le temps de reprendre.
+  // Paused music: still 30 s on screen, the time to resume.
   property bool musicLinger: false
   Timer { id: musicLingerTimer; interval: 30000; onTriggered: strip.musicLinger = false }
   Connections {
@@ -84,10 +84,10 @@ Item {
   // ------------------------------------------------ place
   readonly property real capsuleWidth: 170
   readonly property real circle: h + 8
-  // Combien de bulles tiennent (la première en capsule si possible).
+  // How many bubbles fit (the first as a capsule if possible).
   readonly property bool capsuleFits: roomRight >= capsuleWidth
-  // Largeur estimée d'une activité en capsule (depuis ses textes, pas depuis
-  // la bulle, qui change de taille).
+  // Estimated width of an activity as a capsule (from its texts, not from
+  // the bubble, which changes size).
   function capsuleWidthOf(a) {
     var t = ""
     if (a.kind === "timer") t = a.timer.done ? "Done" : host.formatLeft(a.timer.duration)
@@ -98,8 +98,8 @@ Item {
     else if (a.conv) t = a.conv.busy ? "Searching the web…" : a.conv.unseen ? "Ready" : a.conv.question
     return 56 + Math.min(150, String(t).length * 7.6)
   }
-  // Peu d'activités : toutes en capsule. Sinon la première en capsule, les
-  // autres en ronds, le surplus dans « +N ».
+  // Few activities: all as capsules. Otherwise the first as a capsule, the
+  // others as circles, the surplus in '+N'.
   readonly property bool allCapsules: {
     var w = 0
     for (var i = 0; i < activities.length; i++) w += capsuleWidthOf(activities[i]) + (i > 0 ? 8 : 0)
@@ -111,9 +111,9 @@ Item {
   readonly property var shown: hiddenCount > 0 ? activities.slice(0, maxShown - 1) : activities
   readonly property var overflow: hiddenCount > 0 ? activities.slice(maxShown - 1) : []
 
-  // ------------------------------------------------ dépliage
-  // Clé de l'activité dépliée ; « pinned » : ouverte par un clic, reste
-  // ouverte tant qu'on ne clique pas à nouveau ou qu'on ne la quitte pas.
+  // ------------------------------------------------ unfolding
+  // Key of the unfolded activity; 'pinned': opened by a click, stays
+  // open until clicked again or left.
   property string openKey: ""
   property bool openPinned: false
   property real openX: 0
@@ -130,7 +130,7 @@ Item {
     interval: 320
     onTriggered: if (strip.hoverKey !== "") { strip.openKey = strip.hoverKey; strip.openX = strip.hoverX; strip.openPinned = false }
   }
-  // Fermeture quand la souris a quitté bulle et carte (un délai pour passer de l'une à l'autre).
+  // Closing when the mouse has left bubble and card (a delay to go from one to the other).
   readonly property bool anyHover: hoverKey !== "" || cardLoader.hovered || moreCard.hovered
   Timer {
     interval: 380
@@ -142,32 +142,32 @@ Item {
     openKey = key; openX = x; openPinned = true
   }
 
-  // Zone à donner à la souris en plus de la bande quand une carte est ouverte.
+  // Area to give the mouse in addition to the strip when a card is open.
   readonly property bool cardOpen: openKey !== ""
-  // Rectangle de la carte dépliée (dans le repère de la bande), vide sinon :
-  // pour la zone souris de la fenêtre.
+  // Rectangle of the unfolded card (in the strip's frame), empty otherwise:
+  // for the window's mouse area.
   readonly property rect cardRect: {
     if (!cardOpen) return Qt.rect(0, 0, 0, 0)
     var it = openKey === "more" ? moreCard : cardLoader
     return Qt.rect(it.x, it.y, it.width, it.height)
   }
 
-  // ------------------------------------------------ bulles
-  // Une ligne par activité affichée, mise à jour par clé : une bulle garde son
-  // identité tant que son activité existe (entrée et sortie animées, pas de
-  // reconstruction à chaque changement d'état).
+  // ------------------------------------------------ bubbles
+  // One row per displayed activity, updated by key: a bubble keeps its
+  // identity as long as its activity exists (animated entry and exit, no
+  // rebuild at each state change).
   ListModel { id: bubbles }   // { key, leaving }
   onShownChanged: syncBubbles()
   Component.onCompleted: syncBubbles()
   function syncBubbles() {
     var keys = shown.map(function(a) { return a.key })
-    // Sorties : animées, puis retirées.
+    // Exits: animated, then removed.
     for (var r = 0; r < bubbles.count; r++) {
       var row = bubbles.get(r)
       if (keys.indexOf(row.key) === -1 && !row.leaving) { bubbles.setProperty(r, "leaving", true); leaveTimer.restart() }
       else if (keys.indexOf(row.key) !== -1 && row.leaving) bubbles.setProperty(r, "leaving", false)
     }
-    // Entrées et ordre, parmi les lignes qui restent.
+    // Entries and order, among the rows that remain.
     for (var i = 0; i < keys.length; i++) {
       var at = -1, live = -1
       for (var j = 0; j < bubbles.count; j++) {
@@ -175,7 +175,7 @@ Item {
         live++
         if (bubbles.get(j).key === keys[i]) { at = j; break }
       }
-      // Position cible : après la i-ème ligne vivante.
+      // Target position: after the i-th live row.
       var target = 0, seen = 0
       while (target < bubbles.count && (bubbles.get(target).leaving || seen < i)) { if (!bubbles.get(target).leaving) seen++; target++ }
       if (at === -1) bubbles.insert(Math.min(target, bubbles.count), { key: keys[i], leaving: false })
@@ -200,7 +200,7 @@ Item {
         required property string key
         required property bool leaving
         required property int index
-        // Activité vivante, ou la dernière connue pendant la sortie.
+        // Live activity, or the last known one during the exit.
         property var lastActivity: null
         readonly property var activity: strip.findActivity(key) || lastActivity
         onActivityChanged: if (strip.findActivity(key)) lastActivity = strip.findActivity(key)
@@ -210,7 +210,7 @@ Item {
         visible: !!activity
         clip: leaving
         Behavior on width { NumberAnimation { duration: 240 * strip.host.motionScale; easing.type: Easing.OutQuint } }
-        // Entrée : grossit depuis le centre ; sortie : rétrécit et s'efface.
+        // Entry: grows from the center; exit: shrinks and fades.
         opacity: leaving ? 0 : 1
         scale: leaving ? 0.5 : 1
         Behavior on opacity { NumberAnimation { duration: 200 } }
@@ -238,7 +238,7 @@ Item {
         }
       }
     }
-    // « +N »
+    // '+N'
     Rectangle {
       visible: strip.hiddenCount > 0
       height: strip.h
@@ -259,7 +259,7 @@ Item {
     }
   }
 
-  // ------------------------------------------------ carte dépliée
+  // ------------------------------------------------ unfolded card
   Item {
     id: cardLoader
     readonly property bool hovered: card.hovered
@@ -274,7 +274,7 @@ Item {
     visible: opacity > 0.01
     Behavior on opacity { NumberAnimation { duration: cardLoader.shownNow ? 180 : 130; easing.type: Easing.OutCubic } }
     Behavior on scale { NumberAnimation { duration: cardLoader.shownNow ? 320 * strip.host.motionScale : 140; easing.type: cardLoader.shownNow ? Easing.OutBack : Easing.InCubic; easing.overshoot: 1.2 } }
-    // Garde la dernière activité pendant la fermeture animée.
+    // Keeps the last activity during the animated closing.
     property var lastActivity: null
     Connections {
       target: strip
@@ -290,7 +290,7 @@ Item {
     }
   }
 
-  // ------------------------------------------------ liste de « +N »
+  // ------------------------------------------------ '+N' list
   Rectangle {
     id: moreCard
     readonly property bool hovered: moreHover.hovered

@@ -4,19 +4,19 @@ import Quickshell.Io
 import "file:///usr/share/flea/shelf/Model.js" as Model
 import "file:///usr/share/flea/shelf/Run.js" as Run
 
-// Fichiers (SUPER+D) : sans saisie, le Shelf de Flea (la pile, les épinglés
-// et les dernières captures) ; en tapant, une recherche de dossiers et de
-// fichiers dans le home (fd). Au style du lanceur. La logique du Shelf
-// (pile, tailles, vignettes, actions `flea shelf …`) est celle de Flea, tenue
-// par l'île (host.shelf / host.shelfActions) ; cette vue ne fait qu'afficher.
+// Files (SUPER+D): without input, Flea's Shelf (the stack, the pinned items
+// and the latest captures); while typing, a search for folders and
+// files in the home (fd). In the launcher's style. The Shelf's logic
+// (stack, sizes, thumbnails, `flea shelf …` actions) is Flea's, held
+// by the island (host.shelf / host.shelfActions); this view only displays.
 //
-// Clavier : taper = chercher, ↑↓ bouge, ↵ ouvre, Ctrl+B (ou clic droit)
-// panneau d'actions ; Alt+lettre lance l'action (m déplacer, c copier, a zip, p chemin,
-// l LocalSend, + ajouter au Shelf, x retirer…), Ctrl+C contenu au
-// presse-papiers, Ctrl+Maj+A tout cocher, Maj+↑↓ étend, Tab entre dans un dossier ; sans saisie : Espace
-// coche, Suppr retire du Shelf. Échap vide la recherche, puis ferme.
-// Souris : clic = curseur, clic sur la vignette / Ctrl+clic = coche,
-// Maj+clic = plage, double-clic = ouvrir.
+// Keyboard: typing = search, ↑↓ moves, ↵ opens, Ctrl+B (or right click)
+// actions panel; Alt+letter runs the action (m move, c copy, a zip, p path,
+// l LocalSend, + add to the Shelf, x remove…), Ctrl+C content to the
+// clipboard, Ctrl+Shift+A check all, Shift+↑↓ extends, Tab enters a folder; without input: Space
+// checks, Del removes from the Shelf. Escape clears the search, then closes.
+// Mouse: click = cursor, click on the thumbnail / Ctrl+click = check,
+// Shift+click = range, double-click = open.
 Item {
   id: view
   required property var host
@@ -26,8 +26,8 @@ Item {
 
   readonly property var shelf: host.shelf
   readonly property var doing: host.shelfActions
-  // Une seule liste « Shelf » : pile et épinglés confondus (un élément reste
-  // jusqu'à ce qu'on le retire), puis les dernières captures.
+  // A single 'Shelf' list: stack and pinned items merged (an element stays
+  // until it is removed), then the latest captures.
   readonly property var shelfRows: {
     if (!shelf) return []
     var list = Model.rows(shelf.pile, shelf.captures, shelf.sizes)
@@ -45,8 +45,8 @@ Item {
     return out
   }
   readonly property bool searching: query.trim() !== "" || scope !== ""
-  // Dossier dans lequel on est « entré » (Tab / → sur un dossier) : la
-  // recherche se limite à lui, et sans saisie on voit son contenu.
+  // Folder one has 'entered' (Tab / → on a folder): the
+  // search is limited to it, and without input its content is seen.
   property string scope: ""
   function enterFolder(path) {
     if (!path) return
@@ -66,10 +66,10 @@ Item {
   readonly property var rows: searching ? results : shelfRows
 
   // ---------------------------------------------------------------- search (fd)
-  // Recherche « intelligente » : « a v2 » trouve « ali-v2 » (chaque mot tapé
-  // = début d'un mot du nom), « aliv2 » aussi (lettres dans l'ordre). Si un
-  // mot n'est pas dans le nom, il peut désigner un dossier du chemin
-  // (« unity textures »). Dossiers et chemins courts d'abord.
+  // 'Smart' search: 'a v2' finds 'ali-v2' (each typed word
+  // = start of a word of the name), 'aliv2' too (letters in order). If a
+  // word is not in the name, it can designate a folder of the path
+  // ('unity textures'). Folders and short paths first.
   property string query: ""
   property var results: []
   property bool searchBusy: false
@@ -82,9 +82,9 @@ Item {
   function queryTokens() {
     return query.trim().toLowerCase().split(/[\s\-_]+/).filter(function(w) { return w !== "" })
   }
-  // Dossiers fréquentés (zoxide, le « cd ali » du terminal) : bonus de
-  // classement, et candidats même hors du home. Ouvrir un dossier d'ici
-  // l'ajoute aussi à zoxide.
+  // Frequent folders (zoxide, the terminal's 'cd ali'): ranking
+  // bonus, and candidates even outside the home. Opening a folder from here
+  // also adds it to zoxide.
   property var zoxide: ({})
   Process {
     id: zoxideProc
@@ -108,9 +108,9 @@ Item {
     var parent = path.substring(0, path.lastIndexOf("/"))
     return zoxide[parent] > 0 ? 25 : 0
   }
-  // Mode chemin : une saisie qui commence par « ~ » ou « / » liste le dossier
-  // visé (fichiers cachés compris), filtré par le début du dernier élément ;
-  // Tab complète le chemin.
+  // Path mode: an input that starts with '~' or '/' lists the targeted
+  // folder (hidden files included), filtered by the start of the last element;
+  // Tab completes the path.
   readonly property bool pathMode: /^(~|\/)/.test(query.trim())
   function pathParts() {
     var q = query.trim()
@@ -137,7 +137,7 @@ Item {
     if (!tokens.length && scope === "") { results = []; return }
     var ex = []
     for (var i = 0; i < excluded.length; i++) ex.push("--exclude '" + excluded[i] + "'")
-    // fd termine les dossiers par « / ».
+    // fd ends folders with '/'.
     var fd = "fd -i -t d -t f -t l --max-results 8000 " + ex.join(" ")
     var script
     if (!tokens.length) script = fd + ' --max-depth 1 . "$3"'
@@ -162,7 +162,7 @@ Item {
     }
     onExited: view.searchBusy = false
   }
-  // Score d'un nom : -1 s'il ne correspond pas.
+  // Score of a name: -1 if it does not match.
   function nameScore(name, tokens) {
     var b = String(name).toLowerCase()
     var sep = /[\s\-_.]+/
@@ -170,7 +170,7 @@ Item {
     var joined = tokens.join("")
     var bs = b.replace(/[\s\-_.]+/g, "")
     if (bs === joined) return 1200
-    // chaque mot tapé = début d'un mot du nom, dans l'ordre
+    // each typed word = start of a word of the name, in order
     var wi = 0, inOrder = true
     for (var t = 0; t < tokens.length; t++) {
       while (wi < words.length && words[wi].indexOf(tokens[t]) !== 0) wi++
@@ -206,7 +206,7 @@ Item {
         if (ah !== bh) return ah ? 1 : -1
         return a.name.toLowerCase() < b.name.toLowerCase() ? -1 : 1
       })
-      // Saisie qui finit par « / » : le dossier lui-même en tête (Entrée l'ouvre).
+      // Input that ends with '/': the folder itself first (Enter opens it).
       if (pref === "" && pp.dir !== "") {
         var dname = pp.dir === "/" ? "/" : pp.dir.substring(pp.dir.lastIndexOf("/") + 1)
         prow.unshift({ path: pp.dir, name: dname + "/", folder: true, bytes: -1, partial: false, pinned: false,
@@ -233,7 +233,7 @@ Item {
       var name = path.substring(path.lastIndexOf("/") + 1)
       var sc = nameScore(name, tokens)
       if (sc < 0 && tokens.length > 1) {
-        // les autres mots dans le chemin (début d'un dossier)
+        // the other words in the path (start of a folder)
         var rel = path.substring(homeDir.length).toLowerCase()
         var dirs = rel.split("/")
         var ok = true
@@ -261,7 +261,7 @@ Item {
     selected = 0
     flick.contentY = 0
   }
-  // Contenu du dossier courant : dossiers puis fichiers, par nom.
+  // Content of the current folder: folders then files, by name.
   function listFolder(text) {
     var lines = String(text || "").split("\n")
     var rowsOut = []
@@ -282,7 +282,7 @@ Item {
     selected = 0
     flick.contentY = 0
   }
-  // Même classement que le lanceur : préfixe, début de mot, sous-séquence.
+  // Same ranking as the launcher: prefix, start of word, subsequence.
   function fuzzy(text, q) {
     text = String(text || "").toLowerCase()
     if (!q) return 0
@@ -307,7 +307,7 @@ Item {
   property int anchorIndex: -1
   readonly property int chosenCount: Model.chosenCount(chosen, rows)
 
-  // Destination en cours de choix : "move", "copy" ou "send".
+  // Destination being chosen: "move", "copy" or "send".
   property string pending: ""
   property var flyoutRows: []
   property int flyoutIndex: 0
@@ -334,7 +334,7 @@ Item {
     actionsPanel.shown ? headerHeight + 8 + actionsPanel.height + 8 : 0) + footerHeight + 2
 
   // ---------------------------------------------------------------- actions panel (Ctrl+B)
-  // Comme le lanceur : la liste des actions de la ligne, avec leur touche.
+  // Like the launcher: the list of the row's actions, with their key.
   property bool actionsOpen: false
   property int actionIndex: 0
   readonly property var currentActions: {
@@ -412,7 +412,7 @@ Item {
   }
 
   // ---------------------------------------------------------------- layout
-  // Position de chaque ligne (légendes de section comprises).
+  // Position of each row (section captions included).
   readonly property var layout: {
     var ys = [], captions = [], y = 0, last = ""
     for (var i = 0; i < rows.length; i++) {
@@ -443,10 +443,10 @@ Item {
   }
 
   // ---------------------------------------------------------------- LocalSend
-  // Via le moteur de Flea (`flea --backend`, qui pilote localsend-cli) :
-  // découverte des appareils, puis envoi. localsend-cli n'envoie que des
-  // fichiers : un dossier est zippé d'abord (dossier temporaire, supprimé
-  // après l'envoi). L'appli LocalSend ouverte garde le port : on le dit.
+  // Via Flea's engine (`flea --backend`, which drives localsend-cli):
+  // device discovery, then sending. localsend-cli only sends
+  // files: a folder is zipped first (temporary folder, deleted
+  // after sending). The open LocalSend app keeps the port: this is reported.
   property var lsPaths: []
   property string lsReason: ""
   property bool lsLooking: false
@@ -480,8 +480,8 @@ Item {
     lsLooking = true
     lsWrite({ c: "localsend", op: "peers", id: ++lsId })
   }
-  // Tant que le choix est ouvert, on relance la découverte (Flea ne cherche
-  // que 4 s d'affilée).
+  // As long as the choice is open, discovery is restarted (Flea only searches
+  // 4 s in a row).
   Timer {
     interval: 800
     repeat: true
@@ -529,7 +529,7 @@ Item {
     if (msg.t === "localsendpeers") {
       lsLooking = false
       var names = (msg.peers || []).map(function(p) { return String(p.name) })
-      // Une recherche vide ne fait pas disparaître un appareil déjà vu.
+      // An empty search does not make an already seen device disappear.
       if (pending === "localsend" && names.length) {
         var merged = flyoutRows.slice()
         for (var i = 0; i < names.length; i++) if (merged.indexOf(names[i]) < 0) merged.push(names[i])
@@ -553,8 +553,8 @@ Item {
   }
 
   // ---------------------------------------------------------------- actions
-  // Les lignes cochées, sinon celle du curseur (comme le lanceur) ; Ctrl+A
-  // coche toute la liste.
+  // The checked rows, otherwise the cursor's (like the launcher); Ctrl+A
+  // checks the whole list.
   function actionPaths() {
     if (chosenCount > 0) return Model.actionPaths(chosen, rows)
     return rows[selected] ? [rows[selected].path] : []
@@ -568,9 +568,9 @@ Item {
     var from = anchorIndex >= 0 ? anchorIndex : selected
     chosen = Model.chooseRange(chosen, rows, from, to)
   }
-  // Ctrl+C : le contenu dans le presse-papiers. Une image ou un texte seul
-  // part tel quel (collable dans un chat, un éditeur…) ; sinon les fichiers
-  // partent comme fichiers (text/uri-list, collables dans Flea/Nautilus).
+  // Ctrl+C: the content to the clipboard. A single image or text
+  // goes as is (pasteable in a chat, an editor…); otherwise the files
+  // go as files (text/uri-list, pasteable in Flea/Nautilus).
   function copyContent() {
     var paths = actionPaths()
     if (paths.length === 0) { say("Nothing selected.", true); return }
@@ -591,7 +591,7 @@ Item {
   function forgetRow(i) {
     var row = rows[i]
     if (!row || row.section === Model.CAPTURE || row.section === "result" || !shelf) return
-    // Flea garde les éléments épinglés : on désépingle avant d'oublier.
+    // Flea keeps the pinned elements: unpin before forgetting.
     if (row.pinned) shelf.pinAll([row.path], false)
     shelf.forget(row.path)
   }
@@ -670,8 +670,8 @@ Item {
     function onUndone(kind, count) { view.say(Model.undoneText(kind, count), false) }
   }
 
-  // Pas de glisser-déposer (il bloquait le pointeur) : tout se fait au clavier
-  // ou aux boutons de ligne.
+  // No drag and drop (it blocked the pointer): everything is done with the keyboard
+  // or the row buttons.
 
   // ---------------------------------------------------------------- keys
   function handleKey(event) {
@@ -686,14 +686,14 @@ Item {
         else if (k === Qt.Key_Up || k === Qt.Key_K || k === Qt.Key_Backtab) view.actionIndex = Math.max(0, view.actionIndex - 1)
         else if (k === Qt.Key_Return || k === Qt.Key_Enter) { if (view.currentActions[view.actionIndex]) view.runAction(view.currentActions[view.actionIndex].id) }
         else {
-          // La lettre d'une action la lance directement.
+          // An action's letter runs it directly.
           var typed = "Alt " + (shift ? "Shift " : "") + String.fromCharCode(k).toUpperCase()
           var hit = null
           for (var ai = 0; ai < an; ai++) if (view.currentActions[ai].key === typed) hit = view.currentActions[ai]
           if (hit) { view.runAction(hit.id); return }
           view.actionsOpen = false
         }
-        // Une autre touche ferme le panneau et garde son effet habituel.
+        // Another key closes the panel and keeps its usual effect.
         if (view.actionsOpen || k === Qt.Key_Escape || k === Qt.Key_Return || k === Qt.Key_Enter
             || (ctrl && k === Qt.Key_B) || k === Qt.Key_Tab || k === Qt.Key_Backtab) return
       }
@@ -715,18 +715,18 @@ Item {
         else event.accepted = false
         return
       }
-      // Alt+lettre : l'action directement, même en tapant (la touche est
-      // affichée dans le panneau Ctrl+B).
+      // Alt+letter: the action directly, even while typing (the key is
+      // shown in the Ctrl+B panel).
       if ((event.modifiers & Qt.AltModifier) && !ctrl) {
         var letter = k === Qt.Key_Plus || k === Qt.Key_Equal ? "+" : String.fromCharCode(k).toUpperCase()
-        // « + » demande Maj sur certains claviers : Maj n'y compte pas.
+        // '+' requires Shift on some keyboards: Shift does not count there.
         var want = "Alt " + (shift && letter !== "+" ? "Shift " : "") + letter
         var acts = view.currentActions
         for (var ci = 0; ci < acts.length; ci++) if (acts[ci].key === want) { view.runAction(acts[ci].id); return }
         event.accepted = false
         return
       }
-      // Ctrl+A reste au champ (sélectionner le texte) ; Ctrl+Maj+A coche tout.
+      // Ctrl+A stays with the field (select the text); Ctrl+Shift+A checks everything.
       if (ctrl && shift && k === Qt.Key_A) { view.chosen = Model.chooseAll(view.chosen, view.rows); return }
       if (ctrl && k === Qt.Key_C) { view.copyContent(); return }
       if (ctrl && k === Qt.Key_B) { if (view.currentActions.length) { view.actionIndex = 0; view.actionsOpen = true }; return }
@@ -850,7 +850,7 @@ Item {
     contentHeight: view.layout.total
     boundsBehavior: Flickable.StopAtBounds
 
-    // Surlignage du curseur, comme le lanceur.
+    // Highlight of the cursor, like the launcher.
     Rectangle {
       width: flick.width
       height: view.rowHeight
@@ -914,7 +914,7 @@ Item {
           onDoubleClicked: view.openRow(row.index)
         }
 
-        // Vignette (ou icône), qui sert aussi de case à cocher.
+        // Thumbnail (or icon), which also serves as a checkbox.
         Item {
           id: tile
           anchors.left: parent.left
@@ -945,7 +945,7 @@ Item {
               pixelSize: 16
             }
           }
-          // Coche : pastille d'accent sur la vignette.
+          // Check: accent pill on the thumbnail.
           Rectangle {
             anchors.fill: parent
             radius: 9
@@ -981,7 +981,7 @@ Item {
           }
         }
 
-        // Boutons de ligne (survol ou curseur).
+        // Row buttons (hover or cursor).
         Row {
           id: rowButtons
           anchors.right: parent.right
@@ -1194,7 +1194,7 @@ Item {
             Glyph { anchors.verticalCenter: parent.verticalCenter; glyph: modelData.glyph; color: view.actionIndex === index ? view.host.colorAccent : view.host.colorMuted; fontFamily: view.host.fontFamily; pixelSize: 14 }
             Text { anchors.verticalCenter: parent.verticalCenter; text: modelData.label; color: view.host.colorText; font.family: view.host.uiFont; font.pixelSize: 13 }
           }
-          // La touche directe, pour s'en souvenir.
+          // The direct key, to remember it.
           Rectangle {
             anchors.right: parent.right
             anchors.rightMargin: 10
@@ -1223,7 +1223,7 @@ Item {
     anchors.bottom: parent.bottom
     height: view.footerHeight
     Rectangle { anchors.top: parent.top; width: parent.width; height: 1; color: view.host.withAlpha(view.host.colorText, 0.06) }
-    // Progression d'un déplacement / d'une copie.
+    // Progress of a move / a copy.
     Rectangle {
       anchors.top: parent.top
       height: 1
