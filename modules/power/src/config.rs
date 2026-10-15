@@ -1,19 +1,19 @@
-//! Seuils, dans `~/.config/poste/power.toml` (`XDG_CONFIG_HOME` respecté). Fichier absent :
-//! valeurs par défaut. Clés absentes : valeur par défaut de la clé.
+//! Thresholds, in `~/.config/poste/power.toml` (`XDG_CONFIG_HOME` honoured). Missing file:
+//! default values. Missing keys: default value of the key.
 //!
 //! ```toml
-//! interval = 60            # secondes entre deux passes (10 au minimum)
+//! interval = 60            # seconds between two passes (10 at minimum)
 //!
 //! [battery]
-//! low = 20                 # % : « batterie faible »
-//! critical = 10            # % : « batterie critique » (notification urgente)
-//! drain_w = 12.0           # W : perte réelle qui compte comme « se vide sur secteur »
-//! drain_samples = 2        # passes consécutives avant d'alerter (anti-rebond)
+//! low = 20                 # %: "low battery"
+//! critical = 10            # %: "critical battery" (urgent notification)
+//! drain_w = 12.0           # W: real loss that counts as "draining on mains"
+//! drain_samples = 2        # consecutive passes before alerting (debounce)
 //!
 //! [disk]
-//! percent = 90             # % d'occupation qui déclenche l'alerte
-//! free_gb = 0              # Go libres en dessous desquels alerter (0 : désactivé)
-//! paths = ["/", "/home"]   # points de montage ; /home est ignoré s'il partage le disque de /
+//! percent = 90             # % of usage that triggers the alert
+//! free_gb = 0              # GB free below which to alert (0: disabled)
+//! paths = ["/", "/home"]   # mount points; /home is ignored if it shares the disk of /
 //! ```
 
 use anyhow::{bail, Context, Result};
@@ -87,16 +87,16 @@ impl Config {
     fn validate(&self) -> Result<()> {
         let b = &self.battery;
         if b.critical == 0 || b.critical >= b.low || b.low > 100 {
-            bail!("power.toml : il faut 0 < battery.critical < battery.low <= 100");
+            bail!("power.toml: 0 < battery.critical < battery.low <= 100 is required");
         }
         if self.disk.percent == 0 || self.disk.percent > 100 {
-            bail!("power.toml : disk.percent doit être entre 1 et 100");
+            bail!("power.toml: disk.percent must be between 1 and 100");
         }
         if self.interval < 10 {
-            bail!("power.toml : interval doit être d'au moins 10 secondes");
+            bail!("power.toml: interval must be at least 10 seconds");
         }
         if b.drain_samples == 0 {
-            bail!("power.toml : battery.drain_samples doit être d'au moins 1");
+            bail!("power.toml: battery.drain_samples must be at least 1");
         }
         Ok(())
     }
@@ -105,7 +105,7 @@ impl Config {
         env.config_home.join("poste/power.toml")
     }
 
-    /// Charge le fichier ; absent, les valeurs par défaut.
+    /// Loads the file; absent, the default values.
     pub fn load(env: &Env) -> Result<Self> {
         let f = Self::file(env);
         match std::fs::read_to_string(&f) {
@@ -121,7 +121,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn defauts_et_surcharge_partielle() {
+    fn defaults_and_partial_override() {
         let c = Config::parse("").unwrap();
         assert_eq!(c, Config::default());
         assert_eq!(c.battery.low, 20);
@@ -134,7 +134,7 @@ mod tests {
     }
 
     #[test]
-    fn valeurs_incoherentes_refusees() {
+    fn inconsistent_values_refused() {
         assert!(Config::parse("[battery]\nlow = 10\ncritical = 10\n").is_err());
         assert!(Config::parse("[battery]\ncritical = 0\n").is_err());
         assert!(Config::parse("[disk]\npercent = 101\n").is_err());

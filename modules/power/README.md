@@ -1,76 +1,76 @@
 # poste power
 
-Alertes batterie et disque par un petit démon utilisateur (`poste-power watch`, lancé par l'unité
-systemd `poste-power.service` que `poste sys setup` active). Il remplace les scripts waybar faits à
-la hâte de l'ancien portable pro (`waybar-battery-ac-warn`, `waybar-disk-warn`,
-`omarchy-battery-monitor-plus` et son drop-in systemd). Prévu pour le portable ; sur une machine sans
-batterie il ne fait que l'alerte disque (voir `disabled` plus bas pour ne pas l'installer).
+Battery and disk alerts through a small user daemon (`poste-power watch`, started by the systemd
+unit `poste-power.service` that `poste sys setup` enables). It replaces the hasty waybar scripts of
+the old work laptop (`waybar-battery-ac-warn`, `waybar-disk-warn`, `omarchy-battery-monitor-plus` and
+its systemd drop-in). Meant for the laptop; on a machine without a battery it only does the disk
+alert (see "Not installing it on a machine" below).
 
-## Alertes
+## Alerts
 
-Chacune part UNE fois par passage de seuil, et se réarme quand la condition disparaît. Notification par
-`omarchy-notification-send` (style de l'île, application « Énergie »).
+Each one is sent ONCE per threshold crossing, and re-armed when the condition goes away. Notification
+through `omarchy-notification-send` (island style, application 'Power').
 
-| Alerte | Condition | Urgence | Réarmement |
+| Alert | Condition | Urgency | Re-arming |
 | --- | --- | --- | --- |
-| Batterie faible | niveau <= 20 % et la batterie ne charge pas | normale | on charge, ou niveau > 20 % |
-| Batterie critique | niveau <= 10 % et la batterie ne charge pas | urgente | on charge, ou niveau > 10 % |
-| Branché, mais la batterie se vide | secteur branché ET (statut « Discharging » OU perte réelle > 12 W) pendant 2 passes de suite | urgente | la perte cesse |
-| Disque presque plein | occupation >= 90 % sur `/` et `/home` (ignoré si `/home` est sur le même disque que `/`) | normale | occupation < seuil - 2 points (hystérésis) |
+| Low battery | level <= 20 % and the battery is not charging | normal | it charges, or level > 20 % |
+| Critical battery | level <= 10 % and the battery is not charging | urgent | it charges, or level > 10 % |
+| Plugged in, but the battery is draining | mains plugged in AND (status 'Discharging' OR real loss > 12 W) for 2 passes in a row | urgent | the loss stops |
+| Disk almost full | usage >= 90 % on `/` and `/home` (ignored if `/home` is on the same disk as `/`) | normal | usage < threshold - 2 points (hysteresis) |
 
-- « Ne charge pas » = statut différent de `Charging` et `Full` (`Not charging` compte : le chargeur
-  USB-C d'un portable peut ne pas suivre).
-- La perte réelle se mesure sur `energy_now` (ou `charge_now` x `voltage_now`) entre deux passes : le
-  statut et `power_now` mentent parfois (leçon de l'ancien portable, chargeur USB-C instable). Une
-  mesure après une longue veille est ignorée.
-- Un saut direct sous 10 % ne déclenche que « critique ». Une alerte dont l'envoi échoue est retentée à la
-  passe suivante.
-- Seules les alimentations du système comptent (`scope` différent de `Device` : une pile de souris
-  `hidpp_battery_*` n'est jamais « la batterie »). Secteur = type `Mains` en ligne.
-- Sans batterie : seule l'alerte disque.
-- Pas d'alerte de branchement / débranchement : les références n'en avaient pas (le bruit ne sert à rien).
+- 'Not charging' = status other than `Charging` and `Full` (`Not charging` counts: a laptop's USB-C
+  charger may not keep up).
+- The real loss is measured on `energy_now` (or `charge_now` x `voltage_now`) between two passes: the
+  status and `power_now` sometimes lie (lesson from the old laptop, unstable USB-C charger). A
+  measure after a long sleep is ignored.
+- A direct jump below 10 % only triggers 'critical'. An alert whose sending fails is retried at the
+  next pass.
+- Only the system's supplies count (`scope` other than `Device`: a mouse battery
+  `hidpp_battery_*` is never 'the battery'). Mains = type `Mains` online.
+- Without a battery: only the disk alert.
+- No plug / unplug alert: the references had none (the noise is useless).
 
-## Commandes
+## Commands
 
-- `poste power status` : batterie, secteur, disques, seuils, alertes déjà envoyées.
-- `poste power test` : envoie une notification d'exemple.
-- `poste power check` : une passe (ce que le démon fait toutes les minutes).
-- `poste power watch` : le démon.
+- `poste power status`: battery, mains, disks, thresholds, alerts already sent.
+- `poste power test`: sends a sample notification.
+- `poste power check`: one pass (what the daemon does every minute).
+- `poste power watch`: the daemon.
 
-## Réglages : `~/.config/poste/power.toml`
+## Settings: `~/.config/poste/power.toml`
 
-Facultatif ; chaque clé absente garde sa valeur par défaut. Relu à chaque passe (pas de redémarrage).
+Optional; each missing key keeps its default value. Read again at each pass (no restart).
 
 ```toml
-interval = 60            # secondes entre deux passes (10 au minimum)
+interval = 60            # seconds between two passes (10 at least)
 
 [battery]
 low = 20
 critical = 10
-drain_w = 12.0           # perte (W) qui compte comme « se vide sur secteur »
-drain_samples = 2        # passes consécutives avant d'alerter
+drain_w = 12.0           # loss (W) that counts as 'draining on mains'
+drain_samples = 2        # consecutive passes before alerting
 
 [disk]
 percent = 90
-free_gb = 0              # alerter aussi sous ce nombre de Go libres (0 : non)
+free_gb = 0              # also alert below this number of free GB (0: no)
 paths = ["/", "/home"]
 ```
 
-## Démon léger
+## Light daemon
 
-Une passe toutes les 60 s : quelques lectures de `/sys/class/power_supply/*` et un `statvfs` par
-disque, puis `sleep`. Pas d'udev (le sondage de 60 s suffit et reste simple). L'état « déjà alerté »
-est dans `$XDG_RUNTIME_DIR/poste-power/state.json` (perdu au redémarrage de la machine, conservé quand le
-démon redémarre). L'unité (`systemd/poste-power.service`) tourne en `Nice=19` avec `MemoryMax=64M`.
+One pass every 60 s: a few reads of `/sys/class/power_supply/*` and one `statvfs` per disk, then
+`sleep`. No udev (the 60 s polling is enough and stays simple). The 'already alerted' state is in
+`$XDG_RUNTIME_DIR/poste-power/state.json` (lost at the machine's restart, kept when the daemon
+restarts). The unit (`systemd/poste-power.service`) runs with `Nice=19` and `MemoryMax=64M`.
 
-## Ne pas l'installer sur une machine
+## Not installing it on a machine
 
-Dans `~/.config/poste/config.toml` de cette machine : `poste sys module disable power` (le prochain
-`poste sys setup` retire alors fichiers et unité, avec aperçu).
+In this machine's `~/.config/poste/config.toml`: `poste sys module disable power` (the next
+`poste sys setup` then removes files and unit, with a preview).
 
-## Développement
+## Development
 
-Variables RÉSERVÉES AUX TESTS : `POSTE_POWER_SUPPLY_DIR` (faux `power_supply` en dossier temporaire) et
-`POSTE_POWER_NOTIFY` (remplace `omarchy-notification-send`). Les tests (`cargo test -p poste-power`) :
-seuils et réarmement (`src/engine.rs`), lecture d'un faux arbre (`src/supply.rs`), passes successives
-(`src/lib.rs`), binaire complet avec fausses notifications (`tests/cli.rs`).
+Variables RESERVED FOR TESTS: `POSTE_POWER_SUPPLY_DIR` (fake `power_supply` in a temporary folder) and
+`POSTE_POWER_NOTIFY` (replaces `omarchy-notification-send`). The tests (`cargo test -p poste-power`):
+thresholds and re-arming (`src/engine.rs`), reading of a fake tree (`src/supply.rs`), successive
+passes (`src/lib.rs`), complete binary with fake notifications (`tests/cli.rs`).

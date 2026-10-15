@@ -1,5 +1,5 @@
-//! Le cerveau des alertes : fonction pure `step`. Une alerte par passage de seuil ; l'état
-//! « déjà alerté » est réarmé quand la condition disparaît. Aucune entrée-sortie ici.
+//! The brain of the alerts: pure function `step`. One alert per threshold crossing; the
+//! "already alerted" state is rearmed when the condition disappears. No input/output here.
 
 use crate::config::Config;
 use crate::disk::Usage;
@@ -7,8 +7,8 @@ use crate::supply::Supplies;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 
-/// Hystérésis du disque : l'occupation doit redescendre de ces points sous le seuil pour réarmer
-/// (sinon un disque à 90,0 % oscillerait entre deux alertes).
+/// Disk hysteresis: the usage must drop this many points below the threshold to rearm
+/// (otherwise a disk at 90.0 % would oscillate between two alerts).
 pub const DISK_HYSTERESIS: f64 = 2.0;
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
@@ -23,7 +23,7 @@ pub struct State {
     pub drain_count: u32,
     #[serde(default)]
     pub disks: BTreeSet<String>,
-    /// Dernière mesure d'énergie (µWh) et son horodatage (secondes Unix), pour le débit réel.
+    /// Last energy measure (µWh) and its timestamp (Unix seconds), for the real rate.
     #[serde(default)]
     pub last_energy_uwh: Option<u64>,
     #[serde(default)]
@@ -67,7 +67,7 @@ pub const GLYPH_AC: &str = "\u{f06a5}";
 pub const GLYPH_DISK: &str = "\u{f02ca}";
 
 impl State {
-    /// Une notification n'a pas pu partir : on réarme pour réessayer à la prochaine passe.
+    /// A notification could not be sent: we rearm to try again at the next pass.
     pub fn unfire(&mut self, key: &Key) {
         match key {
             Key::Low => self.low = false,
@@ -80,7 +80,7 @@ impl State {
     }
 }
 
-/// Une passe. `drain_w` : débit réel mesuré depuis la passe précédente (W, positif = se vide).
+/// A pass. `drain_w`: real rate measured since the previous pass (W, positive = draining).
 pub fn step(
     st: &mut State,
     cfg: &Config,
@@ -99,13 +99,13 @@ pub fn step(
                 if !st.critical {
                     out.push(Alert {
                         key: Key::Critical,
-                        title: "Batterie critique".into(),
-                        body: format!("{} % restants : branchez le chargeur maintenant.", b.level),
+                        title: "Critical battery".into(),
+                        body: format!("{} % left: plug in the charger now.", b.level),
                         urgency: Urgency::Critical,
                         glyph: GLYPH_BATTERY,
                     });
                 }
-                // Un saut direct au critique ne déclenche pas aussi « faible ».
+                // A direct jump to critical does not also trigger "low".
                 st.critical = true;
                 st.low = true;
             } else {
@@ -114,11 +114,8 @@ pub fn step(
                     if !st.low {
                         out.push(Alert {
                             key: Key::Low,
-                            title: "Batterie faible".into(),
-                            body: format!(
-                                "{} % restants : pensez à brancher le chargeur.",
-                                b.level
-                            ),
+                            title: "Low battery".into(),
+                            body: format!("{} % left: consider plugging in the charger.", b.level),
                             urgency: Urgency::Normal,
                             glyph: GLYPH_BATTERY,
                         });
@@ -129,7 +126,7 @@ pub fn step(
                 }
             }
 
-            // Branché mais la batterie se vide : le statut peut mentir, le débit mesuré non.
+            // Plugged in but the battery drains: the status may lie, the measured rate does not.
             let draining = sup.ac_online
                 && (b.status == crate::supply::Status::Discharging
                     || drain_w.is_some_and(|w| w > cb.drain_w));
@@ -139,13 +136,13 @@ pub fn step(
                     st.drain = true;
                     let rate = drain_w
                         .filter(|w| *w > 0.0)
-                        .map(|w| format!(" (environ {w:.0} W)"))
+                        .map(|w| format!(" (about {w:.0} W)"))
                         .unwrap_or_default();
                     out.push(Alert {
                         key: Key::Drain,
-                        title: "Branché, mais la batterie se vide".into(),
+                        title: "Plugged in, but the battery is draining".into(),
                         body: format!(
-                            "Batterie à {} %, elle perd de la charge{rate} alors que le secteur est branché : le chargeur ne suit pas. Débranchez et rebranchez le câble.",
+                            "Battery at {} %, it is losing charge{rate} although AC power is connected: the charger cannot keep up. Unplug and plug the cable back in.",
                             b.level
                         ),
                         urgency: Urgency::Critical,
@@ -181,7 +178,7 @@ pub fn step(
                 key: Key::Disk(d.path.clone()),
                 title: "Disque presque plein".into(),
                 body: format!(
-                    "{} est plein à {:.0} % ({:.0} Go libres).",
+                    "{} is {:.0} % full ({:.0} GB free).",
                     d.path, d.used_pct, free_gb
                 ),
                 urgency: Urgency::Normal,
@@ -223,7 +220,7 @@ mod tests {
     }
 
     #[test]
-    fn faible_puis_critique_une_fois_chacun() {
+    fn low_then_critical_once_each() {
         let cfg = Config::default();
         let mut st = State::default();
         assert!(step(
@@ -244,7 +241,7 @@ mod tests {
             )),
             [Key::Low]
         );
-        // Pas de répétition.
+        // No repetition.
         assert!(step(
             &mut st,
             &cfg,
@@ -273,7 +270,7 @@ mod tests {
     }
 
     #[test]
-    fn saut_direct_au_critique_une_seule_alerte() {
+    fn direct_jump_to_critical_a_single_alert() {
         let cfg = Config::default();
         let mut st = State::default();
         let a = step(
@@ -287,7 +284,7 @@ mod tests {
     }
 
     #[test]
-    fn rearmement_en_chargeant_ou_au_dessus() {
+    fn rearming_when_charging_or_above() {
         let cfg = Config::default();
         let mut st = State::default();
         step(
@@ -297,7 +294,7 @@ mod tests {
             &[],
             None,
         );
-        // On branche : en charge, réarmé.
+        // We plug in: charging, rearmed.
         assert!(step(&mut st, &cfg, &sup(15, Status::Charging, true), &[], None).is_empty());
         assert_eq!(
             keys(&step(
@@ -309,7 +306,7 @@ mod tests {
             )),
             [Key::Low]
         );
-        // Remonte au dessus du seuil : réarmé aussi.
+        // Goes back above the threshold: rearmed too.
         step(
             &mut st,
             &cfg,
@@ -330,7 +327,7 @@ mod tests {
     }
 
     #[test]
-    fn critique_redescendu_en_faible_ne_realerte_pas_faible() {
+    fn critical_back_to_low_does_not_alert_low_again() {
         let cfg = Config::default();
         let mut st = State::default();
         step(
@@ -340,7 +337,7 @@ mod tests {
             &[],
             None,
         );
-        // 12 % (en charge lente non signalée) : critique réarmé mais pas de nouvelle alerte « faible ».
+        // 12 % (slow charging not reported): critical rearmed but no new "low" alert.
         assert!(step(
             &mut st,
             &cfg,
@@ -362,7 +359,7 @@ mod tests {
     }
 
     #[test]
-    fn seuils_reglables() {
+    fn adjustable_thresholds() {
         let cfg = Config::parse("[battery]\nlow = 35\ncritical = 5\n").unwrap();
         let mut st = State::default();
         assert_eq!(
@@ -378,20 +375,20 @@ mod tests {
     }
 
     #[test]
-    fn branche_mais_se_vide_avec_antirebond() {
+    fn plugged_but_draining_with_debounce() {
         let cfg = Config::default(); // drain_samples = 2
         let mut st = State::default();
         let s = sup(60, Status::NotCharging, true);
-        // Un seul tour de décharge mesurée : rien.
+        // A single turn of measured discharge: nothing.
         assert!(step(&mut st, &cfg, &s, &[], Some(20.0)).is_empty());
-        // Un tour propre remet le compteur à zéro.
+        // A clean turn resets the counter to zero.
         assert!(step(&mut st, &cfg, &s, &[], Some(1.0)).is_empty());
         assert!(step(&mut st, &cfg, &s, &[], Some(20.0)).is_empty());
         let a = step(&mut st, &cfg, &s, &[], Some(20.0));
         assert_eq!(keys(&a), [Key::Drain]);
         assert!(a[0].body.contains("20 W"));
         assert!(step(&mut st, &cfg, &s, &[], Some(20.0)).is_empty());
-        // Fin de l'épisode puis nouvel épisode.
+        // End of the episode then new episode.
         step(&mut st, &cfg, &s, &[], Some(0.0));
         step(&mut st, &cfg, &s, &[], Some(20.0));
         assert_eq!(
@@ -401,7 +398,7 @@ mod tests {
     }
 
     #[test]
-    fn statut_discharging_sur_secteur_compte_sans_mesure() {
+    fn discharging_status_on_mains_counts_without_measure() {
         let cfg = Config::parse("[battery]\ndrain_samples = 1\n").unwrap();
         let mut st = State::default();
         let a = step(
@@ -412,7 +409,7 @@ mod tests {
             None,
         );
         assert_eq!(keys(&a), [Key::Drain]);
-        // Sans secteur : pas de cette alerte.
+        // Without mains: no such alert.
         let mut st = State::default();
         assert!(step(
             &mut st,
@@ -425,7 +422,7 @@ mod tests {
     }
 
     #[test]
-    fn sans_batterie_seulement_le_disque() {
+    fn without_battery_only_the_disk() {
         let cfg = Config::default();
         let mut st = State::default();
         let none = Supplies::default();
@@ -437,7 +434,7 @@ mod tests {
     }
 
     #[test]
-    fn disque_une_fois_hysteresis_et_rearmement() {
+    fn disk_once_hysteresis_and_rearming() {
         let cfg = Config::default();
         let mut st = State::default();
         let none = Supplies::default();
@@ -451,10 +448,10 @@ mod tests {
         assert_eq!(keys(&a), [Key::Disk("/".into())]);
         assert!(a[0].body.contains("93 %"));
         assert!(step(&mut st, &cfg, &none, &[disk("/", 95.0)], None).is_empty());
-        // 89 % : sous le seuil mais dans l'hystérésis, toujours armé... donc pas de ré-alerte à 90.
+        // 89 %: below the threshold but within the hysteresis, still armed... so no re-alert at 90.
         assert!(step(&mut st, &cfg, &none, &[disk("/", 89.0)], None).is_empty());
         assert!(step(&mut st, &cfg, &none, &[disk("/", 90.5)], None).is_empty());
-        // Redescend nettement : réarmé.
+        // Drops clearly: rearmed.
         step(&mut st, &cfg, &none, &[disk("/", 80.0)], None);
         assert_eq!(
             keys(&step(&mut st, &cfg, &none, &[disk("/", 92.0)], None)),
@@ -463,7 +460,7 @@ mod tests {
     }
 
     #[test]
-    fn alerte_non_envoyee_est_retentee() {
+    fn unsent_alert_is_retried() {
         let cfg = Config::default();
         let mut st = State::default();
         let s = sup(15, Status::Discharging, false);
@@ -473,7 +470,7 @@ mod tests {
     }
 
     #[test]
-    fn seuil_en_go_libres() {
+    fn threshold_in_free_gb() {
         let cfg = Config::parse("[disk]\nfree_gb = 100\n").unwrap();
         let mut st = State::default();
         let d = disk("/", 10.0); // 50 Go libres < 100

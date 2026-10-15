@@ -1,5 +1,5 @@
-//! Notifications au style de l'île : `omarchy-notification-send`, 5 s au plus, échec sans conséquence
-//! (retourné pour que l'alerte soit retentée). `POSTE_POWER_NOTIFY` remplace le programme (TESTS).
+//! Notifications in the island's style: `omarchy-notification-send`, 5 s at most, a failure is
+//! harmless (returned so that the alert is retried). `POSTE_POWER_NOTIFY` replaces the program (TESTS).
 
 use crate::engine::Alert;
 use std::path::PathBuf;
@@ -9,7 +9,7 @@ use std::time::{Duration, Instant};
 pub const NOTIFY_VAR: &str = "POSTE_POWER_NOTIFY";
 const PROGRAM: &str = "omarchy-notification-send";
 
-/// Où chercher le programme quand le PATH du démon est court.
+/// Where to look for the program when the daemon's PATH is short.
 fn program() -> PathBuf {
     if let Some(v) = std::env::var_os(NOTIFY_VAR).filter(|v| !v.is_empty()) {
         return v.into();
@@ -33,11 +33,11 @@ fn program() -> PathBuf {
         .unwrap_or_else(|| PROGRAM.into())
 }
 
-/// Les arguments, séparés de l'envoi pour être testables.
+/// The arguments, kept apart from the sending so that they can be tested.
 pub fn args(a: &Alert) -> Vec<String> {
     vec![
         "--app-name".into(),
-        "Énergie".into(),
+        "Power".into(),
         "-g".into(),
         a.glyph.into(),
         "-u".into(),

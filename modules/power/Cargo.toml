@@ -1,6 +1,6 @@
 [package]
 name = "poste-power"
-description = "Module power de poste : alertes batterie et disque (démon utilisateur léger)"
+description = "Power module of poste: battery and disk alerts (light user daemon)"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

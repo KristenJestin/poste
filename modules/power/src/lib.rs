@@ -1,5 +1,5 @@
-//! Module power de poste : alertes batterie et disque, par un démon utilisateur léger.
-//! Se lance par `poste power <commande>` (aide : `USAGE`).
+//! Power module of poste: battery and disk alerts, through a light user daemon.
+//! Run with `poste power <command>` (help: `USAGE`).
 
 pub mod config;
 pub mod disk;
@@ -13,17 +13,17 @@ use poste_core::Env;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-pub const USAGE: &str = "Module power de poste : alertes batterie et disque.
+pub const USAGE: &str = "Power module of poste: battery and disk alerts.
 
-  poste power status    batterie, secteur, disques, seuils et alertes déjà envoyées
-  poste power test      envoie une notification d'exemple
-  poste power check     une passe : envoie les alertes dues
-  poste power watch     le démon (une passe toutes les 60 s ; unité poste-power.service)
+    poste power status    battery, mains, disks, thresholds and alerts already sent
+    poste power test      sends a sample notification
+    poste power check     one pass: sends the alerts that are due
+    poste power watch     the daemon (one pass every 60 s; unit poste-power.service)
 
-Seuils : ~/.config/poste/power.toml (voir le README du module).";
+Thresholds: ~/.config/poste/power.toml (see the module's README).";
 
-/// Fichier d'état (alertes déjà envoyées) : `$XDG_RUNTIME_DIR/poste-power/state.json`, perdu au
-/// redémarrage de la machine ; sans `XDG_RUNTIME_DIR`, sous le dossier d'état.
+/// State file (alerts already sent): `$XDG_RUNTIME_DIR/poste-power/state.json`, lost at the
+/// machine's restart; without `XDG_RUNTIME_DIR`, under the state folder.
 pub fn state_file(env: &Env) -> PathBuf {
     match std::env::var_os("XDG_RUNTIME_DIR").filter(|v| !v.is_empty()) {
         Some(d) => PathBuf::from(d).join("poste-power/state.json"),
@@ -55,8 +55,8 @@ fn now_secs() -> f64 {
         .unwrap_or(0.0)
 }
 
-/// Une passe complète : lit l'état, calcule les alertes, les envoie avec `send`, note l'état.
-/// Renvoie les alertes envoyées avec succès.
+/// A complete pass: reads the state, computes the alerts, sends them with `send`, notes the state.
+/// Returns the alerts sent successfully.
 pub fn pass(
     cfg: &Config,
     supply_root: &Path,
@@ -67,7 +67,7 @@ pub fn pass(
     let mut st = load_state(state_path);
     let sup = supply::read_supplies(supply_root);
 
-    // Débit réel depuis la passe précédente ; ignoré après une longue veille (mesure sans sens).
+    // Real rate since the previous pass; ignored after a long sleep (meaningless measure).
     let mut drain = None;
     let energy = sup.battery.as_ref().and_then(|b| b.energy_uwh);
     if let (Some(prev), Some(at), Some(cur)) = (st.last_energy_uwh, st.last_at, energy) {
@@ -89,7 +89,7 @@ pub fn pass(
             st.unfire(&a.key);
         }
     }
-    // L'énergie change à chaque passe : on réécrit à chaque fois (petit fichier dans /run).
+    // The energy changes at every pass: we write every time (small file in /run).
     save_state(state_path, &st);
     sent
 }
@@ -101,7 +101,7 @@ fn cmd_status(env: &Env, cfg: &Config) -> i32 {
     match &sup.battery {
         Some(b) => {
             println!(
-                "  batterie   {} : {} % ({})",
+                "  battery    {}: {} % ({})",
                 b.name,
                 b.level,
                 b.status.label()
@@ -109,47 +109,47 @@ fn cmd_status(env: &Env, cfg: &Config) -> i32 {
             println!(
                 "  secteur    {}",
                 if sup.ac_online {
-                    "branché"
+                    "plugged in"
                 } else {
-                    "non branché"
+                    "not plugged in"
                 }
             );
             let c = &cfg.battery;
             println!(
-                "  seuils     faible {} %, critique {} %, perte sur secteur > {} W pendant {} passe(s)",
+                "  thresholds low {} %, critical {} %, loss on mains > {} W for {} pass(es)",
                 c.low, c.critical, c.drain_w, c.drain_samples
             );
-            let flag = |b: bool| if b { "déjà signalé" } else { "non" };
+            let flag = |b: bool| if b { "already reported" } else { "no" };
             println!(
-                "  alertes    faible : {}, critique : {}, perte sur secteur : {}",
+                "  alerts     low: {}, critical: {}, loss on mains: {}",
                 flag(st.low),
                 flag(st.critical),
                 flag(st.drain)
             );
         }
-        None => println!("  pas de batterie : seule l'alerte disque est active"),
+        None => println!("  no battery: only the disk alert is active"),
     }
-    println!("Disques (alerte à {} % d'occupation)", cfg.disk.percent);
+    println!("Disks (alert at {} % usage)", cfg.disk.percent);
     let disks = disk::usages(&cfg.disk.paths);
     if disks.is_empty() {
-        println!("  aucun chemin lisible parmi {:?}", cfg.disk.paths);
+        println!("  no readable path among {:?}", cfg.disk.paths);
     }
     for d in disks {
         println!(
-            "  {:<8} {:.0} % occupé, {:.0} Go libres sur {:.0} Go{}",
+            "  {:<8} {:.0} % used, {:.0} GB free of {:.0} GB{}",
             d.path,
             d.used_pct,
             d.free_bytes as f64 / 1e9,
             d.total_bytes as f64 / 1e9,
             if st.disks.contains(&d.path) {
-                "  [déjà signalé]"
+                "  [already reported]"
             } else {
                 ""
             }
         );
     }
     println!(
-        "Passe toutes les {} s ; réglages : {}",
+        "Pass every {} s; settings: {}",
         cfg.interval,
         env.display(&Config::file(env))
     );
@@ -159,18 +159,16 @@ fn cmd_status(env: &Env, cfg: &Config) -> i32 {
 fn cmd_test() -> i32 {
     let a = Alert {
         key: Key::Low,
-        title: "Test des alertes".into(),
-        body: "Ceci est une notification d'exemple de poste power.".into(),
+        title: "Alert test".into(),
+        body: "This is a sample notification from poste power.".into(),
         urgency: Urgency::Normal,
         glyph: engine::GLYPH_BATTERY,
     };
     if notify::send(&a) {
-        println!("Notification envoyée.");
+        println!("Notification sent.");
         0
     } else {
-        eprintln!(
-            "poste power : la notification n'a pas pu être envoyée (omarchy-notification-send)"
-        );
+        eprintln!("poste power: the notification could not be sent (omarchy-notification-send)");
         1
     }
 }
@@ -183,14 +181,14 @@ pub fn run(argv: &[String]) -> i32 {
     let env = match Env::from_process() {
         Ok(e) => e,
         Err(e) => {
-            eprintln!("poste power : {e:#}");
+            eprintln!("poste power: {e:#}");
             return 1;
         }
     };
     let cfg = match Config::load(&env) {
         Ok(c) => c,
         Err(e) => {
-            eprintln!("poste power : {e:#}");
+            eprintln!("poste power: {e:#}");
             return 1;
         }
     };
@@ -205,13 +203,13 @@ pub fn run(argv: &[String]) -> i32 {
                 now_secs(),
                 &notify::send,
             );
-            println!("{} alerte(s) envoyée(s).", sent.len());
+            println!("{} alert(s) sent.", sent.len());
             0
         }
         "watch" => loop {
-            // Rechargée à chaque passe : modifier power.toml n'exige pas de redémarrage.
+            // Reloaded at each pass: editing power.toml does not require a restart.
             let cfg = Config::load(&env).unwrap_or_else(|e| {
-                eprintln!("poste power : {e:#} (réglages précédents gardés)");
+                eprintln!("poste power: {e:#} (previous settings kept)");
                 cfg.clone()
             });
             pass(
@@ -237,7 +235,7 @@ mod tests {
     use supply::tests::put;
 
     #[test]
-    fn passes_successives_sans_repetition_et_debit_mesure() {
+    fn successive_passes_without_repetition_and_measured_rate() {
         let t = tempfile::tempdir().unwrap();
         let root = t.path().join("ps");
         put(&root, "AC", &[("type", "Mains"), ("online", "1")]);
@@ -263,7 +261,7 @@ mod tests {
         };
         bat("60", "40000000");
         assert!(pass(&cfg, &root, &state, 1000.0, &send).is_empty());
-        // 1 Wh perdu en 60 s = 60 W : 1re passe de perte, 2e passe : alerte.
+        // 1 Wh lost in 60 s = 60 W: 1st pass of loss, 2nd pass: alert.
         bat("59", "39000000");
         assert!(pass(&cfg, &root, &state, 1060.0, &send).is_empty());
         bat("58", "38000000");
@@ -271,13 +269,13 @@ mod tests {
         bat("57", "37000000");
         assert!(pass(&cfg, &root, &state, 1180.0, &send).is_empty());
         assert_eq!(*log.borrow(), [Key::Drain]);
-        // L'état survit (nouveau « processus »), une longue veille ignore la mesure.
+        // The state survives (new "process"), a long sleep ignores the measure.
         bat("30", "10000000");
         assert!(pass(&cfg, &root, &state, 99999.0, &send).is_empty());
     }
 
     #[test]
-    fn echec_d_envoi_retente() {
+    fn send_failure_retried() {
         let t = tempfile::tempdir().unwrap();
         let root = t.path().join("ps");
         put(
@@ -298,7 +296,7 @@ mod tests {
     }
 
     #[test]
-    fn arguments_de_notification() {
+    fn notification_arguments() {
         let a = Alert {
             key: Key::Critical,
             title: "T".into(),

@@ -1,5 +1,5 @@
-//! Le vrai binaire avec un faux arbre `power_supply`, un faux envoi de notification et un HOME
-//! temporaire : jamais le vrai `/sys`, jamais de vraie notification.
+//! The real binary with a fake `power_supply` tree, a fake notification sender and a temporary
+//! HOME: never the real `/sys`, never a real notification.
 
 use std::fs;
 use std::os::unix::fs::PermissionsExt;
@@ -10,7 +10,7 @@ fn bin() -> Command {
 }
 
 #[test]
-fn check_envoie_une_fois_puis_status() {
+fn check_sends_once_then_status() {
     let t = tempfile::tempdir().unwrap();
     let home = t.path().join("home");
     let run = t.path().join("run");
@@ -32,7 +32,7 @@ fn check_envoie_une_fois_puis_status() {
     )
     .unwrap();
     fs::set_permissions(&fake, fs::Permissions::from_mode(0o755)).unwrap();
-    // Config : pas de disque, pour un test déterministe.
+    // Config: no disk, for a deterministic test.
     fs::create_dir_all(home.join(".config/poste")).unwrap();
     fs::write(
         home.join(".config/poste/power.toml"),
@@ -54,11 +54,11 @@ fn check_envoie_une_fois_puis_status() {
     assert!(go(&["check"]).status.success());
     let l = fs::read_to_string(&log).unwrap();
     assert_eq!(l.lines().count(), 1, "{l}");
-    assert!(l.contains("-u critical") && l.contains("Batterie critique"));
+    assert!(l.contains("-u critical") && l.contains("Critical battery"));
 
     let st = String::from_utf8(go(&["status"]).stdout).unwrap();
     assert!(
-        st.contains("8 %") && st.contains("critique : déjà signalé"),
+        st.contains("8 %") && st.contains("critical: already reported"),
         "{st}"
     );
 

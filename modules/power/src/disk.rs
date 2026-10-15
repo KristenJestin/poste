@@ -1,22 +1,22 @@
-//! Occupation des disques (`statvfs`).
+//! Disk usage (`statvfs`).
 
 use std::ffi::CString;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Usage {
     pub path: String,
-    /// Occupation en % comme `df` (utilisé / (utilisé + disponible)).
+    /// Usage in % like `df` (used / (used + available)).
     pub used_pct: f64,
     pub free_bytes: u64,
     pub total_bytes: u64,
-    /// Empreinte (blocs, blocs libres) pour reconnaître deux chemins sur le même disque.
+    /// Fingerprint (blocks, free blocks) to recognize two paths on the same disk.
     pub fingerprint: (u64, u64, u64),
 }
 
-/// `statvfs` d'un chemin ; `None` s'il n'existe pas ou n'est pas lisible.
+/// `statvfs` of a path; `None` if it does not exist or is not readable.
 pub fn usage(path: &str) -> Option<Usage> {
     let c = CString::new(path).ok()?;
-    // SAFETY : `st` est un tampon local valide ; `statvfs` ne lit que le chemin C terminé par NUL.
+    // SAFETY: `st` is a valid local buffer; `statvfs` only reads the NUL-terminated C path.
     let st = unsafe {
         let mut st: libc::statvfs = std::mem::zeroed();
         if libc::statvfs(c.as_ptr(), &mut st) != 0 {
@@ -47,8 +47,8 @@ pub fn from_blocks(path: &str, bs: u64, blocks: u64, bfree: u64, bavail: u64) ->
     }
 }
 
-/// Usages des chemins demandés, sans les chemins absents ni ceux qui partagent le disque
-/// d'un chemin déjà listé (`/home` en sous-volume de `/`).
+/// Usages of the requested paths, without the absent paths or those that share the disk
+/// of a path already listed (`/home` as a sub-volume of `/`).
 pub fn usages(paths: &[String]) -> Vec<Usage> {
     let mut out: Vec<Usage> = Vec::new();
     for p in paths {
@@ -62,7 +62,7 @@ pub fn usages(paths: &[String]) -> Vec<Usage> {
 }
 
 fn same_disk(a: &Usage, b: &Usage) -> bool {
-    // Mêmes blocs total et libres au même instant : le même disque.
+    // Same total and free blocks at the same instant: the same disk.
     a.fingerprint.0 == b.fingerprint.0 && a.fingerprint.1 == b.fingerprint.1
 }
 
@@ -71,8 +71,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn pourcentage_comme_df() {
-        // 1000 blocs, 100 libres dont 50 pour les utilisateurs : utilisé 900, dispo 50 -> 94,7 %.
+    fn percentage_like_df() {
+        // 1000 blocks, 100 free of which 50 for users: used 900, available 50 -> 94.7 %.
         let u = from_blocks("/", 4096, 1000, 100, 50);
         assert!((u.used_pct - 94.736).abs() < 0.01);
         assert_eq!(u.free_bytes, 50 * 4096);
@@ -80,11 +80,11 @@ mod tests {
     }
 
     #[test]
-    fn vrai_systeme_de_fichiers() {
-        let u = usage("/").expect("/ existe");
+    fn real_filesystem() {
+        let u = usage("/").expect("/ exists");
         assert!(u.total_bytes > 0 && u.used_pct >= 0.0 && u.used_pct <= 100.0);
-        assert!(usage("/n'existe/pas").is_none());
-        // Le même chemin donné deux fois ne compte qu'une fois.
+        assert!(usage("/does/not/exist").is_none());
+        // The same path given twice counts only once.
         assert_eq!(
             usages(&["/".into(), "/".into(), "/absent-xyz".into()]).len(),
             1
