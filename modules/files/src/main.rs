@@ -149,10 +149,11 @@ fn run(env: &Env, cmd: Cmd) -> Result<()> {
                 None => Config::load(env)?.limit,
             };
             let hits = store::load(env)?.search(&query, limit);
+            // Results first, housekeeping after.
+            print_hits(env, &hits, json);
             if let Err(e) = store::refresh_if_stale(env) {
                 eprintln!("poste files: {e:#}");
             }
-            print_hits(env, &hits, json);
         }
         Cmd::Home { json } => {
             // Nothing typed: the recent files, or nothing at all (no hint line).

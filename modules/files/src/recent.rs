@@ -30,6 +30,8 @@ fn now() -> u64 {
 
 /// Puts `path` on top of our list (`<unix seconds>\t<path>` per line, newest first).
 pub fn record(env: &Env, path: &Path) -> Result<()> {
+    // A relative path (typed by hand) is stored from the current folder.
+    let path = std::path::absolute(path).context("absolute path")?;
     let Some(p) = path.to_str().filter(|p| !p.contains('\n')) else {
         return Ok(());
     };
@@ -96,6 +98,41 @@ fn percent_decode(s: &str) -> Option<String> {
     String::from_utf8(out).ok()
 }
 
+/// XML entities of an attribute value decoded (`&apos;` for an apostrophe, `&amp;`…).
+fn xml_unescape(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    let mut rest = s;
+    while let Some(i) = rest.find('&') {
+        out.push_str(&rest[..i]);
+        rest = &rest[i..];
+        let Some(end) = rest.find(';') else { break };
+        let decoded = match &rest[1..end] {
+            "amp" => Some('&'),
+            "apos" => Some('\''),
+            "quot" => Some('"'),
+            "lt" => Some('<'),
+            "gt" => Some('>'),
+            e => e
+                .strip_prefix("#x")
+                .and_then(|h| u32::from_str_radix(h, 16).ok())
+                .or_else(|| e.strip_prefix('#').and_then(|d| d.parse().ok()))
+                .and_then(char::from_u32),
+        };
+        match decoded {
+            Some(c) => {
+                out.push(c);
+                rest = &rest[end + 1..];
+            }
+            None => {
+                out.push('&');
+                rest = &rest[1..];
+            }
+        }
+    }
+    out.push_str(rest);
+    out
+}
+
 /// The value of attribute `name` in the tag text `tag`.
 fn attr<'a>(tag: &'a str, name: &str) -> Option<&'a str> {
     let start = tag.find(&format!(" {name}=\""))? + name.len() + 3;
@@ -110,9 +147,8 @@ fn parse_xbel(text: &str) -> Vec<(u64, String)> {
         let tag = &chunk[..chunk.find('>').unwrap_or(chunk.len())];
         let tag = format!(" {tag}");
         let Some(path) = attr(&tag, "href")
-            .and_then(|h| h.strip_prefix("file://"))
-            .and_then(percent_decode)
-            .map(|p| p.replace("&amp;", "&"))
+            .map(xml_unescape)
+            .and_then(|h| h.strip_prefix("file://").and_then(percent_decode))
         else {
             continue;
         };
@@ -167,13 +203,26 @@ mod tests {
   <bookmark href="file:///h/My%20docs/caf%C3%A9.txt" added="2026-10-01T10:00:00Z" modified="2026-10-02T10:00:00Z" visited="2026-10-03T10:00:00Z">
   </bookmark>
   <bookmark href="https://example.com/" added="2026-10-01T10:00:00Z" modified="2026-10-01T10:00:00Z" visited="2026-10-01T10:00:00Z"/>
+  <bookmark href="file:///h/summer&apos;s%20notes.txt" added="2026-08-01T10:00:00Z" modified="2026-08-01T10:00:00Z" visited="2026-08-01T10:00:00Z"/>
+  <bookmark href="file:///h/it%27s%20%26%20more.txt" added="2026-08-01T10:00:00Z" modified="2026-08-01T10:00:00Z" visited="2026-08-01T10:00:00Z"/>
   <bookmark href="file:///h/a&amp;b.pdf" added="2026-09-01T10:00:00Z" modified="2026-09-01T10:00:00Z" visited="2026-09-01T10:00:00Z"/>
 </xbel>"#;
         let v = parse_xbel(text);
-        assert_eq!(v.len(), 2);
-        assert_eq!(v[0].1, "/h/My docs/café.txt");
+        let paths: Vec<&str> = v.iter().map(|(_, p)| p.as_str()).collect();
+        assert_eq!(
+            paths,
+            [
+                "/h/My docs/café.txt",
+                "/h/summer's notes.txt",
+                "/h/it's & more.txt",
+                "/h/a&b.pdf"
+            ]
+        );
         assert_eq!(v[0].0, parse_time("2026-10-03T10:00:00Z").unwrap());
-        assert_eq!(v[1].1, "/h/a&b.pdf");
+        assert_eq!(
+            xml_unescape("a &lt;b&gt; &#39;c&#x27; &bogus; &"),
+            "a <b> 'c' &bogus; &"
+        );
     }
 
     #[test]
@@ -212,5 +261,22 @@ mod tests {
         // Recorded once, even after being opened twice.
         let own = fs::read_to_string(own_path(&env)).unwrap();
         assert_eq!(own.lines().count(), 2);
+    }
+
+    #[test]
+    fn relative_path_stored_absolute() {
+        let t = tempfile::tempdir().unwrap();
+        let env = Env::with_home(t.path());
+        record(&env, Path::new("notes.txt")).unwrap();
+        let own = fs::read_to_string(own_path(&env)).unwrap();
+        let (_, p) = own.trim_end().split_once('\t').unwrap();
+        assert_eq!(
+            p,
+            std::env::current_dir()
+                .unwrap()
+                .join("notes.txt")
+                .to_str()
+                .unwrap()
+        );
     }
 }

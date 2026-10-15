@@ -22,7 +22,7 @@ No daemon: nothing runs while you are not searching.
   must be found, letters in order, in the path (`poste bind` finds
   `~/Projects/poste/config/.config/hypr/bindings.lua`); a matching file name comes before a mere
   matching path; at equal score, the shortest path wins. For a word of 6 letters or more that
-  gives almost nothing, one typo is allowed on the names (`factrue`). Case is always ignored
+  gives almost nothing, one typo is allowed on the names (`invocie` finds `invoice`). Case is always ignored
   (`Huk19` finds `HUk19e.jpg`); the same case still adds to the score. Each keystroke is a
   `poste files search --json` process that reads the index again.
 - **Recent files**, shown before anything is typed: the ones opened from the launcher (Enter goes

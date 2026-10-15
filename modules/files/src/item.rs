@@ -99,13 +99,13 @@ mod tests {
         let v = to_json(
             &env,
             &Hit {
-                path: "/h/Documents/l'été 2026.pdf".into(),
+                path: "/h/Documents/summer's café.pdf".into(),
                 is_dir: false,
             },
         );
-        let quoted = "'/h/Documents/l'\\''été 2026.pdf'";
-        assert_eq!(v["id"], "file:/h/Documents/l'été 2026.pdf");
-        assert_eq!(v["name"], "l'été 2026.pdf");
+        let quoted = "'/h/Documents/summer'\\''s café.pdf'";
+        assert_eq!(v["id"], "file:/h/Documents/summer's café.pdf");
+        assert_eq!(v["name"], "summer's café.pdf");
         assert_eq!(v["subtitle"], "~/Documents");
         assert_eq!(v["icon"], "application-pdf");
         assert_eq!(v["action"]["type"], "command");
@@ -120,7 +120,7 @@ mod tests {
             format!("poste files copy {quoted}")
         );
         assert_eq!(acts[1]["action"]["type"], "copy");
-        assert_eq!(acts[1]["action"]["text"], "/h/Documents/l'été 2026.pdf");
+        assert_eq!(acts[1]["action"]["text"], "/h/Documents/summer's café.pdf");
         assert_eq!(acts[2]["action"]["type"], "terminal");
         assert_eq!(acts[2]["action"]["cwd"], "/h/Documents");
         assert_eq!(

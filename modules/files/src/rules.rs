@@ -89,42 +89,42 @@ pub mod tests {
     /// Test tree: files to find and everything that must be left out.
     pub fn sample_tree(root: &Path) {
         let files = [
-            "notes/recette-crepes.md",
-            "Projets/site/src/main.rs",
-            "Projets/site/out/bundle.js",
-            "Projets/site/garde.log",
-            "Projets/site/node_modules/left-pad/index.js",
-            "Projets/jeu/Library/ShaderCache/a.bin",
-            "Projets/jeu/Assets/Joueur.cs",
-            "Projets/py/__pycache__/m.cpython.pyc",
-            "Projets/py/.venv/bin/python",
-            "Projets/py/app.py",
-            "Projets/web/.next/cache.json",
-            "Projets/web/.svelte-kit/x.js",
-            "Projets/web/dist/index.html",
-            "Projets/web/build/index.html",
-            "Projets/web/node/bin/node",
-            "Projets/rs/target/debug/rs",
+            "notes/pancake-recipe.md",
+            "Projects/site/src/main.rs",
+            "Projects/site/out/bundle.js",
+            "Projects/site/kept.log",
+            "Projects/site/node_modules/left-pad/index.js",
+            "Projects/game/Library/ShaderCache/a.bin",
+            "Projects/game/Assets/Player.cs",
+            "Projects/py/__pycache__/m.cpython.pyc",
+            "Projects/py/.venv/bin/python",
+            "Projects/py/app.py",
+            "Projects/web/.next/cache.json",
+            "Projects/web/.svelte-kit/x.js",
+            "Projects/web/dist/index.html",
+            "Projects/web/build/index.html",
+            "Projects/web/node/bin/node",
+            "Projects/rs/target/debug/rs",
             ".cache/thumb.png",
             ".config/app/reglages.toml",
-            "Images/vacances.jpg",
+            "Pictures/holiday.jpg",
         ];
         for f in files {
             let p = root.join(f);
             fs::create_dir_all(p.parent().unwrap()).unwrap();
             fs::write(&p, "x").unwrap();
         }
-        fs::create_dir_all(root.join("Projets/site/.git")).unwrap();
-        fs::write(root.join("Projets/site/.git/HEAD"), "ref: x").unwrap();
+        fs::create_dir_all(root.join("Projects/site/.git")).unwrap();
+        fs::write(root.join("Projects/site/.git/HEAD"), "ref: x").unwrap();
         // Link named like an excluded folder: excluded too.
-        fs::create_dir_all(root.join("Projets/partage")).unwrap();
+        fs::create_dir_all(root.join("Projects/shared")).unwrap();
         std::os::unix::fs::symlink(
-            root.join("Projets/partage"),
-            root.join("Projets/py/node_modules"),
+            root.join("Projects/shared"),
+            root.join("Projects/py/node_modules"),
         )
         .unwrap();
         // Ignored by git, but we want to find them: .gitignore files are not read.
-        fs::write(root.join("Projets/site/.gitignore"), "out/\n*.log\n").unwrap();
+        fs::write(root.join("Projects/site/.gitignore"), "out/\n*.log\n").unwrap();
     }
 
     fn rel(root: &Path, w: &[(PathBuf, bool)]) -> Vec<String> {
@@ -166,14 +166,14 @@ pub mod tests {
             assert!(!entries.iter().any(hit), "{bad} indexed: {entries:?}");
         }
         for good in [
-            "notes/recette-crepes.md",
-            "Projets/site/src/main.rs",
-            "Projets/site/out/bundle.js",
-            "Projets/site/garde.log",
-            "Projets/jeu/Assets/Joueur.cs",
-            "Projets/py/app.py",
-            "Images/vacances.jpg",
-            "Projets",
+            "notes/pancake-recipe.md",
+            "Projects/site/src/main.rs",
+            "Projects/site/out/bundle.js",
+            "Projects/site/kept.log",
+            "Projects/game/Assets/Player.cs",
+            "Projects/py/app.py",
+            "Pictures/holiday.jpg",
+            "Projects",
         ] {
             assert!(entries.iter().any(|e| e == good), "{good} missing");
         }
@@ -188,19 +188,19 @@ pub mod tests {
         fs::write(root.join("Archives/build/vieux.zip"), "x").unwrap();
         let user = "\
 # commentaire
-Images/
+Pictures/
 *.md
 !build/
 !.config/
-/Projets/py/
+/Projects/py/
 ";
         let entries = rel(&root, &walk(&rules(&root, user), &root, 1));
         // Added: a folder, a name pattern, a path anchored on the root.
-        assert!(!entries.iter().any(|e| e.starts_with("Images")));
+        assert!(!entries.iter().any(|e| e.starts_with("Pictures")));
         assert!(!entries.iter().any(|e| e.ends_with(".md")));
-        assert!(!entries.iter().any(|e| e.starts_with("Projets/py")));
+        assert!(!entries.iter().any(|e| e.starts_with("Projects/py")));
         // Lifted: build/ and .config/ come back, the other exclusions hold.
-        assert!(entries.iter().any(|e| e == "Projets/web/build/index.html"));
+        assert!(entries.iter().any(|e| e == "Projects/web/build/index.html"));
         assert!(entries.iter().any(|e| e == "Archives/build/vieux.zip"));
         assert!(entries.iter().any(|e| e == ".config/app/reglages.toml"));
         assert!(!entries.iter().any(|e| e.starts_with(".cache")));
@@ -213,11 +213,11 @@ Images/
         let t = tempfile::tempdir().unwrap();
         let root = t.path().join("home");
         sample_tree(&root);
-        fs::create_dir_all(root.join("notes/Images")).unwrap();
-        fs::write(root.join("notes/Images/schema.png"), "x").unwrap();
-        let entries = rel(&root, &walk(&rules(&root, "/Images/\n"), &root, 1));
-        assert!(!entries.iter().any(|e| e.starts_with("Images")));
-        assert!(entries.iter().any(|e| e == "notes/Images/schema.png"));
+        fs::create_dir_all(root.join("notes/Pictures")).unwrap();
+        fs::write(root.join("notes/Pictures/schema.png"), "x").unwrap();
+        let entries = rel(&root, &walk(&rules(&root, "/Pictures/\n"), &root, 1));
+        assert!(!entries.iter().any(|e| e.starts_with("Pictures")));
+        assert!(entries.iter().any(|e| e == "notes/Pictures/schema.png"));
     }
 
     #[test]

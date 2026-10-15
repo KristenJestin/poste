@@ -135,8 +135,8 @@ impl Index {
 
     /// The `limit` best results. Each word of the query must be found, letters in order, in
     /// the path; a matching file name comes before a matching path, and at equal score the
-    /// shortest wins. Few results for a word of 6 letters or more: try again on the names
-    /// only, allowing one typo.
+    /// shortest wins. Few results and a word of 6 letters or more: try again allowing one typo
+    /// in each such word, the other words still required.
     pub fn search(&self, query: &str, limit: usize) -> Vec<Hit> {
         let query = query.trim();
         if query.is_empty() || limit == 0 {
@@ -185,19 +185,21 @@ impl Index {
             f.0 = f.0.max(name_score(m.score, m.exact));
         }
 
-        let typos: Vec<Pattern> = patterns
-            .into_iter()
-            .filter(|p| p.needle.chars().count() >= 6)
-            .map(|p| p.max_typos(Some(1)))
-            .collect();
-        if found.len() < limit && !typos.is_empty() {
+        // Second pass allowing one typo in each long word; every word of the query must still
+        // be in the path, as in the first pass.
+        let long = |p: &Pattern| p.needle.chars().count() >= 6;
+        if found.len() < limit && patterns.iter().any(long) {
+            let typos: Vec<Pattern> = patterns
+                .into_iter()
+                .map(|p| if long(&p) { p.max_typos(Some(1)) } else { p })
+                .collect();
             let known: std::collections::HashSet<u32> = found.iter().map(|f| f.1).collect();
-            let names: Vec<&str> = self.spans.iter().map(|s| self.name(s)).collect();
+            let paths: Vec<&str> = self.spans.iter().map(|s| self.path(s)).collect();
             let mut matcher = Matcher::from_patterns(&typos, &config);
-            for m in matcher.match_list_parallel(&names, threads) {
+            for m in matcher.match_list_parallel(&paths, threads) {
                 if !known.contains(&m.index) {
                     // A typo costs: these results come after the others at equal score.
-                    found.push((name_score(m.score, m.exact) / 2, m.index));
+                    found.push((u32::from(m.score) / 2, m.index));
                 }
             }
         }
@@ -281,22 +283,25 @@ mod tests {
     #[test]
     fn fuzzy_search_name_before_path() {
         let ix = index_of(&[
-            ("/h/Projets/poste/config/hypr/bindings.lua", false),
-            ("/h/Projets/bind/README.md", false),
-            ("/h/Documents/facture-edf.pdf", false),
+            ("/h/Projects/poste/config/hypr/bindings.lua", false),
+            ("/h/Projects/bind/README.md", false),
+            ("/h/Documents/invoice-2026.pdf", false),
             ("/h/Documents", true),
             ("/srv/data/bindings.lua", false),
         ]);
         let hits = ix.search("bindings", 10);
         assert_eq!(hits[0].path, "/srv/data/bindings.lua");
-        assert_eq!(hits[1].path, "/h/Projets/poste/config/hypr/bindings.lua");
+        assert_eq!(hits[1].path, "/h/Projects/poste/config/hypr/bindings.lua");
         // Several words: all must be in the path.
         let hits = ix.search("poste bind", 10);
         assert_eq!(hits.len(), 1);
-        assert_eq!(hits[0].path, "/h/Projets/poste/config/hypr/bindings.lua");
+        assert_eq!(hits[0].path, "/h/Projects/poste/config/hypr/bindings.lua");
         // Typo allowed on a long word.
-        let hits = ix.search("factrue", 10);
-        assert_eq!(hits[0].path, "/h/Documents/facture-edf.pdf");
+        let hits = ix.search("invocie", 10);
+        // The typo pass still requires the other words.
+        assert!(ix.search("poste invocie", 10).is_empty());
+        assert_eq!(ix.search("Documents invocie", 10).len(), 1);
+        assert_eq!(hits[0].path, "/h/Documents/invoice-2026.pdf");
         // The home folder prefix does not count: "h" does not find everything.
         assert!(ix
             .search("h", 10)
@@ -305,8 +310,8 @@ mod tests {
         assert!(ix.search("   ", 10).is_empty());
         // Mixed case: ignored.
         assert_eq!(
-            ix.search("FacTure", 10)[0].path,
-            "/h/Documents/facture-edf.pdf"
+            ix.search("InVoice", 10)[0].path,
+            "/h/Documents/invoice-2026.pdf"
         );
         assert_eq!(
             ix.search("Documents", 1)[0],
@@ -324,12 +329,12 @@ mod tests {
         sample_tree(&root);
         let (text, _) = serialize(&walk(&rules(&root, ""), &root, 2), &root, 0);
         let ix = Index::parse(text, &root).unwrap();
-        let hits = ix.search("joueur", 5);
-        assert!(hits[0].path.ends_with("Projets/jeu/Assets/Joueur.cs"));
+        let hits = ix.search("player", 5);
+        assert!(hits[0].path.ends_with("Projects/game/Assets/Player.cs"));
         assert!(ix.search("left-pad", 5).is_empty());
         assert!(ix.search("ShaderCache", 5).is_empty());
-        let hits = ix.search("crepes", 5);
-        assert!(hits[0].path.ends_with("notes/recette-crepes.md"));
+        let hits = ix.search("pancake", 5);
+        assert!(hits[0].path.ends_with("notes/pancake-recipe.md"));
         // Ignored by the repository's .gitignore, but found.
         assert!(ix.search("bundle", 5)[0]
             .path
