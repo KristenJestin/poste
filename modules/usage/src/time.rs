@@ -148,7 +148,7 @@ mod tests {
         );
         assert_eq!(parse_iso("2023-11-15T00:13:20+02:00"), Some(1_700_000_000));
         assert_eq!(parse_iso("2024-02-29T12:00:00Z"), Some(1_709_208_000));
-        assert_eq!(parse_iso("demain"), None);
+        assert_eq!(parse_iso("tomorrow"), None);
         assert_eq!(parse_iso(""), None);
         assert_eq!(parse_iso("2026-10-14T25:00:00Z"), None);
         assert_eq!(parse_iso("2026-02-31T00:00:00Z"), None);

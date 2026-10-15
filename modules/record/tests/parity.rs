@@ -32,7 +32,7 @@ const PRESETS: &str = r#"{
   {"id": "off", "enabled": false, "name": "Disabled"},
   {"id": "gone", "name": "Gone", "window": {"class": "^Nope$"}},
   {"id": "nomon", "name": "NoMon", "monitor": "DP-9"},
-  {"id": "titre", "name": "Par titre", "window": {"title": "terminal"}, "audioSource": "app+mic"},
+  {"id": "by-title", "name": "By title", "window": {"title": "terminal"}, "audioSource": "app+mic"},
   {"id": "raw", "name": "Raw", "monitor": "HDMI-A-1", "audioSource": "app:Unity|default_input", "codec": "h264", "quality": "high"},
   {"id": "it's", "name": "Quote'd", "subtitle": "", "monitor": "VIRT-1", "audioSource": "none"}
  ]
@@ -259,7 +259,7 @@ fn start_targets_and_sounds_identical() {
     let cases: Vec<Vec<&str>> = vec![
         vec!["start", "--preset", "screen"],
         vec!["start", "--preset", "zone"],
-        vec!["start", "--preset", "titre"],
+        vec!["start", "--preset", "by-title"],
         vec!["start", "--preset", "raw"],
         vec!["start", "--preset", "it's"],
         vec!["start", "--preset", "unity", "--audio", "none"],
@@ -293,7 +293,7 @@ fn start_edge_cases_identical() {
     setup(&b);
     // Unknown preset, window not found, window gone: notification and code 1.
     for args in [
-        vec!["start", "--preset", "inconnu"],
+        vec!["start", "--preset", "unknown"],
         vec!["start", "--preset", "gone"],
         vec!["start", "--preset", "off"],
         vec!["start", "--window", "0xdead"],
@@ -307,7 +307,7 @@ fn start_edge_cases_identical() {
     let r = same_start(&b, &["start", "--region"], "quick", false);
     assert_eq!(r.code, Some(0));
     assert!(!r.journal.contains("gpu-screen-recorder\t-w"));
-    b.fake("slurp", "n'importe quoi");
+    b.fake("slurp", "anything");
     same_start(&b, &["start", "--region"], "quick", false);
 }
 
@@ -368,7 +368,7 @@ fn opening_of_the_last_recording_identical() {
     for args in [
         vec!["open-last"],
         vec!["open-last", "--preset", "unity"],
-        vec!["open-last", "--preset", "inconnu"],
+        vec!["open-last", "--preset", "unknown"],
         vec!["open-dir"],
         vec!["open-dir", "--preset", "unity"],
     ] {
@@ -470,6 +470,6 @@ fn share_picker_identical() {
                 std::fs::read_to_string(b.run.join("poste-record/picker.log")).ok(),
             ));
         }
-        assert_eq!(outs[0], outs[1], "adresse {address:?}, at {at}");
+        assert_eq!(outs[0], outs[1], "address {address:?}, at {at}");
     }
 }

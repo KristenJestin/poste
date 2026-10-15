@@ -170,7 +170,7 @@ impl P<'_> {
         let h = self
             .s
             .get(self.i..self.i + 4)
-            .ok_or_else(|| anyhow::anyhow!("\\u incomplet"))?;
+            .ok_or_else(|| anyhow::anyhow!("incomplete \\u escape"))?;
         self.i += 4;
         Ok(u32::from_str_radix(std::str::from_utf8(h)?, 16)?)
     }

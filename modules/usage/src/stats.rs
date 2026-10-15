@@ -426,7 +426,7 @@ pub fn render(st: &Stats) -> String {
         head.push_str("  (estimated, no reading)");
     }
     if let Some(p) = w.peak_percent {
-        head.push_str(&format!("  pic {} %", decimal(p)));
+        head.push_str(&format!("  peak {} %", decimal(p)));
     }
     if let Some(c) = w.capped_at {
         head.push_str(&format!(

@@ -69,12 +69,12 @@ fn print_lines_and_orphans(
             }
         }
     }
-    println!("\nOrphelins");
     println!("\nOrphans");
     println!("  to remove       {}", orphan_list.len());
-    orphans::print(env, &orphan_list);
-    println!("  (poste sys setup propose de les retirer)");
-    println!("  (poste sys setup offers to remove them)");
+    if !orphan_list.is_empty() {
+        orphans::print(env, &orphan_list);
+        println!("  (poste sys setup offers to remove them)");
+    }
     Ok(())
 }
 

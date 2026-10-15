@@ -194,7 +194,7 @@ mod tests {
         // A different ordinary file: conflict, never overwritten.
         let mine = home.join(".config/a/mine");
         fs::remove_file(&mine).unwrap();
-        fs::write(&mine, "maison").unwrap();
+        fs::write(&mine, "home").unwrap();
 
         // Preview: the plan shows the real migration (noted link put back to current, link put in place
         // by hand left), and nothing is written, neither current nor links nor manifest.
@@ -252,7 +252,7 @@ mod tests {
             m.repo.join("config/.config/a/other"),
             "link unknown to the manifest: intact"
         );
-        assert_eq!(fs::read_to_string(&mine).unwrap(), "maison");
+        assert_eq!(fs::read_to_string(&mine).unwrap(), "home");
         let baks: Vec<String> = fs::read_dir(m.env.backup_dir())
             .unwrap()
             .flatten()

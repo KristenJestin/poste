@@ -17,7 +17,7 @@ fn script(path: &Path, body: &str) {
 fn sync_with(bin: &str) -> (bool, String) {
     let d = tempfile::tempdir().unwrap();
     let home = d.path().join("home");
-    let log = d.path().join("relais.log");
+    let log = d.path().join("relay.log");
 
     // Published version: its poste-sys notes how it is launched.
     let src = d.path().join("v1");

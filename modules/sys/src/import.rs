@@ -203,11 +203,11 @@ fn known_token(line: &str) -> Option<&'static str> {
     };
     let alnum = |c: char| c.is_ascii_alphanumeric() || c == '_' || c == '-';
     if run("ghp_", 30, alnum) || run("github_pat_", 30, alnum) || run("glpat-", 18, alnum) {
-        Some("jeton GitHub/GitLab")
+        Some("GitHub/GitLab token")
     } else if run("sk-", 24, alnum) {
         Some("API key (sk-)")
     } else if run("xoxb-", 10, alnum) || run("xoxp-", 10, alnum) {
-        Some("jeton Slack")
+        Some("Slack token")
     } else if line.match_indices("AKIA").any(|(i, _)| {
         line[i + 4..]
             .chars()
@@ -221,7 +221,7 @@ fn known_token(line: &str) -> Option<&'static str> {
         line.split(|c: char| !(c.is_ascii_alphanumeric() || "_-.".contains(c)))
             .any(|w| w.starts_with("eyJ") && w.matches('.').count() == 2)
     } {
-        Some("jeton JWT")
+        Some("JWT token")
     } else {
         None
     }
@@ -247,7 +247,7 @@ pub fn scan_secrets(text: &str) -> Scan {
                 .take_while(|c| value_chars(*c))
                 .collect();
             if tok.len() >= 16 && tok.chars().any(|c| c.is_ascii_digit()) {
-                s.hits.push((n, "jeton Bearer"));
+                s.hits.push((n, "Bearer token"));
                 continue;
             }
         }
@@ -317,7 +317,7 @@ fn short_diff(src_file: &Path, real: &Path) -> String {
         .arg(real)
         .output();
     let Ok(out) = out else {
-        return "(diff indisponible)".into();
+        return "(diff unavailable)".into();
     };
     let text = String::from_utf8_lossy(&out.stdout);
     if text.starts_with("Binary files") || text.is_empty() {
@@ -1029,7 +1029,7 @@ mod tests {
             ".config/leak",
             &format!("password={}\n", "hunter22xyz"),
         );
-        symlink("../cible", {
+        symlink("../target", {
             fs::create_dir_all(home.join(".config/skills")).unwrap();
             home.join(".config/skills/x")
         })
@@ -1050,7 +1050,7 @@ mod tests {
         );
         assert_eq!(
             fs::read_link(cfg.join(".config/skills/x")).unwrap(),
-            PathBuf::from("../cible")
+            PathBuf::from("../target")
         );
         assert!(!cfg.join(".config/leak").exists(), "secret imported");
         assert!(!cfg.join(".config/absent").exists());

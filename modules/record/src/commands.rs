@@ -97,7 +97,7 @@ fn pick_region() -> Option<String> {
         Duration::from_secs(120),
     )
     .unwrap_or_default();
-    let re = regex::Regex::new(r"^(-?\d+),(-?\d+) (\d+)x(\d+)").expect("expression fixe");
+    let re = regex::Regex::new(r"^(-?\d+),(-?\d+) (\d+)x(\d+)").expect("fixed expression");
     let c = re.captures(geo.trim())?;
     Some(format!("{}x{}+{}+{}", &c[3], &c[4], &c[1], &c[2]))
 }

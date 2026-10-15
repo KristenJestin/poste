@@ -213,7 +213,7 @@ fn deduplicated_calls_sub_agents_and_effort() {
     assert_eq!(a["cache_read"], 3000);
     assert_eq!(a["cache_write"], 200);
     assert_eq!(a["input"], 10);
-    assert_eq!(a["effort"], "high", "perTurnEffort d'abord");
+    assert_eq!(a["effort"], "high", "perTurnEffort first");
     assert_eq!(a["project"], "example");
     assert_eq!(a["model"], "claude-test-1");
     assert_eq!(

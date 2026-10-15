@@ -276,8 +276,8 @@ mod tests {
             home.join(".config/a/fresh"),
         )
         .unwrap();
-        fs::write(home.join(".config/a/ordinaire"), "perso").unwrap();
-        symlink("/nulle/part", home.join(".config/a/etranger")).unwrap();
+        fs::write(home.join(".config/a/ordinary"), "perso").unwrap();
+        symlink("/nowhere", home.join(".config/a/foreign")).unwrap();
         let layout = config::load(&repo, &env).unwrap().unwrap();
         let mut m = Manifest::default();
         m.files
@@ -288,8 +288,8 @@ mod tests {
         assert_eq!(apply(&env, &repo, &o, "t", &mut m).unwrap(), 1);
         assert!(!home.join(".config/a/old").is_symlink());
         assert!(home.join(".config/a/fresh").is_symlink());
-        assert!(home.join(".config/a/ordinaire").is_file());
-        assert!(home.join(".config/a/etranger").is_symlink());
+        assert!(home.join(".config/a/ordinary").is_file());
+        assert!(home.join(".config/a/foreign").is_symlink());
         assert!(m.files.is_empty());
     }
 
@@ -306,7 +306,7 @@ mod tests {
         // a version that is no longer installed, a third through an installed version.
         fs::create_dir_all(env.current_link().parent().unwrap()).unwrap();
         symlink(env.versions_dir().join("retiree"), env.current_link()).unwrap();
-        let v = env.versions_dir().join("presente/config/.config/a");
+        let v = env.versions_dir().join("present/config/.config/a");
         fs::create_dir_all(&v).unwrap();
         let links = [
             ("par_current", env.current_link().join("config/.config/a/x")),
@@ -314,7 +314,7 @@ mod tests {
                 "version_retiree",
                 env.versions_dir().join("retiree/config/.config/a/x"),
             ),
-            ("version_presente", v.join("disparu")),
+            ("version_present", v.join("vanished")),
         ];
         let mut m = Manifest::default();
         for (name, target) in &links {
@@ -329,7 +329,7 @@ mod tests {
         let o = find(&repo, &env, Some(&layout), &m, &[]).unwrap();
         // Only the link to a file gone from a version that is really there is an orphan.
         assert_eq!(o.len(), 1, "{o:?}");
-        assert!(o[0].path.ends_with("version_presente"));
+        assert!(o[0].path.ends_with("version_present"));
     }
 
     #[test]

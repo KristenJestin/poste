@@ -266,7 +266,7 @@ fn apply_skip(
     let mut gone: HashSet<String> = HashSet::new();
     for id in skip {
         if gone.contains(id) {
-            continue; // doublon
+            continue; // duplicate
         }
         let known = wanted.remove(id).is_some() | step_ids(steps).contains(id.as_str());
         if known {
@@ -379,7 +379,7 @@ fn print_skipped(sk: &Skipped) {
     }
 }
 
-// ------------------------------------------------------------------ utilitaires
+// ------------------------------------------------------------------ utilities
 
 /// Runs a command without output; true if it ends with code 0.
 fn succeeds(cmd: &[String]) -> bool {
@@ -464,7 +464,7 @@ fn sys_state(ctx: &Ctx, s: &SystemStep) -> Sys {
     let verified = if let (Some(file), Some(src)) = (&s.file, &s.source) {
         let want = match ctx.read_source(src) {
             Ok(w) => w,
-            Err(_) => return Sys::Unknown("source illisible"),
+            Err(_) => return Sys::Unknown("unreadable source"),
         };
         match std::fs::read_to_string(ctx.sub(file)) {
             Ok(c) if c.trim_end() == want.trim_end() => Sys::Done,
@@ -849,7 +849,7 @@ pub fn done(env: &Env, repo: &Path, id: Option<&str>, undo: bool) -> Result<()> 
     Ok(())
 }
 
-// ------------------------------------------------------------------ affichage commun
+// ------------------------------------------------------------------ common display
 
 struct Packages {
     missing: Vec<String>,
@@ -1032,7 +1032,7 @@ pub fn status(env: &Env, repo: &Path) -> Result<()> {
     let manual = manual_pending(&ctx, &steps);
     println!("\nManual steps");
     if manual.is_empty() {
-        println!("  toutes faites");
+        println!("  all done");
     }
     for m in manual {
         println!("  to do  [{}] {}", m.id, ctx.sub(&m.title));
@@ -1090,7 +1090,7 @@ mod tests {
         write(
             &repo,
             "steps.toml",
-            "[[system]]\nid = \"s\"\ntitle = \"exemple\"\ncheck = [\"true\"]\n\
+            "[[system]]\nid = \"s\"\ntitle = \"example\"\ncheck = [\"true\"]\n\
              [[manual]]\nid = \"m\"\ntitle = \"m\"\n",
         );
         let data = d.path().join("data");
@@ -1236,7 +1236,7 @@ check = ["false"]
         write(
             &repo,
             "steps.toml",
-            "[[manual]]\nid = \"m1\"\ntitle = \"faire m1\"\n[[manual]]\nid = \"m2\"\ntitle = \"m2\"\ncheck = [\"true\"]\n",
+            "[[manual]]\nid = \"m1\"\ntitle = \"do m1\"\n[[manual]]\nid = \"m2\"\ntitle = \"m2\"\ncheck = [\"true\"]\n",
         );
         let ctx = Ctx::new(&env, &repo);
         let steps = load_steps(&ctx).unwrap();

@@ -64,5 +64,5 @@ fn check_sends_once_then_status() {
 
     assert!(go(&["test"]).status.success());
     assert_eq!(fs::read_to_string(&log).unwrap().lines().count(), 2);
-    assert_eq!(go(&["inconnu"]).status.code(), Some(2));
+    assert_eq!(go(&["unknown"]).status.code(), Some(2));
 }

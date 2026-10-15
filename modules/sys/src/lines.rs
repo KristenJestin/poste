@@ -508,13 +508,13 @@ mod tests {
         assert_eq!(st[0].op, Op::Forget);
         assert!(m.lines.is_empty());
         // A file that is a link is never modified.
-        let cible = f.with_file_name("cible");
-        fs::write(&cible, "").unwrap();
+        let target_file = f.with_file_name("target_file");
+        fs::write(&target_file, "").unwrap();
         fs::remove_file(&f).unwrap();
-        std::os::unix::fs::symlink(&cible, &f).unwrap();
+        std::os::unix::fs::symlink(&target_file, &f).unwrap();
         let st = run(&env, &[spec("rec", &f, "k = 1")], &mut m);
         assert!(matches!(st[0].op, Op::Blocked(_)));
-        assert_eq!(fs::read_to_string(&cible).unwrap(), "");
+        assert_eq!(fs::read_to_string(&target_file).unwrap(), "");
     }
 
     #[test]

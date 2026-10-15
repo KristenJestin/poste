@@ -22,7 +22,7 @@ pub fn edit_list(file: &Path, key: &str, value: &str, add: bool) -> Result<bool>
     };
     let mut doc: DocumentMut = text
         .parse()
-        .with_context(|| format!("{} invalide", file.display()))?;
+        .with_context(|| format!("{} is invalid", file.display()))?;
     let present = doc
         .get(key)
         .and_then(|i| i.as_array())
@@ -60,7 +60,7 @@ pub fn set_key(file: &Path, key: &str, value: &str) -> Result<bool> {
     };
     let mut doc: DocumentMut = text
         .parse()
-        .with_context(|| format!("{} invalide", file.display()))?;
+        .with_context(|| format!("{} is invalid", file.display()))?;
     if doc.get(key).and_then(|i| i.as_str()) == Some(value) {
         return Ok(false);
     }
@@ -197,7 +197,7 @@ fn read_doc(file: &Path) -> Result<DocumentMut> {
         Err(e) => return Err(e).with_context(|| format!("reading {}", file.display())),
     };
     text.parse()
-        .with_context(|| format!("{} invalide", file.display()))
+        .with_context(|| format!("{} is invalid", file.display()))
 }
 
 fn check_key(key: &str) -> Result<()> {
@@ -608,7 +608,7 @@ mod tests {
     #[test]
     fn local_add_remove_validations() {
         let (_d, repo, env) = repo_and_home();
-        assert!(local_add(&env, &repo, ".config/hypr/inconnu.lua").is_err());
+        assert!(local_add(&env, &repo, ".config/hypr/unknown.lua").is_err());
         local_add(&env, &repo, "~/.config/hypr/monitors.lua").unwrap();
         local_add(&env, &repo, ".config/hypr/monitors.lua").unwrap(); // idempotent
         let c = Config::load(&env).unwrap();
@@ -667,17 +667,17 @@ mod tests {
         .unwrap();
         fs::create_dir_all(env.config_file().parent().unwrap()).unwrap();
         fs::write(env.config_file(), "# perso\nrepo = \"/r\"\n").unwrap();
-        assert!(override_set(&env, &repo, ".config/hypr/inconnu.json", "a", "1").is_err());
+        assert!(override_set(&env, &repo, ".config/hypr/unknown.json", "a", "1").is_err());
         assert!(override_set(&env, &repo, ".config/hypr/s.json", "idle.lock.x", "1").is_err());
         override_set(&env, &repo, ".config/hypr/s.json", "idle.lock", "3600").unwrap();
-        override_set(&env, &repo, ".config/hypr/s.json", "idle.name", "soir").unwrap();
+        override_set(&env, &repo, ".config/hypr/s.json", "idle.name", "evening").unwrap();
         let t = fs::read_to_string(env.config_file()).unwrap();
         assert!(t.contains("# perso"));
         let c = Config::parse(&t).unwrap();
         assert_eq!(c.overrides.len(), 1);
         let sets = crate::overrides::sets_of(&c.overrides[0]).unwrap();
         assert_eq!(sets.len(), 2);
-        assert!(sets.contains(&("idle.name".into(), J::Str("soir".into()))));
+        assert!(sets.contains(&("idle.name".into(), J::Str("evening".into()))));
         override_unset(&env, ".config/hypr/s.json", "idle.lock").unwrap();
         assert!(override_unset(&env, ".config/hypr/s.json", "idle.lock").is_err());
         override_unset(&env, ".config/hypr/s.json", "idle.name").unwrap();

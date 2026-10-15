@@ -176,7 +176,7 @@ pub fn step(
             st.disks.insert(d.path.clone());
             out.push(Alert {
                 key: Key::Disk(d.path.clone()),
-                title: "Disque presque plein".into(),
+                title: "Disk almost full".into(),
                 body: format!(
                     "{} is {:.0} % full ({:.0} GB free).",
                     d.path, d.used_pct, free_gb
@@ -473,7 +473,7 @@ mod tests {
     fn threshold_in_free_gb() {
         let cfg = Config::parse("[disk]\nfree_gb = 100\n").unwrap();
         let mut st = State::default();
-        let d = disk("/", 10.0); // 50 Go libres < 100
+        let d = disk("/", 10.0); // 50 GB free < 100
         assert_eq!(
             keys(&step(&mut st, &cfg, &Supplies::default(), &[d], None)),
             [Key::Disk("/".into())]

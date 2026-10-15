@@ -66,7 +66,7 @@ pub fn backup(env: &Env, dest: &Path, stamp: &str) -> Result<PathBuf> {
         n += 1;
     }
     let md = std::fs::symlink_metadata(dest)
-        .with_context(|| format!("sauvegarde de {}", dest.display()))?;
+        .with_context(|| format!("cannot back up {}", dest.display()))?;
     if md.file_type().is_symlink() {
         symlink(std::fs::read_link(dest)?, &bak)?;
     } else if md.is_dir() {
@@ -76,7 +76,7 @@ pub fn backup(env: &Env, dest: &Path, stamp: &str) -> Result<PathBuf> {
             std::fs::remove_dir_all(dest)?;
         }
     } else {
-        std::fs::copy(dest, &bak).with_context(|| format!("sauvegarde de {}", dest.display()))?;
+        std::fs::copy(dest, &bak).with_context(|| format!("cannot back up {}", dest.display()))?;
     }
     Ok(bak)
 }
@@ -93,7 +93,7 @@ pub fn copy_tree(src: &Path, dst: &Path) -> Result<()> {
         } else if ft.is_dir() {
             copy_tree(&s, &d)?;
         } else {
-            std::fs::copy(&s, &d).with_context(|| format!("copie de {}", s.display()))?;
+            std::fs::copy(&s, &d).with_context(|| format!("cannot copy {}", s.display()))?;
         }
     }
     Ok(())

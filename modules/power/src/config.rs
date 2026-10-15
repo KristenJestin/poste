@@ -79,7 +79,7 @@ impl Default for Config {
 
 impl Config {
     pub fn parse(text: &str) -> Result<Self> {
-        let c: Config = toml::from_str(text).context("power.toml invalide")?;
+        let c: Config = toml::from_str(text).context("invalid power.toml")?;
         c.validate()?;
         Ok(c)
     }

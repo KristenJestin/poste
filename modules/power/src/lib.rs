@@ -107,7 +107,7 @@ fn cmd_status(env: &Env, cfg: &Config) -> i32 {
                 b.status.label()
             );
             println!(
-                "  secteur    {}",
+                "  mains      {}",
                 if sup.ac_online {
                     "plugged in"
                 } else {

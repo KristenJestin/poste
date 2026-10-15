@@ -16,7 +16,7 @@ path = "src/main.rs"
 
 [dependencies]
 libc = "0.2"
-# Expressions régulières des préréglages (window.class / window.title), comme `re.search(..., re.I)` du script d'origine.
+# Regular expressions of the presets (window.class / window.title), like `re.search(..., re.I)` of the original script.
 regex = { version = "1", default-features = false, features = ["std", "unicode", "perf"] }
 serde.workspace = true
 serde_json.workspace = true

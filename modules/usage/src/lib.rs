@@ -84,7 +84,7 @@ fn parse_opts(args: &[String]) -> Result<Opts> {
             s if s.starts_with("--until=") => o.until = Some(s[8..].into()),
             s if s.starts_with("--agent=") => o.agent = Some(s[8..].into()),
             s if s.starts_with('-') && s.len() > 1 && !s.contains("..") => {
-                bail!("option inconnue {s}")
+                bail!("unknown option {s}")
             }
             _ => o.rest.push(a.clone()),
         }
@@ -165,7 +165,7 @@ pub fn run(argv: &[String]) -> i32 {
         Ok(code) => code,
         Err(e) => {
             eprintln!("poste usage {cmd}: {e:#}");
-            if e.to_string().starts_with("option inconnue") {
+            if e.to_string().starts_with("unknown option") {
                 eprint!("{USAGE}");
             }
             2

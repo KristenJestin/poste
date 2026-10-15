@@ -370,7 +370,7 @@ pub fn prune(env: &Env, keep: usize) -> Result<Vec<String>> {
             continue;
         }
         std::fs::remove_dir_all(&v.dir)
-            .with_context(|| format!("retrait de {}", v.dir.display()))?;
+            .with_context(|| format!("cannot remove {}", v.dir.display()))?;
         removed.push(v.short().to_string());
     }
     if let Ok(rd) = std::fs::read_dir(env.versions_dir()) {
@@ -748,7 +748,7 @@ pub(crate) mod tests {
         let f = Fetcher::with(&curl, "https://example.com/r");
         fetch(&env, &f, false).unwrap().unwrap();
         // Same commit, archive rebuilt (different content therefore different checksum).
-        fs::write(src.join("config/.config/a/neuf"), "refait").unwrap();
+        fs::write(src.join("config/.config/a/neuf"), "redone").unwrap();
         let second = publish(&src, &pubdir);
         assert_ne!(first, second);
         let v = fetch(&env, &f, false).unwrap().unwrap();

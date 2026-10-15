@@ -221,7 +221,7 @@ pub mod tests {
 
     #[test]
     fn debit() {
-        // 1 Wh perdu en 300 s = 12 W.
+        // 1 Wh lost in 300 s = 12 W.
         let w = drain_watts(31_000_000, 30_000_000, 300.0).unwrap();
         assert!((w - 12.0).abs() < 1e-9);
         assert!(drain_watts(1, 2, 60.0).unwrap() < 0.0);

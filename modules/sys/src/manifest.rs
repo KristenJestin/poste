@@ -44,9 +44,8 @@ pub struct Manifest {
 impl Manifest {
     pub fn load(file: &Path) -> Result<Self> {
         match std::fs::read_to_string(file) {
-            Ok(t) => {
-                serde_json::from_str(&t).with_context(|| format!("{} illisible", file.display()))
-            }
+            Ok(t) => serde_json::from_str(&t)
+                .with_context(|| format!("{} is unreadable", file.display())),
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(Self::default()),
             Err(e) => Err(e).with_context(|| format!("reading {}", file.display())),
         }

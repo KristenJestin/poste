@@ -131,7 +131,7 @@ mod tests {
         );
         assert_eq!(audio_sources("default_output", Some("x")), "default_output");
         assert_eq!(audio_sources("alsa_input.x", None), "alsa_input.x");
-        assert_eq!(audio_sources("inconnu", None), "");
+        assert_eq!(audio_sources("unknown", None), "");
     }
 
     #[test]

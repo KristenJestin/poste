@@ -37,7 +37,7 @@ fn cycle_start_pause_resume_stop_open_last() {
     b.presets(r#"{"defaults": {"dir": "~/Videos/Rec"}}"#);
     std::fs::create_dir_all(b.videos.join("Rec")).unwrap();
 
-    // Rien en cours.
+    // Nothing in progress.
     assert_eq!(
         status(&b),
         serde_json::json!({"t": "status", "recording": false})

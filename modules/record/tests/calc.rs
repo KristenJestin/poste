@@ -68,7 +68,7 @@ fn calculations_identical_to_the_python_script() {
         "a|b",
         "x:y",
         "Desktop",
-        "mic+inconnu",
+        "mic+unknown",
     ] {
         for app in [json!(null), json!(""), json!("FMOD Ex App"), json!("Zen")] {
             audio.push(json!([a, app]));
@@ -80,7 +80,7 @@ fn calculations_identical_to_the_python_script() {
         "   ",
         "A/B",
         "a:b*c?d\"e<f>g|h",
-        "  espaces   multiples  ",
+        "  spaces   multiple  ",
         "///",
         "tab\tand\nreturn",
         "é".repeat(70).as_str(),
@@ -110,7 +110,7 @@ fn calculations_identical_to_the_python_script() {
     ]);
     let clients = json!([
         {"address": "a", "workspace": {"id": 1}, "at": [1, 2], "size": [3, 4], "class": "Unity", "title": "Un", "mapped": true},
-        {"address": "b", "workspace": {"id": 4}, "at": [5, 6], "size": [7, 8], "class": "unity", "title": "Deux"},
+        {"address": "b", "workspace": {"id": 4}, "at": [5, 6], "size": [7, 8], "class": "unity", "title": "Two"},
         {"address": "c", "workspace": {"id": 7}, "at": [0, 0], "size": [1, 1], "class": "Other"},
         {"address": "d", "workspace": {"id": -98}, "at": [0, 0], "size": [100, 50], "class": "zen", "title": "Zen x", "mapped": false},
         {"address": "e", "workspace": {"id": 0}, "at": [0, 0], "size": [20, 20], "class": "x"},
@@ -119,7 +119,7 @@ fn calculations_identical_to_the_python_script() {
         {"address": "h", "workspace": {"id": 1.0}, "at": [1.5, 2], "size": [3, 4], "class": "float"}
     ]);
     let matches = json!([
-        {"class": "^Unity$"}, {"class": "unity"}, {"title": "deux"}, {"class": "^Unity$", "title": "^Un$"},
+        {"class": "^Unity$"}, {"class": "unity"}, {"title": "two"}, {"class": "^Unity$", "title": "^Un$"},
         {"class": "nope"}, {}, {"class": ""}, {"class": "x|zen"}, {"title": "(?i)ZEN"}
     ]);
     let app_audio = json!([

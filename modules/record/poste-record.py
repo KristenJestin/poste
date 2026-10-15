@@ -101,7 +101,7 @@ def public(st):
             "label": st.get("label", ""), "file": st.get("file", "")}
 
 
-# ---------------------------------------------------------------- cibles
+# ---------------------------------------------------------------- targets
 def clients():
     try:
         return json.loads(subprocess.run(["hyprctl", "clients", "-j"], capture_output=True, text=True, timeout=3).stdout)
@@ -371,7 +371,7 @@ def watch():
         time.sleep(1 if cur.get("recording") else 0.5)
 
 
-# ---------------------------------------------------------------- lanceur
+# ---------------------------------------------------------------- launcher
 def cmd_of(*args):
     return " ".join(["poste", "record"] + ["'%s'" % a.replace("'", "'\\''") for a in args])
 

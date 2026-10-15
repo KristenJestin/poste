@@ -108,7 +108,7 @@ pub fn append_changed(file: &Path, snaps: &[Entry]) -> Result<usize> {
         .create(true)
         .append(true)
         .open(file)
-        .with_context(|| format!("ouverture de {}", file.display()))?;
+        .with_context(|| format!("cannot open {}", file.display()))?;
     let mut buf = String::new();
     for e in &fresh {
         buf.push_str(&serde_json::to_string(e)?);

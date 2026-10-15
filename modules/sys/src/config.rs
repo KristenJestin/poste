@@ -795,7 +795,7 @@ pub fn describe(st: &State) -> String {
     }
 }
 
-// ---------------------------------------------------------------- affichage
+// ---------------------------------------------------------------- display
 
 pub fn print_plan(env: &Env, plan: &Plan) {
     println!("\nConfig (~ <- config/ by links):");
@@ -831,7 +831,7 @@ pub fn print_plan(env: &Env, plan: &Plan) {
         }
     }
     for m in &plan.modes {
-        println!("  droits      {}  {:04o} -> {:04o}", m.rel, m.from, m.to);
+        println!("  permissions {}  {:04o} -> {:04o}", m.rel, m.from, m.to);
     }
     for w in &plan.warnings {
         println!("  note        {w}");
@@ -891,7 +891,7 @@ fn take_home(layout: &Layout, e: &Entry, from: &Path) -> Result<()> {
             let md = std::fs::metadata(from)?;
             let tmp = e
                 .src
-                .with_file_name(format!(".poste-tmp-{}-repris", std::process::id()));
+                .with_file_name(format!(".poste-tmp-{}-takeback", std::process::id()));
             std::fs::copy(from, &tmp)?;
             let exec = md.mode() & 0o111 != 0;
             std::fs::set_permissions(
@@ -1069,7 +1069,7 @@ pub fn apply(
     }
     for m in &plan.modes {
         std::fs::set_permissions(&m.path, std::fs::Permissions::from_mode(m.to))
-            .with_context(|| format!("droits de {}", m.path.display()))?;
+            .with_context(|| format!("cannot set permissions of {}", m.path.display()))?;
         println!("  permissions {:04o}: {}", m.to, m.rel);
         n += 1;
     }
@@ -1246,7 +1246,7 @@ pub fn diff(layout: &Layout, env: &Env, arg: Option<&str>) -> Result<bool> {
                 let _ = std::io::Write::flush(&mut std::io::stdout());
                 let mut cmd = std::process::Command::new("diff");
                 cmd.args(["-ru", "-x", PYCACHE, "--label", &format!("repo/{}", e.rel)]);
-                cmd.arg("--label").arg(format!("maison/{}", e.rel));
+                cmd.arg("--label").arg(format!("home/{}", e.rel));
                 cmd.arg(gen_tmp.as_deref().unwrap_or(&e.src)).arg(&e.dest);
                 let status = cmd.status().context("cannot run diff")?;
                 if let Some(t) = &gen_tmp {
@@ -1423,14 +1423,14 @@ pub fn forget(layout: &Layout, env: &Env, arg: &str, manifest_file: &Path) -> Re
         Kind::File => {
             let tmp = e
                 .dest
-                .with_file_name(format!(".poste-tmp-{}-oubli", std::process::id()));
+                .with_file_name(format!(".poste-tmp-{}-forget", std::process::id()));
             std::fs::copy(&e.src, &tmp)?;
             std::fs::rename(&tmp, &e.dest)?;
         }
         Kind::Dir => {
             let tmp = e
                 .dest
-                .with_file_name(format!(".poste-tmp-{}-oubli", std::process::id()));
+                .with_file_name(format!(".poste-tmp-{}-forget", std::process::id()));
             copy_tree(&e.src, &tmp)?;
             std::fs::remove_file(&e.dest)?;
             std::fs::rename(&tmp, &e.dest)?;
@@ -1560,7 +1560,7 @@ pub fn print_status(layout: &Layout, env: &Env, manifest: &Manifest) -> Result<(
             other => {
                 conflicts += 1;
                 lines.push(format!(
-                    "  conflit      {d}  [{}]  (poste sys diff {rel})",
+                    "  conflict     {d}  [{}]  (poste sys diff {rel})",
                     describe(other)
                 ));
             }
@@ -1572,16 +1572,16 @@ pub fn print_status(layout: &Layout, env: &Env, manifest: &Manifest) -> Result<(
             "  generated         {generated}  (repository + overrides; {stale} to regenerate)"
         );
     }
-    println!("  manquants       {missing}");
+    println!("  missing           {missing}");
     println!("  broken links      {broken}");
     println!("  replaced          {replaced}  (link turned into an ordinary file)");
-    println!("  conflits        {conflicts}");
+    println!("  conflicts         {conflicts}");
     println!("  permissions to fix {}", plan.modes.len());
     for l in lines {
         println!("{l}");
     }
     for m in &plan.modes {
-        println!("  droits       {}  {:04o} -> {:04o}", m.rel, m.from, m.to);
+        println!("  permissions  {}  {:04o} -> {:04o}", m.rel, m.from, m.to);
     }
     print_local(layout, env)?;
     Ok(())
@@ -1754,7 +1754,7 @@ mod tests {
     fn data_repository_on_top_of_the_repository() {
         let f = fx();
         f.cfg(".config/a", "repo a");
-        f.cfg(".config/b", "exemple");
+        f.cfg(".config/b", "example");
         f.cfg(".config/bloc/x", "x");
         f.meta("link-dirs", ".config/bloc\n");
         let data = f.repo.parent().unwrap().join("data");
@@ -1800,25 +1800,25 @@ mod tests {
     #[test]
     fn every_target_state() {
         let f = fx();
-        f.cfg("lie", "a");
+        f.cfg("linked", "a");
         f.cfg("absent", "a");
-        f.cfg("identique", "a");
+        f.cfg("identical", "a");
         f.cfg("different", "a");
         f.cfg("elsewhere", "a");
         f.cfg("broken", "a");
         f.cfg("folder", "a");
         f.cfg("under/file", "a");
-        symlink(f.repo.join("config/lie"), f.home("lie")).unwrap();
-        f.put("identique", "a");
+        symlink(f.repo.join("config/linked"), f.home("linked")).unwrap();
+        f.put("identical", "a");
         f.put("different", "b");
         f.put("other", "a");
         symlink(f.home("other"), f.home("elsewhere")).unwrap();
         symlink(f.home("does-not-exist"), f.home("broken")).unwrap();
         fs::create_dir(f.home("folder")).unwrap();
         f.put("under", "i am a file");
-        assert_eq!(f.state("lie"), State::Linked);
+        assert_eq!(f.state("linked"), State::Linked);
         assert_eq!(f.state("absent"), State::Missing);
-        assert_eq!(f.state("identique"), State::Identical);
+        assert_eq!(f.state("identical"), State::Identical);
         assert_eq!(f.state("different"), State::Differs);
         assert!(matches!(
             f.state("elsewhere"),
@@ -1835,7 +1835,7 @@ mod tests {
     #[test]
     fn application_then_rerun_up_to_date() {
         let f = fx();
-        let src = f.cfg(".config/a/x.conf", "contenu");
+        let src = f.cfg(".config/a/x.conf", "content");
         f.cfg(".config/a/y.conf", "other");
         f.put(".config/a/y.conf", "other");
         let p = f.plan(&[]);
@@ -1871,17 +1871,17 @@ mod tests {
     #[test]
     fn conflicts_listed_without_blocking_the_rest() {
         let f = fx();
-        f.cfg("a-creer", "1");
-        f.cfg("conflit", "repo");
-        f.put("conflit", "maison");
+        f.cfg("to-create", "1");
+        f.cfg("conflict", "repo");
+        f.put("conflict", "home");
         let p = f.plan(&[]);
         assert_eq!(p.conflicts().len(), 1);
         assert_eq!(p.count(&Op::Create), 1);
         f.apply(&p);
-        assert!(f.home("a-creer").is_symlink());
+        assert!(f.home("to-create").is_symlink());
         // The file in conflict is intact, nothing was backed up or overwritten.
-        assert_eq!(fs::read_to_string(f.home("conflit")).unwrap(), "maison");
-        assert!(!f.home("conflit").is_symlink());
+        assert_eq!(fs::read_to_string(f.home("conflict")).unwrap(), "home");
+        assert!(!f.home("conflict").is_symlink());
         assert!(f.backups().is_empty());
         assert_eq!(f.plan(&[]).conflicts().len(), 1);
     }
@@ -1890,7 +1890,7 @@ mod tests {
     fn decision_take_repo() {
         let f = fx();
         let src = f.cfg("c", "repo");
-        f.put("c", "maison");
+        f.put("c", "home");
         f.apply(&f.plan(&[("c", Decision::Repo)]));
         assert_eq!(fs::read_link(f.home("c")).unwrap(), src);
         assert_eq!(fs::read_to_string(&src).unwrap(), "repo");
@@ -1898,7 +1898,7 @@ mod tests {
         assert_eq!(b.len(), 1);
         assert_eq!(
             fs::read_to_string(f.env.backup_dir().join(&b[0])).unwrap(),
-            "maison"
+            "home"
         );
     }
 
@@ -1907,12 +1907,12 @@ mod tests {
         let f = fx();
         let src = f.cfg("c", "repo");
         let h = f.put("secret.conf", "x");
-        f.cfg("secret.conf", "vieux");
-        f.put("c", "maison");
+        f.cfg("secret.conf", "old");
+        f.put("c", "home");
         fs::set_permissions(f.home("c"), fs::Permissions::from_mode(0o755)).unwrap();
         fs::set_permissions(&h, fs::Permissions::from_mode(0o600)).unwrap();
         f.apply(&f.plan(&[("c", Decision::Home), ("secret.conf", Decision::Home)]));
-        assert_eq!(fs::read_to_string(&src).unwrap(), "maison");
+        assert_eq!(fs::read_to_string(&src).unwrap(), "home");
         assert_eq!(fs::metadata(&src).unwrap().mode() & 0o777, 0o755);
         assert!(f.home("c").is_symlink());
         assert_eq!(f.backups().len(), 2);
@@ -1940,11 +1940,11 @@ mod tests {
         let m: HashMap<_, _> = [("c".to_string(), Decision::Home)].into();
         assert!(plan(&f.layout(), &f.env, &m).is_err());
         // --take-repo is possible: the folder is moved into the backup.
-        fs::write(f.home("c/dedans"), "z").unwrap();
+        fs::write(f.home("c/inside"), "z").unwrap();
         f.apply(&f.plan(&[("c", Decision::Repo)]));
         assert!(f.home("c").is_symlink());
         let b = f.backups();
-        assert!(f.env.backup_dir().join(&b[0]).join("dedans").is_file());
+        assert!(f.env.backup_dir().join(&b[0]).join("inside").is_file());
     }
 
     #[test]
@@ -1978,12 +1978,12 @@ mod tests {
         assert_eq!(f.plan(&[]).writes(), 0);
         // A link elsewhere is a conflict; --take-home takes its target back into the repository.
         fs::remove_file(f.home(".claude/skills/x")).unwrap();
-        symlink("/ailleurs", f.home(".claude/skills/x")).unwrap();
+        symlink("/elsewhere-link", f.home(".claude/skills/x")).unwrap();
         assert_eq!(f.plan(&[]).conflicts().len(), 1);
         f.apply(&f.plan(&[(".claude/skills/x", Decision::Home)]));
         assert_eq!(
             fs::read_link(f.repo.join("config/.claude/skills/x")).unwrap(),
-            PathBuf::from("/ailleurs")
+            PathBuf::from("/elsewhere-link")
         );
         assert_eq!(f.plan(&[]).writes(), 0);
     }
@@ -2029,16 +2029,16 @@ mod tests {
         h.cfg(".config/p/k/a.qml", "A");
         h.meta("link-dirs", ".config/p/k\n");
         h.put(".config/p/k/a.qml", "A");
-        h.put(".config/p/k/etat.json", "{}");
+        h.put(".config/p/k/state.json", "{}");
         assert_eq!(h.state(".config/p/k"), State::Differs);
         h.apply(&h.plan(&[]));
         assert!(!h.home(".config/p/k").is_symlink());
-        assert!(h.home(".config/p/k/etat.json").is_file());
+        assert!(h.home(".config/p/k/state.json").is_file());
         // --take-home: the extra file enters the repository.
         h.apply(&h.plan(&[(".config/p/k", Decision::Home)]));
         assert!(h.home(".config/p/k").is_symlink());
         assert_eq!(
-            fs::read_to_string(h.repo.join("config/.config/p/k/etat.json")).unwrap(),
+            fs::read_to_string(h.repo.join("config/.config/p/k/state.json")).unwrap(),
             "{}"
         );
     }
