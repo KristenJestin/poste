@@ -1,0 +1,11 @@
+name = "files"
+description = "Fast file search in the launcher: index on disk rebuilt at each SUPER+D, no daemon"
+commands = [
+  { name = "search", description = "search for a file or folder (--json for the launcher, --limit N)" },
+  { name = "home", description = "recent files, shown before anything is typed (--json)" },
+  { name = "refresh", description = "rebuild the index (--background: return at once, SUPER+D; --force)" },
+  { name = "open", description = "open a file with its default application and remember it as recent" },
+  { name = "copy", description = "copy the file itself to the clipboard (text/uri-list)" },
+  { name = "reveal", description = "show a file in the default file manager (D-Bus FileManager1)" },
+  { name = "status", description = "state of the index: roots, entries, age, settings files" },
+]
