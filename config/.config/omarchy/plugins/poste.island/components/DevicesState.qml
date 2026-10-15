@@ -3,17 +3,17 @@ import Quickshell
 import Quickshell.Io
 import Quickshell.Services.UPower
 
-// Batteries des périphériques sans fil (Island.qml : root.devices) : clavier
-// et souris vus par UPower (Logitech HID++…), casque lu par headsetcontrol
-// s'il est installé. Une activité à gauche de l'île seulement sous 15 %
-// (rouge sous 5 %) et pas en charge ; toujours listés dans le centre de
-// contrôle.
+// Batteries of wireless devices (Island.qml: root.devices): keyboard
+// and mouse seen by UPower (Logitech HID++…), headset read by headsetcontrol
+// if it is installed. An activity to the left of the island only below 15 %
+// (red below 5 %) and not charging; always listed in the control
+// center.
 Item {
   id: devices
   readonly property real lowLevel: 0.15
 
-  // Types UPower : 5 souris, 6 clavier, 12 manette, 13 stylet, 14 pavé
-  // tactile, 17 casque, 19 écouteurs.
+  // UPower types: 5 mouse, 6 keyboard, 12 gamepad, 13 stylus, 14 touchpad,
+  // 17 headset, 19 earphones.
   function kindOf(type, name) {
     var t = Number(type)
     if (t === 5) return "mouse"
@@ -28,7 +28,7 @@ Item {
     return kind === "mouse" ? "󰍽" : kind === "keyboard" ? "󰌌" : kind === "headset" ? "󰋎" : kind === "gamepad" ? "󰊴" : "󰂯"
   }
 
-  // Casque : headsetcontrol (paquet extra/headsetcontrol), relu chaque minute.
+  // Headset: headsetcontrol (package extra/headsetcontrol), read again every minute.
   property var headset: null       // { name, percent, charging }
   Process {
     id: headsetProc
@@ -48,7 +48,7 @@ Item {
   }
   Timer { interval: 60000; running: true; repeat: true; triggeredOnStart: true; onTriggered: headsetProc.running = true }
 
-  // Tous les périphériques : { key, name, kind, glyph, percent, charging, low, color }
+  // All the devices: { key, name, kind, glyph, percent, charging, low, color }
   readonly property var list: {
     var out = []
     var all = UPower.devices.values || []
@@ -61,7 +61,7 @@ Item {
       var p = Number(d.percentage) || 0
       p = p > 1 ? p / 100 : p
       var charging = Number(d.state) === 1 || Number(d.state) === 4
-      if (simAll >= 0) { p = simAll; charging = false }   // simulation « all »
+      if (simAll >= 0) { p = simAll; charging = false }   // 'all' simulation
       out.push(entry("upower:" + String(d.nativePath || name), name, kind, p, charging))
     }
     if (headset) out.push(entry("headset", headset.name, "headset", headset.percent, headset.charging))
@@ -75,8 +75,8 @@ Item {
   }
   readonly property var low: list.filter(function(d) { return d.low })
 
-  // Simulation (commande deviceSim) : "mouse 12" ajoute un faux périphérique ;
-  // "all 8" met tous les vrais à 8 % ; "off" arrête.
+  // Simulation (deviceSim command): "mouse 12" adds a fake device;
+  // "all 8" sets all the real ones to 8 %; "off" stops.
   property var sim: null
   property real simAll: -1
   function simulate(spec) {
