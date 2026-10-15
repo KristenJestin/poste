@@ -150,7 +150,7 @@ F008A	battery-vertical-charging	0		md-battery_charging_80	panels/power
 F008B	battery-vertical-charging	0		md-battery_charging_90	panels/power
 F008E	battery-vertical	0	battery	md-battery_outline	poste.island
 F009A	bell	0		md-bell	notifications,poste.island,poste.notifications
-F009B	bell-off	0		md-bell_off	bar,menu
+F009B	bell-off	0		md-bell_off	bar,menu,poste.island
 F009E	bell-ringing	0	bell	md-bell_ring	poste.island
 F00AF	bluetooth	0		md-bluetooth	menu,panels/audio,panels/bluetooth,poste.island
 F00B1	bluetooth-connected	0		md-bluetooth_connect	panels/bluetooth,poste.island
