@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Mélodie (open address)
+Exec=@HOME@/.local/bin/melodie open %u
+Terminal=false
+NoDisplay=true
+MimeType=x-scheme-handler/melodie;

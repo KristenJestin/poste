@@ -18,6 +18,9 @@ its data repository), and plugged in once `melodie` is in the `PATH` (`requires`
   the sound source pill opens the launcher on the extension (Mélodie has no window of its own).
   Everything else on the card (title, cover, progress, controls) is the island's generic card.
 - **Command**: `poste melodie <command>` passes the command as is to `melodie`.
+- **App**: `bootstrap/files/melodie.desktop` puts « Mélodie » (its window, `melodie-desktop`) among the
+  launcher's apps, and `melodie-open.desktop` opens `melodie:` addresses (`xdg-open melodie:album/<id>`)
+  with `melodie open`. Mélodie installs neither.
 
 ## Install and login
 
