@@ -68,6 +68,13 @@ racine `~/.local/share/poste/current`, qui désigne le clone (mode dev) ou une v
 - Élagage : après un `sync` en release, seules les 3 versions les plus récentes (date de
   construction) restent, plus celle de `current` si elle est plus ancienne ; jamais celle de
   `current`.
+- Relais (`sync` et `use`, sauf `--dry-run`) : une fois `current` posé, si le `poste-sys` de la
+  nouvelle racine (`target/release/poste-sys`, construit d'abord pour le clone) diffère de celui
+  qui tourne, celui-ci lui passe la main (`exec`) par la commande cachée `poste-sys finish`
+  (`--yes`, `--prune`, `--reload-shell`, `--reload-hypr`) : `setup`, élagage et rechargement sont
+  faits par le nouveau programme, qui connaît les nouveautés de sa version (par exemple les
+  minuteurs systemd). Le programme relayé ne repasse jamais la main (`POSTE_SYS_RELAYED`). Les
+  options de `finish` ne changent pas d'une version à l'autre : on en ajoute seulement.
 - Lecture seule en release : `add` et `setup --take-home` écrivent dans le dépôt, ils sont refusés
   tant que `current` désigne une version (passer en dev). `import-chezmoi`, `git` et `cd` travaillent
   toujours sur le clone.

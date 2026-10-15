@@ -1,6 +1,7 @@
 //! `poste-sys` : gestion du dépôt poste (construction, installation, état, git).
 
 mod config;
+mod handoff;
 mod ignore;
 mod import;
 mod lines;
@@ -132,6 +133,19 @@ enum Cmd {
     },
     /// Source, racine (current) et versions installées
     Versions,
+    /// Suite de sync et de use, lancée par un ancien poste-sys qui passe la main (voir handoff)
+    #[command(hide = true)]
+    Finish {
+        #[arg(short, long)]
+        yes: bool,
+        /// Retire les anciennes versions après setup
+        #[arg(long)]
+        prune: bool,
+        #[arg(long)]
+        reload_shell: bool,
+        #[arg(long)]
+        reload_hypr: bool,
+    },
     /// Affiche le chemin du dépôt (cd "$(poste sys cd)")
     Cd,
 }
@@ -277,6 +291,20 @@ fn run(cli: Cli) -> Result<ExitCode> {
                 },
             )?;
             reload::apply(&done.need, yes, dry_run, &setup::confirm)?;
+            Ok(done.code)
+        }
+        Cmd::Finish {
+            yes,
+            prune,
+            reload_shell,
+            reload_hypr,
+        } => {
+            let need = reload::Need {
+                shell: reload_shell,
+                hypr: reload_hypr,
+            };
+            let done = sync::finish(&env, yes, prune, need, false)?;
+            reload::apply(&done.need, yes, false, &setup::confirm)?;
             Ok(done.code)
         }
         Cmd::Versions => {

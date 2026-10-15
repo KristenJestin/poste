@@ -10,7 +10,7 @@
 
 use crate::reload::{self, Need};
 use crate::versions::{self, Fetcher};
-use crate::{setup, util};
+use crate::{handoff, setup, util};
 use anyhow::{bail, Context, Result};
 use poste_core::{Config, Env, Source};
 use std::path::{Path, PathBuf};
@@ -65,11 +65,6 @@ fn data_repo(env: &Env, cfg: &Config) -> Result<Option<PathBuf>> {
 }
 
 pub fn run(env: &Env, cfg: &Config, f: &Fetcher, yes: bool, dry_run: bool) -> Result<Synced> {
-    let mut opts = setup::Opts {
-        yes,
-        dry_run,
-        ..Default::default()
-    };
     let mut dirs = Vec::new();
     if cfg.source == Source::Dev {
         dirs.push(util::clone(env, cfg)?);
@@ -105,16 +100,52 @@ pub fn run(env: &Env, cfg: &Config, f: &Fetcher, yes: bool, dry_run: bool) -> Re
     if let Some(o) = &old {
         versions::add_root_changes(&mut need, Some(o), &root)?;
     }
-    opts.link_root = versions::link_root(env, &root);
+    for (dir, from) in &before {
+        reload::add_changes(&mut need, dir, from, &reload::head(dir)?)?;
+    }
+    let prune = cfg.source == Source::Release;
+    if dry_run {
+        let opts = setup::Opts {
+            yes,
+            dry_run,
+            link_root: versions::link_root(env, &root),
+            ..Default::default()
+        };
+        let done = setup::run(env, &root, &opts)?;
+        return Ok(Synced {
+            code: done.code,
+            need,
+        });
+    }
+    if let Some(bin) = handoff::prepare(&root, false)? {
+        return Err(handoff::relay(&bin, &need, yes, prune));
+    }
+    finish(env, yes, prune, need, false)
+}
+
+/// La suite de `sync` (et de `use`), une fois `current` posé : `setup` depuis `current`, élagage
+/// des anciennes versions si `prune`. Lancée aussi par un ancien `poste-sys` qui passe la main
+/// (`poste-sys finish`, voir `handoff`).
+pub fn finish(
+    env: &Env,
+    yes: bool,
+    prune: bool,
+    mut need: Need,
+    skip_build: bool,
+) -> Result<Synced> {
+    let root = env.current_link();
+    let opts = setup::Opts {
+        yes,
+        skip_build,
+        link_root: versions::link_root(env, &root),
+        ..Default::default()
+    };
     let done = setup::run(env, &root, &opts)?;
     if done.config_changed {
         need.shell = true;
         need.hypr = true;
     }
-    for (dir, from) in &before {
-        reload::add_changes(&mut need, dir, from, &reload::head(dir)?)?;
-    }
-    if cfg.source == Source::Release && !dry_run {
+    if prune {
         let removed = versions::prune(env, versions::KEEP)?;
         if !removed.is_empty() {
             println!("Anciennes versions retirées : {}.", removed.join(", "));

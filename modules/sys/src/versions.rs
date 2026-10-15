@@ -8,7 +8,7 @@
 
 use crate::reload::Need;
 use crate::util::{self, sha256_file};
-use crate::{machine, setup};
+use crate::{handoff, machine, setup, sync};
 use anyhow::{bail, Context, Result};
 use poste_core::{Config, Env, Source};
 use std::collections::{BTreeMap, BTreeSet};
@@ -587,14 +587,13 @@ pub fn switch(env: &Env, source: Source, dir: &Path, o: &setup::Opts) -> Result<
         );
     }
     point_current(env, dir)?;
-    let done = setup::run(env, &env.current_link(), o)?;
-    if done.config_changed {
-        need.shell = true;
-        need.hypr = true;
+    if let Some(bin) = handoff::prepare(&env.current_link(), o.skip_build)? {
+        return Err(handoff::relay(&bin, &need, o.yes, false));
     }
+    let done = sync::finish(env, o.yes, false, need, o.skip_build)?;
     Ok(Switched {
         code: done.code,
-        need,
+        need: done.need,
     })
 }
 
