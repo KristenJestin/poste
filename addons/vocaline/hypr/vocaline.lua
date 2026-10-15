@@ -1,8 +1,8 @@
--- Module vocaline : touche de dictée Vocaline (chargé par hyprland.lua).
--- Installé par `poste sys setup` dans ~/.local/share/poste/modules/vocaline/hypr/.
+-- Vocaline module: Vocaline dictation key (loaded by hyprland.lua).
+-- Installed by `poste sys setup` in ~/.local/share/poste/modules/vocaline/hypr/.
 
--- SUPER+A : appui = `vocaline press`, relâchement = `vocaline release`. Maintenir pour parler,
--- ou taper pour démarrer puis taper encore pour arrêter. Rien ne s'écrit pendant qu'on parle :
--- le texte se voit sous l'île, et Vocaline le colle d'un bloc à l'arrêt.
-o.bind("SUPER + A", "Dictée (Vocaline)", "poste vocaline press")
+-- SUPER+A: press = `vocaline press`, release = `vocaline release`. Hold to talk,
+-- or tap to start then tap again to stop. Nothing is typed while you talk:
+-- the text shows under the island, and Vocaline pastes it in one block at the stop.
+o.bind("SUPER + A", "Dictation (Vocaline)", "poste vocaline press")
 o.bind("SUPER + A", nil, "poste vocaline release", { release = true })

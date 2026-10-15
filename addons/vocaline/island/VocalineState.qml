@@ -2,12 +2,12 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 
-// Dictée Vocaline, lue sur le socket du démon (module vocaline), fournie au slot « dictation »
-// de l'île (island/island.json). Le flux donne un objet JSON par ligne : hello, state, level,
-// partial, final, silence, error ; ce qui est inconnu ou mal formé est ignoré. Vocaline colle
-// toute la dictée une seule fois, à l'arrêt : le bandeau, sous l'île, est le seul endroit où
-// le texte se voit pendant qu'on parle. Démon absent ou flux coupé : rien n'est en cours,
-// nouvel essai 5 s plus tard, sans rien écrire au journal.
+// Vocaline dictation, read on the daemon's socket (vocaline module), provided to the 'dictation' slot
+// of the island (island/island.json). The stream gives one JSON object per line: hello, state, level,
+// partial, final, silence, error; what is unknown or malformed is ignored. Vocaline pastes
+// the whole dictation only once, at the stop: the banner, under the island, is the only place where
+// the text can be seen while you talk. Daemon absent or stream cut: nothing is in progress,
+// new try 5 s later, without writing anything to the log.
 Item {
   id: voc
   readonly property string socketPath: (Quickshell.env("XDG_RUNTIME_DIR") || "/tmp") + "/vocaline.sock"
@@ -15,17 +15,17 @@ Item {
   property string phase: "idle"         // idle, loading, listening, stopping
   readonly property bool listening: phase === "loading" || phase === "listening"
   readonly property bool transcribing: phase === "stopping"
-  // Niveau courant de 0 à 1, à l'échelle de voxtype, que le bandeau échantillonne à cadence fixe.
-  // Le démon en envoie 10 par seconde (voxtype, 100) : entre deux évènements le niveau glisse vers
-  // le suivant au lieu de sauter, pour que l'onde ne fasse pas d'escalier.
+  // Current level from 0 to 1, on voxtype's scale, which the banner samples at a fixed rate.
+  // The daemon sends 10 per second (voxtype, 100): between two events the level glides to
+  // the next one instead of jumping, so that the wave does not make a staircase.
   property real level: 0
   Behavior on level { NumberAnimation { duration: 100; easing.type: Easing.InOutQuad } }
-  // Le rms de Vocaline est le volume efficace des 100 dernières ms ; celui de voxtype est le pic de
-  // fenêtres de 10 ms divisé par racine de 2, donc plus fort sur la parole (facteur de crête de
-  // 2 à 3 : estimé, pas mesuré au micro). Ce gain ramène Vocaline à l'échelle de voxtype.
+  // Vocaline's rms is the effective volume of the last 100 ms; voxtype's is the peak of
+  // 10 ms windows divided by the square root of 2, hence stronger on speech (crest factor of
+  // 2 to 3: estimated, not measured on the microphone). This gain brings Vocaline to voxtype's scale.
   readonly property real voxRmsGain: 1.8
-  property string finals: ""            // phrases figées de cette dictée
-  property string partial: ""           // phrase en cours
+  property string finals: ""            // frozen sentences of this dictation
+  property string partial: ""           // sentence in progress
   property int partialUtterance: -1
 
   function reset() {
@@ -41,19 +41,19 @@ Item {
     if (!ev || typeof ev !== "object") return
     if (ev.type === "state") {
       var s = String(ev.state || "")
-      if (["idle", "loading", "listening", "stopping"].indexOf(s) === -1) return   // inconnu : ignoré
+      if (["idle", "loading", "listening", "stopping"].indexOf(s) === -1) return   // unknown: ignored
       var was = phase
       phase = s
-      // Fin (un partial encore ouvert est jeté), ou nouvelle dictée : le texte disparaît. La
-      // phase change d'abord, pour que l'île ne recopie pas un texte à moitié effacé.
+      // End (a partial still open is dropped), or new dictation: the text disappears. The
+      // phase changes first, so that the island does not copy a half-erased text.
       if (s === "idle" || was === "idle") reset()
     } else if (ev.type === "level") {
       if (!listening) return
-      // Mise à l'échelle de voxtype (voxRmsGain), puis la même formule que l'île pour voxtype.
+      // Scaled to voxtype (voxRmsGain), then the same formula as the island for voxtype.
       level = Math.min(1, Math.sqrt(Math.max(0, (Number(ev.rms) || 0) * voxRmsGain)) * 2.2)
     } else if (ev.type === "partial") {
       if (phase === "idle") return
-      // Dernière lecture du moteur : elle remplace la précédente (elle peut raccourcir).
+      // Last reading of the engine: it replaces the previous one (it can get shorter).
       partialUtterance = Number(ev.utterance)
       partial = String(ev.text || "").trim()
     } else if (ev.type === "final") {
@@ -67,10 +67,10 @@ Item {
     }
   }
 
-  // Le flux est lu sur le socket du démon (commande `watch`), sans passer par un processus : rien
-  // ne dépend de la façon dont le programme vide sa sortie dans un tuyau. Après un échec, un
-  // Socket de Quickshell garde sa connexion morte et ne réessaie plus : on en recrée un à chaque
-  // essai, et seulement quand le socket existe (chaque échec écrirait un avertissement au journal).
+  // The stream is read on the daemon's socket (`watch` command), without going through a process: nothing
+  // depends on how the program flushes its output into a pipe. After a failure, a
+  // Quickshell Socket keeps its dead connection and no longer retries: a new one is created at each
+  // try, and only when the socket exists (each failure would write a warning to the log).
   property bool linked: !!link.item && link.item.connected
   Loader {
     id: link
