@@ -15,11 +15,11 @@ use std::path::PathBuf;
 
 const USAGE: &str = "\
 Usage: poste usage [agent…] [--all] [--refresh] [--json]
-        poste usage history [agent…] [--since <date>] [--json]
-        poste usage calls [--since <date>] [--until <date>] [--agent claude|codex] [--json]
-        poste usage windows [--since <date>] [--until <date>] [--agent claude|codex] [--json]
-                poste usage compare <period A> <period B> [--agent claude|codex] [--json]
-        poste usage record
+       poste usage history [agent…] [--since <date>] [--json]
+       poste usage calls [--since <date>] [--until <date>] [--agent claude|codex] [--json]
+       poste usage windows [--since <date>] [--until <date>] [--agent claude|codex] [--json]
+       poste usage compare <period A> <period B> [--agent claude|codex] [--json]
+       poste usage record
 
     agent      claude (default), codex…: one file per agent in Omarchy's collector
     --all      all the agents recorded
