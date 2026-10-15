@@ -20,6 +20,7 @@ import Quickshell.Wayland
 import qs.Commons
 import "components"
 import "components/ModulePlayers.js" as ModulePlayers
+import "components/WorkspaceGroups.js" as WorkspaceGroups
 import "bandeau"
 import "file:///usr/share/flea/shelf" as Flea
 
@@ -215,10 +216,11 @@ Item {
   }
 
   // ---------------------------------------------------------------- workspaces
-  // Per-monitor workspaces (see ~/.config/hypr/monitors.lua): left 1-10,
-  // center 11-20, right 21-30, any other screen 31-40. State comes straight
-  // from hyprctl on every workspace/window event.
-  // Read from workspace_monitors in monitors.lua, so each machine keeps its own list.
+  // Per-monitor workspaces (see ~/.config/hypr/bindings.lua): each screen has
+  // its own block of ten, the screens of workspace_monitors (monitors.lua) in
+  // their order (1-10, 11-20...), any other screen the block Hyprland gave it
+  // when it arrived (screen-slots). State comes straight from hyprctl on every
+  // workspace/window event.
   // An entry is a port name (DP-1) or "desc:" + the start of the screen's EDID
   // description, matched like Hyprland does.
   property var workspaceMonitors: []
@@ -240,19 +242,21 @@ Item {
     onLoaded: root.workspaceMonitors = root.parseWorkspaceMonitors(text())
     onLoadFailed: root.workspaceMonitors = []
   }
+  // Blocks of the screens outside the list, written by Hyprland (bindings.lua).
+  property var screenSlots: ({})
+  FileView {
+    id: slotsFile
+    path: Quickshell.env("XDG_RUNTIME_DIR") + "/poste/screen-slots"
+    watchChanges: true
+    printErrors: false
+    onFileChanged: reload()
+    onLoaded: root.screenSlots = WorkspaceGroups.parseSlots(text())
+    onLoadFailed: root.screenSlots = ({})
+  }
   // Screen name -> EDID description, from hyprctl.
   property var monitorDescriptions: ({})
-  function screenMatches(entry, screenName) {
-    if (entry.indexOf("desc:") === 0) {
-      var want = entry.slice(5).trim()
-      return String(monitorDescriptions[screenName] || "").indexOf(want) === 0
-    }
-    return entry === screenName
-  }
   function workspaceSlot(screenName) {
-    for (var i = 0; i < workspaceMonitors.length; i++)
-      if (screenMatches(workspaceMonitors[i], screenName)) return i
-    return workspaceMonitors.length
+    return WorkspaceGroups.screenSlot(workspaceMonitors, screenSlots, screenName, monitorDescriptions[screenName])
   }
   function workspaceOffset(screenName) {
     return workspaceSlot(screenName) * 10
@@ -276,6 +280,9 @@ Item {
       // A re-wired monitors.lua (link to another file) does not trigger
       // watchChanges: it is read again when Hyprland reloads its config.
       if (event.name === "configreloaded") monitorsFile.reload()
+      // The file may not exist yet at start (no watch then), and Hyprland
+      // writes it before it renumbers the new screen's workspace.
+      if (/monitor|workspace/.test(event.name)) slotsFile.reload()
       if (/workspace|window|monitor|focus|fullscreen/.test(event.name)) root.refreshWorkspaces()
     }
   }

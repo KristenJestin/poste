@@ -29,12 +29,17 @@
 -- o.bind("SUPER + PERIOD", nil, "omarchy-shell shell toggle omarchy.emojis")
 
 -- --- Workspaces per screen ------------------------------------------------
--- SUPER+N goes to workspace N of the active screen (screens defined in
--- workspace_monitors, monitors.lua). Replaces Omarchy's SUPER+1..0.
+-- Every screen has its own workspaces 1 to 10, held in its own block of ten
+-- (its slot): the first screen of workspace_monitors (monitors.lua) 1-10, the
+-- second 11-20, and so on. A screen outside that list (a projector, a dock, a
+-- virtual output) takes, when it arrives, the first block that no plugged
+-- screen holds and keeps it while plugged; it gets it back when it returns if
+-- no other screen took it meanwhile. SUPER+N goes to workspace N of the active
+-- screen. Replaces Omarchy's SUPER+1..0.
 
--- Does an entry of workspace_monitors designate this screen? Port name
--- (DP-1) or EDID description (desc:AOC 24G2W1G3- …), compared with the start of the
--- description like Hyprland does.
+-- Does an entry of workspace_monitors name this screen? A port name (DP-1) or
+-- an EDID description (desc:AOC 24G2W1G3- ...), matched against the start of
+-- the description as Hyprland does.
 local function screen_matches(entry, monitor)
   if entry:sub(1, 5) == "desc:" then
     local want = entry:sub(6):match("^%s*(.-)%s*$")
@@ -43,15 +48,123 @@ local function screen_matches(entry, monitor)
   return monitor.name == entry
 end
 
-local function monitor_workspace(n)
-  local monitor = hl.get_active_monitor()
-  local slot = #workspace_monitors
+-- Slot of a screen of workspace_monitors, nil for any other.
+local function listed_slot(monitor)
   for index, entry in ipairs(workspace_monitors) do
-    if monitor and screen_matches(entry, monitor) then
-      slot = index - 1
-      break
+    if screen_matches(entry, monitor) then return index - 1 end
+  end
+end
+
+-- Slots of the screens outside the list, one "<name> <slot>" per line. The
+-- island (poste.island) and the bar (poste.workspaces) read it too.
+local slots_dir = (os.getenv("XDG_RUNTIME_DIR") or "/tmp") .. "/poste"
+local slots_path = slots_dir .. "/screen-slots"
+
+-- Read once per config load and kept here: SUPER+N reads no file. A slot
+-- inside the list (the list grew since) is dropped.
+local slots = {}
+do
+  local file = io.open(slots_path, "r")
+  if file then
+    for line in file:lines() do
+      local name, slot = line:match("^(%S+)%s+(%d+)$")
+      if name and tonumber(slot) >= #workspace_monitors then slots[name] = tonumber(slot) end
+    end
+    file:close()
+  end
+end
+
+local slots_dir_made = false
+local function write_slots()
+  if not slots_dir_made then
+    os.execute("mkdir -p '" .. slots_dir:gsub("'", "'\\''") .. "'")
+    slots_dir_made = true
+  end
+  local names = {}
+  for name in pairs(slots) do names[#names + 1] = name end
+  table.sort(names)
+  local file = io.open(slots_path, "w")
+  if not file then return end
+  for _, name in ipairs(names) do file:write(name, " ", slots[name], "\n") end
+  file:close()
+end
+
+local function screen_slot(monitor)
+  return listed_slot(monitor) or slots[monitor.name] or #workspace_monitors
+end
+
+-- Gives a screen outside the list its slot: the one it had, unless a plugged
+-- screen holds it now, else the first block that no plugged screen holds and
+-- that no workspace uses (those of an unplugged screen wait for it there).
+local function claim_slot(monitor)
+  local listed = listed_slot(monitor)
+  if listed then return listed end
+  local held = {}
+  for _, other in ipairs(hl.get_monitors()) do
+    if other.name ~= monitor.name then
+      local slot = listed_slot(other) or slots[other.name]
+      if slot then held[slot] = true end
     end
   end
+  local slot = slots[monitor.name]
+  if slot == nil or held[slot] then
+    local used = {}
+    local shown = monitor.active_workspace
+    for _, workspace in ipairs(hl.get_workspaces()) do
+      if workspace.id > 0 and not (shown and workspace.id == shown.id) then
+        used[(workspace.id - 1) // 10] = true
+      end
+    end
+    slot = #workspace_monitors
+    while held[slot] or used[slot] do slot = slot + 1 end
+  end
+  local changed = slots[monitor.name] ~= slot
+  for name, other in pairs(slots) do
+    if other == slot and name ~= monitor.name then
+      slots[name] = nil
+      changed = true
+    end
+  end
+  if changed then
+    slots[monitor.name] = slot
+    write_slots()
+  end
+  return slot
+end
+
+-- A screen that arrives shows one of its own workspaces. Hyprland gave a
+-- screen no rule names the first free number: that new, empty workspace takes
+-- the first number of its block, or, when the block still holds workspaces
+-- (the screen comes back), those come to it and the first one is shown.
+local function settle(monitor)
+  local first = claim_slot(monitor) * 10 + 1
+  local shown = monitor.active_workspace
+  if shown and shown.id >= first and shown.id < first + 10 then return end
+  local own = {}
+  for _, workspace in ipairs(hl.get_workspaces()) do
+    if workspace.id >= first and workspace.id < first + 10 then own[#own + 1] = workspace.id end
+  end
+  if #own == 0 then
+    if shown and shown.id > 0 and shown.windows == 0 then
+      hl.dispatch(hl.dsp.workspace.change_id({ workspace = tostring(shown.id), id = first }))
+    end
+    return
+  end
+  table.sort(own)
+  for _, id in ipairs(own) do
+    hl.dispatch(hl.dsp.workspace.move({ workspace = tostring(id), monitor = monitor.name }))
+  end
+  monitor:set_workspace({ workspace = tostring(own[1]) })
+end
+
+hl.on("monitor.added", settle)
+-- On a config reload, the plugged screens outside the list keep their slots,
+-- or get one if they have none yet.
+for _, monitor in ipairs(hl.get_monitors()) do claim_slot(monitor) end
+
+local function monitor_workspace(n)
+  local monitor = hl.get_active_monitor()
+  local slot = monitor and screen_slot(monitor) or #workspace_monitors
   return tostring(slot * 10 + n)
 end
 
