@@ -33,12 +33,8 @@ n'est pas dans poste : ce module ne fait que le relier à l'île et à Hyprland.
 
 ## Configuration de la machine
 
-Le programme est `vocaline` du PATH. Pour un autre chemin (version d'essai, par exemple), la clé
-`bin` de `~/.config/poste/vocaline.toml`, posé par le dépôt de données de la machine :
-
-```toml
-bin = "~/chemin/vers/vocaline"
-```
+The program is `vocaline` from the `PATH` (or `~/.local/bin`): the add-on is plugged in only
+when it is there. To try another build, put it first in the `PATH` under the name `vocaline`.
 
 La config de Vocaline lui-même (`~/.config/vocaline/`) se range aussi dans le dépôt de données de
 la machine, jamais dans poste.

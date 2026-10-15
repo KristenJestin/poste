@@ -31,11 +31,6 @@ impl Need {
             ["modules" | "addons", _, "hypr", ..] | ["modules" | "addons", _, "module.toml"] => {
                 self.hypr = true
             }
-            // The data repository's poste.toml can plug or unplug add-ons and modules.
-            ["poste.toml"] => {
-                self.shell = true;
-                self.hypr = true
-            }
             _ => {}
         }
     }
@@ -185,13 +180,6 @@ mod tests {
             need(&["addons/vocaline/hypr/vocaline.lua"]),
             Need {
                 shell: false,
-                hypr: true
-            }
-        );
-        assert_eq!(
-            need(&["poste.toml"]),
-            Need {
-                shell: true,
                 hypr: true
             }
         );

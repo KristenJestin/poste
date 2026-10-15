@@ -403,7 +403,10 @@ fn succeeds(cmd: &[String]) -> bool {
 
 pub fn have(env: &Env, bin: &str) -> bool {
     let in_dirs = |dirs: &[PathBuf]| dirs.iter().any(|d| d.join(bin).is_file());
+    // ~/.local/bin too: a setup run without it in its PATH (script, timer) must still find the
+    // programs installed there, or it would unplug their add-ons.
     in_dirs(&env.path)
+        || env.bin_dir().join(bin).is_file()
         || std::env::var_os("PATH")
             .map(|p| in_dirs(&std::env::split_paths(&p).collect::<Vec<_>>()))
             .unwrap_or(false)

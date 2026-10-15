@@ -7,8 +7,7 @@
   dépôt, et ce module ne réimplémente rien de Vocaline (il passe les commandes telles quelles).
 - Le contrat du flux est `docs/events.md` du dépôt Vocaline : un type ou un champ inconnu est ignoré.
 - Aucun chemin propre à une machine dans le module (ni le chemin d'une version d'essai, ni la config
-  de Vocaline) : `~/.config/poste/vocaline.toml` et `~/.config/vocaline/` viennent du dépôt de
-  données de la machine.
+  de Vocaline) : `~/.config/vocaline/` vient du dépôt de données de la machine.
 - Aucun texte dicté dans un fichier, un journal ni un message de commit.
 - Le module ne connaît l'île que par `island/` (slot `dictation`) ; la touche est dans
   `hypr/vocaline.lua`, jamais dans `config/`. SUPER+A (voxtype) ne doit pas changer.

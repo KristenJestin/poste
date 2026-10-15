@@ -24,8 +24,10 @@ git -C "$repo" archive --format=tar HEAD config bootstrap modules addons | tar -
 for m in "$stage"/modules/*/ "$stage"/addons/*/; do
   [[ -d $m ]] || continue
   n="$(basename "$m")"
+  keep=bootstrap
+  [[ $m == "$stage"/addons/* ]] || keep="poste-$n"
   find "$m" -mindepth 1 -maxdepth 1 \
-    ! -name module.toml ! -name island ! -name hypr ! -name bin ! -name systemd ! -name bootstrap \
+    ! -name module.toml ! -name island ! -name hypr ! -name bin ! -name systemd ! -name "$keep" \
     ! -name "poste-$n" -exec rm -rf {} +
 done
 

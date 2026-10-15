@@ -395,7 +395,10 @@ pub fn addon_list(env: &Env, repo: &Path) -> Result<()> {
         let state = match (chosen, a.missing(env), installed) {
             (false, _, true) => "not chosen, still installed (poste sys setup removes it)".into(),
             (false, _, false) => "available".into(),
-            (true, Some(p), _) => format!("chosen, {p} not installed yet (poste sys setup)"),
+            (true, Some(p), true) => {
+                format!("chosen, {p} not found: still plugged in (poste sys setup removes it)")
+            }
+            (true, Some(p), false) => format!("chosen, {p} not installed yet (poste sys setup)"),
             (true, None, true) => "chosen, plugged in".into(),
             (true, None, false) => "chosen, not plugged in yet (poste sys setup)".into(),
         };

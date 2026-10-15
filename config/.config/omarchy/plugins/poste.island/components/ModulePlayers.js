@@ -22,8 +22,11 @@ function declaration(module, block) {
 function extras(players, bus, metadata) {
   var meta = metadata || {}
   var decl = null
-  for (var i = 0; i < (players || []).length; i++)
-    if (str(bus) !== "" && players[i].bus === bus) { decl = players[i]; break }
+  // The exact name, or the same name with an instance suffix (MPRIS allows `<name>.<instance>`).
+  for (var i = 0; i < (players || []).length; i++) {
+    var b = players[i].bus
+    if (str(bus) !== "" && (bus === b || bus.indexOf(b + ".") === 0)) { decl = players[i]; break }
+  }
   if (!decl) return { detail: "", hasAction: false, actionOn: false, like: [], launcher: "" }
   var hasAction = decl.starred !== "" && decl.like.length > 0
   return {

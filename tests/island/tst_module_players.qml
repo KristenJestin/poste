@@ -40,6 +40,12 @@ TestCase {
     verify(!e.actionOn)
   }
 
+  function test_instance_suffix() {
+    var players = [ModulePlayers.declaration("m", block)]
+    verify(ModulePlayers.extras(players, "org.mpris.MediaPlayer2.example.instance42", {}).hasAction)
+    verify(!ModulePlayers.extras(players, "org.mpris.MediaPlayer2.examples", {}).hasAction)
+  }
+
   function test_other_player_stays_generic() {
     var players = [ModulePlayers.declaration("m", block)]
     var e = ModulePlayers.extras(players, "org.mpris.MediaPlayer2.other", { "example:starred": true })

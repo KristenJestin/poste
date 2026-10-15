@@ -184,7 +184,7 @@ pub fn print(env: &Env, orphans: &[Orphan]) {
                 } else if off.contains(module) {
                     "module désactivé sur cette machine"
                 } else {
-                    "le dépôt ne le produit plus"
+                    "no longer installed here: gone from the repository, add-on not chosen, or its program missing"
                 }
             ),
         }
