@@ -40,9 +40,9 @@ do
       local ok = chunk ~= nil
       if ok then ok, err = pcall(chunk) end
       if not ok then
-        local message = "poste : " .. file:gsub("^" .. dir:gsub("%p", "%%%0") .. "/", "") .. " : " .. tostring(err)
+        local message = "poste: " .. file:gsub("^" .. dir:gsub("%p", "%%%0") .. "/", "") .. ": " .. tostring(err)
         io.stderr:write(message .. "\n")
-        pcall(hl.exec_cmd, "notify-send -u critical 'Hyprland : module poste' " .. "'" .. message:gsub("'", "'\\''") .. "'")
+        pcall(hl.exec_cmd, "notify-send -u critical 'Hyprland: poste module' " .. "'" .. message:gsub("'", "'\\''") .. "'")
       end
     end
     handle:close()

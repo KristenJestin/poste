@@ -72,7 +72,7 @@ Both commands print, on stdout, a JSON array of entries:
 | `keywords` | more words matched by the fuzzy filter |
 | `verb` | label of the main action (`Open` by default; `Play` shows a play glyph) |
 | `action` | what Enter does (see below) |
-| `actions` | secondary actions, shown with → : `{ "label", "icon", "action" }` |
+| `actions` | secondary actions, shown with →: `{ "label", "icon", "action" }` |
 | `highlight` | optional `{ x, y, w, h, window }`: a frame drawn on screen around the target while the line is selected (only when the extension has `"highlight": true`) |
 
 An entry without `action` does nothing on Enter (a message line: 'Copying the library…').
