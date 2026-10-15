@@ -41,6 +41,14 @@ The reference implementation is `components/Launcher.qml` of the island.
 - `requires` (optional): a command that must be in the `PATH` (or `plugin:<id>`, an installed
   Omarchy plugin), one value or a list; otherwise the extension is hidden.
 
+### Nothing typed yet
+
+What `source.command` shows when the extension opens is the same rule for every extension:
+useful content when it has some (Music: playlists and mixes; Files: recent files), otherwise an
+empty array. Never a hint line ("Type a file name…": the field's placeholder already says it),
+and no counts or dates nobody asked for. A message line stays fine when something is wrong (see
+"Errors").
+
 ## Results
 
 Both commands print, on stdout, a JSON array of entries:

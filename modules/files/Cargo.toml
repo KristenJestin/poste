@@ -1,0 +1,25 @@
+[package]
+name = "poste-files"
+description = "Module files of poste: fast file search (index on disk, no daemon)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "poste-files"
+path = "src/main.rs"
+
+[dependencies]
+anyhow.workspace = true
+clap.workspace = true
+ignore = "0.4"
+neo_frizbee = "0.13"
+poste-core.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+toml.workspace = true
+zbus = "5"
+
+[dev-dependencies]
+tempfile.workspace = true

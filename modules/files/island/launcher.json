@@ -1,0 +1,34 @@
+{
+  "//": "Launcher extension of the files module (format: docs/launcher-format.md). SUPER+D opens the launcher straight on it (hypr/files.lua).",
+  "extensions": [
+    {
+      "id": "poste-files",
+      "name": "Files",
+      "subtitle": "Find a file or folder",
+      "icon": "󰥨",
+      "keywords": [
+        "fichier",
+        "fichiers",
+        "dossier",
+        "chercher",
+        "trouver",
+        "file",
+        "files",
+        "folder",
+        "find"
+      ],
+      "ttl": 20,
+      "source": {
+        "type": "script",
+        "command": "poste files home --json",
+        "search": "poste files search --json"
+      },
+      "keyword": [
+        "find",
+        "file",
+        "fichier"
+      ],
+      "rootItems": false
+    }
+  ]
+}
