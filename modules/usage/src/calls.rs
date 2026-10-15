@@ -1,18 +1,18 @@
-//! Appels aux modèles, relus dans les journaux des agents, doublons retirés.
+//! Calls to the models, read back from the agents' logs, duplicates removed.
 //!
-//! Claude Code : `~/.claude/projects/<projet>/<session>.jsonl` et, pour les sous-agents,
-//! `<projet>/<session>/subagents/[workflows/<id>/]agent-<id>.jsonl`. Une ligne `assistant` par bloc
-//! de contenu : le même appel (`requestId`) revient plusieurs fois, et une session reprise recopie
-//! l'historique de la précédente dans un nouveau fichier ; on le compte une fois (l'occurrence la
-//! plus complète). Effort : `perTurnEffort`, sinon `effort` de la ligne ; absent : inconnu.
+//! Claude Code: `~/.claude/projects/<project>/<session>.jsonl` and, for sub-agents,
+//! `<project>/<session>/subagents/[workflows/<id>/]agent-<id>.jsonl`. One `assistant` line per
+//! content block: the same call (`requestId`) comes back several times, and a resumed session copies
+//! the history of the previous one into a new file; it is counted once (the most
+//! complete occurrence). Effort: `perTurnEffort`, otherwise the line's `effort`; absent: unknown.
 //!
-//! Codex : `~/.codex/sessions/AAAA/MM/JJ/rollout-….jsonl`. Un appel par `token_usage_record`
-//! (`response_id`) ; les anciens fichiers n'en ont pas : un appel par événement `token_count` dont le
-//! total cumulé a bougé (le même événement est répété). Modèle et effort : le `turn_context` du
-//! tour. Sous-agent : `session_meta.source.subagent`.
+//! Codex: `~/.codex/sessions/YYYY/MM/DD/rollout-….jsonl`. One call per `token_usage_record`
+//! (`response_id`); the old files do not have any: one call per `token_count` event whose
+//! cumulative total moved (the same event is repeated). Model and effort: the `turn_context` of the
+//! turn. Sub-agent: `session_meta.source.subagent`.
 //!
-//! Tokens séparés : entrée hors cache, cache lu, cache écrit, sortie, et raisonnement (compris
-//! dans la sortie, chez les deux).
+//! Separate tokens: input outside the cache, cache read, cache written, output, and reasoning (included
+//! in the output, for both).
 
 use serde::Deserialize;
 use serde_json::{json, Value};
@@ -32,7 +32,7 @@ pub struct Call {
     pub effort: Option<String>,
     pub subagent: bool,
     pub tokens: Tokens,
-    /// Clé de dédoublonnage (`requestId`, `response_id`…), propre à l'agent.
+    /// Deduplication key (`requestId`, `response_id`…), specific to the agent.
     pub key: String,
 }
 
@@ -42,7 +42,7 @@ pub struct Tokens {
     pub cache_read: u64,
     pub cache_write: u64,
     pub output: u64,
-    /// Compris dans `output`.
+    /// Included in `output`.
     pub reasoning: u64,
 }
 
@@ -90,7 +90,7 @@ impl Call {
     }
 }
 
-/// Où sont les journaux.
+/// Where the logs are.
 #[derive(Debug, Clone)]
 pub struct Sources {
     pub claude: PathBuf,
@@ -98,7 +98,7 @@ pub struct Sources {
 }
 
 impl Sources {
-    /// `CLAUDE_CONFIG_DIR` (sinon `~/.claude`) et `CODEX_HOME` (sinon `~/.codex`), comme les outils.
+    /// `CLAUDE_CONFIG_DIR` (otherwise `~/.claude`) and `CODEX_HOME` (otherwise `~/.codex`), like the tools.
     pub fn from_env(home: &Path) -> Self {
         let dir = |var: &str, def: &str| {
             std::env::var_os(var)
@@ -136,7 +136,7 @@ impl Agent {
     }
 }
 
-/// Les appels de `[since, until)`, doublons retirés, triés par heure.
+/// The calls of `[since, until)`, duplicates removed, sorted by time.
 pub fn load(src: &Sources, agent: Option<Agent>, since: i64, until: i64) -> Vec<Call> {
     let mut all = Vec::new();
     if agent != Some(Agent::Codex) {
@@ -155,7 +155,7 @@ pub fn load(src: &Sources, agent: Option<Agent>, since: i64, until: i64) -> Vec<
     calls
 }
 
-/// Les `.jsonl` sous `root`, sauf ceux qui n'ont pas bougé depuis `since` (aucun appel après).
+/// The `.jsonl` files under `root`, except those that have not moved since `since` (no call after).
 fn jsonl_files(root: &Path, since: i64) -> Vec<PathBuf> {
     let mut out = Vec::new();
     let mut stack = vec![root.to_path_buf()];
@@ -185,7 +185,7 @@ fn jsonl_files(root: &Path, since: i64) -> Vec<PathBuf> {
     out
 }
 
-/// Une occurrence par (agent, clé) : la plus complète (le plus de tokens), à égalité la première.
+/// One occurrence per (agent, key): the most complete (the most tokens), on a tie the first.
 pub fn dedup(calls: Vec<Call>) -> Vec<Call> {
     let mut seen: HashMap<(&'static str, String), usize> = HashMap::new();
     let mut out: Vec<Call> = Vec::with_capacity(calls.len());
@@ -193,7 +193,7 @@ pub fn dedup(calls: Vec<Call>) -> Vec<Call> {
         match seen.get(&(c.agent, c.key.clone())) {
             Some(&i) => {
                 let kept = &mut out[i];
-                // Une copie dans le fichier d'un sous-agent dit qu'il en est un.
+                // A copy in a sub-agent's file says that it is one.
                 let sub = kept.subagent || c.subagent;
                 if c.tokens.total() > kept.tokens.total() {
                     *kept = c;
@@ -297,7 +297,7 @@ fn parse_claude_line(line: &str, in_subagents: bool, project_dir: &str) -> Optio
     }
     let msg = l.message?;
     let model = msg.model?;
-    // `<synthetic>` : message fabriqué par l'outil, aucun appel au modèle.
+    // `<synthetic>`: message made up by the tool, no call to the model.
     if model.starts_with('<') {
         return None;
     }
@@ -361,7 +361,7 @@ fn codex_usage(v: &Value) -> Option<CodexUsage> {
 }
 
 impl CodexUsage {
-    /// `input_tokens` compte aussi le cache lu : on le retire pour avoir l'entrée hors cache.
+    /// `input_tokens` also counts the cache read: we remove it to get the input outside the cache.
     fn tokens(self) -> Tokens {
         Tokens {
             input: self.input.saturating_sub(self.cached),
@@ -435,7 +435,7 @@ pub fn parse_codex_file(path: &Path) -> Vec<Call> {
                 ) else {
                     continue;
                 };
-                // Le même événement est répété (mise à jour des limites) : total inchangé, pas d'appel.
+                // The same event is repeated (limits update): total unchanged, no call.
                 if last_total == Some(total.total) {
                     continue;
                 }
@@ -452,7 +452,7 @@ pub fn parse_codex_file(path: &Path) -> Vec<Call> {
             _ => {}
         }
     }
-    // Les fichiers récents ont les deux : les enregistrements (avec response_id) font foi.
+    // The recent files have both: the records (with response_id) are authoritative.
     let picked = if records.is_empty() { counts } else { records };
     picked
         .into_iter()

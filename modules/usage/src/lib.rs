@@ -1,5 +1,5 @@
-//! Module usage : quotas des agents IA (collecteur d'Omarchy), historique des relevés, appels relus
-//! dans les journaux des agents, fenêtres de 5 h et comparaisons.
+//! Usage module: AI agent quotas (Omarchy's collector), history of the readings, calls read back
+//! from the agents' logs, 5 h windows and comparisons.
 
 pub mod calls;
 pub mod history;
@@ -14,25 +14,25 @@ use std::io::Write;
 use std::path::PathBuf;
 
 const USAGE: &str = "\
-Usage : poste usage [agent…] [--all] [--refresh] [--json]
+Usage: poste usage [agent…] [--all] [--refresh] [--json]
         poste usage history [agent…] [--since <date>] [--json]
         poste usage calls [--since <date>] [--until <date>] [--agent claude|codex] [--json]
         poste usage windows [--since <date>] [--until <date>] [--agent claude|codex] [--json]
-        poste usage compare <période A> <période B> [--agent claude|codex] [--json]
+                poste usage compare <period A> <period B> [--agent claude|codex] [--json]
         poste usage record
 
-  agent      claude (défaut), codex… : un fichier par agent dans le collecteur d'Omarchy
-  --all      tous les agents relevés
-  --refresh  refait le relevé avant d'afficher
-  --json     sortie JSON (une ligne par élément, pour jq ; compare : un objet)
-  history    l'historique des relevés (24 dernières heures par défaut)
-  calls      un appel par ligne, doublons retirés (24 dernières heures par défaut)
-  windows    les fenêtres de 5 h et leurs indicateurs (7 derniers jours par défaut)
-  compare    les indicateurs de deux périodes côte à côte ; période : <début>..<fin>
-             (fin absente : maintenant), ex. « 14 days ago..7 days ago » « 7 days ago.. »
-  record     relève tous les agents et ajoute à l'historique ce qui a changé (le minuteur)
+    agent      claude (default), codex…: one file per agent in Omarchy's collector
+    --all      all the agents recorded
+    --refresh  redoes the reading before showing
+    --json     JSON output (one line per element, for jq; compare: one object)
+    history    the history of the readings (last 24 hours by default)
+    calls      one call per line, duplicates removed (last 24 hours by default)
+    windows    the 5 h windows and their indicators (last 7 days by default)
+    compare    the indicators of two periods side by side; period: <start>..<end>
+               (end absent: now), e.g. '14 days ago..7 days ago' '7 days ago..'
+    record     reads all the agents and adds to the history what changed (the timer)
 
-Dates : ISO 8601 ou tout ce que comprend date -d (« 3 days ago », « yesterday 14:00 »…).
+Dates: ISO 8601 or anything date -d understands ('3 days ago', 'yesterday 14:00'…).
 ";
 
 struct Ctx {
@@ -51,7 +51,7 @@ impl Ctx {
     }
 }
 
-/// Options communes aux commandes de lecture.
+/// Options common to the reading commands.
 #[derive(Default)]
 struct Opts {
     since: Option<String>,
@@ -70,7 +70,7 @@ fn parse_opts(args: &[String]) -> Result<Opts> {
         let mut value = |name: &str| -> Result<String> {
             match it.next() {
                 Some(v) => Ok(v.clone()),
-                None => bail!("{name} demande une valeur"),
+                None => bail!("{name} needs a value"),
             }
         };
         match a.as_str() {
@@ -97,7 +97,7 @@ fn agent_filter(o: &Opts) -> Result<Option<Agent>> {
         None => Ok(None),
         Some(a) => match Agent::parse(a) {
             Some(x) => Ok(Some(x)),
-            None => bail!("agent inconnu : {a} (claude ou codex)"),
+            None => bail!("unknown agent: {a} (claude or codex)"),
         },
     }
 }
@@ -109,15 +109,15 @@ fn range(o: &Opts, default_since: &str) -> Result<(i64, i64)> {
         None => time::now() + 1,
     };
     if until <= since {
-        bail!("--until doit venir après --since");
+        bail!("--until must come after --since");
     }
     Ok((since, until))
 }
 
-/// `début..fin`, fin absente : maintenant.
+/// `start..end`, end absent: now.
 fn period(s: &str) -> Result<(i64, i64)> {
     let Some((a, b)) = s.split_once("..") else {
-        bail!("période illisible : {s} (attendu <début>..<fin>)");
+        bail!("unreadable period: {s} (expected <start>..<end>)");
     };
     let start = time::parse_user(a.trim())?;
     let end = if b.trim().is_empty() {
@@ -126,7 +126,7 @@ fn period(s: &str) -> Result<(i64, i64)> {
         time::parse_user(b.trim())?
     };
     if end <= start {
-        bail!("période vide : {s}");
+        bail!("empty period: {s}");
     }
     Ok((start, end))
 }
@@ -140,7 +140,7 @@ pub fn run(argv: &[String]) -> i32 {
     let env = match Env::from_process() {
         Ok(e) => e,
         Err(e) => {
-            eprintln!("poste usage : {e:#}");
+            eprintln!("poste usage: {e:#}");
             return 1;
         }
     };
@@ -164,7 +164,7 @@ pub fn run(argv: &[String]) -> i32 {
     match res {
         Ok(code) => code,
         Err(e) => {
-            eprintln!("poste usage {cmd} : {e:#}");
+            eprintln!("poste usage {cmd}: {e:#}");
             if e.to_string().starts_with("option inconnue") {
                 eprint!("{USAGE}");
             }
@@ -197,7 +197,7 @@ fn show_quota(ctx: &Ctx, o: &Opts) -> Result<i32> {
     for a in &agents {
         let f = dir.join(format!("{a}.json"));
         let (Some(v), Some(age)) = (quota::read(&f), quota::age(&f)) else {
-            eprintln!("{a} : aucun relevé (agent inconnu du collecteur d'Omarchy ?)");
+            eprintln!("{a}: no reading (agent unknown to Omarchy's collector?)");
             code = 1;
             continue;
         };
@@ -230,10 +230,7 @@ fn show_history(ctx: &Ctx, o: &Opts) -> Result<i32> {
     let (since, until) = range(o, "24 hours ago")?;
     let file = ctx.history_file();
     if !file.exists() {
-        eprintln!(
-            "poste usage history : pas encore d'historique ({})",
-            file.display()
-        );
+        eprintln!("poste usage history: no history yet ({})", file.display());
         return Ok(1);
     }
     let mut names = o.rest.clone();
@@ -262,13 +259,13 @@ fn show_calls(ctx: &Ctx, o: &Opts) -> Result<i32> {
         } else {
             let t = &c.tokens;
             buf.push_str(&format!(
-                "{}  {:<6} {:<8} {:<20} {:<7} {:<4} {:<20} entrée {} cache lu {} écrit {} sortie {} (raisonnement {})",
+                "{}  {:<6} {:<8} {:<20} {:<7} {:<4} {:<20} input {} cache read {} written {} output {} (reasoning {})",
                 time::local(c.t, "%d/%m %H:%M:%S"),
                 c.agent,
                 c.session.get(..8).unwrap_or(&c.session),
                 c.model,
                 c.effort.as_deref().unwrap_or("?"),
-                if c.subagent { "sous" } else { "" },
+                if c.subagent { "sub" } else { "" },
                 c.project,
                 stats::human(t.input),
                 stats::human(t.cache_read),
@@ -283,12 +280,12 @@ fn show_calls(ctx: &Ctx, o: &Opts) -> Result<i32> {
     Ok(0)
 }
 
-/// Fenêtres qui croisent [since, until), avec leurs indicateurs.
+/// Windows that cross [since, until), with their indicators.
 fn window_stats(ctx: &Ctx, agent: Option<Agent>, since: i64, until: i64) -> Vec<stats::Stats> {
     let entries = history::load(&ctx.history_file());
-    // Une fenêtre commencée avant `since` compte entière, et une fenêtre estimée part du premier
-    // appel après un temps calme : appels lus un jour plus tôt, pour que le découpage ne dépende
-    // pas de `--since` (sauf activité continue de plus d'un jour).
+    // A window started before `since` counts whole, and an estimated window starts from the first
+    // call after a quiet time: calls read one day earlier, so that the split does not depend
+    // on `--since` (except continuous activity of more than a day).
     let calls = calls::load(
         &ctx.sources(),
         agent,
@@ -314,7 +311,7 @@ fn show_windows(ctx: &Ctx, o: &Opts) -> Result<i32> {
 
 fn compare(ctx: &Ctx, o: &Opts) -> Result<i32> {
     let [a, b] = o.rest.as_slice() else {
-        bail!("compare demande deux périodes, ex. « 14 days ago..7 days ago » « 7 days ago.. »");
+        bail!("compare needs two periods, e.g. \"14 days ago..7 days ago\" \"7 days ago..\"");
     };
     let (pa, pb) = (period(a)?, period(b)?);
     let all = window_stats(ctx, agent_filter(o)?, pa.0.min(pb.0), pa.1.max(pb.1));

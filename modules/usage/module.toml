@@ -1,16 +1,16 @@
 name = "usage"
-description = "Quotas des agents IA (Claude Code, Codex…), leur historique, et la consommation relue dans les journaux des agents"
+description = "AI agent quotas (Claude Code, Codex…), their history, and the consumption read back from the agents' logs"
 commands = [
-  { name = "[agent]", description = "quotas d'un agent (claude par défaut), actualisés s'ils datent de plus de 5 min" },
-  { name = "--all", description = "quotas de tous les agents relevés" },
-  { name = "--refresh", description = "force un nouveau relevé avant d'afficher" },
-  { name = "--json", description = "l'enregistrement brut du collecteur (JSON)" },
-  { name = "history [agent] [--since <date>] [--json]", description = "historique des relevés (24 dernières heures par défaut)" },
-  { name = "calls [--since <date>] [--until <date>] [--agent claude|codex] [--json]", description = "un appel par ligne, doublons retirés : modèle, effort, sous-agent, tokens (entrée, cache lu/écrit, sortie, raisonnement)" },
-  { name = "windows [--since <date>] [--agent …] [--json]", description = "fenêtres de 5 h : pic, temps jusqu'au plafond, appels, sessions en parallèle, parts d'effort et de modèle, tokens par point" },
-  { name = "compare <début>..<fin> <début>..<fin> [--json]", description = "les indicateurs des fenêtres de deux périodes, côte à côte" },
-  { name = "record", description = "relève les quotas et ajoute à l'historique ce qui a changé (le minuteur, toutes les 5 min)" },
+  { name = "[agent]", description = "quotas of an agent (claude by default), refreshed if older than 5 min" },
+  { name = "--all", description = "quotas of all the agents recorded" },
+  { name = "--refresh", description = "forces a new reading before showing" },
+  { name = "--json", description = "the collector's raw record (JSON)" },
+  { name = "history [agent] [--since <date>] [--json]", description = "history of the readings (last 24 hours by default)" },
+  { name = "calls [--since <date>] [--until <date>] [--agent claude|codex] [--json]", description = "one call per line, duplicates removed: model, effort, sub-agent, tokens (input, cache read/write, output, reasoning)" },
+  { name = "windows [--since <date>] [--agent …] [--json]", description = "5 h windows: peak, time to the cap, calls, parallel sessions, effort and model shares, tokens per point" },
+  { name = "compare <start>..<end> <start>..<end> [--json]", description = "the indicators of the windows of two periods, side by side" },
+  { name = "record", description = "reads the quotas and adds to the history what changed (the timer, every 5 min)" },
 ]
 
-# Minuteur posé et activé par `poste sys setup` (son service poste-usage-record.service est à côté dans systemd/).
+# Timer put in place and enabled by `poste sys setup` (its service poste-usage-record.service is next to it in systemd/).
 units = ["poste-usage-record.timer"]

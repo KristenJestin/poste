@@ -1,10 +1,10 @@
-//! Heures : lecture ISO 8601 (UTC ou décalage), affichage à l'heure locale, dates données par
-//! l'utilisateur (tout ce que comprend `date -d`).
+//! Times: ISO 8601 reading (UTC or offset), display in local time, dates given by
+//! the user (anything `date -d` understands).
 
 use anyhow::{bail, Context, Result};
 use std::process::Command;
 
-/// (année, mois, jour) vers jours depuis 1970-01-01 (calendrier grégorien).
+/// (year, month, day) to days since 1970-01-01 (Gregorian calendar).
 fn days_from_civil(y: i64, m: u32, d: u32) -> i64 {
     let y = if m <= 2 { y - 1 } else { y };
     let era = y.div_euclid(400);
@@ -15,7 +15,7 @@ fn days_from_civil(y: i64, m: u32, d: u32) -> i64 {
     era * 146_097 + doe - 719_468
 }
 
-/// `2026-10-14T15:13:14.737Z`, `…+00:00`, `…+02:00` : secondes UTC (fraction ignorée).
+/// `2026-10-14T15:13:14.737Z`, `…+00:00`, `…+02:00`: UTC seconds (fraction ignored).
 pub fn parse_iso(s: &str) -> Option<i64> {
     let b = s.as_bytes();
     if b.len() < 19 || b[4] != b'-' || b[7] != b'-' || !matches!(b[10], b'T' | b' ') {
@@ -80,13 +80,13 @@ pub fn iso(secs: i64) -> String {
     poste_core::time::rfc3339(secs.max(0) as u64)
 }
 
-/// Heure locale selon `fmt` (strftime), par la libc : le fuseau de la machine.
+/// Local time according to `fmt` (strftime), through libc: the machine's time zone.
 pub fn local(secs: i64, fmt: &str) -> String {
     let t = secs as libc::time_t;
     let mut tm: libc::tm = unsafe { std::mem::zeroed() };
     let fmt = std::ffi::CString::new(fmt).unwrap_or_default();
     let mut buf = [0u8; 64];
-    // SAFETY : tm et buf sont à nous, tailles données à la libc.
+    // SAFETY: tm and buf are ours, sizes given to libc.
     let n = unsafe {
         if libc::localtime_r(&t, &mut tm).is_null() {
             return iso(secs);
@@ -101,7 +101,7 @@ pub fn short(secs: i64) -> String {
     local(secs, "%d/%m %H:%M")
 }
 
-/// Une durée en `2 h 05` ou `35 min`.
+/// A duration as `2 h 05` or `35 min`.
 pub fn duration(secs: i64) -> String {
     let m = secs.max(0) / 60;
     if m >= 60 {
@@ -111,8 +111,8 @@ pub fn duration(secs: i64) -> String {
     }
 }
 
-/// Une date donnée par l'utilisateur : ISO 8601 directement, sinon `date -d` (« 3 days ago »,
-/// « yesterday 14:00 », « 2026-10-01 »…).
+/// A date given by the user: ISO 8601 directly, otherwise `date -d` ("3 days ago",
+/// "yesterday 14:00", "2026-10-01"…).
 pub fn parse_user(s: &str) -> Result<i64> {
     if let Some(t) = parse_iso(s) {
         return Ok(t);
@@ -122,12 +122,12 @@ pub fn parse_user(s: &str) -> Result<i64> {
         .output()
         .context("cannot run date")?;
     if !out.status.success() {
-        bail!("date illisible : {s}");
+        bail!("unreadable date: {s}");
     }
     String::from_utf8_lossy(&out.stdout)
         .trim()
         .parse()
-        .with_context(|| format!("date illisible : {s}"))
+        .with_context(|| format!("unreadable date: {s}"))
 }
 
 pub fn now() -> i64 {
@@ -139,7 +139,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn lecture_iso() {
+    fn iso_parsing() {
         assert_eq!(parse_iso("1970-01-01T00:00:00Z"), Some(0));
         assert_eq!(parse_iso("2023-11-14T22:13:20Z"), Some(1_700_000_000));
         assert_eq!(
@@ -163,9 +163,9 @@ mod tests {
     }
 
     #[test]
-    fn date_utilisateur() {
+    fn user_date() {
         assert_eq!(parse_user("2023-11-14T22:13:20Z").unwrap(), 1_700_000_000);
         assert_eq!(parse_user("@1700000000").unwrap(), 1_700_000_000);
-        assert!(parse_user("pas une date").is_err());
+        assert!(parse_user("not a date").is_err());
     }
 }

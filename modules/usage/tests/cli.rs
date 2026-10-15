@@ -1,5 +1,5 @@
-//! Le binaire de bout en bout, sur des journaux et un collecteur inventés (dossier temporaire :
-//! jamais les vrais journaux, jamais le vrai historique).
+//! The binary end to end, on invented logs and an invented collector (temporary folder:
+//! never the real logs, never the real history).
 
 use serde_json::{json, Value};
 use std::fs;
@@ -28,14 +28,14 @@ fn assistant(t: &str, req: &str, session: &str, out: u64, extra: Value) -> Value
         "timestamp": t,
         "requestId": req,
         "sessionId": session,
-        "cwd": "/home/demo/projets/exemple",
+        "cwd": "/home/demo/projects/example",
         "isSidechain": false,
         "effort": "medium",
         "perTurnEffort": "high",
         "message": {
             "id": format!("msg_{req}"),
             "model": "claude-test-1",
-            "content": [{"type": "text", "text": "contenu inventé"}],
+            "content": [{"type": "text", "text": "invented content"}],
             "usage": {
                 "input_tokens": 10,
                 "cache_creation_input_tokens": 200,
@@ -56,9 +56,9 @@ fn assistant(t: &str, req: &str, session: &str, out: u64, extra: Value) -> Value
 fn fx() -> Fx {
     let d = tempfile::tempdir().unwrap();
     let home = d.path().join("home");
-    let proj = home.join(".claude/projects/-home-demo-projets-exemple");
-    // Session principale : le même appel en trois lignes (une incomplète), un message synthétique,
-    // un appel sans effort noté.
+    let proj = home.join(".claude/projects/-home-demo-projects-example");
+    // Main session: the same call on three lines (one incomplete), a synthetic message,
+    // a call with no effort noted.
     write(
         &proj.join("s1.jsonl"),
         &jsonl(&[
@@ -80,7 +80,7 @@ fn fx() -> Fx {
             },
         ]),
     );
-    // Session reprise : recopie req_b, puis un nouvel appel.
+    // Resumed session: copies req_b, then a new call.
     write(
         &proj.join("s2.jsonl"),
         &jsonl(&[
@@ -100,7 +100,7 @@ fn fx() -> Fx {
             ),
         ]),
     );
-    // Sous-agent, dans un sous-dossier.
+    // Sub-agent, in a sub-folder.
     write(
         &proj.join("s1/subagents/agent-a1.jsonl"),
         &jsonl(&[assistant(
@@ -111,18 +111,18 @@ fn fx() -> Fx {
             json!({"isSidechain": true}),
         )]),
     );
-    // Codex récent : enregistrements par réponse (et token_count, ignorés).
+    // Recent Codex: records per response (and token_count, ignored).
     let codex = home.join(".codex/sessions/2026/01/10");
     write(
         &codex.join("rollout-new.jsonl"),
         &jsonl(&[
-            json!({"timestamp": "2026-01-10T11:00:00Z", "type": "session_meta", "payload": {"id": "c1", "cwd": "/home/demo/projets/autre", "source": "cli"}}),
+            json!({"timestamp": "2026-01-10T11:00:00Z", "type": "session_meta", "payload": {"id": "c1", "cwd": "/home/demo/projects/other", "source": "cli"}}),
             json!({"timestamp": "2026-01-10T11:00:01Z", "type": "turn_context", "payload": {"turn_id": "t1", "model": "gpt-test", "effort": "high"}}),
             json!({"timestamp": "2026-01-10T11:00:05Z", "type": "token_usage_record", "payload": {"response_id": "resp_1", "turn_id": "t1", "usage": {"input_tokens": 1000, "cached_input_tokens": 800, "cache_write_input_tokens": 0, "output_tokens": 60, "reasoning_output_tokens": 20, "total_tokens": 1060}}}),
             json!({"timestamp": "2026-01-10T11:00:05Z", "type": "event_msg", "payload": {"type": "token_count", "info": {"total_token_usage": {"total_tokens": 1060}, "last_token_usage": {"input_tokens": 1000, "output_tokens": 60, "total_tokens": 1060}}}}),
         ]),
     );
-    // Codex ancien, sous-agent : seulement des token_count, dont un répété.
+    // Old Codex, sub-agent: only token_count, one of which is repeated.
     let tc = |t: &str, total: u64, out: u64| {
         json!({"timestamp": t, "type": "event_msg", "payload": {"type": "token_count", "info": {
             "total_token_usage": {"input_tokens": total, "output_tokens": 0, "total_tokens": total},
@@ -131,14 +131,14 @@ fn fx() -> Fx {
     write(
         &codex.join("rollout-old.jsonl"),
         &jsonl(&[
-            json!({"timestamp": "2026-01-10T11:10:00Z", "type": "session_meta", "payload": {"id": "c2", "cwd": "/home/demo/projets/autre", "source": {"subagent": {"other": "guardian"}}}}),
+            json!({"timestamp": "2026-01-10T11:10:00Z", "type": "session_meta", "payload": {"id": "c2", "cwd": "/home/demo/projects/other", "source": {"subagent": {"other": "guardian"}}}}),
             json!({"timestamp": "2026-01-10T11:10:01Z", "type": "turn_context", "payload": {"model": "gpt-test", "effort": "low"}}),
             tc("2026-01-10T11:10:05Z", 510, 10),
             tc("2026-01-10T11:10:06Z", 510, 10),
             tc("2026-01-10T11:11:00Z", 1030, 20),
         ]),
     );
-    // Collecteur d'Omarchy (frais : pas de relevé refait) et faux omarchy-agent-usage-update.
+    // Omarchy's collector (fresh: no reading redone) and fake omarchy-agent-usage-update.
     let usage = home.join(".local/state/omarchy/agents/usage");
     write(
         &usage.join("claude.json"),
@@ -150,7 +150,7 @@ fn fx() -> Fx {
     );
     write(
         &usage.join("broken.json"),
-        &json!({"id": "broken", "name": "Cassé", "usageStatusText": "Connexion expirée", "authHelpText": "Reconnectez-vous.", "limits": []}).to_string(),
+        &json!({"id": "broken", "name": "Broken", "usageStatusText": "Login expired", "authHelpText": "Log in again.", "limits": []}).to_string(),
     );
     let bin = d.path().join("bin");
     write(
@@ -199,13 +199,13 @@ const DAY: [&str; 4] = [
 ];
 
 #[test]
-fn appels_dedoublonnes_sous_agents_et_effort() {
+fn deduplicated_calls_sub_agents_and_effort() {
     let f = fx();
     let (code, out, err) = run(&f, &[&["calls", "--json"][..], &DAY].concat());
     assert_eq!(code, 0, "{err}");
     let calls = json_lines(&out);
     let claude: Vec<&Value> = calls.iter().filter(|c| c["agent"] == "claude").collect();
-    // req_a (une fois, la version complète), req_b (une fois malgré la reprise), req_c, req_s.
+    // req_a (once, the complete version), req_b (once despite the resume), req_c, req_s.
     assert_eq!(claude.len(), 4, "{out}");
     let a = &claude[0];
     assert_eq!(a["output"], 400);
@@ -214,12 +214,12 @@ fn appels_dedoublonnes_sous_agents_et_effort() {
     assert_eq!(a["cache_write"], 200);
     assert_eq!(a["input"], 10);
     assert_eq!(a["effort"], "high", "perTurnEffort d'abord");
-    assert_eq!(a["project"], "exemple");
+    assert_eq!(a["project"], "example");
     assert_eq!(a["model"], "claude-test-1");
     assert_eq!(
         claude[1]["effort"],
         Value::Null,
-        "effort absent : null, jamais deviné"
+        "absent effort: null, never guessed"
     );
     assert_eq!(claude[2]["subagent"], true);
     assert_eq!(claude[2]["time"], "2026-01-10T10:30:00Z");
@@ -227,7 +227,7 @@ fn appels_dedoublonnes_sous_agents_et_effort() {
 
     let codex: Vec<&Value> = calls.iter().filter(|c| c["agent"] == "codex").collect();
     assert_eq!(codex.len(), 3, "{out}");
-    assert_eq!(codex[0]["input"], 200, "entrée hors cache");
+    assert_eq!(codex[0]["input"], 200, "input outside the cache");
     assert_eq!(codex[0]["cache_read"], 800);
     assert_eq!(codex[0]["reasoning"], 20);
     assert_eq!(codex[0]["effort"], "high");
@@ -244,11 +244,11 @@ fn appels_dedoublonnes_sous_agents_et_effort() {
     assert_eq!(json_lines(&only).len(), 3);
     let (_, text, _) = run(&f, &[&["calls"][..], &DAY].concat());
     assert_eq!(text.lines().count(), 7);
-    assert!(!text.contains("contenu inventé"));
+    assert!(!text.contains("invented content"));
 }
 
 #[test]
-fn releve_historique_fenetres_et_comparaison() {
+fn reading_history_windows_and_comparison() {
     let f = fx();
     let (code, _, err) = run(&f, &["record"]);
     assert_eq!(code, 0, "{err}");
@@ -258,7 +258,7 @@ fn releve_historique_fenetres_et_comparaison() {
     assert_eq!(
         lines.lines().count(),
         1,
-        "rien de neuf au second relevé : {lines}"
+        "nothing new at the second reading: {lines}"
     );
     assert!(lines.contains("\"resetsAt\":\"2026-01-10T15:00:00Z\""));
     assert!(!lines.contains("broken"));
@@ -266,17 +266,17 @@ fn releve_historique_fenetres_et_comparaison() {
     assert!(log.contains("--limits-only"));
     assert!(
         log.starts_with(&f.bin.parent().unwrap().display().to_string()),
-        "OMARCHY_PATH déduit"
+        "OMARCHY_PATH deduced"
     );
 
-    // Historique : l'heure du relevé est maintenant ; --since large.
+    // History: the time of the reading is now; wide --since.
     let (code, out, _) = run(&f, &["history", "--since", "2020-01-01", "--json"]);
     assert_eq!(code, 0);
     assert_eq!(json_lines(&out)[0]["limits"][0]["percent"], 42);
     let (_, out, _) = run(&f, &["history", "codex", "--since", "2020-01-01"]);
     assert!(out.is_empty());
 
-    // Fenêtre relevée 10:00 → 15:00 (remise à 15:00), appels Claude de 10:00 à 12:00.
+    // Window recorded 10:00 → 15:00 (reset at 15:00), Claude calls from 10:00 to 12:00.
     let (code, out, err) = run(
         &f,
         &[&["windows", "--json", "--agent", "claude"][..], &DAY].concat(),
@@ -294,7 +294,7 @@ fn releve_historique_fenetres_et_comparaison() {
     assert_eq!(w[0]["effort"]["high"]["calls"], 2);
     assert_eq!(w[0]["effort"]["unknown"]["calls"], 1);
 
-    // Codex : pas de relevé, fenêtre estimée à partir du premier appel.
+    // Codex: no reading, window estimated from the first call.
     let (_, out, _) = run(
         &f,
         &[&["windows", "--json", "--agent", "codex"][..], &DAY].concat(),
@@ -329,31 +329,31 @@ fn releve_historique_fenetres_et_comparaison() {
             "2026-01-10T00:00:00Z..2026-01-11T00:00:00Z",
         ],
     );
-    assert!(text.contains("fenêtres de 5 h"));
-    let (code, _, err) = run(&f, &["compare", "hier"]);
+    assert!(text.contains("5 h windows"));
+    let (code, _, err) = run(&f, &["compare", "yesterday"]);
     assert_eq!(code, 2);
-    assert!(err.contains("deux périodes"));
+    assert!(err.contains("two periods"));
 }
 
 #[test]
-fn quotas_du_collecteur() {
+fn quotas_of_the_collector() {
     let f = fx();
     let (code, out, _) = run(&f, &[]);
     assert_eq!(code, 0);
-    assert!(out.contains("Claude (relevé il y a 0 min)"));
+    assert!(out.contains("Claude (reading 0 min ago)"));
     assert!(
-        out.contains("Session (5-hour)      42 %, remise à zéro le 10/01 à 15:00"),
+        out.contains("Session (5-hour)      42 %, resets on 10/01 at 15:00"),
         "{out}"
     );
     let (code, out, _) = run(&f, &["--all"]);
-    assert_eq!(code, 1, "un agent en erreur");
-    assert!(out.contains("Connexion expirée") && out.contains("Reconnectez-vous."));
-    let (code, _, err) = run(&f, &["inconnu"]);
+    assert_eq!(code, 1, "an agent in error");
+    assert!(out.contains("Login expired") && out.contains("Log in again."));
+    let (code, _, err) = run(&f, &["unknown"]);
     assert_eq!(code, 1);
-    assert!(err.contains("aucun relevé"));
+    assert!(err.contains("no reading"));
     let (code, _, _) = run(&f, &["--nope"]);
     assert_eq!(code, 2);
-    // Relevé frais : le collecteur n'a pas été relancé pour claude.
+    // Fresh reading: the collector was not run again for claude.
     assert!(
         !f.home.parent().unwrap().join("calls.log").exists() || {
             let log = fs::read_to_string(f.home.parent().unwrap().join("calls.log")).unwrap();
