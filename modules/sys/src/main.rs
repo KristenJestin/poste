@@ -144,6 +144,9 @@ enum Cmd {
         /// Le clone est déjà construit par celui qui passe la main
         #[arg(long)]
         skip_build: bool,
+        /// La racine d'avant : ce qu'il faut recharger est recalculé d'après les deux racines
+        #[arg(long)]
+        from: Option<std::path::PathBuf>,
         #[arg(long)]
         reload_shell: bool,
         #[arg(long)]
@@ -300,14 +303,24 @@ fn run(cli: Cli) -> Result<ExitCode> {
             yes,
             prune,
             skip_build,
+            from,
             reload_shell,
             reload_hypr,
         } => {
-            let need = reload::Need {
+            let mut need = reload::Need {
                 shell: reload_shell,
                 hypr: reload_hypr,
             };
-            let done = versions::finish(&env, need, yes, prune, skip_build)?;
+            let root = env.current_link();
+            if let Some(old) = &from {
+                versions::add_root_changes(&mut need, Some(old), &root)?;
+            }
+            let opts = setup::Opts {
+                yes,
+                skip_build,
+                ..Default::default()
+            };
+            let done = versions::finish(&env, &root, need, &opts, prune)?;
             reload::apply(&done.need, yes, false, &setup::confirm)?;
             Ok(done.code)
         }

@@ -70,14 +70,39 @@ fn sync_with(bin: &str) -> (bool, String) {
     )
     .unwrap();
 
+    // Ce qui touche la session de l'utilisateur (île, Hyprland, unités) : remplacé par des
+    // programmes qui notent leur appel et échouent. Aucun ne doit être appelé ici.
+    let stubs = d.path().join("stubs");
+    let session = d.path().join("session.log");
+    fs::create_dir_all(&stubs).unwrap();
+    for prog in [
+        "hyprctl",
+        "omarchy",
+        "systemctl",
+        "notify-send",
+        "qs",
+        "quickshell",
+    ] {
+        script(
+            &stubs.join(prog),
+            &format!("echo \"{prog} $*\" >> '{}'\nexit 1\n", session.display()),
+        );
+    }
+    let path = format!(
+        "{}:{}",
+        stubs.display(),
+        std::env::var("PATH").unwrap_or_default()
+    );
+
     let st = Command::new(env!("CARGO_BIN_EXE_poste-sys"))
         .args(["sync", "--yes"])
         .env("HOME", &home)
+        .env("PATH", path)
+        .env("POSTE_SYS_TEST_SYSTEMCTL", stubs.join("systemctl"))
         .env_remove("XDG_DATA_HOME")
         .env_remove("XDG_CONFIG_HOME")
         .env_remove("XDG_STATE_HOME")
         .env_remove("XDG_CACHE_HOME")
-        .env_remove("POSTE_SYS_RELAYED")
         .env("POSTE_SYS_TEST_CURL", &curl)
         .env("POSTE_SYS_RELEASE_URL", "https://example.com/r")
         .status()
@@ -88,6 +113,7 @@ fn sync_with(bin: &str) -> (bool, String) {
         fs::canonicalize(&current).unwrap(),
         fs::canonicalize(home.join(".local/share/poste/versions/1111111")).unwrap()
     );
+    assert_eq!(fs::read_to_string(&session).unwrap_or_default(), "");
     (st.success(), fs::read_to_string(&log).unwrap_or_default())
 }
 

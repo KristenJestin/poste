@@ -14,6 +14,7 @@
 //! `finish` est un contrat entre versions : ses options ne changent pas, on en ajoute seulement.
 
 use crate::reload::Need;
+use crate::setup;
 use crate::util::sha256_file;
 use crate::versions::{self, Switched};
 use anyhow::Result;
@@ -63,39 +64,50 @@ fn knows_finish(bin: &Path) -> bool {
         .is_ok_and(|s| s.success())
 }
 
-/// La suite de `sync` et de `use` une fois `current` posé sur `root` : passe la main au
-/// `poste-sys` de la racine s'il le faut, sinon `versions::finish` ici.
+/// La suite de `sync` et de `use` une fois `current` posé (`old` : la racine d'avant) : passe
+/// la main au `poste-sys` de `current` s'il le faut, sinon `versions::finish` ici.
 pub fn complete(
     env: &Env,
-    root: &Path,
+    old: Option<&Path>,
     need: Need,
     yes: bool,
     prune: bool,
     skip_build: bool,
 ) -> Result<Switched> {
+    let root = env.current_link();
     // Le clone se construit d'abord : son `poste-sys` est celui du code tiré.
     if !skip_build && root.join("Cargo.toml").is_file() {
-        crate::setup::build(root)?;
+        setup::build(&root)?;
     }
-    if let Some(bin) = running().and_then(|r| target(root, &r)) {
+    if let Some(bin) = running().and_then(|r| target(&root, &r)) {
         if knows_finish(&bin) {
             println!(
                 "\nNouveau poste-sys ({}) : c'est lui qui fait la suite.",
                 env.display(&bin)
             );
-            let err = finish_command(&bin, &need, yes, prune).exec();
+            let err = finish_command(&bin, old, &need, yes, prune).exec();
             eprintln!(
                 "poste sys : impossible de lancer {} ({err}) : suite faite par ce programme.",
                 env.display(&bin)
             );
         }
     }
-    versions::finish(env, need, yes, prune, true)
+    let opts = setup::Opts {
+        yes,
+        skip_build: true,
+        ..Default::default()
+    };
+    versions::finish(env, &root, need, &opts, prune)
 }
 
-fn finish_command(bin: &Path, need: &Need, yes: bool, prune: bool) -> Command {
+fn finish_command(bin: &Path, old: Option<&Path>, need: &Need, yes: bool, prune: bool) -> Command {
     let mut c = Command::new(bin);
     c.args(["finish", "--skip-build"]);
+    // L'ancienne racine : le nouveau programme recompare les racines lui-même (il connaît
+    // peut-être plus de choses à recharger que celui qui passe la main).
+    if let Some(o) = old {
+        c.arg("--from").arg(o);
+    }
     for (on, flag) in [
         (yes, "--yes"),
         (prune, "--prune"),
@@ -150,7 +162,13 @@ mod tests {
             shell: true,
             hypr: false,
         };
-        let c = finish_command(Path::new("/x/poste-sys"), &need, true, true);
+        let c = finish_command(
+            Path::new("/x/poste-sys"),
+            Some(Path::new("/v/old")),
+            &need,
+            true,
+            true,
+        );
         let args: Vec<_> = c
             .get_args()
             .map(|a| a.to_string_lossy().into_owned())
@@ -160,6 +178,8 @@ mod tests {
             [
                 "finish",
                 "--skip-build",
+                "--from",
+                "/v/old",
                 "--yes",
                 "--prune",
                 "--reload-shell"

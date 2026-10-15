@@ -108,17 +108,9 @@ pub fn run(env: &Env, cfg: &Config, f: &Fetcher, yes: bool, dry_run: bool) -> Re
             link_root: versions::link_root(env, &root),
             ..Default::default()
         };
-        let done = setup::run(env, &root, &opts)?;
-        if done.config_changed {
-            need.shell = true;
-            need.hypr = true;
-        }
-        return Ok(Synced {
-            code: done.code,
-            need,
-        });
+        return versions::finish(env, &root, need, &opts, false);
     }
-    handoff::complete(env, &root, need, yes, prune, false)
+    handoff::complete(env, old.as_deref(), need, yes, prune, false)
 }
 
 /// Pour les messages : la racine lue, en clair.

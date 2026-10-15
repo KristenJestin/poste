@@ -587,31 +587,26 @@ pub fn switch(env: &Env, source: Source, dir: &Path, o: &setup::Opts) -> Result<
         );
     }
     point_current(env, dir)?;
-    handoff::complete(env, &env.current_link(), need, o.yes, false, o.skip_build)
+    handoff::complete(env, old.as_deref(), need, o.yes, false, o.skip_build)
 }
 
-/// La suite de `sync` et de `use` une fois `current` posé : `setup` depuis `current`, élagage des
-/// anciennes versions si `prune`. Lancée ici, ou par l'ancien `poste-sys` qui passe la main
+/// La suite de `sync` et de `use` une fois `current` posé : `setup` depuis `root` (`current`,
+/// ou la racine lue en simulation), élagage des anciennes versions si `prune_old`. Lancée ici, ou par l'ancien `poste-sys` qui passe la main
 /// (`poste-sys finish`, voir `handoff`).
 pub fn finish(
     env: &Env,
+    root: &Path,
     mut need: Need,
-    yes: bool,
-    prune: bool,
-    skip_build: bool,
+    opts: &setup::Opts,
+    prune_old: bool,
 ) -> Result<Switched> {
-    let opts = setup::Opts {
-        yes,
-        skip_build,
-        ..Default::default()
-    };
-    let done = setup::run(env, &env.current_link(), &opts)?;
+    let done = setup::run(env, root, opts)?;
     if done.config_changed {
         need.shell = true;
         need.hypr = true;
     }
-    if prune {
-        let removed = crate::versions::prune(env, KEEP)?;
+    if prune_old {
+        let removed = prune(env, KEEP)?;
         if !removed.is_empty() {
             println!("Anciennes versions retirées : {}.", removed.join(", "));
         }
