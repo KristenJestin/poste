@@ -1,19 +1,19 @@
 import QtQuick
 import "../components"
 
-// La pastille de la dictée, seule en bas de l'écran actif, pareille pour toutes les sources
-// (SUPER+A Vocaline ou voxtype, ou toute source du slot « dictation » de l'île) : le micro
-// gris clair, immobile, puis l'onde de la voix (14 barres, la plus récente à droite, depuis
-// l'historique des niveaux tenu par le bandeau) pendant l'écoute, ou trois points qui pulsent
-// pendant la transcription. L'aspect de l'île : son fond plein, sa hauteur, arrondi en pilule.
-// Elle entre en grandissant depuis le bas et sort en se resserrant ; le passage de l'onde aux
-// points resserre sa largeur en douceur.
+// The dictation pill, alone at the bottom of the active screen, the same for all the sources
+// (SUPER+A Vocaline or voxtype, or any source of the island's 'dictation' slot): the light
+// grey microphone, still, then the voice wave (14 bars, the most recent on the right, from
+// the level history kept by the banner) while listening, or three pulsing dots
+// during the transcription. The island's look: its solid background, its height, rounded into a pill.
+// It comes in growing from the bottom and leaves by narrowing; the change from the wave to the
+// dots narrows its width smoothly.
 Item {
   id: pill
   required property var bandeau
   property bool active: false
 
-  // Les points à la place de l'onde. Gardé tel quel pendant le fondu de sortie.
+  // The dots in place of the wave. Kept as is during the exit fade.
   property bool transcribing: false
   function keep() { transcribing = bandeau.dictTranscribing && !bandeau.dictListening }
   onActiveChanged: if (active) keep()
@@ -58,7 +58,7 @@ Item {
       pixelSize: 15
     }
 
-    // L'onde : une barre par niveau récent, la plus récente à droite.
+    // The wave: one bar per recent level, the most recent on the right.
     Row {
       anchors.verticalCenter: parent.verticalCenter
       visible: !pill.transcribing
@@ -81,7 +81,7 @@ Item {
       }
     }
 
-    // La transcription : trois points en vague.
+    // The transcription: three dots in a wave.
     Row {
       anchors.verticalCenter: parent.verticalCenter
       visible: pill.transcribing

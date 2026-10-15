@@ -2,21 +2,21 @@ import QtQuick
 import QtQuick.Effects
 import "../components"
 
-// Les notifications du bandeau, sous le texte dicté et l'OSD : la plus récente en haut (au
-// plus près de l'île), les autres descendent. Trois au plus à la fois sur un écran ; les plus
-// anciennes attendent, cachées et sans décompte, qu'une place se libère.
+// The banner's notifications, under the dictated text and the OSD: the most recent on top (as
+// close as possible to the island), the others go down. Three at most at a time on a screen; the
+// oldest wait, hidden and without a countdown, for a place to free up.
 //
-// Le service (voir Bandeau.qml) donne le modèle, l'écran de chaque toast et, par present(row),
-// ce que montre la carte : { title, body, icon (URL d'image ou ""), crop (image à recadrer),
-// glyph, tile (fond de tuile d'une marque ou ""), ink (couleur du glyphe sur cette tuile),
+// The service (see Bandeau.qml) gives the model, the screen of each toast and, by present(row),
+// what the card shows: { title, body, icon (image URL or ""), crop (image to crop),
+// glyph, tile (tile background of a brand or ""), ink (glyph color on that tile),
 // critical }.
 //
-// La vue garde sa propre liste des cartes affichées (`cards`), tenue à jour depuis le modèle
-// du service : une carte partie y reste le temps de sa sortie, puis la vue la retire. Les
-// cartes sont posées par une Column ; chacune y prend une place (`slot`) dont la hauteur est
-// animée. La place s'ouvre avant que la carte apparaisse, suit sa hauteur quand le contenu
-// change, et se referme une fois la carte effacée : deux cartes ne se chevauchent jamais, même
-// au milieu d'une animation.
+// The view keeps its own list of the displayed cards (`cards`), kept up to date from the service's
+// model: a card that has left stays there for the time of its exit, then the view removes it. The
+// cards are laid out by a Column; each one takes a place (`slot`) there whose height is
+// animated. The place opens before the card appears, follows its height when the content
+// changes, and closes once the card is erased: two cards never overlap, even
+// in the middle of an animation.
 Item {
   id: view
   required property var bandeau
@@ -26,18 +26,18 @@ Item {
   readonly property int cardWidth: 400
   width: cardWidth
 
-  // La fenêtre reste là tant qu'une carte est affichée ou en train de partir.
+  // The window stays there as long as a card is displayed or leaving.
   readonly property bool live: cards.count > 0
-  // Hauteur occupée par les cartes, depuis le haut de la vue (zone qui prend la souris).
+  // Height taken by the cards, from the top of the view (area that takes the mouse).
   readonly property real cardsHeight: stack.height
 
-  // ---------------------------------------------------------------- la liste affichée
-  // Du haut (la plus récente) vers le bas (la plus ancienne), comme la Column les pose.
+  // ---------------------------------------------------------------- the displayed list
+  // From the top (the most recent) to the bottom (the oldest), as the Column lays them out.
   ListModel { id: cards }
   property int nextUid: 1
 
-  // Ce qui doit être affiché : les lignes de cet écran, de la plus récente à la plus ancienne,
-  // trois au plus.
+  // What must be displayed: the rows of this screen, from the most recent to the oldest,
+  // three at most.
   function wanted() {
     var src = source
     var out = []
@@ -50,7 +50,7 @@ Item {
     }
     return out
   }
-  // Ce que la carte montre d'une ligne : tout est copié, la carte ne relit plus le service.
+  // What the card shows of a row: everything is copied, the card no longer reads the service.
   function lookOf(row) {
     var look = source.present(row) || {}
     return {
@@ -69,7 +69,7 @@ Item {
     var want = wanted()
     var rank = {}
     for (var w = 0; w < want.length; w++) rank[want[w].key] = w
-    // Les cartes qui n'ont plus de place partent ; les autres reprennent leur contenu.
+    // The cards that have no more room leave; the others take their content again.
     var present = {}
     for (var c = 0; c < cards.count; c++) {
       var e = cards.get(c)
@@ -83,7 +83,7 @@ Item {
       for (var name in look)
         if (e[name] !== look[name]) cards.setProperty(c, name, look[name])
     }
-    // Les nouvelles entrent à leur rang : au-dessus de la première carte plus ancienne.
+    // The new ones come in at their rank: above the first older card.
     for (var k = 0; k < want.length; k++) {
       if (present[want[k].key]) continue
       var at = cards.count
@@ -102,7 +102,7 @@ Item {
     for (var c = 0; c < cards.count; c++)
       if (cards.get(c).uid === uid) { cards.remove(c); return }
   }
-  // Un clic : la ligne est retrouvée par sa clé dans le modèle d'aujourd'hui.
+  // A click: the row is found again by its key in today's model.
   function act(entryKey, what) {
     var src = source
     if (!src || !src.popupModel) return
@@ -116,7 +116,7 @@ Item {
     }
   }
 
-  // Une mise à jour par tour de boucle, quel que soit le nombre de changements.
+  // One update per loop turn, whatever the number of changes.
   property bool syncQueued: false
   function queueSync() {
     if (syncQueued) return
@@ -142,13 +142,13 @@ Item {
     ignoreUnknownSignals: true
     function onPopupScreensRevChanged() { view.queueSync() }
   }
-  // Un toast sans écran connu va sur l'écran actif.
+  // A toast without a known screen goes to the active screen.
   Connections {
     target: view.bandeau
     function onFocusedScreenChanged() { view.queueSync() }
   }
 
-  // ---------------------------------------------------------------- la pile
+  // ---------------------------------------------------------------- the stack
   Column {
     id: stack
     anchors.top: parent.top
@@ -174,15 +174,15 @@ Item {
         required property double lifetime
 
         width: stack.width
-        // La place de la carte et de l'écart en dessous, à la proportion de son ouverture.
+        // The place of the card and of the gap below, in proportion to its opening.
         property real openness: 0
         property real collapse: 0
         height: (card.height + view.bandeau.gap) * openness * (1 - collapse)
         Behavior on openness { NumberAnimation { duration: 300; easing.type: Easing.OutQuint } }
         Component.onCompleted: Qt.callLater(function() { slot.openness = 1 })
 
-        // Entrée : la carte apparaît dès que sa place peut la contenir (l'écart absorbe la fin
-        // de l'ouverture). Sortie : la carte s'efface sur place, puis sa place se referme.
+        // Entry: the card appears as soon as its place can contain it (the gap absorbs the end
+        // of the opening). Exit: the card fades in place, then its place closes.
         property bool entered: false
         onHeightChanged: if (!entered && !leaving && openness > 0 && height >= card.height - 0.5) entered = true
         property real leave: 0
@@ -197,8 +197,8 @@ Item {
           ScriptAction { script: view.drop(slot.uid) }
         }
 
-        // Durée de vie : une animation sur toute la durée, mise en pause au survol, reprise du
-        // début quand le contenu change.
+        // Lifetime: an animation over the whole duration, paused on hover, restarted from the
+        // beginning when the content changes.
         property real remaining: 1
         NumberAnimation {
           id: life
@@ -227,8 +227,8 @@ Item {
           id: card
           width: parent.width
           anchors.top: parent.top
-          // Hauteur finale (le contenu y est posé tout de suite), puis hauteur montrée, animée
-          // quand le contenu change ; la place suit, les cartes du dessous descendent avec.
+          // Final height (the content is laid out right away), then shown height, animated
+          // when the content changes; the place follows, the cards below go down with it.
           readonly property real fullHeight: Math.max(52, content.implicitHeight + 2 * 12)
           height: fullHeight
           Behavior on height {
@@ -263,7 +263,7 @@ Item {
             onClicked: function(mouse) { view.act(slot.entryKey, mouse.button === Qt.RightButton ? "close" : "invoke") }
           }
 
-          // Le contenu, à sa hauteur finale, coupé à la hauteur montrée.
+          // The content, at its final height, clipped to the shown height.
           Item {
             anchors.fill: parent
             clip: card.height < card.fullHeight - 0.5
@@ -283,8 +283,8 @@ Item {
                 anchors.verticalCenter: parent.verticalCenter
                 spacing: 12
 
-                // L'icône : l'image ou l'icône de l'application, sinon le glyphe à l'accent (ou
-                // la tuile de la marque, Claude Code ou Codex).
+                // The icon: the image or the application's icon, otherwise the accent glyph (or
+                // the brand's tile, Claude Code or Codex).
                 Item {
                   id: tile
                   width: 32; height: 32
@@ -339,7 +339,7 @@ Item {
                   Row {
                     width: parent.width
                     spacing: 7
-                    // Critique : un point rouge discret devant le titre.
+                    // Critical: a discreet red dot before the title.
                     Rectangle {
                       visible: slot.critical
                       anchors.verticalCenter: parent.verticalCenter

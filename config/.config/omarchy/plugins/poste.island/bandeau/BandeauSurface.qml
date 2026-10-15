@@ -1,9 +1,9 @@
 import QtQuick
 import QtQuick.Effects
 
-// Le fond d'une pièce du bandeau : le verre sombre du bandeau (flouté par Hyprland), un liseré
-// discret et une ombre douce (sous le seuil de flou de Hyprland, ignore_alpha). Arrondi en
-// pilule sur une ligne, `blockRadius` du bandeau sur plusieurs.
+// The background of a banner piece: the banner's dark glass (blurred by Hyprland), a discreet
+// outline and a soft shadow (under Hyprland's blur threshold, ignore_alpha). Rounded into a
+// pill on one line, the banner's `blockRadius` on several.
 Item {
   id: surface
   required property var bandeau

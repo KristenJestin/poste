@@ -963,7 +963,7 @@ Item {
       var end = Number(u.next) / 1000      // microseconds since the epoch
       if (!(end > at) || remindersGone.indexOf(unit) !== -1) return
       var m = unit.match(/^omarchy-reminder-(\d+)m-/)
-      list.push({ id: "omarchy:" + unit, unit: unit, label: msgs[unit + ".message"] || "Rappel",
+      list.push({ id: "omarchy:" + unit, unit: unit, label: msgs[unit + ".message"] || "Reminder",
                   duration: Math.max(m ? Number(m[1]) * 60000 : 0, end - at), end: end,
                   paused: false, left: 0, done: false, omarchy: true })
     })

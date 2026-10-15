@@ -1,16 +1,16 @@
 import QtQuick
 
-// Le texte dicté en direct (Vocaline, ou toute source du slot « dictation » de l'île qui donne
-// du texte), en haut de la pile, juste sous l'île, sans icône : les phrases figées en
-// couleur normale, puis la phrase en cours en gris. Trois lignes au plus : trop long, c'est la
-// fin qui reste visible. Le dernier texte reste affiché pendant le fondu de sortie. La pastille
-// animée (micro, onde, points) est à part, en bas de l'écran (DictationPill.qml).
+// The live dictated text (Vocaline, or any source of the island's 'dictation' slot that gives
+// text), at the top of the stack, just under the island, without an icon: the frozen sentences in
+// normal color, then the sentence in progress in grey. Three lines at most: too long, and it is the
+// end that stays visible. The last text stays displayed during the exit fade. The animated pill
+// (microphone, wave, dots) is apart, at the bottom of the screen (DictationPill.qml).
 //
-// Quand le texte s'allonge, la pilule grandit en douceur, en largeur puis en hauteur quand il
-// passe sur deux ou trois lignes. Le texte, lui, est posé tout de suite à sa taille finale
-// (sinon il repasserait à la ligne pendant l'animation) : seuls le fond et la zone visible
-// (`shownWidth`, `shownHeight`) s'animent. Le texte suit le bord gauche de la pilule et reste
-// collé en bas, donc la fin reste visible ; ce qui dépasse est coupé le temps de l'animation.
+// When the text grows, the pill grows smoothly, in width then in height when it
+// goes onto two or three lines. The text itself is laid out right away at its final size
+// (otherwise it would wrap again during the animation): only the background and the visible area
+// (`shownWidth`, `shownHeight`) animate. The text follows the pill's left edge and stays
+// stuck to the bottom, so the end stays visible; what overflows is clipped for the time of the animation.
 Item {
   id: view
   required property var bandeau
@@ -22,14 +22,14 @@ Item {
   onActiveChanged: {
     if (active) {
       keep()
-      // Revenue alors qu'elle était tout à fait cachée : elle apparaît à sa taille.
+      // Back while it was completely hidden: it appears at its size.
       resize(!live)
     }
     followActive()
   }
-  // Relu un tour de boucle plus tard, une fois toutes les valeurs de l'île posées : quand la
-  // dictée s'arrête, le texte se vide en même temps qu'elle se cache, et la pilule doit garder
-  // son dernier état pendant le fondu au lieu de rétrécir.
+  // Read again one loop turn later, once all the island's values are set: when the
+  // dictation stops, the text empties at the same time as it hides, and the pill must keep
+  // its last state during the fade instead of shrinking.
   Connections {
     target: view.bandeau
     function onDictFinalsChanged() { view.queueKeep() }
@@ -77,7 +77,7 @@ Item {
   readonly property real textHeight: Math.max(lineHeight, Math.min(label.implicitHeight, lineHeight * lines))
   readonly property bool multiLine: label.lineCount > 1
 
-  // Taille finale, puis taille montrée (animée vers la finale).
+  // Final size, then shown size (animated toward the final one).
   readonly property real finalWidth: textWidth + 2 * padX
   readonly property real finalHeight: textHeight + 2 * padY
   property real shownWidth: finalWidth
@@ -101,8 +101,8 @@ Item {
   width: shownWidth
   height: shownHeight
 
-  // Ce que la pièce prend dans la pile (pour celles du dessous) : sa hauteur montrée, à la
-  // proportion de sa présence. Rien en dessous ne peut donc la chevaucher.
+  // What the piece takes in the stack (for those below): its shown height, in
+  // proportion to its presence. Nothing below can therefore overlap it.
   property real presence: 0
   Component.onCompleted: presence = active ? 1 : 0
   function followActive() {
@@ -117,8 +117,8 @@ Item {
     NumberAnimation { id: presenceMove; target: view; property: "presence"; duration: 340; easing.type: Easing.OutQuint }
   }
   readonly property real space: (shownHeight + bandeau.gap) * presence
-  // La pièce n'apparaît que lorsque sa place peut la contenir (l'écart absorbe la fin de
-  // l'ouverture) ; en partant, elle s'efface avant que sa place se referme.
+  // The piece only appears when its place can contain it (the gap absorbs the end of
+  // the opening); when leaving, it fades before its place closes.
   readonly property bool shownIn: active && space >= height - 0.5
   readonly property bool live: opacity > 0.01
 
@@ -137,7 +137,7 @@ Item {
     radius: view.multiLine ? view.bandeau.blockRadius : height / 2
   }
 
-  // La zone visible du texte : la place qu'il a dans la pilule montrée.
+  // The visible area of the text: the room it has in the shown pill.
   Item {
     id: clipper
     x: view.padX
