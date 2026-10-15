@@ -482,8 +482,7 @@ pub fn run(env: &Env, repo: &Path, source: Option<&Path>, dry_run: bool) -> Resu
             not_imported.insert(target.clone());
             continue;
         }
-        let bytes =
-            std::fs::read(&real).with_context(|| format!("reading {}", real.display()))?;
+        let bytes = std::fs::read(&real).with_context(|| format!("reading {}", real.display()))?;
         let mut secret_found = false;
         if !is_binary(&bytes) {
             let sc = scan_secrets(&String::from_utf8_lossy(&bytes));
@@ -741,18 +740,18 @@ fn render(r: &Report, nfiles: usize, ndirs: usize, source: &Path) -> String {
         "- imported: {} file(s) and {} symbolic link(s) in `config/`",
         r.imported, r.imported_links
     );
-    let _ = writeln!(s, "- different from the chezmoi source: {}", r.differs.len());
+    let _ = writeln!(
+        s,
+        "- different from the chezmoi source: {}",
+        r.differs.len()
+    );
     let _ = writeln!(
         s,
         "- managed but absent from the machine (not imported): {}",
         r.absent.len()
     );
     let _ = writeln!(s, "- refused for a secret: {}", r.secrets.len());
-    let _ = writeln!(
-        s,
-        "- ignored by the exclusion rules: {}",
-        r.ignored.len()
-    );
+    let _ = writeln!(s, "- ignored by the exclusion rules: {}", r.ignored.len());
     let _ = writeln!(
         s,
         "- of a different type (not imported): {}",
@@ -808,7 +807,10 @@ fn render(r: &Report, nfiles: usize, ndirs: usize, source: &Path) -> String {
         for d in &r.da {
             let _ = writeln!(s, "- {d}");
         }
-        let _ = writeln!(s, "\nNo content is lost or to import: these folders no longer hold any file.\n");
+        let _ = writeln!(
+            s,
+            "\nNo content is lost or to import: these folders no longer hold any file.\n"
+        );
     }
 
     let _ = writeln!(s, "## Refused for a secret (values never copied)\n");
@@ -829,7 +831,10 @@ fn render(r: &Report, nfiles: usize, ndirs: usize, source: &Path) -> String {
     }
     let _ = writeln!(s);
 
-    let _ = writeln!(s, "## Imported files that mention a sensitive keyword without an obvious value (to review)\n");
+    let _ = writeln!(
+        s,
+        "## Imported files that mention a sensitive keyword without an obvious value (to review)\n"
+    );
     if r.review.is_empty() {
         let _ = writeln!(s, "Aucun.\n");
     }
@@ -866,7 +871,10 @@ fn render(r: &Report, nfiles: usize, ndirs: usize, source: &Path) -> String {
         let _ = writeln!(s);
     }
     if !r.modes.is_empty() {
-        let _ = writeln!(s, "## Restricted permissions noted (`config/.poste/modes`)\n");
+        let _ = writeln!(
+            s,
+            "## Restricted permissions noted (`config/.poste/modes`)\n"
+        );
         for (p, m) in &r.modes {
             let _ = writeln!(s, "- `{p}` {m:04o}");
         }
@@ -1057,10 +1065,7 @@ mod tests {
         assert!(report.contains("`.config/app/conf`") && report.contains("version=machine"));
         assert!(report.contains("`.config/absent`"));
         assert!(report.contains("`.config/leak`"));
-        assert!(
-            !report.contains("hunter22xyz"),
-            "secret value copied"
-        );
+        assert!(!report.contains("hunter22xyz"), "secret value copied");
         assert!(report.contains("empty.d"));
         // Nothing moved in HOME.
         assert_eq!(

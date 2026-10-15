@@ -28,8 +28,7 @@ pub fn clone(env: &Env, cfg: &Config) -> Result<PathBuf> {
 
 /// sha256 fingerprint (hexadecimal) of a file.
 pub fn sha256_file(path: &Path) -> Result<String> {
-    let mut f =
-        std::fs::File::open(path).with_context(|| format!("reading {}", path.display()))?;
+    let mut f = std::fs::File::open(path).with_context(|| format!("reading {}", path.display()))?;
     let mut h = Sha256::new();
     let mut buf = [0u8; 64 * 1024];
     loop {
@@ -103,7 +102,9 @@ pub fn copy_tree(src: &Path, dst: &Path) -> Result<()> {
 /// Puts a symbolic link in place, atomically replacing what is at `dest`
 /// (file or link; a folder must have been moved away before).
 pub fn replace_with_symlink(dest: &Path, target: &Path) -> Result<()> {
-    let parent = dest.parent().context("destination without a parent folder")?;
+    let parent = dest
+        .parent()
+        .context("destination without a parent folder")?;
     std::fs::create_dir_all(parent)?;
     let tmp = parent.join(format!(".poste-tmp-{}-link", std::process::id()));
     let _ = std::fs::remove_file(&tmp);
@@ -120,7 +121,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn empreinte_connue() {
+    fn known_fingerprint() {
         let d = tempfile::tempdir().unwrap();
         let p = d.path().join("f");
         std::fs::write(&p, "abc").unwrap();

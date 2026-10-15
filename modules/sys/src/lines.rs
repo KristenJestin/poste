@@ -147,7 +147,7 @@ fn read(file: &Path, vanishing: &HashSet<PathBuf>) -> Content {
         Ok(m) if !m.is_file() => Content::Blocked("it is not an ordinary file".into()),
         Ok(_) => match std::fs::read_to_string(file) {
             Ok(t) => Content::Text(t),
-            Err(e) => Content::Blocked(format!("illisible : {e}")),
+            Err(e) => Content::Blocked(format!("unreadable: {e}")),
         },
     }
 }
@@ -341,8 +341,7 @@ pub fn apply(env: &Env, steps: &[Step], stamp: &str, manifest: &mut Manifest) ->
     for file in files {
         let existed = file.is_file();
         let old = if existed {
-            std::fs::read_to_string(file)
-                .with_context(|| format!("reading {}", file.display()))?
+            std::fs::read_to_string(file).with_context(|| format!("reading {}", file.display()))?
         } else {
             String::new()
         };
@@ -368,7 +367,7 @@ pub fn apply(env: &Env, steps: &[Step], stamp: &str, manifest: &mut Manifest) ->
         if dirty {
             if existed {
                 let bak = crate::util::backup(env, file, stamp)?;
-                println!("  sauvegarde : {}", env.display(&bak));
+                println!("  backup: {}", env.display(&bak));
             }
             let mut text = lines.join("\n");
             if !lines.is_empty() {

@@ -81,10 +81,7 @@ pub fn complete(
     }
     if let Some(bin) = running().and_then(|r| target(&root, &r)) {
         if knows_finish(&bin) {
-            println!(
-                "\nNew poste-sys ({}): it does the rest.",
-                env.display(&bin)
-            );
+            println!("\nNew poste-sys ({}): it does the rest.", env.display(&bin));
             let err = finish_command(&bin, old, &need, yes, prune).exec();
             eprintln!(
                 "poste sys: cannot run {} ({err}): the rest is done by this program.",
@@ -127,24 +124,24 @@ mod tests {
     use std::fs;
 
     #[test]
-    fn relais_seulement_vers_un_binaire_different() {
+    fn hand_over_only_to_a_different_binary() {
         let d = tempfile::tempdir().unwrap();
         let root = d.path().join("root");
         let running = d.path().join("poste-sys");
-        fs::write(&running, "ancien").unwrap();
+        fs::write(&running, "old").unwrap();
         // No poste-sys in the root: we stay.
         assert_eq!(target(&root, &running), None);
         fs::create_dir_all(binary(&root).parent().unwrap()).unwrap();
-        fs::write(binary(&root), "ancien").unwrap();
+        fs::write(binary(&root), "old").unwrap();
         // The same one (content, or the same file): we stay; another one: we hand over.
         assert_eq!(target(&root, &running), None);
         assert_eq!(target(&root, &binary(&root)), None);
-        fs::write(binary(&root), "nouveau").unwrap();
+        fs::write(binary(&root), "new").unwrap();
         assert_eq!(target(&root, &running), Some(binary(&root)));
     }
 
     #[test]
-    fn finish_inconnu_d_une_ancienne_version() {
+    fn finish_unknown_to_an_old_version() {
         let d = tempfile::tempdir().unwrap();
         let bin = d.path().join("poste-sys");
         // A version from before the hand-over: clap refuses the subcommand (code 2).
@@ -157,7 +154,7 @@ mod tests {
     }
 
     #[test]
-    fn commande_finish_transmet_les_options() {
+    fn finish_command_passes_the_options() {
         let need = Need {
             shell: true,
             hypr: false,

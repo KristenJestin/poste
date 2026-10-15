@@ -62,10 +62,7 @@ fn run(m: &Module, args: Vec<OsString>) -> ExitCode {
     {
         use std::os::unix::process::CommandExt;
         let err = cmd.exec();
-        eprintln!(
-            "poste: cannot run {} : {err}",
-            m.program.display()
-        );
+        eprintln!("poste: cannot run {} : {err}", m.program.display());
         ExitCode::from(126)
     }
     #[cfg(not(unix))]

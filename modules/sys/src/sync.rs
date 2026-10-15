@@ -24,10 +24,7 @@ fn pull(dirs: &[PathBuf], dry_run: bool) -> Result<Vec<(PathBuf, String)>> {
     let mut before = Vec::new();
     for dir in dirs {
         if dry_run {
-            println!(
-                "Dry run: git pull --ff-only not run ({}).",
-                dir.display()
-            );
+            println!("Dry run: git pull --ff-only not run ({}).", dir.display());
             continue;
         }
         before.push((dir.clone(), reload::head(dir)?));

@@ -114,11 +114,7 @@ impl P<'_> {
                 }
                 Ok(J::Num(t.to_string()))
             }
-            Some(c) => bail!(
-                "unexpected character '{}' at byte {}",
-                *c as char,
-                self.i
-            ),
+            Some(c) => bail!("unexpected character '{}' at byte {}", *c as char, self.i),
         }
     }
     fn string(&mut self) -> Result<String> {
@@ -158,8 +154,8 @@ impl P<'_> {
                                     bail!("incomplete surrogate pair");
                                 }
                             }
-                            let ch = char::from_u32(cp)
-                                .ok_or_else(|| anyhow::anyhow!("invalid \\u"))?;
+                            let ch =
+                                char::from_u32(cp).ok_or_else(|| anyhow::anyhow!("invalid \\u"))?;
                             let mut b = [0u8; 4];
                             out.extend_from_slice(ch.encode_utf8(&mut b).as_bytes());
                         }

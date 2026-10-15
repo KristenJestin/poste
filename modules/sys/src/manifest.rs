@@ -91,7 +91,7 @@ mod tests {
     }
 
     #[test]
-    fn aller_retour_et_remplacement() {
+    fn round_trip_and_replacement() {
         let d = tempfile::tempdir().unwrap();
         let f = d.path().join("sous/installed.json");
         assert!(Manifest::load(&f).unwrap().files.is_empty());

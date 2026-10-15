@@ -125,7 +125,9 @@ pub fn local_add(env: &Env, repo: &Path, arg: &str) -> Result<()> {
             );
         }
     }
-    println!("  setup no longer links it, no longer reports it as a conflict and never touches it.");
+    println!(
+        "  setup no longer links it, no longer reports it as a conflict and never touches it."
+    );
     Ok(())
 }
 
@@ -279,10 +281,7 @@ pub fn override_unset(env: &Env, arg: &str, key: &str) -> Result<()> {
         None => false,
     };
     if !removed {
-        bail!(
-            "{rel}: no override '{key}' ({})",
-            env.display(&file)
-        );
+        bail!("{rel}: no override '{key}' ({})", env.display(&file));
     }
     // No key left: the table disappears and the file becomes a link again at the next setup.
     let empty = find_override(&mut doc, &rel).is_some_and(|t| match t.get("set") {

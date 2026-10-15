@@ -114,7 +114,7 @@ mod tests {
     }
 
     #[test]
-    fn cles_pointees_et_tables_aplaties() {
+    fn dotted_keys_and_flattened_tables() {
         let a = ov(
             "[[override]]\npath = \"x.json\"\nset = { \"idle.lock\" = 3600, \"a.b\" = \"t\" }\n",
         );

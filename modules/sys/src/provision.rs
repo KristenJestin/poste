@@ -166,8 +166,7 @@ impl<'a> Ctx<'a> {
 
     fn read_source(&self, rel: &str) -> Result<String> {
         let p = self.dir.join(rel);
-        let s =
-            std::fs::read_to_string(&p).with_context(|| format!("reading {}", p.display()))?;
+        let s = std::fs::read_to_string(&p).with_context(|| format!("reading {}", p.display()))?;
         Ok(self.sub(&s))
     }
 
@@ -231,8 +230,7 @@ fn read_packages(dir: &Path) -> Result<BTreeMap<String, String>> {
         return Ok(BTreeMap::new());
     }
     let s = std::fs::read_to_string(&p)?;
-    let f: PackagesFile =
-        toml::from_str(&s).with_context(|| format!("reading {}", p.display()))?;
+    let f: PackagesFile = toml::from_str(&s).with_context(|| format!("reading {}", p.display()))?;
     Ok(f.packages)
 }
 
@@ -342,10 +340,7 @@ pub fn skip_catalog(env: &Env, repo: &Path) -> Result<BTreeMap<String, &'static 
             steps.plugin.iter().map(|s| s.id.as_str()).collect(),
             "plugin",
         ),
-        (
-            steps.file.iter().map(|s| s.id.as_str()).collect(),
-            "file",
-        ),
+        (steps.file.iter().map(|s| s.id.as_str()).collect(), "file"),
         (
             steps.user.iter().map(|s| s.id.as_str()).collect(),
             "user step",
@@ -737,8 +732,7 @@ fn run_act(act: &Act) -> Result<()> {
             std::fs::create_dir_all(parent)?;
             let tmp = parent.join(format!(".poste-tmp-{}", std::process::id()));
             std::fs::write(&tmp, content)?;
-            std::fs::rename(&tmp, target)
-                .with_context(|| format!("writing {}", target.display()))
+            std::fs::rename(&tmp, target).with_context(|| format!("writing {}", target.display()))
         }
     }
 }
@@ -829,11 +823,7 @@ pub fn done(env: &Env, repo: &Path, id: Option<&str>, undo: bool) -> Result<()> 
     let Some(id) = id else {
         println!("Steps that are marked by hand:");
         for (i, t) in &known {
-            let mark = if is_marked(env, i) {
-                "done"
-            } else {
-                "to do"
-            };
+            let mark = if is_marked(env, i) { "done" } else { "to do" };
             println!("  [{i}] ({mark}) {}", ctx.sub(t));
         }
         return Ok(());
@@ -909,11 +899,7 @@ fn print_system(ctx: &Ctx, steps: &Steps) -> Result<usize> {
                     Sys::Unknown(w) => ("to check", w),
                     _ => unreachable!(),
                 };
-                lines.push(format!(
-                    "  [{}] {} ({tag}: {why})",
-                    s.id,
-                    ctx.sub(&s.title)
-                ));
+                lines.push(format!("  [{}] {} ({tag}: {why})", s.id, ctx.sub(&s.title)));
                 if tag == "to check" {
                     lines.push(format!(
                         "      if it is already done: poste sys done {}",
@@ -1419,7 +1405,11 @@ title = "t"
         assert_eq!(wanted.keys().collect::<Vec<_>>(), ["vlc"]);
         assert!(steps.plugin.is_empty() && steps.system.is_empty() && steps.manual.is_empty());
         let users: Vec<&str> = steps.user.iter().map(|u| u.id.as_str()).collect();
-        assert_eq!(users, ["other", "free"], "other depends on cfg, not skipped");
+        assert_eq!(
+            users,
+            ["other", "free"],
+            "other depends on cfg, not skipped"
+        );
         assert_eq!(steps.file.len(), 1, "cfg is not skipped");
         assert_eq!(
             sk.ignored,

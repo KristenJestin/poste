@@ -1,13 +1,13 @@
-//! La config de l'utilisateur : `config/` du dépôt reflète `~` (vrais noms, sans préfixes)
-//! et est posée par liens symboliques. Ce module classe l'état de chaque cible, prépare le
-//! plan de `poste sys setup` et l'applique, sans jamais écraser sans sauvegarde.
+//! The user's config: `config/` of the repository mirrors `~` (real names, no prefixes)
+//! and is put in place with symbolic links. This module classifies the state of each target, prepares the
+//! plan of `poste sys setup` and applies it, never overwriting without a backup.
 //!
-//! Dans `config/` :
-//! - un fichier ordinaire devient, dans `~`, un lien vers ce fichier du dépôt ;
-//! - un lien symbolique du dépôt est recréé tel quel dans `~` (même cible) ;
-//! - un dossier listé dans `config/.poste/link-dirs` est lié d'un bloc ;
-//! - `config/.poste/modes` donne les droits restreints (`chemin mode`), réappliqués à la
-//!   cible réelle du lien ; `config/.poste/ignore` liste ce que `add` refuse.
+//! In `config/`:
+//! - an ordinary file becomes, in `~`, a link to that file of the repository;
+//! - a symbolic link of the repository is recreated as is in `~` (same target);
+//! - a folder listed in `config/.poste/link-dirs` is linked as a block;
+//! - `config/.poste/modes` gives the restricted permissions (`path mode`), applied again to the
+//!   real target of the link; `config/.poste/ignore` lists what `add` refuses.
 
 use crate::manifest::{Entry as ManifestEntry, Manifest};
 use crate::util::{backup, copy_tree, replace_with_symlink, sha256_file};
@@ -18,33 +18,33 @@ use std::collections::{BTreeMap, HashMap};
 use std::os::unix::fs::{symlink, MetadataExt, PermissionsExt};
 use std::path::{Component, Path, PathBuf};
 
-/// Nom du module dans `installed.json`.
+/// Name of the module in `installed.json`.
 pub const MODULE: &str = "config";
-/// Dossier des métadonnées, à la racine de `config/`.
+/// Metadata folder, at the root of `config/`.
 pub const META: &str = ".poste";
 const PYCACHE: &str = "__pycache__";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Kind {
-    /// Fichier ordinaire : lien vers le fichier du dépôt.
+    /// Ordinary file: link to the file of the repository.
     File,
-    /// Lien symbolique du dépôt : recréé avec la même cible.
+    /// Symbolic link of the repository: recreated with the same target.
     Link(PathBuf),
-    /// Dossier lié d'un bloc (`link-dirs`).
+    /// Folder linked as a block (`link-dirs`).
     Dir,
-    /// Fichier JSON généré : contenu du dépôt plus les surcharges de la machine (texte voulu).
-    /// Pas un lien : un fichier ordinaire écrit par `setup`.
+    /// Generated JSON file: content of the repository plus the overrides of the machine (wanted text).
+    /// Not a link: an ordinary file written by `setup`.
     Generated(String),
 }
 
 #[derive(Debug, Clone)]
 pub struct Entry {
-    /// Chemin relatif à `~`, séparé par `/`.
+    /// Path relative to `~`, separated by `/`.
     pub rel: String,
-    /// Dans le dépôt : `config/<rel>`, d'où le contenu est lu.
+    /// In the repository: `config/<rel>`, where the content is read from.
     pub src: PathBuf,
-    /// Cible du lien posé dans `~` : `src`, sauf en simulation où la racine lue n'est pas encore
-    /// `current` (le lien réel passera par `current/config/<rel>`).
+    /// Target of the link put in `~`: `src`, except in a dry run where the root read is not yet
+    /// `current` (the real link will go through `current/config/<rel>`).
     pub link: PathBuf,
     /// Dans `~`.
     pub dest: PathBuf,
@@ -53,37 +53,37 @@ pub struct Entry {
 
 #[derive(Debug)]
 pub struct Layout {
-    /// `<dépôt>/config`.
+    /// `<repository>/config`.
     pub root: PathBuf,
-    /// `<dépôt de données>/config`, s'il est déclaré (`data`) et existe : ses fichiers
-    /// remplacent ceux du dépôt de même chemin, ou s'y ajoutent.
+    /// `<data repository>/config`, if declared (`data`) and existing: its files
+    /// replace those of the repository with the same path, or are added to them.
     pub data_root: Option<PathBuf>,
-    /// Entrées que `setup` pose (hors fichiers locaux).
+    /// Entries that `setup` puts in place (except local files).
     pub entries: Vec<Entry>,
-    /// Entrées que cette machine garde à elle (`local` de `~/.config/poste/config.toml`) :
-    /// jamais liées, jamais signalées en conflit, jamais touchées.
+    /// Entries that this machine keeps for itself (`local` of `~/.config/poste/config.toml`):
+    /// never linked, never reported as a conflict, never touched.
     pub local: Vec<Entry>,
-    /// Chemins déclarés dans `local`, normalisés (y compris ceux que le dépôt ne connaît pas).
+    /// Paths declared in `local`, normalized (including those the repository does not know).
     pub local_paths: Vec<String>,
-    /// Surcharges JSON de la machine, par chemin relatif (fichiers générés).
+    /// JSON overrides of the machine, by relative path (generated files).
     pub overrides: BTreeMap<String, crate::overrides::Sets>,
     pub modes: BTreeMap<String, u32>,
     pub link_dirs: Vec<String>,
 }
 
-// ---------------------------------------------------------------- lecture du dépôt
+// ---------------------------------------------------------------- reading the repository
 
-/// Normalise un chemin relatif à `~` : sans `./`, `~/`, ni `/` final ; refuse `..`.
+/// Normalizes a path relative to `~`: without `./`, `~/`, or a trailing `/`; refuses `..`.
 pub fn normalize_rel(s: &str) -> Result<String> {
     let s = s.trim();
     let s = s.strip_prefix("~/").unwrap_or(s);
     let s = s.strip_prefix("./").unwrap_or(s);
     let s = s.trim_end_matches('/');
     if s.is_empty() || s.starts_with('/') {
-        bail!("chemin invalide : « {s} » (attendu : relatif à ~)");
+        bail!("invalid path: '{s}' (expected: relative to ~)");
     }
     if s.split('/').any(|c| c == ".." || c == "." || c.is_empty()) {
-        bail!("chemin invalide : « {s} »");
+        bail!("invalid path: '{s}'");
     }
     Ok(s.to_string())
 }
@@ -100,11 +100,11 @@ pub fn parse_modes(text: &str) -> Result<BTreeMap<String, u32>> {
     for (n, line) in lines_of(text) {
         let (path, mode) = line
             .rsplit_once(char::is_whitespace)
-            .with_context(|| format!("modes, ligne {n} : attendu « chemin mode »"))?;
+            .with_context(|| format!("modes, line {n}: expected 'path mode'"))?;
         let m = u32::from_str_radix(mode.trim(), 8)
             .ok()
             .filter(|m| *m <= 0o777)
-            .with_context(|| format!("modes, ligne {n} : mode octal invalide « {mode} »"))?;
+            .with_context(|| format!("modes, line {n}: invalid octal mode '{mode}'"))?;
         out.insert(normalize_rel(path.trim())?, m);
     }
     Ok(out)
@@ -123,35 +123,35 @@ fn read_meta(root: &Path, name: &str) -> Result<String> {
     }
 }
 
-/// `rel` est-il l'un des chemins locaux, ou sous l'un d'eux ?
+/// Is `rel` one of the local paths, or under one of them?
 pub fn is_local(rel: &str, local: &[String]) -> bool {
     local
         .iter()
         .any(|l| rel == l || rel.starts_with(&format!("{l}/")))
 }
 
-/// Chemins `local` de la config de la machine, normalisés (erreur claire si l'un est invalide).
+/// `local` paths of the machine's config, normalized (clear error if one is invalid).
 pub fn local_paths(env: &Env) -> Result<Vec<String>> {
     let cfg = poste_core::Config::load(env)?;
     cfg.local
         .iter()
-        .map(|l| normalize_rel(l).with_context(|| format!("config.toml, local : « {l} »")))
+        .map(|l| normalize_rel(l).with_context(|| format!("config.toml, local: '{l}'")))
         .collect()
 }
 
-/// Lit `config/` ; `None` si le dépôt n'a pas de dossier `config/`. Les chemins `local` de la
-/// config de la machine sont mis à part (`Layout::local`).
+/// Reads `config/`; `None` if the repository has no `config/` folder. The `local` paths of the
+/// machine's config are set apart (`Layout::local`).
 pub fn load(repo: &Path, env: &Env) -> Result<Option<Layout>> {
     load_with(repo, env, &local_paths(env)?, &override_sets(env)?)
 }
 
-/// Surcharges JSON de la config de la machine : (chemin relatif normalisé, clés pointées).
+/// JSON overrides of the machine's config: (normalized relative path, dotted keys).
 pub fn override_sets(env: &Env) -> Result<Vec<(String, crate::overrides::Sets)>> {
     let cfg = poste_core::Config::load(env)?;
     let mut out: Vec<(String, crate::overrides::Sets)> = Vec::new();
     for o in &cfg.overrides {
         let rel = normalize_rel(&o.path)
-            .with_context(|| format!("config.toml, override : « {} »", o.path))?;
+            .with_context(|| format!("config.toml, override: '{}'", o.path))?;
         let sets = crate::overrides::sets_of(o)?;
         match out.iter_mut().find(|(r, _)| *r == rel) {
             Some((_, s)) => s.extend(sets),
@@ -161,7 +161,7 @@ pub fn override_sets(env: &Env) -> Result<Vec<(String, crate::overrides::Sets)>>
     Ok(out)
 }
 
-/// Comme `load`, avec une liste de chemins locaux donnée (vide : tout est géré).
+/// Like `load`, with a given list of local paths (empty: everything is managed).
 pub fn load_with(
     repo: &Path,
     env: &Env,
@@ -177,13 +177,13 @@ pub fn load_with(
     for d in &link_dirs {
         let md = std::fs::symlink_metadata(root.join(d));
         if !matches!(&md, Ok(m) if m.is_dir()) {
-            bail!("link-dirs : « {d} » n'est pas un dossier de config/");
+            bail!("link-dirs: '{d}' is not a folder of config/");
         }
         if let Some(o) = link_dirs
             .iter()
             .find(|o| *o != d && d.starts_with(&format!("{o}/")))
         {
-            bail!("link-dirs : « {d} » est dans « {o} », déjà lié d'un bloc");
+            bail!("link-dirs: '{d}' is in '{o}', already linked as a block");
         }
     }
     let mut entries = Vec::new();
@@ -198,16 +198,16 @@ pub fn load_with(
     let mut applied = BTreeMap::new();
     for (rel, sets) in overrides {
         if is_local(rel, local) {
-            continue; // le fichier local gagne : la machine le gère seule
+            continue; // the local file wins: the machine manages it alone
         }
         let Some(e) = entries.iter_mut().find(|e| e.rel == *rel) else {
-            bail!("override : « {rel} » n'est pas un fichier de config/ du dépôt");
+            bail!("override: '{rel}' is not a file of the repository's config/");
         };
         if e.kind != Kind::File {
-            bail!("override : « {rel} » n'est pas un fichier ordinaire de config/");
+            bail!("override: '{rel}' is not an ordinary file of config/");
         }
         let text = std::fs::read_to_string(&e.src)
-            .with_context(|| format!("override {rel} : reading {}", e.src.display()))?;
+            .with_context(|| format!("override {rel}: reading {}", e.src.display()))?;
         let gen =
             crate::overrides::generate(&text, sets).with_context(|| format!("override {rel}"))?;
         e.kind = Kind::Generated(gen);
@@ -225,7 +225,7 @@ pub fn load_with(
     }))
 }
 
-/// `config/` du dépôt de données de la machine, s'il est déclaré et existe.
+/// `config/` of the machine's data repository, if declared and existing.
 pub fn data_config_root(env: &Env) -> Result<Option<PathBuf>> {
     let cfg = poste_core::Config::load(env)?;
     Ok(cfg
@@ -234,9 +234,9 @@ pub fn data_config_root(env: &Env) -> Result<Option<PathBuf>> {
         .filter(|d| d.is_dir()))
 }
 
-/// Pose les fichiers du dépôt de données par-dessus ceux du dépôt : même chemin, il gagne ;
-/// sinon il s'ajoute. Pas de `link-dirs` côté données, et rien sous un dossier lié d'un bloc
-/// du dépôt (on ne peut pas y mettre un fichier sans toucher au dépôt).
+/// Puts the files of the data repository on top of those of the repository: same path, it wins;
+/// otherwise it is added. No `link-dirs` on the data side, and nothing under a folder linked as a block
+/// by the repository (a file cannot be put there without touching the repository).
 fn overlay(
     droot: &Path,
     env: &Env,
@@ -246,7 +246,7 @@ fn overlay(
 ) -> Result<()> {
     if !parse_link_dirs(&read_meta(droot, "link-dirs")?)?.is_empty() {
         bail!(
-            "{} : link-dirs n'est pas pris en charge dans le dépôt de données",
+            "{}: link-dirs is not supported in the data repository",
             droot.join(META).join("link-dirs").display()
         );
     }
@@ -259,7 +259,7 @@ fn overlay(
             .find(|d| e.rel == **d || e.rel.starts_with(&format!("{d}/")))
         {
             bail!(
-                "dépôt de données : « {} » est dans « {d} », lié d'un bloc par le dépôt",
+                "data repository: '{}' is in '{d}', linked as a block by the repository",
                 e.rel
             );
         }
@@ -273,8 +273,8 @@ fn overlay(
 }
 
 impl Layout {
-    /// Simulation : les liens poseront `<link_root>/config/<rel>` (le lien `current`, pas encore
-    /// posé) alors que le contenu se lit dans la racine d'origine.
+    /// Dry run: the links will put `<link_root>/config/<rel>` (the `current` link, not yet
+    /// in place) whereas the content is read from the original root.
     pub fn relink(&mut self, link_root: &Path) {
         for e in self.entries.iter_mut().chain(self.local.iter_mut()) {
             if let Ok(rest) = e.src.strip_prefix(&self.root) {
@@ -283,7 +283,7 @@ impl Layout {
         }
     }
 
-    /// Racine (`config/` du dépôt ou du dépôt de données) d'où vient cette entrée.
+    /// Root (`config/` of the repository or of the data repository) this entry comes from.
     pub fn root_of(&self, e: &Entry) -> &Path {
         match &self.data_root {
             Some(d) if e.src.starts_with(d) => d,
@@ -339,31 +339,31 @@ fn scan(
     Ok(())
 }
 
-// ---------------------------------------------------------------- états
+// ---------------------------------------------------------------- states
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum State {
-    /// Déjà lié comme prévu.
+    /// Already linked as planned.
     Linked,
-    /// Rien à la cible.
+    /// Nothing at the target.
     Missing,
-    /// Fichier (ou dossier) ordinaire identique au dépôt.
+    /// Ordinary file (or folder) identical to the repository.
     Identical,
-    /// Fichier (ou dossier) ordinaire différent du dépôt.
+    /// Ordinary file (or folder) different from the repository.
     Differs,
-    /// Lien qui pointe ailleurs (`broken` : la cible n'existe pas).
+    /// Link that points elsewhere (`broken`: the target does not exist).
     OtherLink { target: PathBuf, broken: bool },
-    /// Lien vers le même chemin dans une autre racine de poste (le clone, une version
-    /// installée) : l'ancienne forme, avant `current`. Remplacé si `installed.json` le connaît.
+    /// Link to the same path in another poste root (the clone, an installed
+    /// version): the old form, before `current`. Replaced if `installed.json` knows it.
     Moved { target: PathBuf },
-    /// Mauvais type (dossier à la place d'un fichier, etc.).
+    /// Wrong type (folder in place of a file, etc.).
     WrongType(&'static str),
-    /// Un dossier parent n'est pas un dossier.
+    /// A parent folder is not a folder.
     ParentBlocked(PathBuf),
-    /// Fichier généré à jour (dépôt plus surcharges).
+    /// Generated file up to date (repository plus overrides).
     Generated,
-    /// Fichier généré non modifié depuis notre écriture, mais le dépôt ou les surcharges ont
-    /// changé : à régénérer.
+    /// Generated file not modified since our write, but the repository or the overrides
+    /// changed: to regenerate.
     Stale,
 }
 
@@ -373,7 +373,7 @@ enum Node {
     Link(PathBuf),
 }
 
-/// Contenu d'un arbre (sans `__pycache__`, sans dossiers vides), pour comparer deux dossiers.
+/// Content of a tree (without `__pycache__`, without empty folders), to compare two folders.
 fn tree(dir: &Path) -> Result<BTreeMap<String, Node>> {
     fn walk(base: &Path, dir: &Path, out: &mut BTreeMap<String, Node>) -> Result<()> {
         for e in std::fs::read_dir(dir)? {
@@ -399,8 +399,8 @@ fn tree(dir: &Path) -> Result<BTreeMap<String, Node>> {
     Ok(out)
 }
 
-/// `target` est-il `config/<rel>` d'une racine de poste (le lien `current`, une version
-/// installée, le clone de la clé `repo`) ?
+/// Is `target` the `config/<rel>` of a poste root (the `current` link, an installed
+/// version, the clone of the `repo` key)?
 pub fn is_poste_target(env: &Env, target: &Path, rel: &str) -> bool {
     let tail = Path::new("config").join(rel);
     if target == env.current_link().join(&tail) {
@@ -418,7 +418,7 @@ pub fn is_poste_target(env: &Env, target: &Path, rel: &str) -> bool {
         .is_some_and(|r| target == r.join(&tail))
 }
 
-/// `installed.json` connaît-il ce fichier de `~` comme posé par `setup` ?
+/// Does `installed.json` know this file of `~` as put in place by `setup`?
 fn placed_by_setup(env: &Env, dest: &Path) -> bool {
     Manifest::load(&env.manifest_file())
         .ok()
@@ -431,20 +431,20 @@ fn same_target(a: &Path, b: &Path) -> bool {
         || matches!((std::fs::canonicalize(a), std::fs::canonicalize(b)), (Ok(x), Ok(y)) if x == y)
 }
 
-/// État d'un fichier ordinaire face au contenu généré voulu.
+/// State of an ordinary file against the wanted generated content.
 fn generated_state(e: &Entry, text: &str, env: &Env) -> Result<State> {
     let bytes = std::fs::read(&e.dest)?;
     if bytes == text.as_bytes() {
         return Ok(State::Generated);
     }
     let cur = String::from_utf8_lossy(&bytes);
-    // Même JSON, autre mise en forme : on peut réécrire sans perdre quoi que ce soit.
+    // Same JSON, other formatting: we can rewrite without losing anything.
     if let (Ok(a), Ok(b)) = (crate::ojson::parse(&cur), crate::ojson::parse(text)) {
         if a.same(&b) {
             return Ok(State::Identical);
         }
     }
-    // Écrit par nous et pas touché depuis : le dépôt ou les surcharges ont changé.
+    // Written by us and not touched since: the repository or the overrides changed.
     let ours = Manifest::load(&env.manifest_file())
         .ok()
         .and_then(|m| m.get(&e.dest).map(|x| x.sha256.clone()));
@@ -463,7 +463,7 @@ pub fn state_of(e: &Entry, env: &Env) -> Result<State> {
             if err.kind() == std::io::ErrorKind::NotFound
                 || err.raw_os_error() == Some(20) /* ENOTDIR */ =>
         {
-            // Un parent existant doit être un dossier (ou un lien vers un dossier).
+            // An existing parent must be a folder (or a link to a folder).
             for p in e.dest.ancestors().skip(1) {
                 if p == env.home {
                     break;
@@ -485,16 +485,16 @@ pub fn state_of(e: &Entry, env: &Env) -> Result<State> {
             && matches!(e.kind, Kind::File | Kind::Dir | Kind::Generated(_))
             && is_poste_target(env, &target, &e.rel)
         {
-            // Lien vers le fichier même que `current` désigne (le clone en dev), posé à la main :
-            // il convient tel quel, setup ne l'a pas posé et n'a rien à y reprendre.
+            // Link to the very file that `current` designates (the clone in dev), put in place by hand:
+            // it is fine as is, setup did not put it and has nothing to take back.
             if !matches!(e.kind, Kind::Generated(_))
                 && same_target(&target, &e.src)
                 && !placed_by_setup(env, &e.dest)
             {
                 return Ok(State::Linked);
             }
-            // L'ancienne forme d'un lien posé par poste : le fichier généré le remplace comme
-            // l'ancien lien vers le dépôt ; un lien est reposé vers `current`.
+            // The old form of a link put by poste: the generated file replaces it like
+            // the old link to the repository; a link is put back to `current`.
             return Ok(if matches!(e.kind, Kind::Generated(_)) {
                 State::Identical
             } else {
@@ -504,7 +504,7 @@ pub fn state_of(e: &Entry, env: &Env) -> Result<State> {
         let ok = match &e.kind {
             Kind::Link(t) => *t == target,
             Kind::File | Kind::Dir => target == e.link || same_target(&target, &e.src),
-            // L'ancien lien vers le dépôt : poste l'avait posé, on peut le remplacer sans risque.
+            // The old link to the repository: poste had put it, it can be replaced without risk.
             Kind::Generated(_) => {
                 if same_target(&target, &e.src) {
                     return Ok(State::Identical);
@@ -523,7 +523,7 @@ pub fn state_of(e: &Entry, env: &Env) -> Result<State> {
     }
     Ok(match (&e.kind, md.is_dir(), md.is_file()) {
         (Kind::Generated(text), false, true) => generated_state(e, text, env)?,
-        (Kind::Generated(_), true, _) => State::WrongType("dossier à la place d'un fichier"),
+        (Kind::Generated(_), true, _) => State::WrongType("folder in place of a file"),
         (Kind::File, false, true) => {
             if sha256_file(&e.src)? == sha256_file(&e.dest)? {
                 State::Identical
@@ -538,11 +538,11 @@ pub fn state_of(e: &Entry, env: &Env) -> Result<State> {
                 State::Differs
             }
         }
-        (Kind::File, true, _) => State::WrongType("dossier à la place d'un fichier"),
-        (Kind::Link(_), true, _) => State::WrongType("dossier à la place d'un lien"),
-        (Kind::Link(_), _, true) => State::WrongType("fichier ordinaire à la place d'un lien"),
-        (Kind::Dir, _, true) => State::WrongType("fichier à la place d'un dossier"),
-        _ => State::WrongType("type de fichier inattendu"),
+        (Kind::File, true, _) => State::WrongType("folder in place of a file"),
+        (Kind::Link(_), true, _) => State::WrongType("folder in place of a link"),
+        (Kind::Link(_), _, true) => State::WrongType("ordinary file in place of a link"),
+        (Kind::Dir, _, true) => State::WrongType("file in place of a folder"),
+        _ => State::WrongType("unexpected file type"),
     })
 }
 
@@ -551,13 +551,13 @@ pub fn state_of(e: &Entry, env: &Env) -> Result<State> {
 #[derive(Debug, Clone)]
 pub struct ModeFix {
     pub rel: String,
-    /// Chemin réel à modifier (dépôt pour un fichier lié, `~` pour un simple dossier).
+    /// Real path to change (repository for a linked file, `~` for a plain folder).
     pub path: PathBuf,
     pub from: u32,
     pub to: u32,
 }
 
-/// Droits à corriger, calculés sur la cible réelle du lien.
+/// Permissions to fix, computed on the real target of the link.
 pub fn mode_fixes(layout: &Layout, env: &Env) -> Vec<ModeFix> {
     let mut out = Vec::new();
     for (rel, want) in &layout.modes {
@@ -579,7 +579,7 @@ pub fn mode_fixes(layout: &Layout, env: &Env) -> Vec<ModeFix> {
                 .link_dirs
                 .iter()
                 .any(|d| rel.starts_with(&format!("{d}/")));
-        // Un dossier ordinaire (non lié) : ses droits sont ceux du dossier de `~`.
+        // An ordinary (unlinked) folder: its permissions are those of the folder in `~`.
         let path = if repo_md.is_dir() && !is_entry {
             let home = env.home.join(rel);
             match std::fs::symlink_metadata(&home) {
@@ -614,17 +614,17 @@ pub enum Decision {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Op {
-    /// Rien à faire (déjà lié).
+    /// Nothing to do (already linked).
     Done,
-    /// Cible absente : créer le lien.
+    /// Target absent: create the link.
     Create,
-    /// Ordinaire identique : sauvegarde puis lien.
+    /// Identical ordinary: backup then link.
     Replace,
-    /// Décision `--take-repo` : sauvegarde de la cible, puis lien.
+    /// `--take-repo` decision: backup of the target, then link.
     TakeRepo,
-    /// Décision `--take-home` : la cible réelle est recopiée dans le dépôt, puis lien.
+    /// `--take-home` decision: the real target is copied into the repository, then link.
     TakeHome,
-    /// Conflit, non traité.
+    /// Conflict, not handled.
     Conflict,
 }
 
@@ -649,7 +649,7 @@ impl Plan {
     pub fn conflicts(&self) -> Vec<&Step> {
         self.steps.iter().filter(|s| s.op == Op::Conflict).collect()
     }
-    /// Nombre d'écritures prévues.
+    /// Number of planned writes.
     pub fn writes(&self) -> usize {
         self.steps
             .iter()
@@ -659,7 +659,7 @@ impl Plan {
     }
 }
 
-/// Reprise d'un fichier généré : le texte du dépôt à écrire (erreur si ambigu).
+/// Take-back of a generated file: the repository text to write (error if ambiguous).
 fn generated_take_home_text(layout: &Layout, e: &Entry) -> Result<String> {
     let sets = layout.overrides.get(&e.rel).cloned().unwrap_or_default();
     let home = std::fs::read_to_string(&e.dest)?;
@@ -672,14 +672,14 @@ fn check_generated_take_home(layout: &Layout, e: &Entry) -> Result<()> {
     generated_take_home_text(layout, e).map(|_| ())
 }
 
-/// Vérifie qu'un `--take-home` est réalisable pour cet état.
+/// Checks that a `--take-home` is feasible for this state.
 fn check_take_home(e: &Entry, st: &State) -> Result<()> {
     let ok = match (&e.kind, st) {
         (Kind::File, State::Differs) => true,
         (Kind::File, State::OtherLink { broken, .. }) => {
             if *broken {
                 bail!(
-                    "--take-home {} : le lien est cassé, rien à reprendre",
+                    "--take-home {}: the link is broken, nothing to take back",
                     e.rel
                 )
             }
@@ -694,7 +694,7 @@ fn check_take_home(e: &Entry, st: &State) -> Result<()> {
     };
     if !ok {
         bail!(
-            "--take-home {} : impossible dans l'état actuel de la cible ({}) ; utilisez --take-repo",
+            "--take-home {}: impossible in the current state of the target ({}); use --take-repo",
             e.rel,
             describe(st)
         );
@@ -712,9 +712,9 @@ pub fn plan(layout: &Layout, env: &Env, decisions: &HashMap<String, Decision>) -
             .iter()
             .find(|d| k.starts_with(&format!("{d}/")))
         {
-            bail!("« {k} » est dans le dossier lié d'un bloc « {d} » : tranchez sur le dossier");
+            bail!("'{k}' is in the folder linked as a block '{d}': decide on the folder");
         }
-        bail!("« {k} » n'est pas une entrée de config/");
+        bail!("'{k}' is not an entry of config/");
     }
     let mut p = Plan::default();
     let manifest = Manifest::load(&env.manifest_file())?;
@@ -725,39 +725,41 @@ pub fn plan(layout: &Layout, env: &Env, decisions: &HashMap<String, Decision>) -
             (State::Linked | State::Generated, d) => {
                 if d.is_some() {
                     p.warnings
-                        .push(format!("{} : déjà lié, rien à trancher", e.rel));
+                        .push(format!("{}: already linked, nothing to decide", e.rel));
                 }
                 Op::Done
             }
             (State::Missing, d) => {
                 if d.is_some() {
                     p.warnings
-                        .push(format!("{} : cible absente, rien à trancher", e.rel));
+                        .push(format!("{}: target absent, nothing to decide", e.rel));
                 }
                 Op::Create
             }
             (State::Identical | State::Stale, d) => {
                 if d.is_some() {
-                    p.warnings
-                        .push(format!("{} : identique au dépôt, rien à trancher", e.rel));
+                    p.warnings.push(format!(
+                        "{}: identical to the repository, nothing to decide",
+                        e.rel
+                    ));
                 }
                 Op::Replace
             }
-            // Posé par poste (installed.json) : reposé vers la nouvelle racine, ancien sauvegardé.
+            // Put in place by poste (installed.json): put back to the new root, old one backed up.
             (State::Moved { .. }, None)
                 if manifest.get(&e.dest).is_some_and(|m| m.module == MODULE) =>
             {
                 Op::Replace
             }
             (State::ParentBlocked(_), Some(_)) => bail!(
-                "{} : un dossier parent n'est pas un dossier, impossible de trancher",
+                "{}: a parent folder is not a folder, impossible to decide",
                 e.rel
             ),
             (_, Some(Decision::Repo)) => Op::TakeRepo,
             (st, Some(Decision::Home)) => {
                 check_take_home(e, st)?;
                 if let Kind::Generated(_) = e.kind {
-                    // Refus net, avant d'écrire quoi que ce soit, si la reprise est ambiguë.
+                    // Clean refusal, before writing anything, if the take-back is ambiguous.
                     check_generated_take_home(layout, e)?;
                 }
                 Op::TakeHome
@@ -776,55 +778,55 @@ pub fn plan(layout: &Layout, env: &Env, decisions: &HashMap<String, Decision>) -
 
 pub fn describe(st: &State) -> String {
     match st {
-        State::Linked => "lié".into(),
+        State::Linked => "linked".into(),
         State::Missing => "absent".into(),
-        State::Identical => "fichier ordinaire identique".into(),
-        State::Differs => "différent du dépôt".into(),
-        State::Moved { target } => format!("lien vers {} (ancienne racine)", target.display()),
+        State::Identical => "identical ordinary file".into(),
+        State::Differs => "different from the repository".into(),
+        State::Moved { target } => format!("link to {} (old root)", target.display()),
         State::OtherLink { target, broken } => format!(
-            "lien vers {}{}",
+            "link to {}{}",
             target.display(),
-            if *broken { " (cassé)" } else { "" }
+            if *broken { " (broken)" } else { "" }
         ),
-        State::Generated => "généré, à jour".into(),
-        State::Stale => "généré, à régénérer".into(),
+        State::Generated => "generated, up to date".into(),
+        State::Stale => "generated, to regenerate".into(),
         State::WrongType(s) => (*s).to_string(),
-        State::ParentBlocked(p) => format!("{} n'est pas un dossier", p.display()),
+        State::ParentBlocked(p) => format!("{} is not a folder", p.display()),
     }
 }
 
 // ---------------------------------------------------------------- affichage
 
 pub fn print_plan(env: &Env, plan: &Plan) {
-    println!("\nConfig (~ <- config/ par liens) :");
+    println!("\nConfig (~ <- config/ by links):");
     let linked = plan.count(&Op::Done);
     for s in &plan.steps {
         let d = env.display(&s.entry.dest);
         let kind = if s.entry.kind == Kind::Dir {
-            " (dossier)"
+            " (folder)"
         } else {
             ""
         };
         match s.op {
             Op::Done | Op::Conflict => {}
             Op::Create if matches!(s.entry.kind, Kind::Generated(_)) => {
-                println!("  généré      {d}  (dépôt + surcharges de la machine)")
+                println!("  generated   {d}  (repository + overrides of the machine)")
             }
             Op::Replace if matches!(s.entry.kind, Kind::Generated(_)) => {
-                println!("  régénéré    {d}  (dépôt + surcharges de la machine, ancien sauvegardé)")
+                println!("  regenerated {d}  (repository + overrides of the machine, old one backed up)")
             }
-            Op::Create => println!("  lien créé   {d}{kind}"),
+            Op::Create => println!("  linked      {d}{kind}"),
             Op::Replace if matches!(s.state, State::Moved { .. }) => {
-                println!("  relié       {d}{kind}  (lien vers l'ancienne racine, reposé vers current, ancien sauvegardé)")
+                println!("  relinked    {d}{kind}  (link to the old root, put back to current, old one backed up)")
             }
             Op::Replace => {
-                println!("  remplacé    {d}{kind}  (identique au dépôt, ancien sauvegardé)")
+                println!("  replaced    {d}{kind}  (identical to the repository, old one backed up)")
             }
             Op::TakeRepo => println!(
-                "  remplacé    {d}{kind}  (--take-repo : version du dépôt, ancien sauvegardé)"
+                "  replaced    {d}{kind}  (--take-repo: version of the repository, old one backed up)"
             ),
             Op::TakeHome => println!(
-                "  repris      {d}{kind}  (--take-home : copié dans le dépôt, ancien sauvegardé)"
+                "  taken back  {d}{kind}  (--take-home: copied into the repository, old one backed up)"
             ),
         }
     }
@@ -835,7 +837,7 @@ pub fn print_plan(env: &Env, plan: &Plan) {
         println!("  note        {w}");
     }
     println!(
-        "  bilan : {linked} déjà lié(s), {} à créer, {} à remplacer (identiques), {} décision(s) appliquée(s), {} droit(s) à corriger, {} conflit(s)",
+        "  summary: {linked} already linked, {} to create, {} to replace (identical), {} decision(s) applied, {} permission(s) to fix, {} conflict(s)",
         plan.count(&Op::Create),
         plan.count(&Op::Replace),
         plan.count(&Op::TakeRepo) + plan.count(&Op::TakeHome),
@@ -850,7 +852,7 @@ pub fn print_conflicts(env: &Env, plan: &Plan) {
         return;
     }
     println!(
-        "\nConflits ({}) : rien n'a été touché pour ces entrées.",
+        "\nConflicts ({}): nothing was touched for these entries.",
         c.len()
     );
     for s in c {
@@ -858,16 +860,16 @@ pub fn print_conflicts(env: &Env, plan: &Plan) {
         let rel = &s.entry.rel;
         match s.state {
             State::Differs if matches!(s.entry.kind, Kind::Generated(_)) => println!(
-                "      fichier généré (dépôt + surcharges) modifié à la main : poste sys diff {rel}\n      régénérer : poste sys setup --take-repo {rel}  ou reprendre dans le dépôt : --take-home {rel} (remet les valeurs surchargées comme dans le dépôt ; refusé si ambigu)"
+                "      generated file (repository + overrides) edited by hand: poste sys diff {rel}\n      regenerate: poste sys setup --take-repo {rel}  or take it back into the repository: --take-home {rel} (puts the overridden values back as in the repository; refused if ambiguous)"
             ),
             State::Differs => println!(
-                "      voir : poste sys diff {rel}\n      trancher : poste sys setup --take-repo {rel}  ou  --take-home {rel}"
+                "      see: poste sys diff {rel}\n      decide: poste sys setup --take-repo {rel}  or  --take-home {rel}"
             ),
             State::ParentBlocked(_) => {
-                println!("      à régler à la main : un dossier parent est un fichier")
+                println!("      to fix by hand: a parent folder is a file")
             }
             _ => println!(
-                "      trancher : poste sys setup --take-repo {rel}  ou  --take-home {rel}"
+                "      decide: poste sys setup --take-repo {rel}  or  --take-home {rel}"
             ),
         }
     }
@@ -882,7 +884,7 @@ fn link_target(e: &Entry) -> PathBuf {
     }
 }
 
-/// Recopie ce qui est dans `~` (fichier, lien ou dossier) vers le dépôt.
+/// Copies what is in `~` (file, link or folder) into the repository.
 fn take_home(layout: &Layout, e: &Entry, from: &Path) -> Result<()> {
     match &e.kind {
         Kind::File => {
@@ -904,12 +906,12 @@ fn take_home(layout: &Layout, e: &Entry, from: &Path) -> Result<()> {
             replace_with_symlink(&e.src, &t)?;
         }
         Kind::Dir => merge_tree(from, &e.src)?,
-        Kind::Generated(_) => unreachable!("traité par apply_generated"),
+        Kind::Generated(_) => unreachable!("handled by apply_generated"),
     }
     Ok(())
 }
 
-/// Copie `src` sur `dst` (sans rien retirer de `dst`), hors `__pycache__`.
+/// Copies `src` onto `dst` (without removing anything from `dst`), except `__pycache__`.
 fn merge_tree(src: &Path, dst: &Path) -> Result<()> {
     for entry in std::fs::read_dir(src)? {
         let entry = entry?;
@@ -931,20 +933,20 @@ fn merge_tree(src: &Path, dst: &Path) -> Result<()> {
     Ok(())
 }
 
-/// Un fichier repris avec des droits restreints : ajoute son mode à `config/.poste/modes`.
+/// A file taken back with restricted permissions: adds its mode to `config/.poste/modes`.
 fn note_restricted_mode(layout: &Layout, e: &Entry, mode: u32) -> Result<()> {
     if mode & 0o077 == 0 && !layout.modes.contains_key(&e.rel) {
         upsert_mode_line(layout.root_of(e), &e.rel, mode)?;
         std::fs::set_permissions(&e.src, std::fs::Permissions::from_mode(mode))?;
         println!(
-            "  droits {:04o} notés dans config/.poste/modes pour {}",
+            "  permissions {:04o} noted in config/.poste/modes for {}",
             mode, e.rel
         );
     }
     Ok(())
 }
 
-/// Ajoute ou remplace la ligne d'un chemin dans `config/.poste/modes` (garde les commentaires).
+/// Adds or replaces the line of a path in `config/.poste/modes` (keeps the comments).
 pub fn upsert_mode_line(root: &Path, rel: &str, mode: u32) -> Result<()> {
     let file = root.join(META).join("modes");
     std::fs::create_dir_all(root.join(META))?;
@@ -973,7 +975,7 @@ pub fn upsert_mode_line(root: &Path, rel: &str, mode: u32) -> Result<()> {
     Ok(())
 }
 
-/// Empreinte à noter dans `installed.json` : contenu d'un fichier, sinon la cible du lien.
+/// Fingerprint to note in `installed.json`: content of a file, otherwise the target of the link.
 fn record_hash(e: &Entry) -> Result<String> {
     Ok(match &e.kind {
         Kind::File => sha256_file(&e.src)?,
@@ -985,7 +987,7 @@ fn record_hash(e: &Entry) -> Result<String> {
     })
 }
 
-/// Note l'entrée dans le manifeste ; `true` si quelque chose a changé.
+/// Notes the entry in the manifest; `true` if something changed.
 pub fn record(manifest: &mut Manifest, e: &Entry) -> Result<bool> {
     let path = e.dest.to_string_lossy().into_owned();
     let sha = record_hash(e)?;
@@ -1004,8 +1006,8 @@ pub fn record(manifest: &mut Manifest, e: &Entry) -> Result<bool> {
     Ok(true)
 }
 
-/// Applique le plan. Renvoie le nombre d'entrées écrites. Met à jour `manifest` (à
-/// enregistrer par l'appelant, qui sait aussi enregistrer les entrées déjà liées).
+/// Applies the plan. Returns the number of entries written. Updates `manifest` (to be
+/// saved by the caller, who also knows how to save the entries that are already linked).
 pub fn apply(
     layout: &Layout,
     env: &Env,
@@ -1033,12 +1035,12 @@ pub fn apply(
                     std::fs::create_dir_all(parent)?;
                 }
                 symlink(link_target(e), &e.dest)
-                    .with_context(|| format!("lien {}", e.dest.display()))?;
+                    .with_context(|| format!("link {}", e.dest.display()))?;
             }
             Op::Replace | Op::TakeRepo | Op::TakeHome => {
                 if s.op == Op::TakeHome {
-                    // Un dossier est déplacé par la sauvegarde : on le recopie depuis là.
-                    // Pour le reste, on recopie d'abord, puis on sauvegarde l'original.
+                    // A folder is moved by the backup: we copy it back from there.
+                    // For the rest, we copy first, then back up the original.
                     let bak = if e.kind == Kind::Dir {
                         let bak = backup(env, &e.dest, stamp)?;
                         take_home(layout, e, &bak)?;
@@ -1047,7 +1049,7 @@ pub fn apply(
                         take_home(layout, e, &e.dest)?;
                         backup(env, &e.dest, stamp)?
                     };
-                    println!("  sauvegarde : {}", env.display(&bak));
+                    println!("  backup: {}", env.display(&bak));
                     if matches!(e.kind, Kind::Link(_)) && state_of(e, env)? == State::Linked {
                         record(manifest, e)?;
                         manifest.save(manifest_file)?;
@@ -1056,7 +1058,7 @@ pub fn apply(
                     }
                 } else {
                     let bak = backup(env, &e.dest, stamp)?;
-                    println!("  sauvegarde : {}", env.display(&bak));
+                    println!("  backup: {}", env.display(&bak));
                 }
                 place_link(e)?;
             }
@@ -1068,48 +1070,50 @@ pub fn apply(
     for m in &plan.modes {
         std::fs::set_permissions(&m.path, std::fs::Permissions::from_mode(m.to))
             .with_context(|| format!("droits de {}", m.path.display()))?;
-        println!("  droits {:04o} : {}", m.to, m.rel);
+        println!("  permissions {:04o}: {}", m.to, m.rel);
         n += 1;
     }
     Ok(n)
 }
 
-/// Écrit un fichier ordinaire de façon atomique (le lien éventuel est remplacé, pas suivi).
+/// Writes an ordinary file atomically (a possible link is replaced, not followed).
 fn write_text(dest: &Path, text: &str) -> Result<()> {
-    let parent = dest.parent().context("destination sans dossier parent")?;
+    let parent = dest
+        .parent()
+        .context("destination without a parent folder")?;
     std::fs::create_dir_all(parent)?;
     let tmp = parent.join(format!(".poste-tmp-{}-gen", std::process::id()));
     std::fs::write(&tmp, text)?;
-    std::fs::rename(&tmp, dest).with_context(|| format!("écriture de {}", dest.display()))
+    std::fs::rename(&tmp, dest).with_context(|| format!("writing {}", dest.display()))
 }
 
-/// Pose un fichier généré (sauvegarde de l'ancien, reprise éventuelle dans le dépôt). Renvoie
-/// le texte écrit.
+/// Puts a generated file in place (backup of the old one, possible take-back into the repository). Returns
+/// the text written.
 fn apply_generated(layout: &Layout, env: &Env, e: &Entry, op: &Op, stamp: &str) -> Result<String> {
     let Kind::Generated(text) = &e.kind else {
-        unreachable!("fichier généré");
+        unreachable!("generated file");
     };
     let mut text = text.clone();
     if *op == Op::TakeHome {
-        // Le dépôt reçoit le fichier de ~ sans les valeurs surchargées ; le fichier généré en dérive.
+        // The repository receives the file of ~ without the overridden values; the generated file derives from it.
         let new_repo = generated_take_home_text(layout, e)?;
         let sets = layout.overrides.get(&e.rel).cloned().unwrap_or_default();
         text = crate::overrides::generate(&new_repo, &sets)?;
         write_text(&e.src, &new_repo)?;
         println!(
-            "  repris dans le dépôt (valeurs surchargées remises) : config/{}",
+            "  taken back into the repository (overridden values put back): config/{}",
             e.rel
         );
     }
     if std::fs::symlink_metadata(&e.dest).is_ok() {
         let bak = backup(env, &e.dest, stamp)?;
-        println!("  sauvegarde : {}", env.display(&bak));
+        println!("  backup: {}", env.display(&bak));
     }
     write_text(&e.dest, &text)?;
     Ok(text)
 }
 
-/// Note un fichier généré dans le manifeste (empreinte du texte écrit).
+/// Notes a generated file in the manifest (fingerprint of the written text).
 fn record_text(manifest: &mut Manifest, e: &Entry, text: &str) {
     manifest.upsert(ManifestEntry {
         path: e.dest.to_string_lossy().into_owned(),
@@ -1119,22 +1123,22 @@ fn record_text(manifest: &mut Manifest, e: &Entry, text: &str) {
     });
 }
 
-/// Pose le lien final (la cible a été sauvegardée ; un dossier a déjà été déplacé).
+/// Puts the final link in place (the target was backed up; a folder was already moved).
 fn place_link(e: &Entry) -> Result<()> {
     let target = link_target(e);
     match std::fs::symlink_metadata(&e.dest) {
-        Ok(m) if m.is_dir() => bail!("{} est encore un dossier", e.dest.display()),
+        Ok(m) if m.is_dir() => bail!("{} is still a folder", e.dest.display()),
         Ok(_) => replace_with_symlink(&e.dest, &target),
         Err(_) => {
             if let Some(parent) = e.dest.parent() {
                 std::fs::create_dir_all(parent)?;
             }
-            symlink(&target, &e.dest).with_context(|| format!("lien {}", e.dest.display()))
+            symlink(&target, &e.dest).with_context(|| format!("link {}", e.dest.display()))
         }
     }
 }
 
-/// Enregistre dans le manifeste toutes les entrées déjà liées (idempotent) ; `true` si changé.
+/// Records in the manifest all the entries that are already linked (idempotent); `true` if changed.
 pub fn record_linked(plan: &Plan, manifest: &mut Manifest) -> Result<bool> {
     let mut changed = false;
     for s in &plan.steps {
@@ -1145,10 +1149,10 @@ pub fn record_linked(plan: &Plan, manifest: &mut Manifest) -> Result<bool> {
     Ok(changed)
 }
 
-// ---------------------------------------------------------------- chemins donnés par l'utilisateur
+// ---------------------------------------------------------------- paths given by the user
 
-/// Chemin relatif à `~` pour un argument : `~/x`, absolu sous `~`, relatif au dossier
-/// courant s'il existe sous `~`, sinon relatif à `~`. Ne suit pas les liens.
+/// Path relative to `~` for an argument: `~/x`, absolute under `~`, relative to the current
+/// folder if it exists under `~`, otherwise relative to `~`. Does not follow links.
 pub fn rel_of(env: &Env, arg: &str) -> Result<String> {
     let p = if arg == "~" || arg.starts_with("~/") {
         env.expand(arg)
@@ -1164,17 +1168,17 @@ pub fn rel_of(env: &Env, arg: &str) -> Result<String> {
     let mut parts: Vec<String> = Vec::new();
     for c in p
         .strip_prefix(&env.home)
-        .map_err(|_| anyhow::anyhow!("{} n'est pas sous le dossier personnel", p.display()))?
+        .map_err(|_| anyhow::anyhow!("{} is not under the home folder", p.display()))?
         .components()
     {
         match c {
             Component::Normal(s) => parts.push(s.to_string_lossy().into_owned()),
             Component::CurDir => {}
-            _ => bail!("chemin invalide : {arg}"),
+            _ => bail!("invalid path: {arg}"),
         }
     }
     if parts.is_empty() {
-        bail!("chemin invalide : {arg}");
+        bail!("invalid path: {arg}");
     }
     Ok(parts.join("/"))
 }
@@ -1193,18 +1197,18 @@ fn entry_for<'a>(layout: &'a Layout, rel: &str) -> Result<&'a Entry> {
         .iter()
         .find(|d| rel.starts_with(&format!("{d}/")))
     {
-        bail!("{rel} est dans le dossier lié d'un bloc « {d} » : utilisez ce dossier");
+        bail!("{rel} is in the folder linked as a block '{d}': use that folder");
     }
-    bail!("{rel} n'est pas géré par config/")
+    bail!("{rel} is not managed by config/")
 }
 
 // ---------------------------------------------------------------- diff
 
-/// `poste sys diff [<chemin>]` : retourne `true` s'il y a des différences.
+/// `poste sys diff [<path>]`: returns `true` if there are differences.
 pub fn diff(layout: &Layout, env: &Env, arg: Option<&str>) -> Result<bool> {
     let entries: Vec<&Entry> = match arg {
         Some(a) => vec![entry_for(layout, &rel_of(env, a)?)?],
-        // Sans argument : seulement ce que `setup` gère (les fichiers locaux sont voulus différents).
+        // Without argument: only what `setup` manages (local files are meant to differ).
         None => layout.entries.iter().collect(),
     };
     let mut any = false;
@@ -1212,23 +1216,25 @@ pub fn diff(layout: &Layout, env: &Env, arg: Option<&str>) -> Result<bool> {
     for e in entries {
         let st = state_of(e, env)?;
         if arg.is_some() && is_local(&e.rel, &layout.local_paths) {
-            println!("(fichier local à cette machine : setup n'y touche pas, l'écart est normal)");
+            println!(
+                "(file local to this machine: setup does not touch it, the difference is normal)"
+            );
         }
         match st {
             State::Linked | State::Identical | State::Generated => {
                 if arg.is_some() {
-                    println!("{} : {}, aucune différence.", e.rel, describe(&st));
+                    println!("{}: {}, no difference.", e.rel, describe(&st));
                 }
             }
             State::Missing => {
                 if arg.is_some() {
-                    println!("{} : absent de ~ (setup créera le lien).", e.rel);
+                    println!("{}: absent from ~ (setup will create the link).", e.rel);
                 }
             }
             State::Differs | State::Stale => {
                 any = true;
-                println!("=== {} (dépôt : -, ~ : +)", e.rel);
-                // Fichier généré : on compare à ce que setup écrirait (dépôt + surcharges).
+                println!("=== {} (repository: -, ~: +)", e.rel);
+                // Generated file: we compare with what setup would write (repository + overrides).
                 let gen_tmp = if let Kind::Generated(text) = &e.kind {
                     let t =
                         std::env::temp_dir().join(format!(".poste-diff-{}", std::process::id()));
@@ -1239,7 +1245,7 @@ pub fn diff(layout: &Layout, env: &Env, arg: Option<&str>) -> Result<bool> {
                 };
                 let _ = std::io::Write::flush(&mut std::io::stdout());
                 let mut cmd = std::process::Command::new("diff");
-                cmd.args(["-ru", "-x", PYCACHE, "--label", &format!("depot/{}", e.rel)]);
+                cmd.args(["-ru", "-x", PYCACHE, "--label", &format!("repo/{}", e.rel)]);
                 cmd.arg("--label").arg(format!("maison/{}", e.rel));
                 cmd.arg(gen_tmp.as_deref().unwrap_or(&e.src)).arg(&e.dest);
                 let status = cmd.status().context("cannot run diff")?;
@@ -1247,16 +1253,16 @@ pub fn diff(layout: &Layout, env: &Env, arg: Option<&str>) -> Result<bool> {
                     let _ = std::fs::remove_file(t);
                 }
                 if status.code().is_some_and(|c| c > 1) {
-                    bail!("diff a échoué pour {}", e.rel);
+                    bail!("diff failed for {}", e.rel);
                 }
             }
             other => {
                 any = true;
                 if arg.is_some() {
-                    println!("{} : {}", e.rel, describe(&other));
+                    println!("{}: {}", e.rel, describe(&other));
                     if let (Kind::Link(t), State::OtherLink { target, .. }) = (&e.kind, &other) {
                         println!(
-                            "  dépôt : lien vers {}\n  ~     : lien vers {}",
+                            "  repository: link to {}\n  ~         : link to {}",
                             t.display(),
                             target.display()
                         );
@@ -1268,25 +1274,25 @@ pub fn diff(layout: &Layout, env: &Env, arg: Option<&str>) -> Result<bool> {
         }
     }
     if !others.is_empty() {
-        println!("\nAutres conflits (pas de diff possible) :");
+        println!("\nOther conflicts (no diff possible):");
         for (p, d) in others {
             println!("  {p}  [{d}]");
         }
     }
     if !any && arg.is_none() {
-        println!("Aucune différence : tout ce qui est en place est lié ou identique.");
+        println!("No difference: everything in place is linked or identical.");
     }
     Ok(any)
 }
 
 // ---------------------------------------------------------------- add / forget
 
-/// Droits à noter pour un fichier ajouté : restreints seulement si aucun droit de groupe/autres.
+/// Permissions to note for an added file: restricted only if there are no group/other permissions.
 fn restricted(mode: u32) -> Option<u32> {
     (mode & 0o077 == 0).then_some(mode & 0o777)
 }
 
-/// Chemins (fichiers et liens) sous `p` pour `add`, hors `__pycache__`.
+/// Paths (files and links) under `p` for `add`, except `__pycache__`.
 fn collect_files(p: &Path, out: &mut Vec<PathBuf>) -> Result<()> {
     let md = std::fs::symlink_metadata(p)?;
     if md.is_dir() && !md.file_type().is_symlink() {
@@ -1310,12 +1316,12 @@ pub fn add(env: &Env, repo: &Path, arg: &str, dry_run: bool, manifest_file: &Pat
     let ignore = crate::ignore::Ignore::load(&root.join(META).join("ignore"))?;
     if let Some(rule) = ignore.matching(&rel) {
         bail!(
-            "refus : {rel} correspond à la règle « {rule} » (config/.poste/ignore ou règles intégrées : secrets, caches, fichiers régénérés)"
+            "refused: {rel} matches the rule '{rule}' (config/.poste/ignore or built-in rules: secrets, caches, regenerated files)"
         );
     }
     let home_path = env.home.join(&rel);
     if std::fs::symlink_metadata(&home_path).is_err() {
-        bail!("{} n'existe pas", env.display(&home_path));
+        bail!("{} does not exist", env.display(&home_path));
     }
     let mut files = Vec::new();
     collect_files(&home_path, &mut files)?;
@@ -1325,29 +1331,29 @@ pub fn add(env: &Env, repo: &Path, arg: &str, dry_run: bool, manifest_file: &Pat
     for f in files {
         let frel = f.strip_prefix(&env.home)?.to_string_lossy().into_owned();
         if let Some(rule) = ignore.matching(&frel) {
-            println!("  ignoré : {frel} (règle « {rule} »)");
+            println!("  ignored: {frel} (rule '{rule}')");
             skipped += 1;
             continue;
         }
         let dest_repo = root.join(&frel);
         let md = std::fs::symlink_metadata(&f)?;
-        // Déjà dans le dépôt (lien vers config/, ou sous un dossier lié) ?
+        // Already in the repository (link to config/, or under a linked folder)?
         if let (Ok(c), Ok(r)) = (std::fs::canonicalize(&f), std::fs::canonicalize(&root)) {
             if c.starts_with(&r) {
-                println!("  déjà géré : {frel}");
+                println!("  already managed: {frel}");
                 skipped += 1;
                 continue;
             }
         }
         if std::fs::symlink_metadata(&dest_repo).is_ok() {
             println!(
-                "  existe déjà dans le dépôt : {frel} (tranchez avec poste sys setup --take-home/--take-repo)"
+                "  already exists in the repository: {frel} (decide with poste sys setup --take-home/--take-repo)"
             );
             skipped += 1;
             continue;
         }
         if dry_run {
-            println!("  ajouterait : {frel}");
+            println!("  would add: {frel}");
             added += 1;
             continue;
         }
@@ -1356,12 +1362,12 @@ pub fn add(env: &Env, repo: &Path, arg: &str, dry_run: bool, manifest_file: &Pat
         }
         if md.file_type().is_symlink() {
             symlink(std::fs::read_link(&f)?, &dest_repo)?;
-            println!("  ajouté (lien) : {frel}");
+            println!("  added (link): {frel}");
         } else {
             let bak = backup(env, &f, &stamp)?;
             std::fs::copy(&f, &dest_repo)?;
             if sha256_file(&f)? != sha256_file(&dest_repo)? {
-                bail!("copie de {frel} différente de l'original, abandon (original intact)");
+                bail!("copy of {frel} differs from the original, giving up (original intact)");
             }
             let exec = md.mode() & 0o111 != 0;
             std::fs::set_permissions(
@@ -1373,7 +1379,7 @@ pub fn add(env: &Env, repo: &Path, arg: &str, dry_run: bool, manifest_file: &Pat
                 std::fs::set_permissions(&dest_repo, std::fs::Permissions::from_mode(m))?;
             }
             replace_with_symlink(&f, &dest_repo)?;
-            println!("  ajouté : {frel} (sauvegarde : {})", env.display(&bak));
+            println!("  added: {frel} (backup: {})", env.display(&bak));
         }
         let e = Entry {
             rel: frel.clone(),
@@ -1393,15 +1399,15 @@ pub fn add(env: &Env, repo: &Path, arg: &str, dry_run: bool, manifest_file: &Pat
         manifest.save(manifest_file)?;
     }
     println!(
-        "{added} ajouté(s){} ; à vérifier puis commiter dans le dépôt.",
+        "{added} added{}; to check then commit in the repository.",
         if skipped > 0 {
-            format!(", {skipped} ignoré(s)")
+            format!(", {skipped} ignored")
         } else {
             String::new()
         }
     );
     if dry_run {
-        println!("Simulation (--dry-run) : rien n'a été écrit.");
+        println!("Dry run (--dry-run): nothing was written.");
     }
     Ok(())
 }
@@ -1411,7 +1417,7 @@ pub fn forget(layout: &Layout, env: &Env, arg: &str, manifest_file: &Path) -> Re
     let e = entry_for(layout, &rel)?;
     let st = state_of(e, env)?;
     if st != State::Linked {
-        bail!("{rel} n'est pas lié ({}) : rien à retirer", describe(&st));
+        bail!("{rel} is not linked ({}): nothing to remove", describe(&st));
     }
     match &e.kind {
         Kind::File => {
@@ -1438,36 +1444,36 @@ pub fn forget(layout: &Layout, env: &Env, arg: &str, manifest_file: &Path) -> Re
         manifest.save(manifest_file)?;
     }
     println!(
-        "{} : le lien est remplacé par un fichier ordinaire (copie du dépôt).",
+        "{}: the link is replaced by an ordinary file (copy of the repository).",
         env.display(&e.dest)
     );
     println!(
-        "Le fichier reste dans le dépôt jusqu'à votre commit : retirez-le avec « git rm -r config/{rel} » (et sa ligne dans config/.poste/modes ou link-dirs si besoin), sinon le prochain setup le relierait."
+        "The file stays in the repository until your commit: remove it with 'git rm -r config/{rel}' (and its line in config/.poste/modes or link-dirs if needed), otherwise the next setup would link it again."
     );
     Ok(())
 }
 
 // ---------------------------------------------------------------- status
 
-/// Fichiers que cette machine garde à elle (`local`), avec leur état par rapport au dépôt.
+/// Files that this machine keeps for itself (`local`), with their state against the repository.
 pub fn print_local(layout: &Layout, env: &Env) -> Result<()> {
     if layout.local_paths.is_empty() {
         return Ok(());
     }
     println!(
-        "\nFichiers locaux ({} ; config.toml, clé local : poste ne les lie ni ne les touche)",
+        "\nLocal files ({}; config.toml, key local: poste neither links nor touches them)",
         layout.local.len()
     );
     for e in &layout.local {
         let st = state_of(e, env)?;
         let d = match &st {
             State::Linked => {
-                "encore lié au dépôt (poste sys forget pour en faire un fichier ordinaire)"
+                "still linked to the repository (poste sys forget to make it an ordinary file)"
                     .to_string()
             }
-            State::Missing => "absent de ~".to_string(),
-            State::Identical => "identique au dépôt".to_string(),
-            State::Differs => "différent du dépôt (poste sys diff pour voir)".to_string(),
+            State::Missing => "absent from ~".to_string(),
+            State::Identical => "identical to the repository".to_string(),
+            State::Differs => "different from the repository (poste sys diff to see)".to_string(),
             other => describe(other),
         };
         println!("  local        {}  [{d}]", env.display(&e.dest));
@@ -1478,14 +1484,14 @@ pub fn print_local(layout: &Layout, env: &Env) -> Result<()> {
             .iter()
             .any(|e| is_local(&e.rel, std::slice::from_ref(l)))
         {
-            println!("  inconnu      ~/{l}  (aucune entrée de config/ ne correspond)");
+            println!("  unknown      ~/{l}  (no config/ entry matches)");
         }
     }
     Ok(())
 }
 
 pub fn print_status(layout: &Layout, env: &Env, manifest: &Manifest) -> Result<()> {
-    println!("\nConfig ({} entrée(s) dans config/)", layout.entries.len());
+    println!("\nConfig ({} entries in config/)", layout.entries.len());
     let plan = plan(layout, env, &HashMap::new())?;
     let mut linked = 0;
     let mut lines: Vec<String> = Vec::new();
@@ -1501,19 +1507,19 @@ pub fn print_status(layout: &Layout, env: &Env, manifest: &Manifest) -> Result<(
             State::Stale => {
                 stale += 1;
                 lines.push(format!(
-                    "  à régénérer  {d}  (le dépôt ou les surcharges ont changé : poste sys setup)"
+                    "  to regenerate {d}  (the repository or the overrides changed: poste sys setup)"
                 ));
             }
             State::Differs if matches!(s.entry.kind, Kind::Generated(_)) => {
                 conflicts += 1;
                 lines.push(format!(
-                    "  généré, modifié à la main  {d}  (poste sys diff {rel} ; poste sys setup --take-repo {rel} pour régénérer, --take-home {rel} pour reprendre dans le dépôt)"
+                    "  generated, edited by hand  {d}  (poste sys diff {rel}; poste sys setup --take-repo {rel} to regenerate, --take-home {rel} to take it back into the repository)"
                 ));
             }
             State::Missing => {
                 missing += 1;
                 lines.push(format!(
-                    "  manquant     {d}  (poste sys setup crée le lien)"
+                    "  missing      {d}  (poste sys setup creates the link)"
                 ));
             }
             State::OtherLink {
@@ -1522,33 +1528,33 @@ pub fn print_status(layout: &Layout, env: &Env, manifest: &Manifest) -> Result<(
             } => {
                 broken += 1;
                 lines.push(format!(
-                    "  lien cassé   {d}  -> {}  (poste sys setup --take-repo {rel})",
+                    "  broken link  {d}  -> {}  (poste sys setup --take-repo {rel})",
                     target.display()
                 ));
             }
             State::Moved { target } if tracked(&s.entry) => {
                 missing += 1;
                 lines.push(format!(
-                    "  à relier     {d}  -> {}  (ancienne racine : poste sys setup le repose vers current)",
+                    "  to relink    {d}  -> {}  (old root: poste sys setup puts it back to current)",
                     target.display()
                 ));
             }
             State::Identical if tracked(&s.entry) => {
                 replaced += 1;
                 lines.push(format!(
-                    "  remplacé par un fichier ordinaire (identique au dépôt)  {d}  (poste sys setup relie)"
+                    "  replaced by an ordinary file (identical to the repository)  {d}  (poste sys setup links it)"
                 ));
             }
             State::Differs if tracked(&s.entry) => {
                 replaced += 1;
                 lines.push(format!(
-                    "  remplacé par un fichier ordinaire, modifié  {d}  (une appli a réécrit le fichier : poste sys setup --take-home {rel} pour le reprendre, ou --take-repo {rel})"
+                    "  replaced by an ordinary file, modified  {d}  (an app rewrote the file: poste sys setup --take-home {rel} to take it back, or --take-repo {rel})"
                 ));
             }
             State::Identical => {
                 missing += 1;
                 lines.push(format!(
-                    "  pas encore lié  {d}  (fichier identique, poste sys setup le relie)"
+                    "  not linked yet  {d}  (identical file, poste sys setup links it)"
                 ));
             }
             other => {
@@ -1560,15 +1566,17 @@ pub fn print_status(layout: &Layout, env: &Env, manifest: &Manifest) -> Result<(
             }
         }
     }
-    println!("  liés            {linked}");
+    println!("  linked            {linked}");
     if !layout.overrides.is_empty() {
-        println!("  générés         {generated}  (dépôt + surcharges ; {stale} à régénérer)");
+        println!(
+            "  generated         {generated}  (repository + overrides; {stale} to regenerate)"
+        );
     }
     println!("  manquants       {missing}");
-    println!("  liens cassés    {broken}");
-    println!("  remplacés       {replaced}  (lien devenu fichier ordinaire)");
+    println!("  broken links      {broken}");
+    println!("  replaced          {replaced}  (link turned into an ordinary file)");
     println!("  conflits        {conflicts}");
-    println!("  droits à corriger {}", plan.modes.len());
+    println!("  permissions to fix {}", plan.modes.len());
     for l in lines {
         println!("{l}");
     }
@@ -1584,7 +1592,7 @@ mod tests {
     use super::*;
     use std::fs;
 
-    /// Dépôt et HOME temporaires : jamais le vrai `~`.
+    /// Temporary repository and HOME: never the real `~`.
     struct Fx {
         _d: tempfile::TempDir,
         repo: PathBuf,
@@ -1657,11 +1665,11 @@ mod tests {
     }
 
     #[test]
-    fn lien_vers_le_clone_pose_a_la_main_en_dev_est_lie_sauf_si_setup_l_a_pose() {
+    fn link_to_the_clone_put_by_hand_in_dev_is_linked_unless_setup_put_it() {
         let f = fx();
         let src = f.cfg(".config/a/x", "1");
         f.cfg(".config/a/y", "2");
-        // Mode dev : `current` désigne le clone (clé `repo`).
+        // Dev mode: `current` designates the clone (key `repo`).
         fs::create_dir_all(f.env.config_file().parent().unwrap()).unwrap();
         fs::write(
             f.env.config_file(),
@@ -1679,9 +1687,9 @@ mod tests {
             fs::create_dir_all(d.parent().unwrap()).unwrap();
             symlink(f.repo.join("config").join(rel), &d).unwrap();
         }
-        // Posé à la main, inconnu de installed.json : déjà bon, ni reposé ni conflit.
+        // Put in place by hand, unknown to installed.json: already right, neither put back nor conflict.
         assert_eq!(state(".config/a/x"), State::Linked);
-        // Posé par setup (noté) : reposé vers current, comme à la migration.
+        // Put in place by setup (noted): put back to current, as in the migration.
         let mut m = Manifest::default();
         m.upsert(ManifestEntry {
             path: f.home(".config/a/y").to_string_lossy().into_owned(),
@@ -1691,18 +1699,18 @@ mod tests {
         });
         m.save(&f.env.manifest_file()).unwrap();
         assert!(matches!(state(".config/a/y"), State::Moved { .. }));
-        // Un lien vers une autre version que celle de current reste un conflit.
-        let autre = f.repo.parent().unwrap().join("autre");
-        fs::create_dir_all(autre.join("config/.config/a")).unwrap();
-        fs::write(autre.join("config/.config/a/x"), "1").unwrap();
+        // A link to another version than the one of current stays a conflict.
+        let other = f.repo.parent().unwrap().join("other");
+        fs::create_dir_all(other.join("config/.config/a")).unwrap();
+        fs::write(other.join("config/.config/a/x"), "1").unwrap();
         fs::remove_file(f.home(".config/a/x")).unwrap();
-        symlink(autre.join("config/.config/a/x"), f.home(".config/a/x")).unwrap();
+        symlink(other.join("config/.config/a/x"), f.home(".config/a/x")).unwrap();
         assert!(matches!(state(".config/a/x"), State::OtherLink { .. }));
         assert!(src.is_file());
     }
 
     #[test]
-    fn analyse_des_fichiers_de_metadonnees() {
+    fn parsing_of_metadata_files() {
         let m = parse_modes("# c\n.config/foot/foot.ini 0600\n.a b/c 0700\n").unwrap();
         assert_eq!(m[".config/foot/foot.ini"], 0o600);
         assert_eq!(m[".a b/c"], 0o700);
@@ -1714,7 +1722,7 @@ mod tests {
     }
 
     #[test]
-    fn lecture_du_depot_liens_et_meta() {
+    fn reading_the_repository_links_and_meta() {
         let f = fx();
         f.cfg(".config/hypr/bindings.lua", "x");
         f.cfg(".bashrc", "y");
@@ -1743,9 +1751,9 @@ mod tests {
     }
 
     #[test]
-    fn depot_de_donnees_par_dessus_le_depot() {
+    fn data_repository_on_top_of_the_repository() {
         let f = fx();
-        f.cfg(".config/a", "dépôt a");
+        f.cfg(".config/a", "repo a");
         f.cfg(".config/b", "exemple");
         f.cfg(".config/bloc/x", "x");
         f.meta("link-dirs", ".config/bloc\n");
@@ -1755,8 +1763,8 @@ mod tests {
             fs::create_dir_all(p.parent().unwrap()).unwrap();
             fs::write(p, s).unwrap();
         };
-        dcfg(".config/b", "vrai b");
-        dcfg(".config/c", "propre à la machine");
+        dcfg(".config/b", "real b");
+        dcfg(".config/c", "machine own");
         dcfg(".poste/modes", ".config/c 0600\n");
         fs::create_dir_all(f.env.config_file().parent().unwrap()).unwrap();
         fs::write(
@@ -1777,83 +1785,83 @@ mod tests {
 
         let p = f.plan(&[]);
         f.apply(&p);
-        assert_eq!(fs::read_to_string(f.home(".config/b")).unwrap(), "vrai b");
+        assert_eq!(fs::read_to_string(f.home(".config/b")).unwrap(), "real b");
         assert_eq!(f.state(".config/c"), State::Linked);
         assert_eq!(
             fs::metadata(data.join("config/.config/c")).unwrap().mode() & 0o777,
             0o600
         );
 
-        // Rien sous un dossier lié d'un bloc par le dépôt.
+        // Nothing under a folder linked as a block by the repository.
         dcfg(".config/bloc/y", "y");
         assert!(load(&f.repo, &f.env).is_err());
     }
 
     #[test]
-    fn chaque_etat_de_cible() {
+    fn every_target_state() {
         let f = fx();
         f.cfg("lie", "a");
         f.cfg("absent", "a");
         f.cfg("identique", "a");
         f.cfg("different", "a");
-        f.cfg("ailleurs", "a");
-        f.cfg("cassé", "a");
-        f.cfg("dossier", "a");
-        f.cfg("sous/fichier", "a");
+        f.cfg("elsewhere", "a");
+        f.cfg("broken", "a");
+        f.cfg("folder", "a");
+        f.cfg("under/file", "a");
         symlink(f.repo.join("config/lie"), f.home("lie")).unwrap();
         f.put("identique", "a");
         f.put("different", "b");
-        f.put("autre", "a");
-        symlink(f.home("autre"), f.home("ailleurs")).unwrap();
-        symlink(f.home("n-existe-pas"), f.home("cassé")).unwrap();
-        fs::create_dir(f.home("dossier")).unwrap();
-        f.put("sous", "je suis un fichier");
+        f.put("other", "a");
+        symlink(f.home("other"), f.home("elsewhere")).unwrap();
+        symlink(f.home("does-not-exist"), f.home("broken")).unwrap();
+        fs::create_dir(f.home("folder")).unwrap();
+        f.put("under", "i am a file");
         assert_eq!(f.state("lie"), State::Linked);
         assert_eq!(f.state("absent"), State::Missing);
         assert_eq!(f.state("identique"), State::Identical);
         assert_eq!(f.state("different"), State::Differs);
         assert!(matches!(
-            f.state("ailleurs"),
+            f.state("elsewhere"),
             State::OtherLink { broken: false, .. }
         ));
         assert!(matches!(
-            f.state("cassé"),
+            f.state("broken"),
             State::OtherLink { broken: true, .. }
         ));
-        assert!(matches!(f.state("dossier"), State::WrongType(_)));
-        assert!(matches!(f.state("sous/fichier"), State::ParentBlocked(_)));
+        assert!(matches!(f.state("folder"), State::WrongType(_)));
+        assert!(matches!(f.state("under/file"), State::ParentBlocked(_)));
     }
 
     #[test]
-    fn application_puis_relance_a_jour() {
+    fn application_then_rerun_up_to_date() {
         let f = fx();
         let src = f.cfg(".config/a/x.conf", "contenu");
-        f.cfg(".config/a/y.conf", "autre");
-        f.put(".config/a/y.conf", "autre");
+        f.cfg(".config/a/y.conf", "other");
+        f.put(".config/a/y.conf", "other");
         let p = f.plan(&[]);
         assert_eq!(p.count(&Op::Create), 1);
         assert_eq!(p.count(&Op::Replace), 1);
         assert_eq!(p.writes(), 2);
-        // L'aperçu n'écrit rien.
+        // The preview writes nothing.
         assert!(fs::symlink_metadata(f.home(".config/a/x.conf")).is_err());
         assert!(f.backups().is_empty());
         let m = f.apply(&p);
         assert_eq!(fs::read_link(f.home(".config/a/x.conf")).unwrap(), src);
         assert!(f.home(".config/a/y.conf").is_symlink());
-        // Modifier le fichier lié modifie le dépôt.
-        fs::write(f.home(".config/a/x.conf"), "changé").unwrap();
-        assert_eq!(fs::read_to_string(&src).unwrap(), "changé");
-        // L'ancien fichier identique a été sauvegardé.
+        // Editing the linked file edits the repository.
+        fs::write(f.home(".config/a/x.conf"), "changed").unwrap();
+        assert_eq!(fs::read_to_string(&src).unwrap(), "changed");
+        // The old identical file was backed up.
         let b = f.backups();
         assert_eq!(b.len(), 1, "{b:?}");
         assert!(b[0].starts_with(".config_a_y.conf.20260101-000000"));
         assert_eq!(
             fs::read_to_string(f.env.backup_dir().join(&b[0])).unwrap(),
-            "autre"
+            "other"
         );
-        // installed.json tient les deux entrées du module config.
+        // installed.json holds the two entries of the config module.
         assert_eq!(m.files.iter().filter(|e| e.module == MODULE).count(), 2);
-        // Relance : rien à faire.
+        // Run again: nothing to do.
         let p2 = f.plan(&[]);
         assert_eq!(p2.writes(), 0);
         assert_eq!(p2.count(&Op::Done), 2);
@@ -1861,7 +1869,7 @@ mod tests {
     }
 
     #[test]
-    fn conflits_listes_sans_bloquer_le_reste() {
+    fn conflicts_listed_without_blocking_the_rest() {
         let f = fx();
         f.cfg("a-creer", "1");
         f.cfg("conflit", "repo");
@@ -1871,7 +1879,7 @@ mod tests {
         assert_eq!(p.count(&Op::Create), 1);
         f.apply(&p);
         assert!(f.home("a-creer").is_symlink());
-        // Le fichier en conflit est intact, rien n'a été sauvegardé ni écrasé.
+        // The file in conflict is intact, nothing was backed up or overwritten.
         assert_eq!(fs::read_to_string(f.home("conflit")).unwrap(), "maison");
         assert!(!f.home("conflit").is_symlink());
         assert!(f.backups().is_empty());
@@ -1895,7 +1903,7 @@ mod tests {
     }
 
     #[test]
-    fn decision_take_home_recopie_dans_le_depot() {
+    fn decision_take_home_copies_into_the_repository() {
         let f = fx();
         let src = f.cfg("c", "repo");
         let h = f.put("secret.conf", "x");
@@ -1908,7 +1916,7 @@ mod tests {
         assert_eq!(fs::metadata(&src).unwrap().mode() & 0o777, 0o755);
         assert!(f.home("c").is_symlink());
         assert_eq!(f.backups().len(), 2);
-        // Droits restreints notés puis appliqués au fichier du dépôt.
+        // Restricted permissions noted then applied to the file of the repository.
         let modes =
             parse_modes(&fs::read_to_string(f.repo.join("config/.poste/modes")).unwrap()).unwrap();
         assert_eq!(modes["secret.conf"], 0o600);
@@ -1919,19 +1927,19 @@ mod tests {
                 & 0o777,
             0o600
         );
-        // Décision sur un chemin inconnu : refus net.
+        // Decision on an unknown path: clean refusal.
         let m: HashMap<_, _> = [("zzz".to_string(), Decision::Repo)].into();
         assert!(plan(&f.layout(), &f.env, &m).is_err());
     }
 
     #[test]
-    fn take_home_impossible_sur_un_dossier_a_la_place_dun_fichier() {
+    fn take_home_impossible_on_a_folder_in_place_of_a_file() {
         let f = fx();
         f.cfg("c", "repo");
         fs::create_dir(f.home("c")).unwrap();
         let m: HashMap<_, _> = [("c".to_string(), Decision::Home)].into();
         assert!(plan(&f.layout(), &f.env, &m).is_err());
-        // --take-repo est possible : le dossier est déplacé en sauvegarde.
+        // --take-repo is possible: the folder is moved into the backup.
         fs::write(f.home("c/dedans"), "z").unwrap();
         f.apply(&f.plan(&[("c", Decision::Repo)]));
         assert!(f.home("c").is_symlink());
@@ -1940,20 +1948,20 @@ mod tests {
     }
 
     #[test]
-    fn lien_ailleurs_est_un_conflit_puis_se_tranche() {
+    fn link_elsewhere_is_a_conflict_then_decided() {
         let f = fx();
         let src = f.cfg("c", "repo");
-        f.put("autre", "autre");
-        symlink(f.home("autre"), f.home("c")).unwrap();
+        f.put("other", "other");
+        symlink(f.home("other"), f.home("c")).unwrap();
         assert_eq!(f.plan(&[]).conflicts().len(), 1);
         f.apply(&f.plan(&[("c", Decision::Repo)]));
         assert_eq!(fs::read_link(f.home("c")).unwrap(), src);
-        assert_eq!(fs::read_to_string(f.home("autre")).unwrap(), "autre");
+        assert_eq!(fs::read_to_string(f.home("other")).unwrap(), "other");
         assert_eq!(f.backups().len(), 1);
     }
 
     #[test]
-    fn liens_symboliques_de_la_config() {
+    fn config_symbolic_links() {
         let f = fx();
         symlink("../../.agents/skills/x", {
             let p = f.repo.join("config/.claude/skills");
@@ -1962,13 +1970,13 @@ mod tests {
         })
         .unwrap();
         f.apply(&f.plan(&[]));
-        // Même cible, conservée telle quelle.
+        // Same target, kept as is.
         assert_eq!(
             fs::read_link(f.home(".claude/skills/x")).unwrap(),
             PathBuf::from("../../.agents/skills/x")
         );
         assert_eq!(f.plan(&[]).writes(), 0);
-        // Un lien vers ailleurs est un conflit ; --take-home reprend sa cible dans le dépôt.
+        // A link elsewhere is a conflict; --take-home takes its target back into the repository.
         fs::remove_file(f.home(".claude/skills/x")).unwrap();
         symlink("/ailleurs", f.home(".claude/skills/x")).unwrap();
         assert_eq!(f.plan(&[]).conflicts().len(), 1);
@@ -1981,7 +1989,7 @@ mod tests {
     }
 
     #[test]
-    fn dossier_lie_d_un_bloc() {
+    fn folder_linked_as_a_block() {
         let f = fx();
         f.cfg(".config/p/k/a.qml", "A");
         f.cfg(".config/p/k/bin/run", "R");
@@ -1989,7 +1997,7 @@ mod tests {
         let l = f.layout();
         assert_eq!(l.entries.len(), 1);
         assert_eq!(l.entries[0].kind, Kind::Dir);
-        // Cible absente : lien de dossier.
+        // Target absent: folder link.
         f.apply(&f.plan(&[]));
         assert!(f.home(".config/p/k").is_symlink());
         assert_eq!(
@@ -1998,7 +2006,7 @@ mod tests {
         );
         assert_eq!(f.plan(&[]).writes(), 0);
 
-        // Dossier réel identique (hors __pycache__) : déplacé en sauvegarde, remplacé par le lien.
+        // Identical real folder (except __pycache__): moved into the backup, replaced by the link.
         let g = fx();
         g.cfg(".config/p/k/a.qml", "A");
         g.meta("link-dirs", ".config/p/k\n");
@@ -2016,7 +2024,7 @@ mod tests {
             .join("__pycache__/x.pyc")
             .is_file());
 
-        // Fichier réel en plus : conflit, rien ne bouge.
+        // Extra real file: conflict, nothing moves.
         let h = fx();
         h.cfg(".config/p/k/a.qml", "A");
         h.meta("link-dirs", ".config/p/k\n");
@@ -2026,7 +2034,7 @@ mod tests {
         h.apply(&h.plan(&[]));
         assert!(!h.home(".config/p/k").is_symlink());
         assert!(h.home(".config/p/k/etat.json").is_file());
-        // --take-home : le fichier en plus entre dans le dépôt.
+        // --take-home: the extra file enters the repository.
         h.apply(&h.plan(&[(".config/p/k", Decision::Home)]));
         assert!(h.home(".config/p/k").is_symlink());
         assert_eq!(
@@ -2036,7 +2044,7 @@ mod tests {
     }
 
     #[test]
-    fn link_dirs_invalides() {
+    fn invalid_link_dirs() {
         let f = fx();
         f.cfg("a/b", "x");
         f.meta("link-dirs", "absent\n");
@@ -2046,7 +2054,7 @@ mod tests {
     }
 
     #[test]
-    fn droits_reappliques_a_la_cible_reelle() {
+    fn permissions_applied_again_to_the_real_target() {
         let f = fx();
         let src = f.cfg(".config/foot/foot.ini", "x");
         f.cfg(".config/priv/f", "y");
@@ -2055,7 +2063,7 @@ mod tests {
         let p = f.plan(&[]);
         assert_eq!(p.modes.len(), 2);
         f.apply(&p);
-        // Le mode est sur le fichier du dépôt (cible du lien), pas sur le lien.
+        // The mode is on the file of the repository (target of the link), not on the link.
         assert_eq!(fs::metadata(&src).unwrap().mode() & 0o777, 0o600);
         assert_eq!(
             fs::metadata(f.home(".config/foot/foot.ini"))
@@ -2072,27 +2080,27 @@ mod tests {
     }
 
     #[test]
-    fn add_deplace_et_lie_avec_sauvegarde() {
+    fn add_moves_and_links_with_backup() {
         let f = fx();
-        let h = f.put(".config/app/conf", "valeur");
+        let h = f.put(".config/app/conf", "value");
         fs::set_permissions(&h, fs::Permissions::from_mode(0o600)).unwrap();
         let mf = f.env.manifest_file();
         add(&f.env, &f.repo, ".config/app/conf", false, &mf).unwrap();
         let in_repo = f.repo.join("config/.config/app/conf");
-        assert_eq!(fs::read_to_string(&in_repo).unwrap(), "valeur");
+        assert_eq!(fs::read_to_string(&in_repo).unwrap(), "value");
         assert_eq!(fs::read_link(&h).unwrap(), in_repo);
         assert_eq!(f.backups().len(), 1);
         let modes =
             parse_modes(&fs::read_to_string(f.repo.join("config/.poste/modes")).unwrap()).unwrap();
         assert_eq!(modes[".config/app/conf"], 0o600);
-        // Déjà géré : sans effet, sans erreur.
+        // Already managed: no effect, no error.
         add(&f.env, &f.repo, ".config/app/conf", false, &mf).unwrap();
         assert_eq!(f.backups().len(), 1);
         assert_eq!(f.plan(&[]).writes(), 0);
     }
 
     #[test]
-    fn add_refuse_les_secrets_et_respecte_dry_run() {
+    fn add_refuses_secrets_and_respects_dry_run() {
         let f = fx();
         f.put(".ssh/id_ed25519", "cle");
         f.put(".config/app/.env.local", "x");
@@ -2110,17 +2118,17 @@ mod tests {
             assert!(e.contains("refus"), "{p}: {e}");
         }
         assert!(!f.repo.join("config/.ssh").exists());
-        // Règle ajoutée dans le fichier `ignore`.
-        f.meta("ignore", ".config/autre/**\n");
-        f.put(".config/autre/f", "x");
-        assert!(add(&f.env, &f.repo, ".config/autre/f", false, &mf).is_err());
-        // --dry-run : rien d'écrit.
+        // Rule added in the `ignore` file.
+        f.meta("ignore", ".config/other/**\n");
+        f.put(".config/other/f", "x");
+        assert!(add(&f.env, &f.repo, ".config/other/f", false, &mf).is_err());
+        // --dry-run: nothing written.
         f.put(".config/ok", "x");
         add(&f.env, &f.repo, ".config/ok", true, &mf).unwrap();
         assert!(!f.repo.join("config/.config/ok").exists());
         assert!(!f.home(".config/ok").is_symlink());
         assert!(!mf.exists());
-        // Un dossier : les fichiers ignorés sont sautés, les autres ajoutés.
+        // A folder: the ignored files are skipped, the others added.
         f.put(".config/d/a", "1");
         f.put(".config/d/.env", "secret");
         add(&f.env, &f.repo, ".config/d", false, &mf).unwrap();
@@ -2130,7 +2138,7 @@ mod tests {
     }
 
     #[test]
-    fn forget_remet_un_fichier_ordinaire() {
+    fn forget_puts_back_an_ordinary_file() {
         let f = fx();
         let src = f.cfg("c", "v");
         f.apply(&f.plan(&[]));
@@ -2139,16 +2147,16 @@ mod tests {
         forget(&f.layout(), &f.env, "c", &mf).unwrap();
         assert!(!f.home("c").is_symlink());
         assert_eq!(fs::read_to_string(f.home("c")).unwrap(), "v");
-        // Le dépôt garde son fichier ; la suite le verrait comme identique.
+        // The repository keeps its file; what follows would see it as identical.
         assert!(src.is_file());
         assert_eq!(f.state("c"), State::Identical);
         assert!(Manifest::load(&mf).unwrap().get(&f.home("c")).is_none());
-        // Pas lié : refus.
+        // Not linked: refusal.
         assert!(forget(&f.layout(), &f.env, "c", &mf).is_err());
     }
 
     #[test]
-    fn chemins_donnes_par_l_utilisateur() {
+    fn paths_given_by_the_user() {
         let f = fx();
         assert_eq!(rel_of(&f.env, ".config/a").unwrap(), ".config/a");
         assert_eq!(rel_of(&f.env, "~/.config/a").unwrap(), ".config/a");
@@ -2159,7 +2167,7 @@ mod tests {
     }
 
     #[test]
-    fn diff_signale_les_ecarts() {
+    fn diff_reports_differences() {
         let f = fx();
         f.cfg("a", "1\n");
         f.cfg("b", "1\n");
@@ -2172,7 +2180,7 @@ mod tests {
     }
 
     #[test]
-    fn statut_ne_modifie_rien() {
+    fn status_changes_nothing() {
         let f = fx();
         f.cfg("a", "1");
         f.cfg("b", "1");

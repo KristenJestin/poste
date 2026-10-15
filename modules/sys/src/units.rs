@@ -534,7 +534,10 @@ esac
         let enable_at = c
             .find(&format!("enable --now {}", t.file.display()))
             .unwrap();
-        assert!(link_at < enable_at, "the service is linked before the timer");
+        assert!(
+            link_at < enable_at,
+            "the service is linked before the timer"
+        );
         let svc_link = link_path(&f.env, "poste-usage-record.service");
         assert_eq!(fs::read_link(&svc_link).unwrap(), svc);
 

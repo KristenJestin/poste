@@ -114,7 +114,7 @@ mod tests {
     }
 
     #[test]
-    fn analyse_et_regles_integrees() {
+    fn parsing_and_built_in_rules() {
         assert_eq!(parse("# note\n\n .a/** \nb\n"), vec![".a/**", "b"]);
         let d = tempfile::tempdir().unwrap();
         let ig = Ignore::load(&d.path().join("absent")).unwrap();

@@ -145,10 +145,7 @@ pub fn run(env: &Env, repo: &Path, o: &Opts) -> Result<Outcome> {
         }
     }
     if !applied.failed.is_empty() {
-        eprintln!(
-            "\nposte sys: step(s) failed: {}",
-            applied.failed.join(", ")
-        );
+        eprintln!("\nposte sys: step(s) failed: {}", applied.failed.join(", "));
         code = ExitCode::from(1);
     }
     Ok(Outcome {
@@ -331,9 +328,7 @@ fn install_phase(env: &Env, repo: &Path, o: &Opts) -> Result<Phase> {
             config::print_conflicts(env, p);
         }
         if cfg_conflicts > 0 {
-            println!(
-                "\n{msg} ({cfg_conflicts} config conflict(s) to decide, exit code 2)."
-            );
+            println!("\n{msg} ({cfg_conflicts} config conflict(s) to decide, exit code 2).");
         } else {
             println!("\n{msg}");
         }
@@ -448,9 +443,7 @@ fn print_plan(env: &Env, steps: &[(Item, Action)]) {
     println!("\nPlan:");
     for (it, a) in steps {
         let note = match a {
-            Action::Update { by_hand: true } => {
-                "  (overwrites a manual edit, old file backed up)"
-            }
+            Action::Update { by_hand: true } => "  (overwrites a manual edit, old file backed up)",
             Action::Adopt => "  (already identical, now tracked)",
             Action::Conflict => "  (foreign file, not put in place by poste sys)",
             _ => "",
@@ -487,7 +480,9 @@ pub(crate) fn confirm(prompt: &str) -> Result<bool> {
 /// Atomic copy: neighbouring temporary file then rename (works even if
 /// the destination is a running binary, including poste-sys itself).
 fn install(src: &Path, dest: &Path) -> Result<()> {
-    let parent = dest.parent().context("destination without a parent folder")?;
+    let parent = dest
+        .parent()
+        .context("destination without a parent folder")?;
     std::fs::create_dir_all(parent)?;
     let tmp = parent.join(format!(".poste-tmp-{}", std::process::id()));
     std::fs::copy(src, &tmp).with_context(|| format!("copy to {}", tmp.display()))?;

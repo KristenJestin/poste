@@ -223,7 +223,7 @@ pub fn apply(
                     continue;
                 }
                 let bak = crate::util::backup(env, &o.path, stamp)?;
-                println!("  sauvegarde : {}", env.display(&bak));
+                println!("  backup: {}", env.display(&bak));
                 std::fs::remove_file(&o.path)?;
                 let stop = env.modules_dir();
                 for dir in o.path.ancestors().skip(1) {

@@ -1,4 +1,4 @@
-//! `poste-sys sync` passe la main au `poste-sys` de la version qu'il vient d'installer.
+//! `poste-sys sync` hands over to the `poste-sys` of the version it has just installed.
 
 use std::fs;
 use std::os::unix::fs::PermissionsExt;
@@ -12,14 +12,14 @@ fn script(path: &Path, body: &str) {
     fs::set_permissions(path, fs::Permissions::from_mode(0o755)).unwrap();
 }
 
-/// `poste-sys sync --yes` sur une version publiée dont le `poste-sys` est `bin` (script shell, `$LOG`
-/// désigne son journal) ; renvoie le succès et le journal.
+/// `poste-sys sync --yes` on a published version whose `poste-sys` is `bin` (shell script, `$LOG`
+/// designates its log); returns the success and the log.
 fn sync_with(bin: &str) -> (bool, String) {
     let d = tempfile::tempdir().unwrap();
     let home = d.path().join("home");
     let log = d.path().join("relais.log");
 
-    // Version publiée : son poste-sys note comment il est lancé.
+    // Published version: its poste-sys notes how it is launched.
     let src = d.path().join("v1");
     fs::create_dir_all(src.join("target/release")).unwrap();
     fs::write(src.join("target/release/poste"), "bin").unwrap();
@@ -53,7 +53,7 @@ fn sync_with(bin: &str) -> (bool, String) {
     )
     .unwrap();
 
-    // Faux curl : copie `<pubdir>/<nom>` vers `-o` ou la sortie.
+    // Fake curl: copies `<pubdir>/<name>` to `-o` or the output.
     let curl = d.path().join("fake-curl");
     script(
         &curl,
@@ -70,8 +70,8 @@ fn sync_with(bin: &str) -> (bool, String) {
     )
     .unwrap();
 
-    // Ce qui touche la session de l'utilisateur (île, Hyprland, unités) : remplacé par des
-    // programmes qui notent leur appel et échouent. Aucun ne doit être appelé ici.
+    // What touches the user's session (island, Hyprland, units): replaced by
+    // programs that note their call and fail. None of them must be called here.
     let stubs = d.path().join("stubs");
     let session = d.path().join("session.log");
     fs::create_dir_all(&stubs).unwrap();
@@ -107,7 +107,7 @@ fn sync_with(bin: &str) -> (bool, String) {
         .env("POSTE_SYS_RELEASE_URL", "https://example.com/r")
         .status()
         .unwrap();
-    // La version est installée et current la désigne, relais ou pas.
+    // The version is installed and current designates it, hand-over or not.
     let current = home.join(".local/share/poste/current");
     assert_eq!(
         fs::canonicalize(&current).unwrap(),
@@ -118,15 +118,15 @@ fn sync_with(bin: &str) -> (bool, String) {
 }
 
 #[test]
-fn sync_passe_la_main_au_nouveau_poste_sys() {
+fn sync_hands_over_to_the_new_poste_sys() {
     let (ok, log) = sync_with("echo \"$*\" >> \"$LOG\"\n");
     assert!(ok);
     assert_eq!(log, "finish --help\nfinish --skip-build --yes --prune\n");
 }
 
 #[test]
-fn sync_garde_la_main_si_la_version_ne_connait_pas_finish() {
-    // Version d'avant le relais : clap refuse `finish` (code 2) ; la suite est faite ici.
+fn sync_keeps_control_if_the_version_does_not_know_finish() {
+    // Version from before the hand-over: clap refuses `finish` (code 2); the rest is done here.
     let (ok, log) = sync_with("echo \"$*\" >> \"$LOG\"\nexit 2\n");
     assert!(ok);
     assert_eq!(log, "finish --help\n");
