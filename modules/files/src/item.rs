@@ -10,10 +10,11 @@ const ICON_COPY: &str = "\u{f018f}";
 const ICON_TERMINAL: &str = "\u{f018d}";
 const ICON_REVEAL: &str = "\u{f0770}";
 
-/// Theme icon for the type (freedesktop names, present in every common theme).
+/// Nerd Font glyph for the type: the island resolves glyphs everywhere, theme icon names only
+/// when the theme Qt uses has them.
 pub fn icon_for(path: &str, is_dir: bool) -> &'static str {
     if is_dir {
-        return "folder";
+        return "\u{f024b}"; // folder
     }
     let ext = Path::new(path)
         .extension()
@@ -22,20 +23,20 @@ pub fn icon_for(path: &str, is_dir: bool) -> &'static str {
         .unwrap_or_default();
     match ext.as_str() {
         "png" | "jpg" | "jpeg" | "gif" | "webp" | "svg" | "bmp" | "tif" | "tiff" | "heic"
-        | "avif" | "ico" | "xcf" | "psd" | "kra" => "image-x-generic",
-        "mp4" | "mkv" | "webm" | "mov" | "avi" | "m4v" | "wmv" => "video-x-generic",
-        "mp3" | "flac" | "ogg" | "opus" | "wav" | "m4a" | "aac" => "audio-x-generic",
-        "pdf" => "application-pdf",
+        | "avif" | "ico" | "xcf" | "psd" | "kra" => "\u{f021f}", // file-image
+        "mp4" | "mkv" | "webm" | "mov" | "avi" | "m4v" | "wmv" => "\u{f022b}", // file-video
+        "mp3" | "flac" | "ogg" | "opus" | "wav" | "m4a" | "aac" => "\u{f0223}", // file-music
+        "pdf" => "\u{f0226}",                                                  // file-pdf-box
         "zip" | "tar" | "gz" | "tgz" | "xz" | "zst" | "bz2" | "7z" | "rar" | "deb" | "rpm"
-        | "iso" => "package-x-generic",
-        "odt" | "doc" | "docx" | "rtf" | "epub" => "x-office-document",
-        "ods" | "xls" | "xlsx" | "csv" | "tsv" => "x-office-spreadsheet",
-        "odp" | "ppt" | "pptx" => "x-office-presentation",
+        | "iso" => "\u{f05c4}", // zip-box
+        "odt" | "doc" | "docx" | "rtf" | "epub" | "md" | "txt" => "\u{f0219}", // file-document
+        "ods" | "xls" | "xlsx" | "csv" | "tsv" => "\u{f0c7e}",                 // file-table
+        "odp" | "ppt" | "pptx" => "\u{f0227}",                                 // file-powerpoint
         "rs" | "py" | "js" | "mjs" | "ts" | "tsx" | "jsx" | "sh" | "bash" | "zsh" | "fish"
         | "lua" | "c" | "h" | "cpp" | "hpp" | "cs" | "go" | "java" | "kt" | "rb" | "php"
         | "qml" | "html" | "css" | "scss" | "svelte" | "vue" | "json" | "toml" | "yaml" | "yml"
-        | "xml" | "sql" | "gd" | "shader" => "text-x-script",
-        _ => "text-x-generic",
+        | "xml" | "sql" | "gd" | "shader" => "\u{f022e}", // file-code
+        _ => "\u{f0214}",                                                      // file
     }
 }
 
@@ -107,7 +108,7 @@ mod tests {
         assert_eq!(v["id"], "file:/h/Documents/summer's café.pdf");
         assert_eq!(v["name"], "summer's café.pdf");
         assert_eq!(v["subtitle"], "~/Documents");
-        assert_eq!(v["icon"], "application-pdf");
+        assert_eq!(v["icon"], "\u{f0226}");
         assert_eq!(v["action"]["type"], "command");
         assert_eq!(v["action"]["command"], format!("poste files open {quoted}"));
         let acts = v["actions"].as_array().unwrap();
@@ -141,7 +142,7 @@ mod tests {
                 is_dir: true,
             },
         );
-        assert_eq!(v["icon"], "folder");
+        assert_eq!(v["icon"], "\u{f024b}");
         assert_eq!(v["subtitle"], "/srv/data");
         assert_eq!(v["action"]["command"], "poste files open /srv/data/photos");
         assert_eq!(v["actions"][2]["action"]["cwd"], "/srv/data/photos");
@@ -149,9 +150,10 @@ mod tests {
 
     #[test]
     fn icons_by_type() {
-        assert_eq!(icon_for("/a/b.RS", false), "text-x-script");
-        assert_eq!(icon_for("/a/photo.JPG", false), "image-x-generic");
-        assert_eq!(icon_for("/a/Makefile", false), "text-x-generic");
-        assert_eq!(icon_for("/a/b.tar", false), "package-x-generic");
+        assert_eq!(icon_for("/a/b.RS", false), "\u{f022e}");
+        assert_eq!(icon_for("/a/photo.JPG", false), "\u{f021f}");
+        assert_eq!(icon_for("/a/Makefile", false), "\u{f0214}");
+        assert_eq!(icon_for("/a/b.tar", false), "\u{f05c4}");
+        assert_eq!(icon_for("/a/b", true), "\u{f024b}");
     }
 }

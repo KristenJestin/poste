@@ -54,7 +54,7 @@ exclusions by name only, system database updated once a day.
 
 ## In the launcher
 
-Each result: name, parent folder (with `~`), theme icon by type. Enter = **Open** (`xdg-open`: the
+Each result: name, parent folder (with `~`), a Nerd Font glyph by type (folder, image, video, audio, PDF, archive, document, table, slides, code, other file). Enter = **Open** (`xdg-open`: the
 default application, the file manager for a folder). Secondary actions:
 
 - **Copy file**: the file itself, as `text/uri-list` (`wl-copy`): file managers, browsers and chat
