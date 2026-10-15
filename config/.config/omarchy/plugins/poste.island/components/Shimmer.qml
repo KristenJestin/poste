@@ -1,11 +1,11 @@
 import QtQuick
 
-// Chargement commun de l'île : des lignes fantômes à la place du contenu
-// attendu, balayées par un reflet, et au-dessus un libellé (ce qui se passe)
-// traversé par le même reflet. Sert à l'IA (en attendant la réponse) et à la
-// vue Usage (en lisant les journaux).
-//   lines : largeur de chaque ligne fantôme (fraction de la largeur)
-//   blocks : lignes plus hautes (titre, gros chiffre), mêmes règles
+// Common loading of the island: ghost rows in place of the expected
+// content, swept by a reflection, and above them a label (what is happening)
+// crossed by the same reflection. Used by the AI (while waiting for the answer) and by the
+// Usage view (while reading the logs).
+//   lines: width of each ghost row (fraction of the width)
+//   blocks: taller rows (title, big number), same rules
 Item {
   id: shimmer
   required property var host
@@ -15,7 +15,7 @@ Item {
   property real spacing: 9
   property bool running: visible
 
-  // 0 → 1 : position du reflet, commune à toutes les lignes et au libellé.
+  // 0 → 1: position of the reflection, common to all the rows and to the label.
   property real phase: 0
   NumberAnimation on phase {
     running: shimmer.running
@@ -26,7 +26,7 @@ Item {
   readonly property color base: host.withAlpha(host.colorText, 0.07)
   readonly property color glow: host.withAlpha(host.colorText, 0.22)
   readonly property real band: Math.max(120, width * 0.45)
-  // Abscisse du reflet dans le repère du shimmer (part de la gauche, hors champ).
+  // X of the reflection in the shimmer's frame (starts from the left, out of view).
   readonly property real sweepX: -band + phase * (width + 2 * band)
 
   implicitHeight: col.implicitHeight

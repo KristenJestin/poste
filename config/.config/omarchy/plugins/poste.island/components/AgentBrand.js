@@ -23,8 +23,8 @@ function brand(summary, app, appIcon) {
   return a ? brands[a] : null
 }
 
-// Un agent sans tuile attitrée (« fireworks », un nouveau venu) : son
-// initiale sur une couleur tirée de son nom.
+// An agent without an assigned tile ('fireworks', a newcomer): its
+// initial on a color drawn from its name.
 function brandOrName(name, summary, app, appIcon) {
   return brand(summary, app, appIcon)
     || { glyph: NameColor.initial(name), tile: NameColor.color(name, 0.55, 0.5), ink: "#ffffff" }

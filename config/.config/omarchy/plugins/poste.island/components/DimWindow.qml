@@ -18,8 +18,8 @@ PanelWindow {
   WlrLayershell.namespace: "poste-island-dim"
   WlrLayershell.layer: WlrLayer.Top
   WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
-  // Deux zones fixes plutôt qu'une Region dont l'item change : celle-ci
-  // n'était pas recalculée, le voile s'affichait sans jamais prendre le clic.
+  // Two fixed areas rather than a Region whose item changes: that one
+  // was not recomputed, the veil showed without ever taking the click.
   Region { id: veilRegion; item: veil }
   Region { id: noRegion }
   mask: dim.shown ? veilRegion : noRegion

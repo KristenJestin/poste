@@ -18,7 +18,7 @@ Item {
   implicitHeight: column.implicitHeight
 
   readonly property var locale: Qt.locale("en_GB")
-  // Réseau / Bluetooth / Audio, plus VPN, Tailscale, Mail et le profil d'alimentation quand ils sont là.
+  // Network / Bluetooth / Audio, plus VPN, Tailscale, Mail and the power profile when they are there.
   readonly property int tileCount: 3 + (host.mailAvailable ? 1 : 0) + ((host.vpnAvailable || host.vpnConnected) ? 1 : 0)
     + (host.tsAvailable ? 1 : 0) + (host.powerProfile.present ? 1 : 0)
   readonly property real tileWidth: Math.min(74, Math.floor((width - 8 * (tileCount - 1)) / tileCount))
@@ -265,7 +265,7 @@ Item {
     }
 
     // ---------------------------------------------------------------- battery
-    // Portables seulement (BatteryState.qml) : niveau, état, temps restant.
+    // Laptops only (BatteryState.qml): level, state, time left.
     Column {
       id: batterySection
       readonly property var bat: cc.host.battery
@@ -321,7 +321,7 @@ Item {
     }
 
     // ---------------------------------------------------------------- devices
-    // Périphériques sans fil (DevicesState.qml) : une ligne chacun.
+    // Wireless devices (DevicesState.qml): one row each.
     Column {
       width: parent.width
       spacing: 6
@@ -417,7 +417,7 @@ Item {
           width: usage.width
           spacing: 6
 
-          // En-tête ; pour Claude Code, un clic ouvre la vue « Usage » (qui consomme quoi).
+          // Header; for Claude Code, a click opens the 'Usage' view (who consumes what).
           Item {
             width: parent.width
             height: 20
@@ -427,7 +427,7 @@ Item {
                 anchors.verticalCenter: parent.verticalCenter
                 width: 20; height: 20; radius: 6
                 color: agentBlock.brand ? agentBlock.brand.tile : cc.host.withAlpha(cc.host.colorText, 0.1)
-                // Logos Claude / Codex : glyphes de police, gardés tels quels (pas d'équivalent Tabler).
+                // Claude / Codex logos: font glyphs, kept as they are (no Tabler equivalent).
                 Text {
                   anchors.centerIn: parent
                   text: agentBlock.brand ? agentBlock.brand.glyph : "󰚩"
@@ -527,7 +527,7 @@ Item {
       spacing: 8
       IconButton {
         glyph: "󰤨"; label: "Network"
-        // Grows the Wi-Fi module inside the island; its « Réglages avancés… »
+        // Grows the Wi-Fi module inside the island; its 'Advanced settings…'
         // still opens Omarchy's panel.
         onActivated: cc.moduleRequested("wifi")
       }
@@ -551,8 +551,8 @@ Item {
         label: "Tailscale"
         onActivated: cc.moduleRequested("tailscale")
       }
-      // Profil d'alimentation (PowerProfileState.qml) : l'icône et le nom du profil en place ;
-      // un clic passe au suivant (Saver, Balanced, Performance), retenu pour la source en cours.
+      // Power profile (PowerProfileState.qml): the current profile's icon and name;
+      // a click goes to the next one (Saver, Balanced, Performance), remembered for the current source.
       IconButton {
         visible: cc.host.powerProfile.present
         glyph: cc.host.powerProfile.glyph

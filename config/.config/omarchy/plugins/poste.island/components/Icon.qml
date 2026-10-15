@@ -1,21 +1,21 @@
 import QtQuick
 import Quickshell.Io
 
-// Icône Tabler (assets/tabler, MIT) aux couleurs de l'île :
-// le SVG est relu, sa couleur (currentColor) et l'épaisseur du trait
-// remplacées, puis affiché par une Image.
+// Tabler icon (assets/tabler, MIT) in the island's colors:
+// the SVG is read again, its color (currentColor) and the stroke width
+// replaced, then displayed by an Image.
 Item {
   id: icon
   property string name: ""
   property color color: "white"
   property real size: 18
   property real stroke: 2.5
-  property bool filled: false     // formes fermées remplies (lecture, pause…)
+  property bool filled: false     // closed shapes filled (play, pause…)
 
   implicitWidth: size
   implicitHeight: size
 
-  // name : chemin sous assets/, sans .svg (« tabler/microphone »).
+  // name: path under assets/, without .svg ('tabler/microphone').
   readonly property string dir: String(Qt.resolvedUrl("../assets/")).replace(/^file:\/\//, "")
   property string raw: ""
   FileView {
@@ -31,8 +31,8 @@ Item {
     var rgb = "#" + hex(color.r) + hex(color.g) + hex(color.b)
     text = text.replace(/<!--[\s\S]*?-->/g, "")
       .replace(/currentColor/g, rgb)
-      // Le carré invisible de 24×24 que Tabler met dans chaque icône : sans ça,
-      // « filled » le remplirait (un carré plein au lieu de l'icône).
+      // The invisible 24×24 square that Tabler puts in each icon: without this,
+      // 'filled' would fill it (a solid square instead of the icon).
       .replace(/<path[^>]*d="M0 0h24v24H0z"[^>]*\/>/g, "")
     if (filled) text = text.replace(/fill="none"/, 'fill="' + rgb + '" fill-opacity="' + color.a + '"')
     text = text

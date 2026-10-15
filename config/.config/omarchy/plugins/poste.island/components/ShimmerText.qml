@@ -1,8 +1,8 @@
 import QtQuick
 import QtQuick.Effects
 
-// Libellé traversé par un reflet (Shimmer.qml) : le texte, en gris, sert de
-// masque à une bande claire qui le balaie.
+// Label crossed by a reflection (Shimmer.qml): the text, in grey, serves as a
+// mask for a light band that sweeps over it.
 Item {
   id: root
   required property var host

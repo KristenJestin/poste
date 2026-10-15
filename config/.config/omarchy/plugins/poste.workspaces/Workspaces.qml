@@ -6,15 +6,15 @@ import Quickshell.Io
 import qs.Commons
 import qs.Ui
 
-// Clone de omarchy.workspaces, version "workspaces par écran" : chaque écran
-// a ses propres 1 à 10, et chaque barre affiche / cible ceux de son écran.
-// Même correspondance que workspace_monitors dans ~/.config/hypr/monitors.lua
-// (gauche = 1-10, centre = 11-20, droite = 21-30, autre écran = 31-40).
+// Clone of omarchy.workspaces, 'workspaces per screen' version: each screen
+// has its own 1 to 10, and each bar shows / targets those of its screen.
+// Same correspondence as workspace_monitors in ~/.config/hypr/monitors.lua
+// (left = 1-10, center = 11-20, right = 21-30, other screen = 31-40).
 BarWidget {
   id: root
   moduleName: "poste.workspaces"
 
-  // Lu dans workspace_monitors de monitors.lua : chaque machine garde sa liste.
+  // Read from workspace_monitors of monitors.lua: each machine keeps its list.
   property var workspaceMonitors: []
   function parseWorkspaceMonitors(text) {
     var m = /^\s*workspace_monitors\s*=\s*\{([^}]*)\}/m.exec(text || "")
@@ -35,8 +35,8 @@ BarWidget {
     onLoadFailed: root.workspaceMonitors = []
   }
 
-  // Écran de cette barre. Lu après installation du widget dans sa barre : un
-  // binding direct gardait l'écran du premier rendu pour toutes les barres.
+  // Screen of this bar. Read after the widget is installed in its bar: a
+  // direct binding kept the screen of the first render for all the bars.
   property string screenName: ""
   function updateScreen() {
     var window = QsWindow.window
@@ -44,8 +44,8 @@ BarWidget {
     if (name !== screenName) screenName = name
   }
 
-  // Une entrée de workspace_monitors : nom de prise (DP-1) ou « desc: » suivi du
-  // début de la description EDID de l'écran, comparée comme le fait Hyprland.
+  // An entry of workspace_monitors: port name (DP-1) or 'desc:' followed by the
+  // start of the screen's EDID description, compared as Hyprland does.
   property string screenDescription: ""
   readonly property int offset: {
     for (var i = 0; i < workspaceMonitors.length; i++) {
@@ -58,8 +58,8 @@ BarWidget {
     return workspaceMonitors.length * 10
   }
 
-  // État lu directement dans hyprctl (les objets Quickshell.Hyprland ne
-  // suivaient pas de façon fiable le workspace actif par écran).
+  // State read directly from hyprctl (the Quickshell.Hyprland objects did not
+  // reliably follow the active workspace per screen).
   property int activeWorkspaceId: -1
   property var windowCounts: ({})
   property bool refreshPending: false
@@ -84,8 +84,8 @@ BarWidget {
   Connections {
     target: Hyprland
     function onRawEvent(event) {
-      // Un monitors.lua recâblé (lien vers un autre fichier) ne déclenche pas
-      // watchChanges : on le relit quand Hyprland recharge sa config.
+      // A re-wired monitors.lua (link to another file) does not trigger
+      // watchChanges: it is read again when Hyprland reloads its config.
       if (event.name === "configreloaded") monitorsFile.reload()
       if (/workspace|window|monitor|focus|openlayer|closelayer/.test(event.name)) root.refresh()
     }
@@ -125,8 +125,8 @@ BarWidget {
     }
   }
 
-  // Numéros locaux (1-10) à afficher pour cet écran : 1 à 5, plus les
-  // workspaces au-delà qui existent.
+  // Local numbers (1-10) to show for this screen: 1 to 5, plus the
+  // workspaces beyond that exist.
   function workspaceIds() {
     var ids = [1, 2, 3, 4, 5]
 
@@ -165,7 +165,7 @@ BarWidget {
 
         readonly property int globalId: root.offset + modelData
         readonly property bool occupied: (root.windowCounts[globalId] || 0) > 0
-        // Workspace affiché sur CET écran (pas le workspace focus global).
+        // Workspace shown on THIS screen (not the global focus workspace).
         readonly property bool focused: root.activeWorkspaceId === globalId
 
         bar: root.bar

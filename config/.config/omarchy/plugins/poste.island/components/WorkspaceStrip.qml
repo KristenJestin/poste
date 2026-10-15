@@ -1,12 +1,12 @@
 import QtQuick
 import "WorkspaceGroups.js" as WorkspaceGroups
 
-// Les workspaces de cet écran, numérotés 1-10 : 1-5 toujours, au-delà ceux
-// qui existent. Celui qui est affiché est une pastille d'accent, ceux qui ont
-// des fenêtres sont vifs, les vides atténués. Un clic l'affiche sur cet écran.
-// Après une barre fine : les workspaces d'un autre écran que Hyprland a posés
-// ici (host.visitingWorkspaces), avec leur numéro 1-10, un groupe par écran
-// d'origine (WorkspaceGroups.js) ; ils repartent sur leur écran quand il revient.
+// This screen's workspaces, numbered 1-10: 1-5 always, beyond them those
+// that exist. The one displayed is an accent pill, those that have
+// windows are vivid, the empty ones are dimmed. A click shows it on this screen.
+// After a thin bar: the workspaces of another screen that Hyprland has put
+// here (host.visitingWorkspaces), with their number 1-10, one group per screen
+// of origin (WorkspaceGroups.js); they go back to their screen when it returns.
 Row {
   id: strip
   required property var host
@@ -15,7 +15,7 @@ Row {
   spacing: 2
 
   readonly property int activeId: host.activeWorkspaces[screenName] !== undefined ? host.activeWorkspaces[screenName] : -1
-  // Ids globaux à dessiner, 0 pour la barre avant chaque groupe de passage.
+  // Global ids to draw, 0 for the bar before each visiting group.
   readonly property var cells: WorkspaceGroups.cells(host.windowCounts, activeId, offset, host.visitingWorkspaces[screenName])
 
   Repeater {
