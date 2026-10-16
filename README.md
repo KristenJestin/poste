@@ -311,6 +311,21 @@ the default for `application/x-mswinurl`: opening the file (the notification of 
 receiver, Strata, `xdg-open`) opens its address in the browser. Only `http(s)` addresses are
 opened, otherwise a notification says so; the file is kept.
 
+## Zen in the theme's colors
+
+`config/.config/omarchy/themed/zen.css.tpl` is an Omarchy template like the T3 Code and Obsidian
+ones: at each theme change Omarchy renders it into `~/.local/state/omarchy/current/theme/zen.css`.
+`poste sys setup` links `chrome/userChrome.css` of Zen's default profile (the one `installs.ini`
+names) to it, and its `user.js` to `bootstrap/files/zen/user.js` (user stylesheets on, Browser
+Toolbox on). It never replaces a `userChrome.css` or `user.js` it did not put in place: it says so
+and leaves them. The profile exists once Zen has started; before that, the step waits.
+
+- Zen reads `userChrome.css` at start: restart it after a theme change.
+- The workspace gradient is replaced by the theme's background; private windows keep Zen's look.
+- To work on the CSS live: `devtools.debugger.remote-enabled` to `true` in `about:config`, then
+  Ctrl+Shift+Alt+I, Style Editor, filter `userChrome`. Saving writes the rendered file (the next
+  theme change overwrites it): copy what works into the template.
+
 ## Repository layout
 
 ```

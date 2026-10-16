@@ -183,6 +183,25 @@ requires = "omarchy"
 check = ["sh", "-c", "[ \"$(omarchy-theme-current | tr 'A-Z ' 'a-z-')\" = poste-theme ]"]
 run = [["omarchy", "theme", "set", "poste-theme"]]
 
+# Zen in the theme's colors: Omarchy renders config/.config/omarchy/themed/zen.css.tpl into the
+# current theme at each theme change; the default profile's chrome/userChrome.css is a link to
+# it, its user.js a link to files/zen/user.js. Zen reads both at start.
+# zen.css missing (the template was added after the theme was set): the current theme is applied
+# again, like a theme change (themed apps reloaded by signals, same background).
+[[user]]
+id = "zen-theme-render"
+title = "Zen: zen.css rendered in the current theme"
+requires = "omarchy"
+check = ["sh", "-c", "[ -f \"@HOME@/.local/state/omarchy/current/theme/zen.css\" ]"]
+run = [["omarchy-theme-refresh"]]
+
+[[user]]
+id = "zen-userchrome"
+title = "Zen: userChrome.css and user.js of the default profile (restart Zen to apply)"
+requires = "zen-browser"
+check = ["sh", "@BOOTSTRAP@/files/zen/link-profile.sh", "--check", "@BOOTSTRAP@/files/zen/user.js"]
+run = [["sh", "@BOOTSTRAP@/files/zen/link-profile.sh", "@BOOTSTRAP@/files/zen/user.js"]]
+
 
 # ------------------------------------------------------------ system steps (sudo, never run by poste)
 [[system]]
@@ -198,10 +217,6 @@ source = "system/polkit-systemd-creds.rules"
 id = "gh-auth"
 title = "GitHub: gh auth login, then gh auth setup-git"
 check = ["gh", "auth", "status"]
-
-[[manual]]
-id = "zen-theme"
-title = "Zen: Settings, Appearance: choose the wanted dark internal theme"
 
 [[manual]]
 id = "unity-login"
