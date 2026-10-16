@@ -17,7 +17,10 @@ Step families (details and comments in `steps.toml`):
   release tag (a pre-release tag such as `-rc1` only if there is nothing else; no tag: its default
   branch). Present: only its optional patch is checked (already applied =
   `git apply --reverse --check` succeeds); a patch that no longer applies is left alone, a note
-  says so. Moving it is `poste sys update` (see below).
+  says so. Moving it is `poste sys update` (see below). poste keeps a copy of the patch it
+  applied (`~/.local/state/poste/patches/<id>.patch`): when the repository's patch changes (or is
+  removed from the steps), the plugin is seen carrying the earlier one, and `poste sys update`
+  swaps them (or takes it off).
 - `[[app]]`: program published as a GitHub release asset (`github`, `asset` with `{version}` and
   `*`, `prerelease`). Exactly one way to install it: `package` (a pacman package: poste downloads
   and checks it, then PRINTS `sudo pacman -U`), `bin` (that file of the archive into
@@ -50,8 +53,9 @@ one from its source. An update made by hand or by `yay` is therefore always seen
   poste that runs `sudo`.
 - `poste sys update <id>…`: only these apps and plugins (no system packages).
 - An app is downloaded through `gh` and checked against the sha256 GitHub publishes (no
-  checksum, no install). A plugin's patch is taken off, the plugin moved, the patch put back; if
-  it no longer applies, the plugin is put back where it was and the update fails.
+  checksum, no install). A plugin's patch is taken off (the version it carries, from that copy),
+  the plugin moved, the repository's patch put on; if it no longer applies, the plugin is put
+  back where it was, earlier patch included, and the update fails.
 - Versions are compared, never moved back: pacman's order (`0.1.2` < `0.1.2.r3.g<hash>` <
   `0.1.3`), a release above its pre-releases (`0.1.1-beta.9` < `0.1.1`), and the order of the
   releases for tags without an order (`1.0.0-local.<hash>`). The available version is the one

@@ -187,9 +187,19 @@ impl<'a> Ctx<'a> {
         self.env.config_home.join("omarchy/plugins").join(id)
     }
 
-    /// Path of a plugin's patch (relative to `bootstrap/`, or absolute once merged).
-    pub(crate) fn patch_path(&self, rel: &str) -> PathBuf {
-        self.dir.join(rel)
+    /// A plugin's patch: its file (relative to `bootstrap/`, or absolute once merged) and the
+    /// copy of what was applied, in the state folder.
+    pub(crate) fn plugin_patch(&self, p: &Plugin) -> Option<apps::Patch> {
+        let applied = self
+            .env
+            .state_dir()
+            .join("patches")
+            .join(format!("{}.patch", p.id));
+        // A patch removed from the steps keeps its copy, to be taken off.
+        (p.patch.is_some() || applied.is_file()).then(|| apps::Patch {
+            file: p.patch.as_ref().map(|rel| self.dir.join(rel)),
+            applied,
+        })
     }
 }
 
@@ -550,9 +560,15 @@ enum Act {
     /// Moves a plugin just added to its latest version, its patch applied.
     PluginLatest {
         dir: PathBuf,
-        patch: Option<PathBuf>,
+        patch: Option<apps::Patch>,
         prerelease: bool,
         tools: Tools,
+    },
+    /// Applies a plugin's patch (`apply`), then keeps a copy of it as the applied one.
+    Patch {
+        dir: PathBuf,
+        patch: apps::Patch,
+        apply: bool,
     },
 }
 
@@ -582,6 +598,15 @@ impl Act {
                 ..
             } => format!("write {} (mode {m:o})", target.display()),
             Act::Write { target, .. } => format!("write {}", target.display()),
+            Act::Patch { dir, patch, apply } => format!(
+                "{}keep a copy of the applied patch in {}",
+                match (apply, &patch.file) {
+                    (true, Some(f)) =>
+                        format!("git -C {} apply {}, then ", dir.display(), f.display()),
+                    _ => String::new(),
+                },
+                patch.applied.display()
+            ),
         }
     }
 }
@@ -627,7 +652,7 @@ fn cmd(parts: &[&str]) -> Act {
 /// only gets its patch checked; moving it is `poste sys update`.
 fn plugin_acts(ctx: &Ctx, p: &Plugin) -> Result<Vec<Act>, String> {
     let dir = ctx.plugin_dir(&p.id);
-    let patch = p.patch.as_ref().map(|r| ctx.patch_path(r));
+    let patch = ctx.plugin_patch(p);
     if !dir.exists() {
         if !have(ctx.env, "omarchy") {
             return Err(format!(
@@ -651,16 +676,45 @@ fn plugin_acts(ctx: &Ctx, p: &Plugin) -> Result<Vec<Act>, String> {
             p.id
         ));
     }
-    if let Some(pa) = &patch {
-        let pa = pa.to_string_lossy();
-        let d = dir.to_string_lossy().into_owned();
-        if git_ok(&dir, &["apply", "--reverse", "--check", &pa]) {
-            // already applied
-        } else if git_ok(&dir, &["apply", "--check", &pa]) {
-            return Ok(vec![cmd(&["git", "-C", &d, "apply", &pa])]);
-        } else {
+    if let Some(patch) = patch {
+        let on = patch.on(&dir, &ctx.tools);
+        if patch.stale(on.as_ref()) {
             return Err(format!(
-                "{}: the patch no longer applies (plugin moved by hand?): {pa}",
+                "{}: carries {}, `poste sys update {}` {}",
+                p.id,
+                if patch.file.is_some() {
+                    "an earlier version of its patch"
+                } else {
+                    "a patch removed from the steps"
+                },
+                p.id,
+                if patch.file.is_some() {
+                    "puts the new one"
+                } else {
+                    "takes it off"
+                },
+            ));
+        } else if on.is_some() {
+            // Already applied: only its copy, if missing or older.
+            if !patch.recorded() {
+                return Ok(vec![Act::Patch {
+                    dir,
+                    patch,
+                    apply: false,
+                }]);
+            }
+        } else if let Some(file) = &patch.file {
+            let pa = file.to_string_lossy();
+            // Only on an untouched plugin: never stacked on changes it cannot take off.
+            if apps::plugin_clean(&dir, &ctx.tools) && git_ok(&dir, &["apply", "--check", &pa]) {
+                return Ok(vec![Act::Patch {
+                    dir,
+                    patch,
+                    apply: true,
+                }]);
+            }
+            return Err(format!(
+                "{}: the patch no longer applies (plugin moved or changed by hand?): {pa}",
                 p.id
             ));
         }
@@ -839,13 +893,21 @@ fn run_act(act: &Act) -> Result<bool> {
         } => {
             let st = apps::plugin_state(dir, *prerelease, tools)?;
             let (name, commit) = st.target.context("no tag nor default branch found")?;
-            if st.head != commit && !st.ahead {
-                apps::plugin_move(dir, &commit, patch.as_deref(), tools)?;
-            } else if let Some(p) = patch {
-                let d = dir.to_string_lossy().into_owned();
-                run_act(&cmd(&["git", "-C", &d, "apply", &p.to_string_lossy()]))?;
-            }
+            // Never moved back: already there or ahead, only the patch is applied.
+            let to = apps::destination(&st.head, &commit, st.ahead);
+            apps::plugin_move(dir, to, patch.as_ref(), tools)?;
             println!("    at {name}");
+            Ok(true)
+        }
+        Act::Patch { dir, patch, apply } => {
+            match (apply, &patch.file) {
+                (true, Some(f)) => {
+                    let d = dir.to_string_lossy().into_owned();
+                    run_act(&cmd(&["git", "-C", &d, "apply", &f.to_string_lossy()]))?;
+                    patch.record_or_warn();
+                }
+                _ => patch.record()?,
+            }
             Ok(true)
         }
         Act::Write {
@@ -1440,6 +1502,44 @@ check = ["false"]
         assert_eq!(fs::read_to_string(dir.join("f.txt")).unwrap(), "two\n");
         // Already applied: nothing.
         assert!(plugin_acts(&ctx, &plug()).unwrap().is_empty());
+        // Applied, its copy missing (applied before poste kept one): only the copy.
+        let patch = ctx.plugin_patch(&plug()).unwrap();
+        assert!(patch.applied.starts_with(env.state_dir()));
+        fs::remove_file(&patch.applied).unwrap();
+        let acts = plugin_acts(&ctx, &plug()).unwrap();
+        assert!(matches!(acts[..], [Act::Patch { apply: false, .. }]));
+        run_act(&acts[0]).unwrap();
+        assert!(patch.recorded());
+        // The repository's patch changed: the plugin carries the earlier one, left to update.
+        write(
+            &repo,
+            "patches/p.patch",
+            "diff --git a/f.txt b/f.txt\n--- a/f.txt\n+++ b/f.txt\n@@ -1 +1 @@\n-one\n+deux\n",
+        );
+        let e = plugin_acts(&ctx, &plug()).unwrap_err();
+        assert!(e.contains("earlier version"), "{e}");
+        assert_eq!(fs::read_to_string(dir.join("f.txt")).unwrap(), "two\n");
+        // Removed from the steps: its copy still says it is there.
+        let mut q = plug();
+        q.patch = None;
+        let e = plugin_acts(&ctx, &q).unwrap_err();
+        assert!(e.contains("removed from the steps"), "{e}");
+        // The new patch is a part of the earlier one: still the earlier one, copy kept.
+        let both = "diff --git a/f.txt b/f.txt\n--- a/f.txt\n+++ b/f.txt\n@@ -1 +1 @@\n-one\n+two\n\
+                    diff --git a/s.txt b/s.txt\nnew file mode 100644\n--- /dev/null\n+++ b/s.txt\n@@ -0,0 +1 @@\n+s\n";
+        sh(&dir, &["apply", "-R", &patch.applied.to_string_lossy()]);
+        fs::write(&patch.applied, both).unwrap();
+        sh(&dir, &["apply", &patch.applied.to_string_lossy()]);
+        write(
+            &repo,
+            "patches/p.patch",
+            "diff --git a/f.txt b/f.txt\n--- a/f.txt\n+++ b/f.txt\n@@ -1 +1 @@\n-one\n+two\n",
+        );
+        let e = plugin_acts(&ctx, &plug()).unwrap_err();
+        assert!(e.contains("earlier version"), "{e}");
+        assert_eq!(fs::read_to_string(&patch.applied).unwrap(), both);
+        sh(&dir, &["apply", "-R", &patch.applied.to_string_lossy()]);
+        assert!(!dir.join("s.txt").exists());
         // Patch that no longer applies.
         fs::write(dir.join("f.txt"), "three\n").unwrap();
         assert!(plugin_acts(&ctx, &plug()).is_err());

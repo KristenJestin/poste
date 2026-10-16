@@ -743,13 +743,104 @@ pub fn plugin_log(dir: &Path, commit: &str, fetch: bool, tools: &Tools) -> Resul
     )
 }
 
-/// Moves a plugin to `commit`, its local patch taken off then put back. If the patch no longer
-/// applies, the plugin is put back where it was, patch included, and the update fails.
-pub fn plugin_move(dir: &Path, commit: &str, patch: Option<&Path>, tools: &Tools) -> Result<()> {
-    // The network first: once the patch is off, nothing should be left that can fail alone.
-    git(tools, dir, &["fetch", "--quiet", "--tags", "origin"])?;
+/// A plugin's local patch: the repository's file (`None`: removed from the steps), and the copy
+/// of what poste last applied (`~/.local/state/poste/patches/<id>.patch`). The copy is what lets
+/// the patch be taken off once the repository's file has changed or gone.
+#[derive(Clone, Debug)]
+pub struct Patch {
+    pub file: Option<PathBuf>,
+    pub applied: PathBuf,
+}
+
+impl Patch {
+    fn reverses(p: &Path, dir: &Path, tools: &Tools) -> bool {
+        p.is_file()
+            && git(
+                tools,
+                dir,
+                &["apply", "--reverse", "--check", &p.to_string_lossy()],
+            )
+            .is_ok()
+    }
+
+    /// Changed lines of a patch.
+    fn weight(p: &Path) -> usize {
+        std::fs::read_to_string(p)
+            .unwrap_or_default()
+            .lines()
+            .filter(|l| {
+                (l.starts_with('+') && !l.starts_with("+++"))
+                    || (l.starts_with('-') && !l.starts_with("---"))
+            })
+            .count()
+    }
+
+    /// The patch that is on the plugin, among the copy (what poste applied) and the repository's
+    /// file; `None` if neither can be taken off. When both can, one holds the other (a patch
+    /// grown or cut down): the larger is the one on it, the other would leave changes behind.
+    pub fn on(&self, dir: &Path, tools: &Tools) -> Option<PathBuf> {
+        std::iter::once(&self.applied)
+            .chain(self.file.as_ref())
+            .filter(|p| Self::reverses(p, dir, tools))
+            .fold(None, |best: Option<&PathBuf>, p| match best {
+                Some(b) if Self::weight(b) >= Self::weight(p) => Some(b),
+                _ => Some(p),
+            })
+            .cloned()
+    }
+
+    /// The copy is the repository's file (or both are absent).
+    pub fn recorded(&self) -> bool {
+        match &self.file {
+            Some(f) => match (std::fs::read(f), std::fs::read(&self.applied)) {
+                (Ok(a), Ok(b)) => a == b,
+                _ => false,
+            },
+            None => !self.applied.exists(),
+        }
+    }
+
+    /// The plugin carries an earlier version of the patch (or one removed from the steps).
+    pub fn stale(&self, on: Option<&PathBuf>) -> bool {
+        on == Some(&self.applied) && !self.recorded()
+    }
+
+    /// `record` once the patch is on the plugin: failing to keep the copy is only a warning (the
+    /// copy left over no longer matches the plugin, the repository's file is found on it).
+    pub fn record_or_warn(&self) {
+        if let Err(e) = self.record() {
+            eprintln!("    warning: {e:#}");
+        }
+    }
+
+    /// Keeps a copy of the repository's file as the applied patch (removes it if there is none).
+    pub fn record(&self) -> Result<()> {
+        let Some(file) = &self.file else {
+            if self.applied.exists() {
+                std::fs::remove_file(&self.applied)?;
+            }
+            return Ok(());
+        };
+        if let Some(parent) = self.applied.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+        std::fs::copy(file, &self.applied)
+            .with_context(|| format!("copying {} to {}", file.display(), self.applied.display()))?;
+        Ok(())
+    }
+}
+
+/// Moves a plugin to `commit`, its local patch taken off (the version that is on it, see
+/// [`Patch::on`]) then the repository's put on and recorded. If that no longer applies, the
+/// plugin is put back where it was, patch included, and the update fails. `commit` may be
+/// `HEAD`: then nothing is fetched nor checked out, only the patch is renewed.
+pub fn plugin_move(dir: &Path, commit: &str, patch: Option<&Patch>, tools: &Tools) -> Result<()> {
     let old = git(tools, dir, &["rev-parse", "HEAD"])?;
-    let p = patch.map(|p| p.to_string_lossy().into_owned());
+    let moving = commit != old;
+    // The network first: once the patch is off, nothing should be left that can fail alone.
+    if moving {
+        git(tools, dir, &["fetch", "--quiet", "--tags", "origin"])?;
+    }
     let status = |tools: &Tools| {
         git(
             tools,
@@ -757,15 +848,16 @@ pub fn plugin_move(dir: &Path, commit: &str, patch: Option<&Path>, tools: &Tools
             &["status", "--porcelain", "--untracked-files=no"],
         )
     };
-    let mut unpatched = false;
+    // The patch taken off, to put back if anything fails.
+    let mut off: Option<String> = None;
     if !status(tools)?.is_empty() {
-        match &p {
-            Some(p) if git(tools, dir, &["apply", "--reverse", "--check", p]).is_ok() => {
-                git(tools, dir, &["apply", "--reverse", p])?;
-                unpatched = true;
+        match patch.and_then(|p| p.on(dir, tools)) {
+            Some(p) => {
+                let p = p.to_string_lossy().into_owned();
+                git(tools, dir, &["apply", "--reverse", &p])?;
                 // A file the patch created and that was marked `git add -N`: its empty index
                 // entry stays once the file is gone, and is only a placeholder.
-                let summary = git(tools, dir, &["apply", "--summary", p])?;
+                let summary = git(tools, dir, &["apply", "--summary", &p])?;
                 for f in summary
                     .lines()
                     .filter_map(|l| l.trim().strip_prefix("create mode "))
@@ -782,22 +874,28 @@ pub fn plugin_move(dir: &Path, commit: &str, patch: Option<&Path>, tools: &Tools
                     }
                 }
                 if !status(tools)?.is_empty() {
-                    git(tools, dir, &["apply", p])?;
+                    git(tools, dir, &["apply", &p])?;
                     bail!(
                         "{}: files modified by hand besides the patch, nothing touched",
                         dir.display()
                     );
                 }
+                off = Some(p);
             }
-            _ => bail!("{}: files modified by hand, nothing touched", dir.display()),
+            None => bail!("{}: files modified by hand, nothing touched", dir.display()),
         }
     }
     // From here on, any failure puts the plugin back where it was, patch included.
     let back = |why: anyhow::Error| -> Result<()> {
-        git(tools, dir, &["checkout", "--quiet", "--detach", &old])
-            .and_then(|_| match (&p, unpatched) {
-                (Some(p), true) => git(tools, dir, &["apply", p]).map(|_| ()),
-                _ => Ok(()),
+        let checkout = if moving {
+            git(tools, dir, &["checkout", "--quiet", "--detach", &old]).map(|_| ())
+        } else {
+            Ok(())
+        };
+        checkout
+            .and_then(|_| match &off {
+                Some(p) => git(tools, dir, &["apply", p]).map(|_| ()),
+                None => Ok(()),
             })
             .with_context(|| {
                 format!(
@@ -808,21 +906,47 @@ pub fn plugin_move(dir: &Path, commit: &str, patch: Option<&Path>, tools: &Tools
             })?;
         Err(why)
     };
-    if let Err(e) = git(tools, dir, &["checkout", "--quiet", "--detach", commit]) {
-        return back(e);
-    }
-    if let Some(p) = &p {
-        if git(tools, dir, &["apply", "--check", p]).is_err() {
-            return back(anyhow::anyhow!(
-                "the patch {p} no longer applies to {}: plugin left where it was, update the patch",
-                &commit[..commit.len().min(7)]
-            ));
-        }
-        if let Err(e) = git(tools, dir, &["apply", p]) {
+    if moving {
+        if let Err(e) = git(tools, dir, &["checkout", "--quiet", "--detach", commit]) {
             return back(e);
         }
     }
+    if let Some(patch) = patch {
+        if let Some(file) = &patch.file {
+            let p = file.to_string_lossy().into_owned();
+            if git(tools, dir, &["apply", "--check", &p]).is_err() {
+                return back(anyhow::anyhow!(
+                    "the patch {p} no longer applies to {}: plugin left where it was, update the patch",
+                    &commit[..commit.len().min(7)]
+                ));
+            }
+            if let Err(e) = git(tools, dir, &["apply", &p]) {
+                return back(e);
+            }
+        }
+        patch.record_or_warn();
+    }
     Ok(())
+}
+
+/// Where a plugin goes: its target, or where it is when the target is already in `HEAD` (never
+/// moved back).
+pub fn destination<'a>(head: &'a str, target: &'a str, ahead: bool) -> &'a str {
+    if ahead {
+        head
+    } else {
+        target
+    }
+}
+
+/// No tracked file of the plugin is changed.
+pub fn plugin_clean(dir: &Path, tools: &Tools) -> bool {
+    git(
+        tools,
+        dir,
+        &["status", "--porcelain", "--untracked-files=no"],
+    )
+    .is_ok_and(|s| s.is_empty())
 }
 
 #[cfg(test)]
@@ -1212,14 +1336,18 @@ mod tests {
             .status()
             .unwrap();
         assert!(st.success());
-        let patch = d.path().join("p.patch");
+        let file = d.path().join("p.patch");
         fs::write(
-            &patch,
+            &file,
             "diff --git a/f.txt b/f.txt\n--- a/f.txt\n+++ b/f.txt\n@@ -1,2 +1,2 @@\n-one\n+two\n keep\n\
              diff --git a/n.txt b/n.txt\nnew file mode 100644\n--- /dev/null\n+++ b/n.txt\n@@ -0,0 +1 @@\n+new\n",
         )
         .unwrap();
-        sh(&plug, &["apply", &patch.to_string_lossy()]);
+        sh(&plug, &["apply", &file.to_string_lossy()]);
+        let patch = Patch {
+            file: Some(file.clone()),
+            applied: d.path().join("state/patches/p.patch"),
+        };
         // The created file marked intent-to-add, as found on a real plugin.
         sh(&plug, &["add", "-N", "n.txt"]);
         let tools = Tools::default();
@@ -1242,6 +1370,7 @@ mod tests {
         assert!(plug.join("g.txt").is_file());
         assert_eq!(fs::read_to_string(plug.join("n.txt")).unwrap(), "new\n");
         assert_eq!(describe(&plug, &tools), "v2");
+        assert!(patch.recorded());
 
         // Upstream changes the patched line: left at v2, patch still there.
         fs::write(up.join("f.txt"), "uno\nkeep\n").unwrap();
@@ -1267,5 +1396,58 @@ mod tests {
         fs::write(plug.join("g.txt"), "mine\n").unwrap();
         assert!(plugin_move(&plug, &c2, Some(&patch), &tools).is_err());
         assert_eq!(fs::read_to_string(plug.join("g.txt")).unwrap(), "mine\n");
+        sh(&plug, &["checkout", "--", "g.txt"]);
+
+        // The repository's patch changed: the plugin carries the earlier one (the copy), which
+        // is taken off, and the new one put on, at the same commit.
+        fs::write(
+            &file,
+            "diff --git a/f.txt b/f.txt\n--- a/f.txt\n+++ b/f.txt\n@@ -1,2 +1,2 @@\n-one\n+three\n keep\n",
+        )
+        .unwrap();
+        assert!(patch.stale(patch.on(&plug, &tools).as_ref()));
+        assert_eq!(patch.on(&plug, &tools), Some(patch.applied.clone()));
+        plugin_move(&plug, &c2, Some(&patch), &tools).unwrap();
+        assert_eq!(
+            fs::read_to_string(plug.join("f.txt")).unwrap(),
+            "three\nkeep\n"
+        );
+        assert!(!plug.join("n.txt").exists());
+        assert!(patch.recorded());
+        assert!(!patch.stale(patch.on(&plug, &tools).as_ref()));
+
+        // The patch grown on the plugin itself, then written to the repository: the copy still
+        // reverses, but the larger file is the one on it.
+        fs::write(plug.join("z.txt"), "z\n").unwrap();
+        fs::write(
+            &file,
+            "diff --git a/f.txt b/f.txt\n--- a/f.txt\n+++ b/f.txt\n@@ -1,2 +1,2 @@\n-one\n+three\n keep\n\
+             diff --git a/z.txt b/z.txt\nnew file mode 100644\n--- /dev/null\n+++ b/z.txt\n@@ -0,0 +1 @@\n+z\n",
+        )
+        .unwrap();
+        assert_eq!(patch.on(&plug, &tools), Some(file.clone()));
+        assert!(!patch.stale(patch.on(&plug, &tools).as_ref()));
+        plugin_move(&plug, &c2, Some(&patch), &tools).unwrap();
+        assert!(patch.recorded());
+        fs::write(
+            &file,
+            "diff --git a/f.txt b/f.txt\n--- a/f.txt\n+++ b/f.txt\n@@ -1,2 +1,2 @@\n-one\n+three\n keep\n",
+        )
+        .unwrap();
+        plugin_move(&plug, &c2, Some(&patch), &tools).unwrap();
+        assert!(!plug.join("z.txt").exists());
+
+        // A new patch that does not apply: the plugin keeps the one it had.
+        fs::write(
+            &file,
+            "diff --git a/f.txt b/f.txt\n--- a/f.txt\n+++ b/f.txt\n@@ -1,2 +1,2 @@\n-nope\n+four\n keep\n",
+        )
+        .unwrap();
+        assert!(plugin_move(&plug, &c2, Some(&patch), &tools).is_err());
+        assert_eq!(
+            fs::read_to_string(plug.join("f.txt")).unwrap(),
+            "three\nkeep\n"
+        );
+        assert!(patch.stale(patch.on(&plug, &tools).as_ref()));
     }
 }

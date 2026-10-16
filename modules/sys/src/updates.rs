@@ -21,7 +21,9 @@ enum Item {
     Plugin {
         id: String,
         dir: PathBuf,
-        patch: Option<PathBuf>,
+        patch: Option<apps::Patch>,
+        /// Carries an earlier version of its patch.
+        stale: bool,
         at: String,
         head: String,
         name: String,
@@ -38,17 +40,17 @@ impl Item {
         }
     }
 
+    /// A plugin whose commit changes (never moved back).
+    fn moves(&self) -> bool {
+        matches!(self, Item::Plugin { head, commit, ahead, .. } if head != commit && !ahead)
+    }
+
     fn behind(&self) -> bool {
         match self {
             Item::App { standing, .. } => {
                 matches!(standing, Standing::Behind | Standing::Missing)
             }
-            Item::Plugin {
-                head,
-                commit,
-                ahead,
-                ..
-            } => head != commit && !ahead,
+            Item::Plugin { stale, .. } => self.moves() || *stale,
         }
     }
 
@@ -76,10 +78,23 @@ impl Item {
                 name,
                 commit,
                 ahead,
+                stale,
+                patch,
                 ..
             } => {
-                if self.behind() {
-                    format!("{at} -> {name} ({})", &commit[..commit.len().min(7)])
+                let removed = patch.as_ref().is_some_and(|p| p.file.is_none());
+                let renew = match (stale, removed) {
+                    (false, _) => "",
+                    (true, false) => ", new local patch",
+                    (true, true) => ", local patch removed",
+                };
+                if self.moves() {
+                    format!("{at} -> {name} ({}){renew}", &commit[..commit.len().min(7)])
+                } else if *stale {
+                    format!(
+                        "{at} (local patch to {})",
+                        if removed { "remove" } else { "renew" }
+                    )
                 } else if *ahead {
                     format!("{at} (ahead of {name}: nothing to do)")
                 } else {
@@ -124,6 +139,7 @@ fn survey_plugins(ctx: &Ctx, steps: &provision::Steps, only: &[String]) -> Vec<I
     let mut out = Vec::new();
     for p in steps.plugin.iter().filter(|p| wanted(only, &p.id)) {
         let dir = ctx.plugin_dir(&p.id);
+        let patch = ctx.plugin_patch(p);
         if !dir.join(".git").exists() {
             println!(
                 "  {:<14} not installed as a git clone (poste sys setup)",
@@ -139,7 +155,10 @@ fn survey_plugins(ctx: &Ctx, steps: &provision::Steps, only: &[String]) -> Vec<I
             }) => out.push(Item::Plugin {
                 id: p.id.clone(),
                 at: apps::describe(&dir, &ctx.tools),
-                patch: p.patch.as_ref().map(|r| ctx.patch_path(r)),
+                stale: patch
+                    .as_ref()
+                    .is_some_and(|pa| pa.stale(pa.on(&dir, &ctx.tools).as_ref())),
+                patch,
                 dir,
                 head,
                 name,
@@ -325,7 +344,7 @@ pub fn update(
         for i in &todo {
             println!("  {:<w$} {}", i.id(), i.line());
             match i {
-                Item::Plugin { dir, commit, .. } => {
+                Item::Plugin { dir, commit, .. } if i.moves() => {
                     match apps::plugin_log(dir, commit, !dry_run, &ctx.tools) {
                         Ok(log) if log.is_empty() => {}
                         Ok(log) => {
@@ -344,7 +363,7 @@ pub fn update(
                 Item::App { app, .. } if app.package.is_some() => {
                     println!("      downloaded and checked, then sudo pacman -U (your password)")
                 }
-                Item::App { .. } => {}
+                _ => {}
             }
         }
     }
@@ -385,8 +404,16 @@ pub fn update(
                 None => true,
             }),
             Item::Plugin {
-                dir, commit, patch, ..
-            } => apps::plugin_move(dir, commit, patch.as_deref(), &ctx.tools).map(|()| true),
+                dir,
+                head,
+                commit,
+                patch,
+                ahead,
+                ..
+            } => {
+                let to = apps::destination(head, commit, *ahead);
+                apps::plugin_move(dir, to, patch.as_ref(), &ctx.tools).map(|()| true)
+            }
         };
         match res {
             Ok(true) => {

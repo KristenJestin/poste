@@ -29,8 +29,10 @@ url = "https://github.com/HoneySpoons/omarchy-localsend.git"
 [[plugin]]
 id = "omamail"
 url = "https://github.com/huacnlee/omamail"
-# Mail sorting (text or number dates counted as 0), Delete key, AI and calendar hidden,
-# wait at startup, island style.
+# Made on v0.11.0. Mail sorted by date (a local IMAP bridge numbers mails without following
+# the date), Delete key, AI and calendar hidden, a wait for that bridge at startup (accounts
+# served on this machine only), island style. The added code lives in files of its own
+# (BridgeSettle.qml, DateSort.js, SenderAvatar.qml) so that updates touch little.
 patch = "patches/omamail-local.patch"
 
 [[plugin]]
@@ -77,7 +79,7 @@ check = ["sh", "-c", "! systemctl --user is-enabled --quiet omarchy-crash-watch.
 run = [["systemctl", "--user", "disable", "--now", "omarchy-crash-watch.service"]]
 
 # ------------------------------------------------------------ Strata, the file manager
-# A patched build of Strata (KristenJestin/strata, public), installed in ~/.local/bin. An old
+# A patched build of Strata (KristenJestin/strata-local, public), installed in ~/.local/bin. An old
 # Omarchy `strata` package may still be in /usr/bin and come first in the PATH: everything here
 # calls @HOME@/.local/bin/strata explicitly. Strata is a single instance: after an update, its
 # open windows keep the old binary until they are all closed.
@@ -86,7 +88,7 @@ run = [["systemctl", "--user", "disable", "--now", "omarchy-crash-watch.service"
 [[app]]
 id = "strata"
 title = "Strata (file manager) in ~/.local/bin"
-github = "KristenJestin/strata"
+github = "KristenJestin/strata-local"
 asset = "strata-x86_64.tar.gz"
 bin = "strata"
 version = ["@HOME@/.local/bin/strata", "--version"]
