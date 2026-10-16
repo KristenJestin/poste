@@ -42,16 +42,15 @@ Step families (details and comments in `steps.toml`):
 
 No version is written anywhere, neither here nor on the machine: the installed one is read on
 the system each time (`pacman -Q`, the `version` command, the plugin's git `HEAD`), the available
-one from its source. An update made by hand or by `yay` is therefore always seen.
+one from its source. An app updated by hand is therefore always seen.
 
-- `poste sys outdated`: apps, plugins, then the packages of the repositories (`checkupdates`,
-  Omarchy included) and of the AUR (`yay -Qua`), with the command to run for those.
+- `poste sys outdated`: the apps and plugins that are behind. The system packages (repositories,
+  AUR, Omarchy) are not poste's: they stay with Omarchy's own tools.
 - `poste sys update [--yes] [--dry-run]`: everything at once, after one preview (for a plugin:
   its new commits) and one confirmation: the apps and plugins that are behind, then, in the
-  terminal (your password), the `sudo pacman -U` of the downloaded packages and `omarchy update`
-  (or `yay -Syu`) when the packages of the repositories or the AUR are behind. The only command of
+  terminal (your password), the `sudo pacman -U` of the downloaded packages. The only command of
   poste that runs `sudo`.
-- `poste sys update <id>…`: only these apps and plugins (no system packages).
+- `poste sys update <id>…`: only these apps and plugins.
 - An app is downloaded through `gh` and checked against the sha256 GitHub publishes (no
   checksum, no install). A plugin's patch is taken off (the version it carries, from that copy),
   the plugin moved, the repository's patch put on; if it no longer applies, the plugin is put

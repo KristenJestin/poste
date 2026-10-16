@@ -124,7 +124,7 @@ knowing any module; module absent, no trace):
 
 ## Install on a new PC
 
-Starting point: a fresh Omarchy, connected to the Internet. `poste` never runs `sudo`:
+Starting point: a fresh Omarchy, connected to the Internet. the install never runs `sudo`:
 each time root rights are needed, it prints the exact command to copy.
 
 1. Rust and git (once, by hand):

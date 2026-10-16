@@ -17,10 +17,10 @@ root `~/.local/share/poste/current`, which points to the clone (dev mode) or to 
   if it has a `Cargo.toml`, otherwise the script `poste-<name>` of the module folder.
   Exit code 2 if config conflicts remain. Unless `--no-config` is given, goes on with the "machine"
   part (see below).
-- `poste sys outdated`: what is behind its source: apps (GitHub releases), Omarchy plugins, packages
-  of the repositories and of the AUR (see [`bootstrap/README.md`](../../bootstrap/README.md), "Versions").
-- `poste sys update [<id>…] [--yes] [--dry-run]`: everything at once (apps, plugins, then the system
-  packages with sudo in the terminal), or only the cited apps and plugins; one preview, one
+- `poste sys outdated`: what is behind its source: apps (GitHub releases) and Omarchy plugins (see
+  [`bootstrap/README.md`](../../bootstrap/README.md), "Versions"). The system packages are not poste's.
+- `poste sys update [<id>…] [--yes] [--dry-run]`: the apps and plugins that are behind (all, or the
+  cited ones), the downloaded packages with `sudo pacman -U` in the terminal; one preview, one
   confirmation.
 - `poste sys done [<id>] [--undo]`: marks a manual step (or a system step that cannot be checked) done;
   without id, lists them. State in `~/.local/state/poste/done/<id>`.

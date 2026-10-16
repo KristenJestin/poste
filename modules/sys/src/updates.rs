@@ -1,14 +1,15 @@
 //! `poste sys outdated` and `poste sys update`: what is behind its source, and the update of
 //! everything at once: the apps (`[[app]]`) and third-party plugins by poste itself, then the
-//! packages with sudo (`sudo pacman -U` of a downloaded package, `omarchy update` or
-//! `yay -Syu`), run in the terminal after the confirmation: the user types the password.
+//! downloaded packages with `sudo pacman -U`, run in the terminal after the confirmation: the
+//! user types the password. The system packages (repositories, AUR, Omarchy) are not poste's:
+//! never listed nor updated here.
 
 use crate::apps::{self, Standing};
 use crate::provision::{self, Ctx};
 use anyhow::{bail, Result};
 use poste_core::Env;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
+use std::process::Command;
 
 /// Where one app or plugin stands.
 enum Item {
@@ -183,76 +184,8 @@ fn print_items(items: &[Item]) {
     }
 }
 
-/// Lines of a command that lists updates (`name old -> new`); `None` if it failed.
-/// `none`: its exit code when there is nothing to update (`checkupdates` 2, `yay -Qua` 1).
-fn listing(prog: &str, args: &[&str], none: i32) -> Option<Vec<String>> {
-    let o = Command::new(prog)
-        .args(args)
-        .stdin(Stdio::null())
-        .stderr(Stdio::null())
-        .output()
-        .ok()?;
-    let lines: Vec<String> = String::from_utf8_lossy(&o.stdout)
-        .lines()
-        .map(|l| l.trim().to_string())
-        .filter(|l| !l.is_empty())
-        .collect();
-    match o.status.code() {
-        Some(0) => Some(lines),
-        Some(c) if c == none && lines.is_empty() => Some(lines),
-        _ => None,
-    }
-}
-
-/// The packages of the repositories (Omarchy included) and of the AUR that are behind.
-struct System {
-    repos: Option<Vec<String>>,
-    aur: Option<Vec<String>>,
-}
-
-impl System {
-    fn read() -> Self {
-        Self {
-            repos: listing("checkupdates", &["--nocolor"], 2),
-            aur: listing("yay", &["-Qua"], 1),
-        }
-    }
-
-    /// Something to update. A list that could not be read (offline, tool missing) runs nothing:
-    /// it says so, and the update with sudo stays to run by hand.
-    fn worth_running(&self) -> bool {
-        [&self.repos, &self.aur]
-            .iter()
-            .any(|l| l.as_ref().is_some_and(|l| !l.is_empty()))
-    }
-
-    fn print(&self) {
-        for (what, l) in [("repositories", &self.repos), ("AUR", &self.aur)] {
-            match l {
-                None => println!("  {what}: check impossible"),
-                Some(l) if l.is_empty() => println!("  {what}: up to date"),
-                Some(l) => {
-                    println!("  {what}: {} to update", l.len());
-                    for x in l {
-                        println!("    {x}");
-                    }
-                }
-            }
-        }
-    }
-}
-
-/// The command that updates the packages: `omarchy update` (packages, AUR and Omarchy's
-/// migrations) when Omarchy is there, otherwise `yay -Syu`.
-fn system_command(env: &Env) -> Vec<String> {
-    if provision::have(env, "omarchy-update") {
-        vec!["omarchy-update".into()]
-    } else {
-        vec!["yay".into(), "-Syu".into()]
-    }
-}
-
-/// `poste sys outdated`: apps, plugins, then the system packages.
+/// `poste sys outdated`: apps and plugins. The system packages are not poste's: never listed
+/// nor updated here.
 pub fn outdated(env: &Env, repo: &Path) -> Result<()> {
     let ctx = Ctx::new(env, repo);
     let (_, steps, _) = provision::load_wanted(&ctx)?;
@@ -262,11 +195,8 @@ pub fn outdated(env: &Env, repo: &Path) -> Result<()> {
     println!("\nOmarchy plugins");
     let plugins = survey_plugins(&ctx, &steps, &[]);
     print_items(&plugins);
-    println!("\nPackages (pacman repositories, Omarchy included, then AUR)");
-    let sys = System::read();
-    sys.print();
     let behind = items.iter().chain(&plugins).filter(|i| i.behind()).count();
-    if behind > 0 || sys.worth_running() {
+    if behind > 0 {
         println!("\nTo update everything: poste sys update (or poste sys update <id>)");
     }
     Ok(())
@@ -293,9 +223,8 @@ fn run_here(cmd: &[String]) -> bool {
 
 /// `poste sys update [<id>…]`: everything at once, or only the cited apps and plugins. Moves the
 /// apps and plugins that are behind to their latest version, then, with sudo in the terminal,
-/// installs the downloaded packages and (without ids) updates the system packages, all after
-/// one preview (the new commits of a plugin) and one confirmation. Returns the exit code: 0, or
-/// 1 if one failed.
+/// installs the downloaded packages, all after one preview (the new commits of a plugin) and
+/// one confirmation. Returns the exit code: 0, or 1 if one failed.
 pub fn update(
     env: &Env,
     repo: &Path,
@@ -322,56 +251,36 @@ pub fn update(
     items.extend(survey_plugins(&ctx, &steps, ids));
     let (todo, fresh): (Vec<Item>, Vec<Item>) = items.into_iter().partition(|i| i.behind());
     print_items(&fresh);
-    // The system packages: only when everything is asked for.
-    let sys = ids.is_empty().then(System::read);
-    let run_sys = sys.as_ref().is_some_and(System::worth_running);
-    if sys
-        .as_ref()
-        .is_some_and(|s| s.repos.is_none() || s.aur.is_none())
-    {
-        println!(
-            "Packages: the list of updates could not be read (offline, checkupdates or yay missing): `{}` is not run, run it yourself.",
-            system_command(env).join(" ")
-        );
-    }
-    if todo.is_empty() && !run_sys {
+    if todo.is_empty() {
         println!("Nothing to update.");
         return Ok(0);
     }
-    if !todo.is_empty() {
-        println!("To update");
-        let w = width(&todo);
-        for i in &todo {
-            println!("  {:<w$} {}", i.id(), i.line());
-            match i {
-                Item::Plugin { dir, commit, .. } if i.moves() => {
-                    match apps::plugin_log(dir, commit, !dry_run, &ctx.tools) {
-                        Ok(log) if log.is_empty() => {}
-                        Ok(log) => {
-                            let lines: Vec<&str> = log.lines().collect();
-                            for l in lines.iter().take(30) {
-                                println!("      {l}");
-                            }
-                            if lines.len() > 30 {
-                                println!("      … {} more commits", lines.len() - 30);
-                            }
+    println!("To update");
+    let w = width(&todo);
+    for i in &todo {
+        println!("  {:<w$} {}", i.id(), i.line());
+        match i {
+            Item::Plugin { dir, commit, .. } if i.moves() => {
+                match apps::plugin_log(dir, commit, !dry_run, &ctx.tools) {
+                    Ok(log) if log.is_empty() => {}
+                    Ok(log) => {
+                        let lines: Vec<&str> = log.lines().collect();
+                        for l in lines.iter().take(30) {
+                            println!("      {l}");
                         }
-                        Err(_) if dry_run => println!("      new commits not fetched (dry run)"),
-                        Err(e) => println!("      new commits unreadable: {e:#}"),
+                        if lines.len() > 30 {
+                            println!("      … {} more commits", lines.len() - 30);
+                        }
                     }
+                    Err(_) if dry_run => println!("      new commits not fetched (dry run)"),
+                    Err(e) => println!("      new commits unreadable: {e:#}"),
                 }
-                Item::App { app, .. } if app.package.is_some() => {
-                    println!("      downloaded and checked, then sudo pacman -U (your password)")
-                }
-                _ => {}
             }
+            Item::App { app, .. } if app.package.is_some() => {
+                println!("      downloaded and checked, then sudo pacman -U (your password)")
+            }
+            _ => {}
         }
-    }
-    let sys_cmd = system_command(env);
-    if let Some(s) = sys.as_ref().filter(|_| run_sys) {
-        println!("\nPackages (pacman repositories, Omarchy included, then AUR)");
-        s.print();
-        println!("  then: {} (your password)", sys_cmd.join(" "));
     }
     if dry_run {
         println!("\nDry run (--dry-run): nothing updated");
@@ -442,9 +351,6 @@ pub fn update(
                 failed.push("triggered steps".into());
             }
         }
-    }
-    if run_sys && !run_here(&sys_cmd) {
-        failed.push("system packages".into());
     }
     if todo
         .iter()

@@ -6,7 +6,7 @@
 - `poste sys setup` must never overwrite or delete what it did not put in place; before replacing a file it put in place, it keeps a copy in `~/.local/state/poste/backup/`.
 - No secret in the repository or in the logs: credentials go in the system keyring (Secret Service).
 - The repository is meant to be public: no personal data in the files or in the commit messages (email addresses, senders or contents of real emails, names of services or people, IPs and names of the local network, serial numbers, disk UUIDs, details of the work or of the work PC). Examples are invented (`example.com`, `192.0.2.10`, `<connection>`). What belongs to one machine lives in its local unversioned config (`~/.config/poste/`, `config.local`, `monitors.lua` of the work PC), never in the repository.
-- No `sudo` (root steps are printed, never run). One exception, decided by the user: `poste sys update` runs `sudo pacman -U` of a package it downloaded and checked, and `omarchy update` (or `yay -Syu`), in the terminal after its confirmation; the user types the password.
+- No `sudo` (root steps are printed, never run). One exception, decided by the user: `poste sys update` runs `sudo pacman -U` of a package it downloaded and checked, in the terminal after its confirmation; the user types the password. Never a system upgrade (`yay -Syu`, `omarchy update`): the system packages are not poste's.
 - Test before committing: `cargo test` and `cargo clippy -- -D warnings`.
 - Never stop a screen recording in progress or the music playing: check `poste record status` before restarting the island or the portal.
 - Do not change what does not belong to poste (existing `~/.config/*`, chezmoi, Hyprland, the Quickshell island) until the project has decided to.

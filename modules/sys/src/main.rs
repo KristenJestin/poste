@@ -137,7 +137,7 @@ enum Cmd {
     },
     /// Source, root (current) and installed versions
     Versions,
-    /// What is behind its source: apps (GitHub releases), Omarchy plugins, system packages
+    /// What is behind its source: apps (GitHub releases) and Omarchy plugins
     Outdated,
     /// Updates the apps and plugins that are behind (all, or the cited ones), after a preview
     Update {
