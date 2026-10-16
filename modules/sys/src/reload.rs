@@ -1,5 +1,6 @@
 //! Reload of the island (`omarchy restart shell`) and of Hyprland (`hyprctl reload`)
-//! after `poste sys sync`, depending on the files changed by the pull.
+//! after `poste sys sync`, depending on the files changed by the pull; the shell alone after
+//! `poste sys update` moved a plugin.
 
 use anyhow::{Context, Result};
 use std::path::Path;
@@ -64,13 +65,41 @@ pub fn add_changes(need: &mut Need, dir: &Path, from: &str, to: &str) -> Result<
     Ok(())
 }
 
-/// A screen recording is running (restarting the island would cut it).
+/// A screen recording is running (restarting the island would cut it): the recorder's process,
+/// or the state of `poste record` when the module is there.
 fn recording() -> bool {
-    Command::new("pgrep")
+    let process = Command::new("pgrep")
         .args(["-f", "gpu-screen-recorder"])
         .stdout(Stdio::null())
         .status()
-        .is_ok_and(|s| s.success())
+        .is_ok_and(|s| s.success());
+    process
+        || Command::new("poste")
+            .args(["record", "status"])
+            .stderr(Stdio::null())
+            .output()
+            .ok()
+            .and_then(|o| serde_json::from_slice::<serde_json::Value>(&o.stdout).ok())
+            .is_some_and(|v| v["recording"] == true)
+}
+
+/// Restarts the shell (`omarchy restart shell`), never during a screen recording. False if it
+/// was not restarted (recording, or the command failed), with the reason printed.
+pub fn restart_shell() -> bool {
+    if recording() {
+        println!(
+            "Screen recording in progress: shell not restarted, run `omarchy restart shell` once it is over."
+        );
+        return false;
+    }
+    println!("\n$ omarchy restart shell");
+    match Command::new("omarchy").args(["restart", "shell"]).status() {
+        Ok(s) if s.success() => true,
+        _ => {
+            eprintln!("poste sys: `omarchy restart shell` failed");
+            false
+        }
+    }
 }
 
 fn launch(args: &[&str]) {
@@ -111,13 +140,7 @@ pub fn apply(
         launch(&["hyprctl", "reload"]);
     }
     if need.shell {
-        if recording() {
-            println!(
-                "Screen recording in progress: island not restarted, run `omarchy restart shell` once it is over."
-            );
-        } else {
-            launch(&["omarchy", "restart", "shell"]);
-        }
+        restart_shell();
     }
     Ok(())
 }

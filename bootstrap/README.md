@@ -49,7 +49,8 @@ one from its source. An app updated by hand is therefore always seen.
 - `poste sys update [--yes] [--dry-run]`: everything at once, after one preview (for a plugin:
   its new commits) and one confirmation: the apps and plugins that are behind, then, in the
   terminal (your password), the `sudo pacman -U` of the downloaded packages. The only command of
-  poste that runs `sudo`.
+  poste that runs `sudo`. A plugin moved: the shell is restarted (`omarchy restart shell`), never
+  during a screen recording.
 - `poste sys update <id>…`: only these apps and plugins.
 - An app is downloaded through `gh` and checked against the sha256 GitHub publishes (no
   checksum, no install). A plugin's patch is taken off (the version it carries, from that copy),

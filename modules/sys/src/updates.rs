@@ -6,6 +6,7 @@
 
 use crate::apps::{self, Standing};
 use crate::provision::{self, Ctx};
+use crate::reload;
 use anyhow::{bail, Result};
 use poste_core::Env;
 use std::path::{Path, PathBuf};
@@ -224,7 +225,8 @@ fn run_here(cmd: &[String]) -> bool {
 /// `poste sys update [<id>…]`: everything at once, or only the cited apps and plugins. Moves the
 /// apps and plugins that are behind to their latest version, then, with sudo in the terminal,
 /// installs the downloaded packages, all after one preview (the new commits of a plugin) and
-/// one confirmation. Returns the exit code: 0, or 1 if one failed.
+/// one confirmation; the shell is then restarted if a plugin moved (not during a screen
+/// recording). Returns the exit code: 0, or 1 if one failed.
 pub fn update(
     env: &Env,
     repo: &Path,
@@ -281,6 +283,9 @@ pub fn update(
             }
             _ => {}
         }
+    }
+    if todo.iter().any(|i| matches!(i, Item::Plugin { .. })) {
+        println!("\nthen: omarchy restart shell (not during a screen recording)");
     }
     if dry_run {
         println!("\nDry run (--dry-run): nothing updated");
@@ -356,9 +361,10 @@ pub fn update(
         .iter()
         .any(|i| matches!(i, Item::Plugin { .. }) && done.iter().any(|d| d == i.id()))
     {
-        println!(
-            "\nPlugins updated: `omarchy restart shell` loads them (check `poste record status` first)."
-        );
+        // Already confirmed with the update.
+        if !reload::restart_shell() {
+            failed.push("shell restart (plugins not loaded)".into());
+        }
     }
     if !failed.is_empty() {
         eprintln!("\nfailed: {}", failed.join(", "));

@@ -21,7 +21,7 @@ root `~/.local/share/poste/current`, which points to the clone (dev mode) or to 
   [`bootstrap/README.md`](../../bootstrap/README.md), "Versions"). The system packages are not poste's.
 - `poste sys update [<id>…] [--yes] [--dry-run]`: the apps and plugins that are behind (all, or the
   cited ones), the downloaded packages with `sudo pacman -U` in the terminal; one preview, one
-  confirmation.
+  confirmation, then the shell restarted if a plugin moved (never during a screen recording).
 - `poste sys done [<id>] [--undo]`: marks a manual step (or a system step that cannot be checked) done;
   without id, lists them. State in `~/.local/state/poste/done/<id>`.
 - `poste sys status`: source (dev or release) and root read; branch of the clone, uncommitted changes, unpushed commits; installed
