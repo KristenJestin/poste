@@ -83,8 +83,8 @@ run = [["systemctl", "--user", "disable", "--now", "omarchy-crash-watch.service"
 # Omarchy `strata` package may still be in /usr/bin and come first in the PATH: everything here
 # calls @HOME@/.local/bin/strata explicitly. Strata is a single instance: after an update, its
 # open windows keep the old binary until they are all closed.
-# Installed at its latest release if absent, then kept up to date by its own updater (signed;
-# check_for_updates = true in settings.toml, a link to poste-data) or by `poste sys update`.
+# Installed at its latest release if absent, then moved by `poste sys update` only: its own
+# update checks are off (check_for_updates = false in settings.toml, a link to poste-data).
 # The upstream desktop file (files/strata/io.github.lgse.Strata.desktop) comes from its repository.
 [[app]]
 id = "strata"
@@ -177,6 +177,27 @@ title = "poste-theme theme"
 requires = "omarchy"
 check = ["sh", "-c", "[ \"$(omarchy-theme-current | tr 'A-Z ' 'a-z-')\" = poste-theme ]"]
 run = [["omarchy", "theme", "set", "poste-theme"]]
+
+# Strata's theme: config/.config/omarchy/themed/strata.toml.tpl, rendered by Omarchy into the
+# current theme at each theme change (the accent in grey), linked as a custom theme of Strata;
+# settings.toml (poste-data) selects it (`mode = "theme"`, `theme = "omarchy-poste"`). Strata
+# reads it at start: restart Strata after a theme change.
+# strata.toml missing (the template was added after the theme was set): the current theme is
+# applied again, like a theme change.
+[[user]]
+id = "strata-theme-render"
+title = "Strata: strata.toml rendered in the current theme"
+requires = "omarchy"
+check = ["sh", "-c", "[ -f \"@HOME@/.local/state/omarchy/current/theme/strata.toml\" ]"]
+run = [["omarchy-theme-refresh"]]
+
+# A link, never forced: a file already there is left and the step stays shown.
+[[user]]
+id = "strata-theme-link"
+title = "Strata: the poste theme among its custom themes (link to the rendered strata.toml)"
+requires = "omarchy"
+check = ["sh", "-c", "[ \"$(readlink '@HOME@/.config/strata/themes/omarchy-poste.toml')\" = '@HOME@/.local/state/omarchy/current/theme/strata.toml' ]"]
+run = [["mkdir", "-p", "@HOME@/.config/strata/themes"], ["ln", "-s", "@HOME@/.local/state/omarchy/current/theme/strata.toml", "@HOME@/.config/strata/themes/omarchy-poste.toml"]]
 
 # Zen in the theme's colors: Omarchy renders config/.config/omarchy/themed/zen.css.tpl into the
 # current theme at each theme change; the default profile's chrome/userChrome.css is a link to

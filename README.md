@@ -281,13 +281,16 @@ poste-data/
 
 ## The file manager: Strata
 
-poste's file manager is [Strata](https://github.com/lgse/strata), its upstream release binary (a
-patched build, [KristenJestin/strata-local](https://github.com/KristenJestin/strata-local), is kept on
-GitHub but no longer installed).
+poste's file manager is [Strata](https://github.com/lgse/strata), its upstream release binary.
 `poste sys setup` puts it in place, all in `~`, without root (steps in `bootstrap/steps.toml`):
 
 - its latest release in `~/.local/bin/strata` (`[[app]]` step: archive checked against the sha256
-  GitHub publishes before extracting); then its own signed updates, or `poste sys update strata`;
+  GitHub publishes before extracting); `poste sys update strata` moves it, its own update checks
+  are off (`check_for_updates = false` in its `settings.toml`, a link to poste-data);
+- its theme, "Omarchy (poste)": `config/.config/omarchy/themed/strata.toml.tpl`, rendered by Omarchy
+  at each theme change, linked into `~/.config/strata/themes/` and selected in `settings.toml`. The
+  current theme's colors with the accent in grey: Strata has one accent for hover, icons and the
+  selection alike. Strata reads it at start: restart it after a theme change;
 - its desktop entry in `~/.local/share/applications/`, pointing to that binary;
 - the default for folders (`xdg-mime … inode/directory`), the D-Bus `org.freedesktop.FileManager1`
   service ('Show in folder' of browsers and GTK apps) and the file chooser of the portal (Open and
