@@ -13,7 +13,8 @@ Item {
   readonly property string socketPath: (Quickshell.env("XDG_RUNTIME_DIR") || "/tmp") + "/navette/events.sock"
 
   property string role: ""           // desk, remote
-  property string phase: "off"       // desk: waiting, linked, starting, mode, stopping; remote: away, dialing, linked, starting, mode; both: incompatible
+  property string phase: "off"       // desk: waiting, linked, starting, mode, stopping; remote: away, dialing,
+                                     // linked, starting, mode; both: incompatible; or a newer one, never shown
   property string peer: ""           // label of the other machine
   property string peerVersion: ""
   property string mode: ""
@@ -21,15 +22,14 @@ Item {
   property var modes: []             // [{ name, monitors }], on the desk
   property string mic: "off"         // desk, remote, failed, off
 
-  // The other machine is there to drive (desk), a session runs, or the versions differ.
-  readonly property bool shown: phase === "starting" || phase === "mode" || phase === "stopping"
-    || phase === "incompatible" || (role === "desk" && phase === "linked")
+  // A session starts, runs or stops; something to show: that, the other machine there to drive
+  // (desk), or versions that do not talk.
+  readonly property bool running: phase === "starting" || phase === "mode" || phase === "stopping"
+  readonly property bool shown: running || phase === "incompatible" || (role === "desk" && phase === "linked")
 
   function start(name) { Quickshell.execDetached(name ? ["navette", "mode", "start", name] : ["navette", "mode", "start"]) }
   function stop() { Quickshell.execDetached(["navette", "mode", "stop"]) }
   function toggleMic() { Quickshell.execDetached(["navette", "mic", "toggle"]) }
-
-  readonly property var knownStates: ["waiting", "linked", "starting", "mode", "stopping", "away", "dialing", "incompatible", "off"]
 
   function reset() {
     role = ""
@@ -50,7 +50,12 @@ Item {
     try { ev = JSON.parse(line) } catch (e) { return }
     if (!ev || typeof ev !== "object") return
     if (typeof ev.role === "string") role = word(ev.role)
-    if (typeof ev.state === "string" && knownStates.indexOf(ev.state) !== -1) phase = ev.state
+    if (typeof ev.state === "string") {
+      // An unknown state is kept as is: nothing is shown for it (`shown`), rather than the last
+      // known one. Out of a session, what belonged to it goes, unless this line says it again.
+      phase = ev.state
+      if (["starting", "mode", "stopping"].indexOf(ev.state) === -1) { mode = ""; monitors = []; mic = "off" }
+    }
     if (typeof ev.peer === "string") peer = ev.peer
     if (typeof ev.peer_version === "string") peerVersion = ev.peer_version
     if ("mode" in ev) mode = typeof ev.mode === "string" ? ev.mode : ""

@@ -5,7 +5,8 @@
 # Installed at its latest release if absent, then moved by `poste sys update`. The archive's
 # install.sh puts navette in ~/.local/bin, its icon and its user units, then `daemon-reload`; it
 # enables and starts nothing. Never replaced while a mode starts, runs or stops (`busy`): that
-# would cut the session at the restart below; run the update again later.
+# would cut the session at the restart below; run the update again later. When Navette runs but
+# its state cannot be read (no answer within 5 s, an older version), it counts as busy too.
 [[app]]
 id = "navette"
 title = "Navette (work-from-home mode) in ~/.local/bin"
@@ -13,7 +14,7 @@ github = "KristenJestin/navette"
 asset = "navette-{version}-linux-x86_64.tar.gz"
 script = "navette-{version}-linux-x86_64/install.sh"
 version = ["@HOME@/.local/bin/navette", "--version"]
-busy = ["sh", "-c", "\"@HOME@/.local/bin/navette\" watch --json --once 2>/dev/null | grep -qE '\"state\": *\"(starting|mode|stopping)\"'"]
+busy = ["sh", "-c", "out=$(timeout 5 \"@HOME@/.local/bin/navette\" watch --json --once 2>/dev/null) || { [ -S \"${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/navette/events.sock\" ]; exit; }; printf %s \"$out\" | grep -qE '\"state\": *\"(starting|mode|stopping)\"'"]
 
 # One unit, the same on both machines: `navette run --audio` reads the role of the pairing and
 # runs `serve` (desk) or `agent` (remote). poste never decides when it runs: away from the
@@ -36,10 +37,10 @@ run = [["systemctl", "--user", "try-restart", "navette.service"]]
 
 # Pairing, once, by hand: the desk shows a PIN that the remote asks for. The service exits
 # while there is no pairing, so it is restarted afterwards. Details: addons/navette/README.md.
+# No check: poste does not read Navette's files; `poste sys done navette-pair` once paired.
 [[manual]]
 id = "navette-pair"
-title = "Navette: pair the two machines (navette pair), then systemctl --user restart navette"
-check = ["test", "-f", "@HOME@/.config/navette/paired.conf"]
+title = "Navette: pair the two machines (navette pair), systemctl --user restart navette, then poste sys done navette-pair"
 
 # The desk only: its firewall lets the remote reach the pairing port. The rule holds the
 # machines' addresses: printed from the README, typed with sudo, never in this repository.

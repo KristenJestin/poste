@@ -356,10 +356,10 @@ Rectangle {
     Flow {
       id: remoteActions
       anchors.horizontalCenter: parent.horizontalCenter
-      width: Math.min(parent.width, implicitWidth)
+      width: parent.width
       spacing: 8
       visible: remoteCol.desk && (remoteCol.rm.phase === "linked" || remoteCol.rm.phase === "mode")
-      // There: one chip per mode of mode.conf (the default mode when none is listed).
+      // There: one chip per mode the provider lists (its default mode when it lists none).
       Repeater {
         model: remoteCol.desk && remoteCol.rm.phase === "linked"
           ? (remoteCol.rm.modes.length ? remoteCol.rm.modes : [{ name: "" }]) : []

@@ -1,4 +1,3 @@
-| [`navette`](addons/navette/README.md) | the [Navette](https://github.com/KristenJestin/navette) work-from-home mode, on both machines: its service always running, a bubble left of the island when the other machine is there (click: start the mode), its mic and stop. Installs its latest release (`poste sys update` moves it, never during a mode). For Navette 0.2.0 and later. |
 # poste
 
 `poste` is my work environment (Arch Linux, Hyprland, Omarchy), in Rust.
@@ -85,6 +84,7 @@ stays installed. `poste sys addons` shows each add-on and its state on this mach
 | Add-on | Plugs in |
 | --- | --- |
 | [`melodie`](addons/melodie/README.md) | the [Mélodie](https://github.com/KristenJestin/melodie) music player: launcher search, quality and heart on the player card. Installs its latest release (`poste sys update` moves it). |
+| [`navette`](addons/navette/README.md) | the [Navette](https://github.com/KristenJestin/navette) work-from-home mode, on both machines: its service always running, a bubble left of the island when the other machine is there (click: start the mode), its mic and stop. Installs its latest release (`poste sys update` moves it, never during a mode). For Navette 0.2.0 and later. |
 | [`vocaline`](addons/vocaline/README.md) | the [Vocaline](https://github.com/KristenJestin/vocaline) dictation: SUPER+A, animated pill at the bottom of the screen, dictated text live under the island. poste downloads and checks its package (`poste sys update` installs it with sudo). |
 | [`voxtype`](addons/voxtype/README.md) | the [voxtype](https://github.com/peteonrails/voxtype) dictation: SUPER+A (tap to toggle, hold to talk), animated pill at the bottom of the screen. Installs `voxtype-bin`, its config, model and service. |
 

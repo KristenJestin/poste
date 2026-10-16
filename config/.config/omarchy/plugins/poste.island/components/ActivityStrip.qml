@@ -108,7 +108,13 @@ Item {
     else if (a.kind === "battery" || a.kind === "device") t = "100 %"
     else if (a.kind === "music") return 96
     else if (a.kind === "obs") return 120
-    else if (a.kind === "remote") return 76 + Math.min(150, String(host.remote ? host.remote.peer : "").length * 7.6)
+    else if (a.kind === "remote") {
+      // The text the bubble shows (ActivityBubble.qml), plus the mic while a mode runs on the desk.
+      var rm = host.remote
+      if (!rm) return 56
+      t = rm.phase === "starting" ? "Starting…" : rm.phase === "stopping" ? "Stopping…" : rm.phase === "incompatible" ? "Update" : rm.peer
+      return 56 + Math.min(150, String(t).length * 7.6) + (rm.role === "desk" && rm.phase === "mode" && rm.mic !== "off" ? 23 : 0)
+    }
     else if (a.conv) t = a.conv.busy ? "Searching the web…" : a.conv.unseen ? "Ready" : a.conv.question
     return 56 + Math.min(150, String(t).length * 7.6)
   }
