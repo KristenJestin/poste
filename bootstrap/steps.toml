@@ -83,9 +83,9 @@ run = [["systemctl", "--user", "disable", "--now", "omarchy-crash-watch.service"
 # Omarchy `strata` package may still be in /usr/bin and come first in the PATH: everything here
 # calls @HOME@/.local/bin/strata explicitly. Strata is a single instance: after an update, its
 # open windows keep the old binary until they are all closed.
-# Installed at its latest release if absent, then kept up to date by its own updater (signed,
-# check_for_updates below) or by `poste sys update`. The upstream
-# desktop file (files/strata/io.github.lgse.Strata.desktop) comes from its repository.
+# Installed at its latest release if absent, then kept up to date by its own updater (signed;
+# check_for_updates = true in settings.toml, a link to poste-data) or by `poste sys update`.
+# The upstream desktop file (files/strata/io.github.lgse.Strata.desktop) comes from its repository.
 [[app]]
 id = "strata"
 title = "Strata (file manager) in ~/.local/bin"
@@ -133,16 +133,6 @@ id = "strata-portal"
 title = "Strata as the file chooser (Open / Save dialogs)"
 check = ["sh", "-c", "grep -qs '^Exec=@HOME@/.local/bin/strata --portal' '@HOME@/.local/share/dbus-1/services/org.freedesktop.impl.portal.desktop.strata.service' && cat \"${XDG_CONFIG_HOME:-@HOME@/.config}\"/xdg-desktop-portal/*portals.conf 2>/dev/null | grep -qE '^org\\.freedesktop\\.impl\\.portal\\.FileChooser=strata(;|$)'"]
 run = [["@HOME@/.local/bin/strata", "--install-portal"]]
-
-# Strata preferences poste wants, set in its settings.toml without touching the rest (Strata
-# writes paths and UUIDs of this machine there): its own updates on. Done only while Strata is
-# closed; a copy of the file goes to ~/.local/state/poste/backup/ first. A file poste did not put
-# in place: an exception decided by the user (AGENTS.md).
-[[user]]
-id = "strata-settings"
-title = "Strata: its own update checks on (settings.toml, Strata closed)"
-check = ["sh", "@BOOTSTRAP@/files/strata/settings.sh", "--check", "check_for_updates=true"]
-run = [["sh", "@BOOTSTRAP@/files/strata/settings.sh", "check_for_updates=true"]]
 
 # Taildrop in Strata's context menu: an external file provider (Strata's docs/file-providers.md)
 # listing the online devices of the tailnet. Real files, not links of config/: Strata refuses a
