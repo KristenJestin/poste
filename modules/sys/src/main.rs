@@ -222,7 +222,38 @@ enum SkipCmd {
     },
 }
 
+/// Omarchy's commands (theme set, templates) need OMARCHY_PATH and its `bin` in PATH, which
+/// only the login shell sets: without them (ssh, a service), a theme is rendered without
+/// Omarchy's own files. Set from the installed Omarchy (package, otherwise the classic clone)
+/// when missing; a value already there is kept.
+fn omarchy_env() {
+    use std::path::PathBuf;
+    let mut roots = vec![PathBuf::from("/usr/share/omarchy")];
+    if let Some(h) = std::env::var_os("HOME") {
+        roots.push(PathBuf::from(h).join(".local/share/omarchy"));
+    }
+    let root = match std::env::var_os("OMARCHY_PATH").filter(|v| !v.is_empty()) {
+        Some(v) => PathBuf::from(v),
+        None => match roots.into_iter().find(|r| r.join("bin").is_dir()) {
+            Some(r) => {
+                std::env::set_var("OMARCHY_PATH", &r);
+                r
+            }
+            None => return,
+        },
+    };
+    let bin = root.join("bin");
+    let path = std::env::var_os("PATH").unwrap_or_default();
+    if bin.is_dir() && !std::env::split_paths(&path).any(|p| p == bin) {
+        let joined = std::env::join_paths(std::env::split_paths(&path).chain([bin]));
+        if let Ok(p) = joined {
+            std::env::set_var("PATH", p);
+        }
+    }
+}
+
 fn main() -> ExitCode {
+    omarchy_env();
     let cli = Cli::parse();
     match run(cli) {
         Ok(code) => code,
