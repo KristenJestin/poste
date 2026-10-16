@@ -111,78 +111,106 @@ fn wanted(only: &[String], id: &str) -> bool {
     only.is_empty() || only.iter().any(|o| o == id)
 }
 
-/// Reads where each app is and where its source is (network, nothing written). Errors are
-/// printed and the app left out.
-fn survey_apps(ctx: &Ctx, steps: &provision::Steps, only: &[String]) -> Vec<Item> {
-    let mut out = Vec::new();
-    for a in steps.app.iter().filter(|a| wanted(only, &a.id)) {
-        let found = apps::releases(a, &ctx.tools).and_then(|rel| {
+/// Where an app is and where its source is (network, nothing written).
+fn survey_app(ctx: &Ctx, a: &apps::App) -> Result<Item, String> {
+    let (rel, target) = apps::releases(a, &ctx.tools)
+        .and_then(|rel| {
             let t = apps::target(a, &rel, &ctx.tools)?;
             Ok((rel, t))
-        });
-        match found {
-            Ok((rel, target)) => {
-                let installed = apps::installed(a, &ctx.sub_cmd(&a.version), &ctx.tools);
-                out.push(Item::App {
-                    standing: apps::standing(installed.as_deref(), &target, &rel),
-                    installed,
-                    target,
-                    app: a.clone(),
-                })
-            }
-            Err(e) => println!("  {:<14} check impossible: {e:#}", a.id),
-        }
-    }
-    out
+        })
+        .map_err(|e| format!("check impossible: {e:#}"))?;
+    let installed = apps::installed(a, &ctx.sub_cmd(&a.version), &ctx.tools);
+    Ok(Item::App {
+        standing: apps::standing(installed.as_deref(), &target, &rel),
+        installed,
+        target,
+        app: a.clone(),
+    })
 }
 
-/// The same for the plugins (`git ls-remote`, nothing written).
-fn survey_plugins(ctx: &Ctx, steps: &provision::Steps, only: &[String]) -> Vec<Item> {
-    let mut out = Vec::new();
-    for p in steps.plugin.iter().filter(|p| wanted(only, &p.id)) {
-        let dir = ctx.plugin_dir(&p.id);
-        let patch = ctx.plugin_patch(p);
-        if !dir.join(".git").exists() {
-            println!(
-                "  {:<14} not installed as a git clone (poste sys setup)",
-                p.id
-            );
-            continue;
-        }
-        match apps::plugin_state(&dir, p.prerelease, &ctx.tools) {
-            Ok(apps::PluginState {
-                head,
-                target: Some((name, commit)),
-                ahead,
-            }) => out.push(Item::Plugin {
-                id: p.id.clone(),
-                at: apps::describe(&dir, &ctx.tools),
-                stale: patch
-                    .as_ref()
-                    .is_some_and(|pa| pa.stale(pa.on(&dir, &ctx.tools).as_ref())),
-                patch,
-                dir,
-                head,
-                name,
-                commit,
-                ahead,
-            }),
-            Ok(_) => println!("  {:<14} no tag nor default branch upstream", p.id),
-            Err(e) => println!("  {:<14} check impossible: {e:#}", p.id),
-        }
+/// The same for a plugin (`git ls-remote`, nothing written).
+fn survey_plugin(ctx: &Ctx, p: &provision::Plugin) -> Result<Item, String> {
+    let dir = ctx.plugin_dir(&p.id);
+    let patch = ctx.plugin_patch(p);
+    if !dir.join(".git").exists() {
+        return Err("not installed as a git clone (poste sys setup)".into());
     }
-    out
+    match apps::plugin_state(&dir, p.prerelease, &ctx.tools) {
+        Ok(apps::PluginState {
+            head,
+            target: Some((name, commit)),
+            ahead,
+        }) => Ok(Item::Plugin {
+            id: p.id.clone(),
+            at: apps::describe(&dir, &ctx.tools),
+            stale: patch
+                .as_ref()
+                .is_some_and(|pa| pa.stale(pa.on(&dir, &ctx.tools).as_ref())),
+            patch,
+            dir,
+            head,
+            name,
+            commit,
+            ahead,
+        }),
+        Ok(_) => Err("no tag nor default branch upstream".into()),
+        Err(e) => Err(format!("check impossible: {e:#}")),
+    }
+}
+
+/// Checks the apps and plugins (all, or the cited ones) at the same time, one thread each (a
+/// few network calls, not a load), and prints each line as soon as it is known. Errors are
+/// printed and the item left out; the items come back in the order of the steps file. The
+/// lines of the items behind only with `behind_too` (`update` lists them after).
+fn survey(ctx: &Ctx, steps: &provision::Steps, only: &[String], behind_too: bool) -> Vec<Item> {
+    let apps: Vec<_> = steps.app.iter().filter(|a| wanted(only, &a.id)).collect();
+    let plugins: Vec<_> = steps
+        .plugin
+        .iter()
+        .filter(|p| wanted(only, &p.id))
+        .collect();
+    let ids: Vec<&str> = apps
+        .iter()
+        .map(|a| a.id.as_str())
+        .chain(plugins.iter().map(|p| p.id.as_str()))
+        .collect();
+    let w = ids.iter().map(|i| i.len()).max().unwrap_or(0);
+    println!("Checking…");
+    let (tx, rx) = std::sync::mpsc::channel();
+    let found: Vec<Option<Item>> = std::thread::scope(|s| {
+        for (n, &a) in apps.iter().enumerate() {
+            let tx = tx.clone();
+            s.spawn(move || {
+                let _ = tx.send((n, survey_app(ctx, a)));
+            });
+        }
+        let first = apps.len();
+        for (n, &p) in plugins.iter().enumerate() {
+            let tx = tx.clone();
+            s.spawn(move || {
+                let _ = tx.send((first + n, survey_plugin(ctx, p)));
+            });
+        }
+        drop(tx);
+        let mut found: Vec<Option<Item>> = (0..ids.len()).map(|_| None).collect();
+        for (n, r) in rx {
+            match r {
+                Ok(i) => {
+                    if behind_too || !i.behind() {
+                        println!("  {:<w$} {}", i.id(), i.line());
+                    }
+                    found[n] = Some(i);
+                }
+                Err(e) => println!("  {:<w$} {e}", ids[n]),
+            }
+        }
+        found
+    });
+    found.into_iter().flatten().collect()
 }
 
 fn width(items: &[Item]) -> usize {
     items.iter().map(|i| i.id().len()).max().unwrap_or(0)
-}
-
-fn print_items(items: &[Item]) {
-    let w = width(items);
-    for i in items {
-        println!("  {:<w$} {}", i.id(), i.line());
-    }
 }
 
 /// `poste sys outdated`: apps and plugins. The system packages are not poste's: never listed
@@ -190,14 +218,8 @@ fn print_items(items: &[Item]) {
 pub fn outdated(env: &Env, repo: &Path) -> Result<()> {
     let ctx = Ctx::new(env, repo);
     let (_, steps, _) = provision::load_wanted(&ctx)?;
-    println!("Apps (GitHub releases)");
-    let items = survey_apps(&ctx, &steps, &[]);
-    print_items(&items);
-    println!("\nOmarchy plugins");
-    let plugins = survey_plugins(&ctx, &steps, &[]);
-    print_items(&plugins);
-    let behind = items.iter().chain(&plugins).filter(|i| i.behind()).count();
-    if behind > 0 {
+    let items = survey(&ctx, &steps, &[], true);
+    if items.iter().any(Item::behind) {
         println!("\nTo update everything: poste sys update (or poste sys update <id>)");
     }
     Ok(())
@@ -249,15 +271,15 @@ pub fn update(
             known.join(", ")
         );
     }
-    let mut items = survey_apps(&ctx, &steps, ids);
-    items.extend(survey_plugins(&ctx, &steps, ids));
-    let (todo, fresh): (Vec<Item>, Vec<Item>) = items.into_iter().partition(|i| i.behind());
-    print_items(&fresh);
+    let todo: Vec<Item> = survey(&ctx, &steps, ids, false)
+        .into_iter()
+        .filter(Item::behind)
+        .collect();
     if todo.is_empty() {
-        println!("Nothing to update.");
+        println!("\nNothing to update.");
         return Ok(0);
     }
-    println!("To update");
+    println!("\nTo update");
     let w = width(&todo);
     for i in &todo {
         println!("  {:<w$} {}", i.id(), i.line());
