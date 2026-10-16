@@ -251,7 +251,7 @@ PanelWindow {
       : window.usageOpen ? 600
       : window.launcherOpen ? 580
       : window.notificationsOpen ? 440
-      : window.controlsOpen ? (controlCenter.tileCount > 5 ? 400 : 360)
+      : window.controlsOpen ? 400
       : window.wifiOpen || window.bluetoothOpen || window.vpnOpen || window.tailscaleOpen ? 400
       : window.audioOpen ? 420
       : window.playerOpen ? 420

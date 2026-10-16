@@ -32,8 +32,7 @@ Item {
     if (name === "performance") return "󰓅"
     return "󰊚"
   }
-  // Short label (control center tile) and full label (OSD).
-  function shortLabel(name) { return name === "power-saver" ? "Saver" : name === "performance" ? "Perf" : "Balanced" }
+  // Its name (control center tile, OSD).
   function label(name) { return name === "power-saver" ? "Power saver" : name === "performance" ? "Performance" : "Balanced" }
   readonly property string glyph: glyphOf(active)
 

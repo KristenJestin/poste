@@ -1,12 +1,15 @@
 import QtQuick
 import Quickshell
+import Quickshell.Bluetooth
+import Quickshell.Networking
+import Quickshell.Services.Pipewire
 import Quickshell.Services.SystemTray
 import Quickshell.Widgets
 import "file:///usr/share/omarchy/shell/plugins/panels/tailscale" as TsPanel
 import "AgentBrand.js" as AgentBrand
 
-// Opened from the clock: a month calendar, shortcuts to Omarchy's own
-// network / bluetooth / audio panels, and the system tray.
+// Opened from the clock: a month calendar, the tiles (connections on the
+// first row, settings on the second), then the apps (Mail and the system tray).
 Item {
   id: cc
   required property var host
@@ -18,11 +21,49 @@ Item {
   implicitHeight: column.implicitHeight
 
   readonly property var locale: Qt.locale("en_GB")
-  // Network / Bluetooth / Audio, plus VPN, Tailscale, Mail, the power profile and Silence when they are there.
-  readonly property int tileCount: 3 + (host.mailAvailable ? 1 : 0) + ((host.vpnAvailable || host.vpnConnected) ? 1 : 0)
-    + (host.tsAvailable ? 1 : 0) + (host.powerProfile.present ? 1 : 0) + (host.dndAvailable ? 1 : 0)
-  readonly property real tileWidth: Math.min(74, Math.floor((width - 8 * (tileCount - 1)) / tileCount))
+  // Tiles sit on a grid of 4 columns, whatever is shown.
+  readonly property real tileWidth: Math.floor((width - 8 * 3) / 4)
   property int monthOffset: 0
+
+  // ---------------------------------------------------------------- tile states
+  // A tile is lit while what it stands for is on; its second line says how.
+  // Network: a connected device, Wi-Fi preferred (same lookup as Omarchy's panel).
+  function findDevice(type) {
+    var devices = Networking.devices ? Networking.devices.values : []
+    var fallback = null
+    for (var i = 0; i < devices.length; i++) {
+      var d = devices[i]
+      if (!d || d.type !== type) continue
+      if (d.connected) return d
+      if (!fallback) fallback = d
+    }
+    return fallback
+  }
+  readonly property var wifiDevice: findDevice(DeviceType.Wifi)
+  readonly property var wiredDevice: findDevice(DeviceType.Wired)
+  readonly property var wifiNetwork: {
+    var list = wifiDevice && wifiDevice.networks ? wifiDevice.networks.values : []
+    for (var i = 0; i < list.length; i++) if (list[i] && list[i].connected) return list[i]
+    return null
+  }
+  readonly property bool netOn: !!wifiNetwork || (!!wiredDevice && wiredDevice.connected)
+  readonly property string netDetail: wifiNetwork ? String(wifiNetwork.name)
+    : wiredDevice && wiredDevice.connected ? "Ethernet"
+    : Networking.backend !== NetworkBackendType.NetworkManager ? "Unavailable"
+    : wifiDevice && !Networking.wifiEnabled ? "Off" : "Not connected"
+  readonly property string netGlyph: wifiNetwork ? "󰤨" : wiredDevice && wiredDevice.connected ? "󰈀" : wifiDevice && !Networking.wifiEnabled ? "󰤮" : "󰤯"
+
+  readonly property var btAdapter: Bluetooth.defaultAdapter
+  readonly property bool btOn: !!btAdapter && btAdapter.enabled
+  readonly property var btConnected: (Bluetooth.devices ? Bluetooth.devices.values : []).filter(function(d) { return d && d.connected })
+  readonly property string btDetail: !btAdapter ? "No adapter" : !btOn ? "Off"
+    : btConnected.length === 1 ? String(btConnected[0].name || "1 device")
+    : btConnected.length > 1 ? btConnected.length + " devices" : "On"
+
+  readonly property var sink: Pipewire.defaultAudioSink
+  PwObjectTracker { objects: cc.sink ? [cc.sink] : [] }
+  readonly property bool soundMuted: !!sink && !!sink.audio && sink.audio.muted
+  readonly property string soundDetail: !sink || !sink.audio ? "No output" : soundMuted ? "Muted" : Math.round(sink.audio.volume * 100) + " %"
 
   // Tray menu shown in the panel (see trayMenuView). Each submenu level keeps its own
   // opener: an entry belongs to its parent's model, so the stack is torn down deepest first.
@@ -101,61 +142,105 @@ Item {
     return list
   }
 
-  component IconButton: Item {
-    id: button
+  // A tile: what it is (glyph and name) and its state (lit, second line).
+  component Tile: Item {
+    id: tile
     property string glyph: ""
     property string label: ""
-    property int badge: 0
+    property string detail: ""
+    property bool lit: false
     property bool tailscaleMark: false   // Tailscale's own mark instead of a glyph
-    property bool markOn: false
-    property bool lit: false             // a mode that is on (Silence): the tile stays lit
     signal activated()
-    width: label ? cc.tileWidth : 28
-    height: label ? 56 : 28
+    width: cc.tileWidth
+    height: 68
     Rectangle {
       anchors.fill: parent
-      radius: button.label ? 14 : 14
-      color: button.lit ? cc.host.withAlpha(cc.host.colorText, mouse.containsMouse ? 0.24 : 0.18)
-        : mouse.containsMouse ? cc.host.withAlpha(cc.host.colorText, 0.1)
-        : button.label ? cc.host.withAlpha(cc.host.colorText, 0.05) : "transparent"
+      radius: 14
+      color: tile.lit ? cc.host.withAlpha(cc.host.colorText, tileMouse.containsMouse ? 0.24 : 0.18)
+        : cc.host.withAlpha(cc.host.colorText, tileMouse.containsMouse ? 0.1 : 0.05)
       Behavior on color { ColorAnimation { duration: 120 } }
     }
     Column {
       anchors.centerIn: parent
-      spacing: 3
-      Glyph {
-        anchors.horizontalCenter: parent.horizontalCenter
-        visible: !button.tailscaleMark
-        width: implicitWidth; height: 22
-        glyph: button.glyph
-        color: cc.host.colorText
-        fontFamily: cc.host.fontFamily
-        pixelSize: button.label ? 19 : 16
-      }
+      width: parent.width - 10
+      spacing: 2
       Item {
         anchors.horizontalCenter: parent.horizontalCenter
-        visible: button.tailscaleMark
         width: 22; height: 22
+        Glyph {
+          anchors.centerIn: parent
+          visible: !tile.tailscaleMark
+          width: implicitWidth; height: 22
+          glyph: tile.glyph
+          color: tile.lit ? cc.host.colorText : cc.host.withAlpha(cc.host.colorText, 0.55)
+          fontFamily: cc.host.fontFamily
+          pixelSize: 19
+        }
         TsPanel.TailscaleIcon {
           anchors.centerIn: parent
+          visible: tile.tailscaleMark
           iconSize: 16
-          color: button.markOn ? cc.host.colorText : cc.host.withAlpha(cc.host.colorText, 0.45)
+          color: tile.lit ? cc.host.colorText : cc.host.withAlpha(cc.host.colorText, 0.55)
         }
       }
       Text {
-        anchors.horizontalCenter: parent.horizontalCenter
-        visible: button.label !== ""
-        text: button.label
-        color: cc.host.withAlpha(cc.host.colorText, 0.7)
+        width: parent.width
+        horizontalAlignment: Text.AlignHCenter
+        text: tile.label
+        color: cc.host.colorText
         font.family: cc.host.uiFont
         font.pixelSize: 11
+        font.weight: Font.DemiBold
+        elide: Text.ElideRight
       }
+      Text {
+        width: parent.width
+        horizontalAlignment: Text.AlignHCenter
+        text: tile.detail
+        color: cc.host.withAlpha(cc.host.colorText, 0.55)
+        font.family: cc.host.uiFont
+        font.pixelSize: 10
+        elide: Text.ElideRight
+      }
+    }
+    MouseArea {
+      id: tileMouse
+      anchors.fill: parent
+      hoverEnabled: true
+      cursorShape: Qt.PointingHandCursor
+      onClicked: tile.activated()
+    }
+  }
+
+  // A small button (calendar arrows, Mail in the apps row).
+  component IconButton: Item {
+    id: button
+    property string glyph: ""
+    property int badge: 0
+    property real size: 28
+    signal activated()
+    width: size
+    height: size
+    Rectangle {
+      anchors.fill: parent
+      radius: size / 2
+      color: mouse.containsMouse ? cc.host.withAlpha(cc.host.colorText, 0.1) : "transparent"
+      Behavior on color { ColorAnimation { duration: 120 } }
+    }
+    Glyph {
+      anchors.centerIn: parent
+      width: implicitWidth; height: 22
+      glyph: button.glyph
+      color: cc.host.colorText
+      fontFamily: cc.host.fontFamily
+      pixelSize: 16
     }
     Rectangle {
       visible: button.badge > 0
       anchors.top: parent.top
       anchors.right: parent.right
-      anchors.margins: 6
+      anchors.topMargin: -3
+      anchors.rightMargin: 0
       height: 15
       width: Math.max(15, badgeText.implicitWidth + 8)
       radius: 7.5
@@ -523,66 +608,75 @@ Item {
 
     Rectangle { width: parent.width; height: 1; color: cc.host.withAlpha(cc.host.colorText, 0.08) }
 
-    // ---------------------------------------------------------------- Omarchy panels
-    Row {
-      anchors.horizontalCenter: parent.horizontalCenter
+    // ---------------------------------------------------------------- tiles
+    Column {
       spacing: 8
-      IconButton {
-        glyph: "󰤨"; label: "Network"
-        // Grows the Wi-Fi module inside the island; its 'Advanced settings…'
-        // still opens Omarchy's panel.
-        onActivated: cc.moduleRequested("wifi")
+      // Connections: a click opens their module inside the island.
+      Row {
+        spacing: 8
+        Tile {
+          // The Wi-Fi module's 'Advanced settings…' still opens Omarchy's panel.
+          glyph: cc.netGlyph; label: "Network"; detail: cc.netDetail; lit: cc.netOn
+          onActivated: cc.moduleRequested("wifi")
+        }
+        Tile {
+          glyph: cc.btOn ? "󰂯" : "󰂲"; label: "Bluetooth"; detail: cc.btDetail; lit: cc.btOn
+          onActivated: cc.moduleRequested("bluetooth")
+        }
+        Tile {
+          visible: cc.host.vpnAvailable || cc.host.vpnConnected
+          glyph: cc.host.vpnConnected ? "󰌾" : "󰦝"; label: "VPN"
+          detail: cc.host.vpnConnected ? "Connected" : "Off"; lit: cc.host.vpnConnected
+          onActivated: cc.moduleRequested("vpn")
+        }
+        Tile {
+          visible: cc.host.tsAvailable
+          tailscaleMark: true; label: "Tailscale"
+          detail: cc.host.tsConnected ? "Connected" : "Off"; lit: cc.host.tsConnected
+          onActivated: cc.moduleRequested("tailscale")
+        }
       }
-      IconButton {
-        glyph: "󰂯"; label: "Bluetooth"
-        onActivated: cc.moduleRequested("bluetooth")
-      }
-      IconButton {
-        glyph: "󰕾"; label: "Sound"
-        onActivated: cc.moduleRequested("audio")
-      }
-      IconButton {
-        visible: cc.host.vpnAvailable || cc.host.vpnConnected
-        glyph: cc.host.vpnConnected ? "󰌾" : "󰦝"; label: "VPN"
-        onActivated: cc.moduleRequested("vpn")
-      }
-      IconButton {
-        visible: cc.host.tsAvailable
-        tailscaleMark: true
-        markOn: cc.host.tsConnected
-        label: "Tailscale"
-        onActivated: cc.moduleRequested("tailscale")
-      }
-      // Power profile (PowerProfileState.qml): the current profile's icon and name;
-      // a click goes to the next one (Saver, Balanced, Performance), remembered for the current source.
-      IconButton {
-        visible: cc.host.powerProfile.present
-        glyph: cc.host.powerProfile.glyph
-        label: cc.host.powerProfile.shortLabel(cc.host.powerProfile.active)
-        onActivated: cc.host.powerProfile.cycle()
-      }
-      // Do not disturb (Island.qml): lit while notifications are silenced; a click switches it.
-      IconButton {
-        visible: cc.host.dndAvailable
-        glyph: cc.host.dndGlyph
-        label: "Silence"
-        lit: cc.host.dnd
-        onActivated: cc.host.toggleDnd()
-      }
-      IconButton {
-        visible: cc.host.mailAvailable
-        glyph: "󰇮"; label: "Mail"
-        badge: cc.host.mailUnread
-        onActivated: { cc.closeRequested(); cc.host.openMail() }
+
+      // Settings: Sound opens its module, the other two switch in place.
+      Row {
+        spacing: 8
+        Tile {
+          glyph: cc.soundMuted ? "󰝟" : "󰕾"; label: "Sound"; detail: cc.soundDetail; lit: !!cc.sink && !!cc.sink.audio && !cc.soundMuted
+          onActivated: cc.moduleRequested("audio")
+        }
+        // Power profile (PowerProfileState.qml): a click goes to the next one (Saver,
+        // Balanced, Performance), remembered for the current source. A profile is never
+        // "off", so the tile is never lit.
+        Tile {
+          visible: cc.host.powerProfile.present
+          glyph: cc.host.powerProfile.glyph; label: "Power"
+          detail: cc.host.powerProfile.label(cc.host.powerProfile.active)
+          onActivated: cc.host.powerProfile.cycle()
+        }
+        // Do not disturb (Island.qml): lit while notifications are silenced.
+        Tile {
+          visible: cc.host.dndAvailable
+          glyph: cc.host.dndGlyph; label: "Silence"
+          detail: cc.host.dnd ? "On" : "Off"; lit: cc.host.dnd
+          onActivated: cc.host.toggleDnd()
+        }
       }
     }
 
-    // ---------------------------------------------------------------- tray
+    // ---------------------------------------------------------------- apps
+    // Mail (unread count as a badge), then the system tray.
     Flow {
       id: tray
       width: parent.width
       spacing: 6
-      visible: trayRepeater.count > 0
+      visible: cc.host.mailAvailable || trayRepeater.count > 0
+      IconButton {
+        visible: cc.host.mailAvailable
+        size: 32
+        glyph: "󰇮"
+        badge: cc.host.mailUnread
+        onActivated: { cc.closeRequested(); cc.host.openMail() }
+      }
       Repeater {
         id: trayRepeater
         model: SystemTray.items.values.filter(function(item) { return item.status !== Status.Passive })
