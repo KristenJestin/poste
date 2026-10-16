@@ -1,0 +1,6 @@
+# Strata's settings when poste puts it on a machine that has none: the poste theme, and no update
+# checks of its own (`poste sys update` moves it). Strata fills in the missing keys with its
+# defaults and rewrites this file when a setting changes; poste never touches it again.
+mode = "theme"
+theme = "omarchy-poste"
+check_for_updates = false

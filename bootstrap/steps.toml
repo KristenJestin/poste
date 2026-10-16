@@ -84,7 +84,7 @@ run = [["systemctl", "--user", "disable", "--now", "omarchy-crash-watch.service"
 # calls @HOME@/.local/bin/strata explicitly. Strata is a single instance: after an update, its
 # open windows keep the old binary until they are all closed.
 # Installed at its latest release if absent, then moved by `poste sys update` only: its own
-# update checks are off (check_for_updates = false in settings.toml, a link to poste-data).
+# update checks are off in the default settings (step strata-settings).
 # The upstream desktop file (files/strata/io.github.lgse.Strata.desktop) comes from its repository.
 [[app]]
 id = "strata"
@@ -180,8 +180,8 @@ run = [["omarchy", "theme", "set", "poste-theme"]]
 
 # Strata's theme: config/.config/omarchy/themed/strata.toml.tpl, rendered by Omarchy into the
 # current theme at each theme change (the accent in grey), linked as a custom theme of Strata;
-# settings.toml (poste-data) selects it (`mode = "theme"`, `theme = "omarchy-poste"`). Strata
-# reads it at start: restart Strata after a theme change.
+# the default settings.toml selects it (step strata-settings). Strata reads it at start: restart
+# Strata after a theme change.
 # strata.toml missing (the template was added after the theme was set): the current theme is
 # applied again, like a theme change.
 [[user]]
@@ -198,6 +198,17 @@ title = "Strata: the poste theme among its custom themes (link to the rendered s
 requires = "omarchy"
 check = ["sh", "-c", "[ \"$(readlink '@HOME@/.config/strata/themes/omarchy-poste.toml')\" = '@HOME@/.local/state/omarchy/current/theme/strata.toml' ]"]
 run = [["mkdir", "-p", "@HOME@/.config/strata/themes"], ["ln", "-s", "@HOME@/.local/state/omarchy/current/theme/strata.toml", "@HOME@/.config/strata/themes/omarchy-poste.toml"]]
+
+# Strata's settings by default (files/strata/settings.toml: the poste theme, its own update
+# checks off), only when it has none: from then on Strata owns the file and poste never touches it
+# again, so settings Strata wrote before (opened before the first setup) stay. The config links
+# come first: a settings.toml linked from the data repository is kept (one added later finds this
+# file and is a conflict to decide). Without Omarchy, Strata falls back from the missing theme.
+[[user]]
+id = "strata-settings"
+title = "Strata: default settings (poste theme, its own update checks off) if it has none"
+check = ["sh", "-c", "[ -e '@HOME@/.config/strata/settings.toml' ] || [ -L '@HOME@/.config/strata/settings.toml' ]"]
+run = [["mkdir", "-p", "@HOME@/.config/strata"], ["cp", "--update=none","@BOOTSTRAP@/files/strata/settings.toml", "@HOME@/.config/strata/settings.toml"]]
 
 # Zen in the theme's colors: Omarchy renders config/.config/omarchy/themed/zen.css.tpl into the
 # current theme at each theme change; the default profile's chrome/userChrome.css is a link to

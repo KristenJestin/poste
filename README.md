@@ -285,8 +285,12 @@ poste's file manager is [Strata](https://github.com/lgse/strata), its upstream r
 `poste sys setup` puts it in place, all in `~`, without root (steps in `bootstrap/steps.toml`):
 
 - its latest release in `~/.local/bin/strata` (`[[app]]` step: archive checked against the sha256
-  GitHub publishes before extracting); `poste sys update strata` moves it, its own update checks
-  are off (`check_for_updates = false` in its `settings.toml`, a link to poste-data);
+  GitHub publishes before extracting); `poste sys update strata` moves it;
+- its settings by default, only when it has none (`bootstrap/files/strata/settings.toml`): the
+  poste theme and its own update checks off (`check_for_updates = false`). Strata then owns the
+  file (it rewrites it when a setting changes) and poste never touches it again: settings Strata
+  wrote before the first setup stay as they are. A `settings.toml` of the data repository, linked
+  first, is kept;
 - its theme, "Omarchy (poste)": `config/.config/omarchy/themed/strata.toml.tpl`, rendered by Omarchy
   at each theme change, linked into `~/.config/strata/themes/` and selected in `settings.toml`. The
   current theme's colors with the accent in grey: Strata has one accent for hover, icons and the
