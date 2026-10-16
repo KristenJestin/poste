@@ -281,21 +281,23 @@ poste-data/
 
 ## The file manager: Strata
 
-poste's file manager is [Strata](https://github.com/lgse/strata), in a patched build
-([KristenJestin/strata](https://github.com/KristenJestin/strata), branch `local`: the accent only
-on the selection, no upstream update offers, action submenus filled by a `choices` script).
+poste's file manager is [Strata](https://github.com/lgse/strata), its upstream release binary (a
+patched build, [KristenJestin/strata-local](https://github.com/KristenJestin/strata-local), is kept on
+GitHub but no longer installed).
 `poste sys setup` puts it in place, all in `~`, without root (steps in `bootstrap/steps.toml`):
 
 - its latest release in `~/.local/bin/strata` (`[[app]]` step: archive checked against the sha256
-  GitHub publishes before extracting; `poste sys update strata` moves it);
+  GitHub publishes before extracting); then its own signed updates, or `poste sys update strata`;
+- the preferences poste wants (`check_for_updates = true`), set in its `settings.toml` without
+  touching the rest, only while Strata is closed (`files/strata/settings.sh`, a copy first);
 - its desktop entry in `~/.local/share/applications/`, pointing to that binary;
 - the default for folders (`xdg-mime … inode/directory`), the D-Bus `org.freedesktop.FileManager1`
   service ('Show in folder' of browsers and GTK apps) and the file chooser of the portal (Open and
   Save dialogs, through `strata --install-portal`; `--uninstall-portal` goes back);
-- the 'Send with Taildrop' action of its context menu (`~/.config/strata/actions/taildrop/`): a
-  submenu of the online devices of the tailnet, `tailscale file cp` of the selected files. Real files,
-  not links (Strata refuses linked actions). Needs the user to be a Tailscale operator
-  (`sudo tailscale set --operator=$USER`, once).
+- Taildrop in its context menu, an external file provider (`~/.config/strata/providers/taildrop/`):
+  'Send to <device>' with one device online, a 'Send with Taildrop' submenu with several; the
+  send runs detached and ends in a notification. Real files, not links (Strata refuses them).
+  Needs the user to be a Tailscale operator (`sudo tailscale set --operator=$USER`, once).
 
 Its libraries are in `bootstrap/packages.toml`. SUPER+E opens it on the active terminal's folder.
 poste always calls `~/.local/bin/strata` by its full path: an old Omarchy `strata` package may

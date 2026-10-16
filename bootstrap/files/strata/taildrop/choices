@@ -1,4 +1,0 @@
-#!/usr/bin/env bash
-# One line per online Taildrop target (its name): the submenu of the action.
-# Columns of `tailscale file cp --targets`: IP, name, then "offline" when it is.
-tailscale file cp --targets 2>/dev/null | awk -F'\t' '$3 !~ /offline/ { print $2 }'

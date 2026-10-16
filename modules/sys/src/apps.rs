@@ -31,6 +31,7 @@ pub struct App {
     #[serde(default)]
     pub prerelease: bool,
     pub package: Option<String>,
+    /// Path of the program in the archive; `{version}` is the release's version.
     pub bin: Option<String>,
     pub script: Option<String>,
     /// Command whose output gives the installed version (last word of its first line); not
@@ -578,11 +579,12 @@ pub fn install(
         }
         match how {
             Install::Bin(b) => {
-                let src = x.join(b);
+                let b = b.replace("{version}", &t.version);
+                let src = x.join(&b);
                 if !src.is_file() {
                     bail!("{b}: not in the archive");
                 }
-                let name = Path::new(b).file_name().context("empty bin")?;
+                let name = Path::new(&b).file_name().context("empty bin")?;
                 std::fs::create_dir_all(bin_dir)?;
                 let new = bin_dir.join(format!(".{}.new", name.to_string_lossy()));
                 std::fs::copy(&src, &new)?;
@@ -1144,6 +1146,41 @@ mod tests {
         // Busy: nothing replaced.
         let busy = vec!["true".to_string()];
         assert!(install(&app, None, &busy, &bin, &d.path().join("cache"), &tools).is_err());
+    }
+
+    #[test]
+    fn bin_in_a_versioned_folder() {
+        // Upstream Strata: strata-<version>-<target>.tar.gz holds strata-<version>-<target>/strata.
+        let d = tempfile::tempdir().unwrap();
+        let top = "strata-1.2.0-x86_64-unknown-linux-gnu";
+        let src = d.path().join("src").join(top);
+        fs::create_dir_all(&src).unwrap();
+        fs::write(src.join("strata"), "#!/bin/sh\necho strata 1.2.0\n").unwrap();
+        let a = d.path().join(format!("{top}.tar.gz"));
+        let st = Command::new("tar")
+            .arg("-czf")
+            .arg(&a)
+            .arg("-C")
+            .arg(d.path().join("src"))
+            .arg(top)
+            .status()
+            .unwrap();
+        assert!(st.success());
+        let sum = sha256_file(&a).unwrap();
+        let tools = Tools {
+            gh: fake_gh(d.path(), "v1.2.0", &a, &format!("sha256:{sum}")),
+            ..Default::default()
+        };
+        let bin = d.path().join("bin");
+        let app = app(&format!(
+            "id=\"strata\"\ntitle=\"t\"\ngithub=\"o/strata\"\nasset=\"strata-{{version}}-x86_64-unknown-linux-gnu.tar.gz\"\nbin=\"strata-{{version}}-x86_64-unknown-linux-gnu/strata\"\nversion=[\"sh\", \"{}\", \"--version\"]",
+            bin.join("strata").display()
+        ));
+        install(&app, None, &[], &bin, &d.path().join("cache"), &tools).unwrap();
+        assert_eq!(
+            installed(&app, &app.version, &tools).as_deref(),
+            Some("1.2.0")
+        );
     }
 
     #[test]

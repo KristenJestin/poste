@@ -1,0 +1,6 @@
+{
+  "version": 1,
+  "id": "taildrop",
+  "name": "Taildrop",
+  "command": ["@HOME@/.config/strata/providers/taildrop/provider.sh"]
+}

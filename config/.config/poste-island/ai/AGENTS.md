@@ -37,7 +37,7 @@ Background player (MPRIS 'Mélodie'), also shown by the island. Playback command
 
 ## Files
 - File manager: Strata, always by its full path (`~/.local/bin/strata <folder>`; a `strata` in `/usr/bin` may be an old package). SUPER+E opens it on the active terminal's folder. A single instance: never kill it, never start it to test something.
-- Its context menu has 'Send with Taildrop' (files to a device of the tailnet), from `~/.config/strata/actions/taildrop/`.
+- Its context menu sends files to a device of the tailnet with Taildrop ('Send to <device>', or a 'Send with Taildrop' submenu), from the provider in `~/.config/strata/providers/taildrop/`.
 
 ## AI agent quotas
 - `poste usage`: Claude Code quotas (5 h session, week), as a percentage, with the reset time. `poste usage codex`, `poste usage --all`, `--refresh` to redo the reading, `--json` for the raw data.
