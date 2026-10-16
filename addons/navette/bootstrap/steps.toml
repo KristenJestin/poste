@@ -1,0 +1,49 @@
+# Steps of the navette add-on, merged with bootstrap/steps.toml when the add-on is chosen.
+# Written for Navette 0.2.0 (`install.sh`, `navette run`, `navette.service`, `events.sock`):
+# do not choose the add-on on a machine before that version is released.
+
+# Installed at its latest release if absent, then moved by `poste sys update`. The archive's
+# install.sh puts navette in ~/.local/bin, its icon and its user units, then `daemon-reload`; it
+# enables and starts nothing. Never replaced while a mode starts, runs or stops (`busy`): that
+# would cut the session at the restart below; run the update again later.
+[[app]]
+id = "navette"
+title = "Navette (work-from-home mode) in ~/.local/bin"
+github = "KristenJestin/navette"
+asset = "navette-{version}-linux-x86_64.tar.gz"
+script = "navette-{version}-linux-x86_64/install.sh"
+version = ["@HOME@/.local/bin/navette", "--version"]
+busy = ["sh", "-c", "\"@HOME@/.local/bin/navette\" watch --json --once 2>/dev/null | grep -qE '\"state\": *\"(starting|mode|stopping)\"'"]
+
+# One unit, the same on both machines: `navette run --audio` reads the role of the pairing and
+# runs `serve` (desk) or `agent` (remote). poste never decides when it runs: away from the
+# desk's network, the agent sleeps (`away`). Not paired yet: it exits without looping.
+[[user]]
+id = "navette-enable"
+title = "Navette: service enabled and started"
+requires = "navette"
+check = ["systemctl", "--user", "is-enabled", "--quiet", "navette.service"]
+run = [["systemctl", "--user", "daemon-reload"], ["systemctl", "--user", "enable", "--now", "navette.service"]]
+
+# After an update, the running service still has the old binary: restarted (never during a
+# mode, see `busy`). Both machines must run the same minor version: update them together.
+[[user]]
+id = "navette-restart"
+title = "Navette: service restarted on the new version"
+requires = "navette"
+trigger = ["navette"]
+run = [["systemctl", "--user", "try-restart", "navette.service"]]
+
+# Pairing, once, by hand: the desk shows a PIN that the remote asks for. The service exits
+# while there is no pairing, so it is restarted afterwards. Details: addons/navette/README.md.
+[[manual]]
+id = "navette-pair"
+title = "Navette: pair the two machines (navette pair), then systemctl --user restart navette"
+check = ["test", "-f", "@HOME@/.config/navette/paired.conf"]
+
+# The desk only: its firewall lets the remote reach the pairing port. The rule holds the
+# machines' addresses: printed from the README, typed with sudo, never in this repository.
+# On the remote: `poste sys skip add navette-firewall`.
+[[manual]]
+id = "navette-firewall"
+title = "Navette, desk only: ufw rule for the remote (addons/navette/README.md), then poste sys done navette-firewall"

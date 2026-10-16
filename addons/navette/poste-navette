@@ -1,0 +1,3 @@
+#!/bin/sh
+# Add-on navette of poste: passes the command as is to Navette.
+exec navette "$@"

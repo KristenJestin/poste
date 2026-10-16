@@ -1,0 +1,8 @@
+{
+  "slots": [
+    {
+      "slot": "remote",
+      "file": "NavetteState.qml"
+    }
+  ]
+}

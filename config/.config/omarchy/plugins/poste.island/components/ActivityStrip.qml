@@ -36,6 +36,10 @@ Item {
     var out = []
     // OBS: recording or streaming in progress, always first.
     if (host.obs && host.obs.active) out.push({ kind: "obs", key: "obs", rank: -2, order: 0 })
+    // The other machine of a work-from-home mode (slot "remote"): a session first, before the
+    // music; only there to drive, after the music that plays.
+    var rm = host.remote
+    if (rm) out.push({ kind: "remote", key: "remote", rank: rm.phase === "linked" ? 5.5 : -1, order: 0 })
     // Music: during playback, and 30 s after a pause (then it leaves).
     var p = host.player
     if (p && String(p.trackTitle || "") !== "" && (host.mediaPlaying || musicLinger))
@@ -76,6 +80,15 @@ Item {
     }
   }
 
+  // Click on the remote bubble: starts the mode at once when the desk has only one to start;
+  // otherwise (several modes, a session running) the card opens.
+  function quickStart() {
+    var rm = host.remote
+    if (!rm || rm.role !== "desk" || rm.phase !== "linked" || rm.modes.length > 1) return false
+    rm.start(rm.modes.length === 1 ? rm.modes[0].name : "")
+    return true
+  }
+
   function findActivity(key) {
     for (var i = 0; i < activities.length; i++) if (activities[i].key === key) return activities[i]
     return null
@@ -95,6 +108,7 @@ Item {
     else if (a.kind === "battery" || a.kind === "device") t = "100 %"
     else if (a.kind === "music") return 96
     else if (a.kind === "obs") return 120
+    else if (a.kind === "remote") return 76 + Math.min(150, String(host.remote ? host.remote.peer : "").length * 7.6)
     else if (a.conv) t = a.conv.busy ? "Searching the web…" : a.conv.unseen ? "Ready" : a.conv.question
     return 56 + Math.min(150, String(t).length * 7.6)
   }
@@ -232,6 +246,8 @@ Item {
             if (!a || slot.leaving) return
             if (a.kind === "ai") { strip.close(); strip.openConversation(a.conv) }
             else if (a.kind === "music") { strip.close(); strip.openPlayer() }
+            // The other machine is there with a single mode: the click starts it.
+            else if (a.kind === "remote" && strip.quickStart()) strip.close()
             else if (a.kind === "timer" && a.timer.done) strip.host.cancelTimer(a.timer.id)
             else strip.toggle(slot.key, slot.x + width / 2)
           }
@@ -343,6 +359,7 @@ Item {
             elide: Text.ElideMiddle
             text: moreRow.modelData.kind === "timer" ? (moreRow.modelData.timer.label || "Timer") + "  ·  " + (moreRow.modelData.timer.done ? "Done" : strip.host.formatLeft(strip.host.timerLeft(moreRow.modelData.timer)))
               : moreRow.modelData.kind === "ai" ? moreRow.modelData.conv.question
+              : moreRow.modelData.kind === "remote" ? (strip.host.remote ? strip.host.remote.peer : "")
               : moreRow.modelData.kind === "music" ? (strip.host.player ? String(strip.host.player.trackTitle || "Music") : "Music")
               : "Battery"
             color: strip.host.colorText

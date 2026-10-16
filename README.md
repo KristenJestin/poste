@@ -1,3 +1,4 @@
+| [`navette`](addons/navette/README.md) | the [Navette](https://github.com/KristenJestin/navette) work-from-home mode, on both machines: its service always running, a bubble left of the island when the other machine is there (click: start the mode), its mic and stop. Installs its latest release (`poste sys update` moves it, never during a mode). For Navette 0.2.0 and later. |
 # poste
 
 `poste` is my work environment (Arch Linux, Hyprland, Omarchy), in Rust.
@@ -108,9 +109,12 @@ knowing any module; module absent, no trace):
     window up or opens it), `launcher` (launcher extension the pill opens instead, for a player
     without a window). Example: `addons/melodie/island/island.json`.
     Slots loaded by the island: `capture` (recording source
-    with the same interface as `ObsState.qml`, for the capture pill) and `dictation` (dictation
+    with the same interface as `ObsState.qml`, for the capture pill), `dictation` (dictation
     source: `listening`, `transcribing`, `level`, `finals`, `partial`, for the dictation pill
-    at the bottom of the screen and the text under the island).
+    at the bottom of the screen and the text under the island) and `remote` (a link to another
+    machine whose screens this desk drives: `shown`, `role`, `phase`, `peer`, `mode`, `modes`,
+    `mic`…, `start(name)`, `stop()`, `toggleMic()`, for the bubble left of the island; contract
+    in `Island.qml`).
   - Discovered at startup, then reloaded live (inotifywait on the modules folder).
 - `hypr/*.lua`: pieces of Hyprland config. `hyprland.lua` loads each
   `modules/*/hypr/*.lua` (`loadfile` + `pcall`: an error is isolated and notified, the rest of the

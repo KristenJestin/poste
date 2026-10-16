@@ -646,7 +646,8 @@ PanelWindow {
 
   // Ongoing activities (ActivityStrip.qml), on either side of the island: on the
   // right what works in the background (timers, AI), on the left what lasts
-  // (music, battery). They fade when the island shows a view.
+  // (music, battery, the other machine of a work-from-home mode). They fade when the island
+  // shows a view.
   ActivityStrip {
     id: activities
     host: window.host
@@ -663,7 +664,7 @@ PanelWindow {
   ActivityStrip {
     id: ambient
     host: window.host
-    kinds: ["music", "battery", "device"]
+    kinds: ["remote", "music", "battery", "device"]
     side: "left"
     x: (capture.visible ? capture.x : island.x) - width - 8
     y: island.y

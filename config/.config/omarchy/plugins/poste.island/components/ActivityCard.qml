@@ -7,7 +7,8 @@ import Quickshell.Widgets
 //   AI: the question, where it stands (or the start of the answer), Open and
 //     stop / unpin;
 //   battery: the gauge, the percentage and the estimated time;
-//   music: cover, title, artist, progress, previous / play / next.
+//   music: cover, title, artist, progress, previous / play / next;
+//   remote: the other machine, what it is doing, the modes to start, or the mic and stop.
 Rectangle {
   id: card
   required property var host
@@ -19,6 +20,7 @@ Rectangle {
   readonly property var battery: host.battery
   readonly property var device: activity ? activity.device || null : null
   readonly property var obs: host.obs
+  readonly property var remote: kind === "remote" ? host.remote : null
   // Source of the 'battery' block: the laptop's battery or a device.
   readonly property var batSrc: kind === "device" && device
     ? { percent: device.percent, charging: device.charging, color: device.color, glyph: device.glyph, label: device.name }
@@ -30,7 +32,7 @@ Rectangle {
 
   width: kind === "ai" ? 360 : kind === "music" ? 360 : kind === "obs" ? 330 : 320
   // Music without a known duration (YouTube…): no progress bar, shorter card.
-  height: kind === "obs" ? 132 : kind === "timer" ? 132 : kind === "battery" || kind === "device" ? 64 : kind === "music" ? (musicCard.length > 0 ? 132 : 100) : aiCol.implicitHeight + 28
+  height: kind === "remote" ? remoteCol.implicitHeight + 36 : kind === "obs" ? 132 : kind === "timer" ? 132 : kind === "battery" || kind === "device" ? 64 : kind === "music" ? (musicCard.length > 0 ? 132 : 100) : aiCol.implicitHeight + 28
   radius: kind === "battery" || kind === "device" ? height / 2 : 28
   color: host.colorIsland
   border.width: kind === "timer" ? 0 : 1
@@ -306,6 +308,82 @@ Rectangle {
       font.pixelSize: 11
       font.weight: Font.DemiBold
       MouseArea { id: replayMouse; anchors.fill: parent; anchors.margins: -6; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: card.obs.request("SaveReplayBuffer") }
+    }
+  }
+
+  // ================================================ remote
+  // The other machine of a work-from-home mode (slot 'remote'): on the desk, its modes to start,
+  // then, while one runs, where the mic goes and stop; on the machine driven, what drives it.
+  Column {
+    id: remoteCol
+    visible: card.kind === "remote"
+    anchors.centerIn: parent
+    width: parent.width - 40
+    spacing: 4
+    readonly property var rm: card.remote
+    readonly property bool desk: !!rm && rm.role === "desk"
+    Text {
+      anchors.horizontalCenter: parent.horizontalCenter
+      width: Math.min(implicitWidth, parent.width)
+      elide: Text.ElideRight
+      text: {
+        var rm = remoteCol.rm
+        if (!rm) return ""
+        if (rm.phase === "starting") return "Starting…"
+        if (rm.phase === "stopping") return "Stopping…"
+        if (rm.phase === "incompatible") return "Other version" + (rm.peerVersion ? " (" + rm.peerVersion + ")" : "") + ": update both"
+        if (rm.phase === "mode") return remoteCol.desk
+          ? (rm.mode ? rm.mode + "  ·  " : "") + rm.monitors.join(", ")
+          : "Driven from"
+        return "Here"
+      }
+      color: remoteCol.rm && remoteCol.rm.phase === "incompatible" ? "#ff9f0a" : card.host.colorMuted
+      font.family: card.host.uiFont
+      font.pixelSize: 12
+      font.weight: Font.DemiBold
+    }
+    Text {
+      anchors.horizontalCenter: parent.horizontalCenter
+      width: Math.min(implicitWidth, parent.width)
+      elide: Text.ElideRight
+      text: remoteCol.rm ? remoteCol.rm.peer : ""
+      color: card.host.colorText
+      font.family: card.host.uiFont
+      font.pixelSize: 30
+      font.weight: Font.Bold
+    }
+    Item { width: 1; height: 6; visible: remoteActions.visible }
+    Flow {
+      id: remoteActions
+      anchors.horizontalCenter: parent.horizontalCenter
+      width: Math.min(parent.width, implicitWidth)
+      spacing: 8
+      visible: remoteCol.desk && (remoteCol.rm.phase === "linked" || remoteCol.rm.phase === "mode")
+      // There: one chip per mode of mode.conf (the default mode when none is listed).
+      Repeater {
+        model: remoteCol.desk && remoteCol.rm.phase === "linked"
+          ? (remoteCol.rm.modes.length ? remoteCol.rm.modes : [{ name: "" }]) : []
+        delegate: Chip {
+          required property var modelData
+          required property int index
+          label: modelData.name ? "Start " + modelData.name : "Start"
+          accent: index === 0
+          onActivated: { if (card.remote) card.remote.start(modelData.name); card.done() }
+        }
+      }
+      // Running: the mic, then stop.
+      Chip {
+        visible: remoteCol.desk && remoteCol.rm.phase === "mode"
+        label: !remoteCol.rm ? "" : remoteCol.rm.mic === "remote" ? "Mic to " + remoteCol.rm.peer
+          : remoteCol.rm.mic === "failed" ? "Mic failed" : "Mic here"
+        accent: !!remoteCol.rm && remoteCol.rm.mic === "remote"
+        onActivated: if (card.remote) card.remote.toggleMic()
+      }
+      Chip {
+        visible: remoteCol.desk && remoteCol.rm.phase === "mode"
+        label: "Stop"
+        onActivated: { if (card.remote) card.remote.stop(); card.done() }
+      }
     }
   }
 

@@ -1,0 +1,6 @@
+name = "navette"
+requires = "navette"
+description = "Plugs the Navette work-from-home mode into the desktop: a bubble when the other machine is there, its mode and mic"
+commands = [
+  { name = "<command>", description = "any Navette command, passed as is (see navette --help)" },
+]

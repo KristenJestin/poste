@@ -735,6 +735,39 @@ Item {
     return list.length > 0 ? list[0] : obsState
   }
 
+  // 'remote' slot: a link to another machine whose screens this desk can drive (a work-from-home
+  // mode). Contract of the loaded element: read properties `shown` (something to show: the other
+  // machine is there, or a session runs), `role` (desk, remote), `phase` (linked, starting, mode,
+  // stopping, incompatible…), `peer` (the other machine's label), `peerVersion`, `mode`,
+  // `monitors`, `modes` ([{ name, monitors }], on the desk), `mic` (desk, remote, failed, off);
+  // functions `start(name)`, `stop()`, `toggleMic()`. The bubble, left of the island, follows the
+  // first one that has something to show.
+  property var remoteItems: []
+  function collectRemotes() {
+    var list = []
+    for (var i = 0; i < remoteLoaders.count; i++) {
+      var ld = remoteLoaders.itemAt(i)
+      if (ld && ld.item) list.push(ld.item)
+    }
+    remoteItems = list
+  }
+  Repeater {
+    id: remoteLoaders
+    model: moduleRegistry.slots["remote"] || []
+    delegate: Loader {
+      required property string modelData
+      source: modelData
+      onLoaded: root.collectRemotes()
+    }
+    onItemAdded: Qt.callLater(root.collectRemotes)
+    onItemRemoved: Qt.callLater(root.collectRemotes)
+  }
+  readonly property var remote: {
+    var list = remoteItems
+    for (var i = 0; i < list.length; i++) if (list[i].shown) return list[i]
+    return null
+  }
+
   // Batteries of wireless devices (keyboard, mouse, headset): DevicesState.qml.
   DevicesState { id: devicesState }
   readonly property var devices: devicesState

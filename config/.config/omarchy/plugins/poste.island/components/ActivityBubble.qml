@@ -1,7 +1,7 @@
 import QtQuick
 import Quickshell.Widgets
 
-// An island activity (timer, AI conversation, battery, music,
+// An island activity (timer, AI conversation, battery, music, the other machine,
 // dictation) as a bubble, next
 // to the island: 'compact' = capsule, one piece of info on the left and one on the right
 // (ring and time left); 'minimal' = a circle (when several
@@ -20,6 +20,8 @@ Rectangle {
   readonly property var battery: host.battery
   readonly property var device: activity.device || null
   readonly property var obs: host.obs
+  readonly property var remote: kind === "remote" ? host.remote : null
+  readonly property bool remoteBusy: !!remote && (remote.phase === "starting" || remote.phase === "stopping")
 
   // ------------------------------------------------ state of the activity
   readonly property real timerLeft: timer ? host.timerLeft(timer) : 0
@@ -29,11 +31,13 @@ Rectangle {
   readonly property color tint: kind === "battery" ? battery.color
     : kind === "device" ? device.color
     : kind === "obs" ? (obs.paused ? "#ffd60a" : "#ff453a")
+    : kind === "remote" ? (!remote ? host.colorText : remote.phase === "incompatible" ? "#ff9f0a" : remote.phase === "mode" ? host.colorAccent : host.colorText)
     : kind === "music" ? host.mediaTint
     : kind === "timer" ? (timer.paused ? host.colorMuted : host.colorAccent)
     : (aiReady || (conv && conv.busy) ? host.colorAccent : host.colorText)
   readonly property string trailing: {
     if (kind === "music") return ""
+    if (kind === "remote") return !remote ? "" : remote.phase === "starting" ? "Starting…" : remote.phase === "stopping" ? "Stopping…" : remote.phase === "incompatible" ? "Update" : remote.peer
     if (kind === "timer") return timer.done ? "Done" : host.formatLeft(timerLeft)
     if (kind === "battery") return Math.round(battery.percent * 100) + " %"
     if (kind === "device") return Math.round(device.percent * 100) + " %"
@@ -138,6 +142,23 @@ Rectangle {
       font.family: bubble.compact ? bubble.host.fontFamily : bubble.host.uiFont
       font.pixelSize: bubble.compact ? 17 : 8
       font.weight: Font.Bold
+    }
+    // The other machine: a screen, breathing while a mode starts or stops.
+    Glyph {
+      id: remoteGlyph
+      anchors.centerIn: parent
+      visible: bubble.kind === "remote"
+      glyph: "󰍹"
+      color: bubble.tint
+      fontFamily: bubble.host.fontFamily
+      pixelSize: 15
+      SequentialAnimation on opacity {
+        running: bubble.remoteBusy
+        loops: Animation.Infinite
+        onRunningChanged: if (!running) remoteGlyph.opacity = 1
+        NumberAnimation { to: 0.35; duration: 700; easing.type: Easing.InOutSine }
+        NumberAnimation { to: 1; duration: 700; easing.type: Easing.InOutSine }
+      }
     }
     Glyph {
       id: aiGlyph
@@ -244,6 +265,15 @@ Rectangle {
       font.pixelSize: 13
       font.weight: Font.DemiBold
       font.features: { "tnum": 1 }
+    }
+    // Mode running on the desk: where the mic goes (accent: to the other machine).
+    Glyph {
+      anchors.verticalCenter: parent.verticalCenter
+      visible: !!bubble.remote && bubble.remote.role === "desk" && bubble.remote.phase === "mode" && bubble.remote.mic !== "off"
+      glyph: bubble.remote && bubble.remote.mic === "failed" ? "󰍭" : "󰍬"
+      color: !bubble.remote ? bubble.host.colorMuted : bubble.remote.mic === "remote" ? bubble.host.colorAccent : bubble.remote.mic === "failed" ? "#ff453a" : bubble.host.colorMuted
+      fontFamily: bubble.host.fontFamily
+      pixelSize: 14
     }
     // Battery on mains unplugged: the current power profile's icon.
     Glyph {
