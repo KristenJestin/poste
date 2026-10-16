@@ -58,6 +58,18 @@ title = "recolor the cursor with the current theme"
 trigger = ["cursor-accent-config", "io.github.smoothpixels.cursor-accent"]
 run = [["sh", "-c", "python3 \"@HOME@/.config/omarchy/plugins/io.github.smoothpixels.cursor-accent/recolor.py\" \"$(omarchy-theme-current 2>/dev/null || echo unknown)\""]]
 
+# Omamail's backend: the exact version its plugin asks for (`backend-version`), from its GitHub
+# release, SHA256SUMS checked, by the plugin's own installer (the same as 'Install backend' in
+# its window). Due when its status is not `ready` (nothing while the plugin is absent: its
+# trigger runs it once the plugin is added), and again once the plugin has moved.
+[[user]]
+id = "omamail-backend"
+title = "Omamail: backend of the version the plugin asks for"
+requires = "python3"
+trigger = ["omamail"]
+check = ["sh", "-c", "d=\"@HOME@/.config/omarchy/plugins/omamail\"; [ ! -d \"$d\" ] || python3 \"$d/scripts/backend-runtime.py\" status | grep -q '\"state\": \"ready\"'"]
+run = [["sh", "@HOME@/.config/omarchy/plugins/omamail/scripts/install-backend.sh"]]
+
 [[user]]
 id = "omarchy-crash-watch-off"
 title = "omarchy-crash-watch.service disabled"
@@ -198,8 +210,8 @@ id = "proton-bridge"
 title = "Proton Mail Bridge: start it, sign in; Settings: 'Open on startup' ON, 'Automatic updates' OFF. Note the Bridge password (different from the Proton one)"
 
 [[manual]]
-id = "omamail-backend"
-title = "Omamail (SUPER+SHIFT+M): click 'Install backend' in the window (GitHub release checked with SHA256SUMS), then add the Proton account with the Bridge password (IMAP 127.0.0.1:1143 / SMTP 1025, STARTTLS: Proton preset)"
+id = "omamail-account"
+title = "Omamail (SUPER+SHIFT+M): add the Proton account with the Bridge password (IMAP 127.0.0.1:1143 / SMTP 1025, STARTTLS: Proton preset)"
 
 [[manual]]
 id = "proton-vpn"

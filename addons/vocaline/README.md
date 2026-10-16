@@ -43,5 +43,6 @@ never in poste.
 This is an add-on: it is installed only on a machine that lists it in the `poste.toml` of its
 data repository (`addons = ["vocaline"]`), and plugged in once `vocaline` is in the `PATH`
 (`requires`). The `vocaline` package comes from its GitHub release: `poste sys setup` (if absent) or
-`poste sys update vocaline` downloads and checks it, then prints the `sudo pacman -U` to run.
+`poste sys update` downloads and checks it, then runs the `sudo pacman -U` in the terminal
+(`setup` only prints it). Its pre-releases (the `dev` builds) are followed.
 Removing it from the list removes the key and the island part.

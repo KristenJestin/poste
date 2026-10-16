@@ -48,6 +48,9 @@ pub(crate) struct Plugin {
     pub(crate) id: String,
     url: String,
     pub(crate) patch: Option<String>,
+    /// Pre-release tags (`-rc1`, `-beta`) are followed too.
+    #[serde(default)]
+    pub(crate) prerelease: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -548,6 +551,7 @@ enum Act {
     PluginLatest {
         dir: PathBuf,
         patch: Option<PathBuf>,
+        prerelease: bool,
         tools: Tools,
     },
 }
@@ -636,6 +640,7 @@ fn plugin_acts(ctx: &Ctx, p: &Plugin) -> Result<Vec<Act>, String> {
             Act::PluginLatest {
                 dir,
                 patch,
+                prerelease: p.prerelease,
                 tools: ctx.tools.clone(),
             },
         ]);
@@ -765,9 +770,15 @@ fn user_plan(ctx: &Ctx, steps: &Steps) -> Result<UserPlan> {
             title: u.title.clone(),
             acts: u.run.iter().map(|c| Act::Cmd(ctx.sub_cmd(c))).collect(),
         };
+        // A `check` that fails makes it due now, trigger or not; otherwise a trigger waits for
+        // its steps (a plugin updated: its backend installed again).
+        // A step with a trigger is always kept as triggered too: `poste sys update` runs it after
+        // its trigger even when its check now fails (it is no longer the one setup saw).
+        let failing = !u.check.is_empty() && !succeeds(&ctx.sub_cmd(&u.check));
         if !u.trigger.is_empty() {
-            plan.triggered.push((u.trigger.clone(), todo));
-        } else if u.check.is_empty() || !succeeds(&ctx.sub_cmd(&u.check)) {
+            plan.triggered.push((u.trigger.clone(), todo.clone()));
+        }
+        if failing || (u.trigger.is_empty() && u.check.is_empty()) {
             plan.todos.push(todo);
         }
     }
@@ -807,17 +818,26 @@ fn run_act(act: &Act) -> Result<bool> {
             let done = apps::install(app, None, busy, bin, cache, tools)?;
             match done.by_hand {
                 Some(c) => {
-                    println!("    {}: to run yourself:\n      {c}", done.tag);
+                    println!(
+                        "    {}: to run yourself:\n      {}",
+                        done.target.version,
+                        c.join(" ")
+                    );
                     Ok(false)
                 }
                 None => {
-                    println!("    {} installed", done.tag);
+                    println!("    {} installed", done.target.version);
                     Ok(true)
                 }
             }
         }
-        Act::PluginLatest { dir, patch, tools } => {
-            let st = apps::plugin_state(dir, tools)?;
+        Act::PluginLatest {
+            dir,
+            patch,
+            prerelease,
+            tools,
+        } => {
+            let st = apps::plugin_state(dir, *prerelease, tools)?;
             let (name, commit) = st.target.context("no tag nor default branch found")?;
             if st.head != commit && !st.ahead {
                 apps::plugin_move(dir, &commit, patch.as_deref(), tools)?;
@@ -876,6 +896,10 @@ fn run_todo(t: &Todo, res: &mut Applied) {
 
 fn run_triggers(plan: &UserPlan, res: &mut Applied) {
     for (triggers, t) in &plan.triggered {
+        // Already done as a step due by its own check: not twice.
+        if res.done.contains(&t.id) || res.failed.contains(&t.id) {
+            continue;
+        }
         if triggers.iter().any(|x| res.done.contains(x)) {
             run_todo(t, res);
         }
@@ -909,6 +933,7 @@ fn triggered_in_plan(plan: &UserPlan) -> Vec<&Todo> {
         .iter()
         .filter(|(tr, _)| plan.todos.iter().any(|t| tr.contains(&t.id)))
         .map(|(_, t)| t)
+        .filter(|t| !plan.todos.iter().any(|d| d.id == t.id))
         .collect()
 }
 
@@ -1406,6 +1431,7 @@ check = ["false"]
             id: "p".into(),
             url: "u".into(),
             patch: Some("patches/p.patch".into()),
+            prerelease: false,
         };
         // Present, at whatever version: only the patch, to apply.
         let acts = plugin_acts(&ctx, &plug()).unwrap();
@@ -1528,6 +1554,7 @@ check = ["false"]
         let (_d, repo, env) = fixture();
         let ctx = Ctx::new(&env, &repo);
         let marker = env.home.join("marker");
+        let marker2 = env.home.join("marker2");
         let steps: Steps = toml::from_str(&format!(
             r#"
 [[user]]
@@ -1546,21 +1573,40 @@ title = "after a"
 trigger = ["a"]
 run = [["true"]]
 [[user]]
+id = "backend-ok"
+title = "backend ready, again after a"
+trigger = ["a"]
+check = ["true"]
+run = [["true"]]
+[[user]]
+id = "backend-missing"
+title = "backend not ready: due now"
+trigger = ["zzz"]
+check = ["false"]
+run = [["touch", "{m2}"]]
+[[user]]
 id = "no-bin"
 title = "x"
 requires = "binary-that-does-not-exist"
 run = [["false"]]
 "#,
-            m = marker.display()
+            m = marker.display(),
+            m2 = marker2.display()
         ))
         .unwrap();
         let plan = user_plan(&ctx, &steps).unwrap();
-        assert_eq!(plan.todos.len(), 1);
+        assert_eq!(plan.todos.len(), 2, "a, backend-missing");
         assert_eq!(plan.notes.len(), 1);
-        assert_eq!(triggered_in_plan(&plan).len(), 1);
+        assert_eq!(triggered_in_plan(&plan).len(), 2, "after, backend-ok");
         let r = apply_user(&plan);
-        assert_eq!(r.done, vec!["a", "after"]);
+        assert_eq!(r.done, vec!["a", "backend-missing", "after", "backend-ok"]);
         assert!(r.failed.is_empty() && marker.is_file());
+        // After an update outside setup: a triggered step runs even when its check fails now.
+        fs::remove_file(&marker2).unwrap();
+        assert!(run_triggered(&ctx, &steps, &["zzz".to_string()])
+            .unwrap()
+            .is_empty());
+        assert!(marker2.is_file());
     }
 
     #[test]

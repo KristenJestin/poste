@@ -1,12 +1,14 @@
 # Steps of the vocaline add-on, merged with bootstrap/steps.toml when the add-on is chosen.
 
-# Neither in the repositories nor the AUR: the package of its GitHub release. poste downloads
-# and checks it, then prints the `sudo pacman -U` to run (at setup if absent, at
-# `poste sys update` once a new release is out).
+# Neither in the repositories nor the AUR: the package of its GitHub release, downloaded and
+# checked by poste; `setup` prints its `sudo pacman -U` when absent, `poste sys update` runs it
+# in the terminal. Pre-releases followed: the rolling `dev` release carries its version in its
+# package (`0.1.2.r3.g<hash>`, pacman's order), above the stable it starts from.
 [[app]]
 id = "vocaline"
 title = "Vocaline (dictation), pacman package"
 github = "KristenJestin/vocaline"
+prerelease = true
 asset = "vocaline-{version}-*-x86_64.pkg.tar.zst"
 package = "vocaline"
 

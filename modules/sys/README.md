@@ -19,8 +19,9 @@ root `~/.local/share/poste/current`, which points to the clone (dev mode) or to 
   part (see below).
 - `poste sys outdated`: what is behind its source: apps (GitHub releases), Omarchy plugins, packages
   of the repositories and of the AUR (see [`bootstrap/README.md`](../../bootstrap/README.md), "Versions").
-- `poste sys update [<id>…] [--yes] [--dry-run]`: moves the apps and plugins that are behind to
-  their latest version, after a preview and a confirmation; prints the `sudo` left to run.
+- `poste sys update [<id>…] [--yes] [--dry-run]`: everything at once (apps, plugins, then the system
+  packages with sudo in the terminal), or only the cited apps and plugins; one preview, one
+  confirmation.
 - `poste sys done [<id>] [--undo]`: marks a manual step (or a system step that cannot be checked) done;
   without id, lists them. State in `~/.local/state/poste/done/<id>`.
 - `poste sys status`: source (dev or release) and root read; branch of the clone, uncommitted changes, unpushed commits; installed

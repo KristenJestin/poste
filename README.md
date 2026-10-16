@@ -84,7 +84,7 @@ stays installed. `poste sys addons` shows each add-on and its state on this mach
 | Add-on | Plugs in |
 | --- | --- |
 | [`melodie`](addons/melodie/README.md) | the [Mélodie](https://github.com/KristenJestin/melodie) music player: launcher search, quality and heart on the player card. Installs its latest release (`poste sys update` moves it). |
-| [`vocaline`](addons/vocaline/README.md) | the [Vocaline](https://github.com/KristenJestin/vocaline) dictation: SUPER+A, animated pill at the bottom of the screen, dictated text live under the island. poste downloads its package and prints the `sudo pacman -U`. |
+| [`vocaline`](addons/vocaline/README.md) | the [Vocaline](https://github.com/KristenJestin/vocaline) dictation: SUPER+A, animated pill at the bottom of the screen, dictated text live under the island. poste downloads and checks its package (`poste sys update` installs it with sudo). |
 | [`voxtype`](addons/voxtype/README.md) | the [voxtype](https://github.com/peteonrails/voxtype) dictation: SUPER+A (tap to toggle, hold to talk), animated pill at the bottom of the screen. Installs `voxtype-bin`, its config, model and service. |
 
 Choose a single dictation add-on: `vocaline` and `voxtype` both take SUPER+A.

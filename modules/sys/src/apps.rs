@@ -9,6 +9,7 @@
 use anyhow::{bail, Context, Result};
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
+use std::cmp::Ordering;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
@@ -152,44 +153,127 @@ pub fn installed(app: &App, cmd: &[String], tools: &Tools) -> Option<String> {
     (!v.is_empty()).then_some(v)
 }
 
-/// Tag of the release to follow.
-pub fn latest_tag(app: &App, tools: &Tools) -> Result<String> {
-    let tag = if app.prerelease {
-        output(
-            &tools.gh,
-            &[
-                "release",
-                "list",
-                "-R",
-                &app.github,
-                "--exclude-drafts",
-                "--limit",
-                "1",
-                "--json",
-                "tagName",
-                "--jq",
-                ".[0].tagName",
-            ],
-        )?
-    } else {
-        output(
-            &tools.gh,
-            &[
-                "release",
-                "view",
-                "-R",
-                &app.github,
-                "--json",
-                "tagName",
-                "--jq",
-                ".tagName",
-            ],
-        )?
+/// Compares two versions: pacman's order (`vercmp`) on what precedes a `-`, then a release above
+/// its pre-releases (`0.1.1-beta.9` < `0.1.1-beta.10` < `0.1.1`). A pacman version has no `-`
+/// once its package release is off: `0.1.2` < `0.1.2.r3.gb8f455d` < `0.1.3`.
+pub fn cmp_versions(a: &str, b: &str) -> Ordering {
+    let split = |v: &str| match v.split_once('-') {
+        Some((base, pre)) => (base.to_string(), Some(pre.to_string())),
+        None => (v.to_string(), None),
     };
-    if tag.is_empty() || tag == "null" {
-        bail!("{}: no release published", app.github);
+    let ((ba, pa), (bb, pb)) = (split(a), split(b));
+    match vercmp(&ba, &bb) {
+        Ordering::Equal => match (pa, pb) {
+            (None, None) => Ordering::Equal,
+            (None, Some(_)) => Ordering::Greater,
+            (Some(_), None) => Ordering::Less,
+            (Some(x), Some(y)) => vercmp(&x, &y),
+        },
+        o => o,
     }
-    Ok(tag)
+}
+
+/// pacman's `rpmvercmp`: runs of digits compared as numbers, runs of letters as text, a number
+/// above letters; once one side is done, a remaining letter run is older, anything else newer.
+fn vercmp(a: &str, b: &str) -> Ordering {
+    if a == b {
+        return Ordering::Equal;
+    }
+    let (a, b) = (a.as_bytes(), b.as_bytes());
+    let (mut i, mut j) = (0, 0);
+    while i < a.len() && j < b.len() {
+        while i < a.len() && !a[i].is_ascii_alphanumeric() {
+            i += 1;
+        }
+        while j < b.len() && !b[j].is_ascii_alphanumeric() {
+            j += 1;
+        }
+        if i >= a.len() || j >= b.len() {
+            break;
+        }
+        let num = a[i].is_ascii_digit();
+        let kind = |c: u8| {
+            if num {
+                c.is_ascii_digit()
+            } else {
+                c.is_ascii_alphabetic()
+            }
+        };
+        let (si, sj) = (i, j);
+        while i < a.len() && kind(a[i]) {
+            i += 1;
+        }
+        while j < b.len() && kind(b[j]) {
+            j += 1;
+        }
+        let (x, y) = (&a[si..i], &b[sj..j]);
+        if y.is_empty() {
+            // Segments of different kinds: the number is newer.
+            return if num {
+                Ordering::Greater
+            } else {
+                Ordering::Less
+            };
+        }
+        let o = if num {
+            let trim = |s: &[u8]| -> usize { s.iter().take_while(|c| **c == b'0').count() };
+            let (x, y) = (&x[trim(x)..], &y[trim(y)..]);
+            x.len().cmp(&y.len()).then_with(|| x.cmp(y))
+        } else {
+            x.cmp(y)
+        };
+        if o != Ordering::Equal {
+            return o;
+        }
+    }
+    let (ra, rb) = (&a[i.min(a.len())..], &b[j.min(b.len())..]);
+    if ra.is_empty() && rb.is_empty() {
+        Ordering::Equal
+    } else if (ra.is_empty() && !rb[0].is_ascii_alphabetic())
+        || (!ra.is_empty() && ra[0].is_ascii_alphabetic())
+    {
+        Ordering::Less
+    } else {
+        Ordering::Greater
+    }
+}
+
+/// A published release (drafts left out).
+#[derive(Debug, Clone, PartialEq)]
+pub struct Release {
+    pub tag: String,
+    pub prerelease: bool,
+}
+
+/// The releases of the app's repository, newest first.
+pub fn releases(app: &App, tools: &Tools) -> Result<Vec<Release>> {
+    let out = output(
+        &tools.gh,
+        &[
+            "release",
+            "list",
+            "-R",
+            &app.github,
+            "--exclude-drafts",
+            "--limit",
+            "100",
+            "--json",
+            "tagName,isPrerelease",
+            "--jq",
+            ".[] | .tagName + \" \" + (.isPrerelease | tostring)",
+        ],
+    )?;
+    Ok(parse_releases(&out))
+}
+
+fn parse_releases(out: &str) -> Vec<Release> {
+    out.lines()
+        .filter_map(|l| l.trim().split_once(' '))
+        .map(|(tag, pre)| Release {
+            tag: tag.to_string(),
+            prerelease: pre == "true",
+        })
+        .collect()
 }
 
 /// `*` matches any text (possibly empty); everything else literally.
@@ -212,35 +296,70 @@ pub fn glob(pat: &str, s: &str) -> bool {
     true
 }
 
-/// The asset of the release matching `asset`, and its sha256 published by GitHub.
-pub fn pick_asset(app: &App, tag: &str, listing: &str) -> Result<(String, String)> {
-    let pat = app.asset.replace("{version}", &norm(tag));
-    let found: Vec<(&str, &str)> = listing
+/// The version an asset name carries where the template says `{version}` (the shortest that
+/// fits), or `None` if the name does not match the template.
+pub fn asset_version(template: &str, name: &str) -> Option<String> {
+    let Some((before, after)) = template.split_once("{version}") else {
+        return glob(template, name).then(String::new);
+    };
+    // A version starts with a digit (after an optional `v`): `vocaline-debug-0.1.2-1-…`, the
+    // debug package of the same release, is not version `debug`.
+    let starts_well = |v: &str| {
+        v.strip_prefix('v')
+            .unwrap_or(v)
+            .starts_with(|c: char| c.is_ascii_digit())
+    };
+    let cuts: Vec<usize> = (0..=name.len())
+        .filter(|&k| name.is_char_boundary(k))
+        .collect();
+    for &s in &cuts {
+        if !glob(before, &name[..s]) {
+            continue;
+        }
+        for &e in cuts.iter().filter(|&&e| e > s) {
+            let v = &name[s..e];
+            if starts_well(v) && glob(after, &name[e..]) {
+                return Some(v.to_string());
+            }
+        }
+    }
+    None
+}
+
+/// An asset to download: its name, the sha256 GitHub publishes, the version its name carries
+/// (the tag's when the template has no `{version}`).
+#[derive(Debug, PartialEq)]
+pub struct Asset {
+    pub name: String,
+    pub sum: String,
+    pub version: String,
+}
+
+/// The asset of release `tag` matching the template, from `name digest` lines.
+pub fn pick_asset(app: &App, tag: &str, listing: &str) -> Result<Asset> {
+    let found: Vec<(&str, &str, String)> = listing
         .lines()
         .filter_map(|l| l.trim().split_once(' '))
-        .filter(|(name, _)| glob(&pat, name))
+        .filter_map(|(name, d)| asset_version(&app.asset, name).map(|v| (name, d, v)))
         .collect();
     match found.as_slice() {
-        [(name, digest)] => {
+        [(name, digest, v)] => {
             let Some(sum) = digest.strip_prefix("sha256:") else {
                 bail!("{tag}: no sha256 published by GitHub for {name}, nothing installed");
             };
-            Ok((name.to_string(), sum.to_string()))
+            let version = if v.is_empty() { norm(tag) } else { norm(v) };
+            Ok(Asset {
+                name: name.to_string(),
+                sum: sum.to_string(),
+                version,
+            })
         }
-        [] => bail!("{tag}: no asset {pat} in the release"),
-        _ => bail!("{tag}: several assets match {pat}"),
+        [] => bail!("{tag}: no asset {} in the release", app.asset),
+        _ => bail!("{tag}: several assets match {}", app.asset),
     }
 }
 
-fn sha256_file(p: &Path) -> Result<String> {
-    let mut f = std::fs::File::open(p).with_context(|| format!("reading {}", p.display()))?;
-    let mut h = Sha256::new();
-    std::io::copy(&mut f, &mut h)?;
-    Ok(h.finalize().iter().map(|b| format!("{b:02x}")).collect())
-}
-
-/// Downloads the asset of `tag` into `dir` and checks its sha256; returns its path.
-pub fn download(app: &App, tag: &str, dir: &Path, tools: &Tools) -> Result<PathBuf> {
+fn asset_of(app: &App, tag: &str, tools: &Tools) -> Result<Asset> {
     let listing = output(
         &tools.gh,
         &[
@@ -255,9 +374,123 @@ pub fn download(app: &App, tag: &str, dir: &Path, tools: &Tools) -> Result<PathB
             ".assets[] | .name + \" \" + (.digest // \"none\")",
         ],
     )?;
-    let (name, sum) = pick_asset(app, tag, &listing)?;
+    pick_asset(app, tag, &listing)
+}
+
+/// What to install: the release and the version its asset carries.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Target {
+    pub tag: String,
+    pub version: String,
+}
+
+/// The latest release, and with `prerelease` the latest pre-release too: the higher version of
+/// the two (a rolling pre-release such as `dev-latest` carries its version in its asset).
+pub fn target(app: &App, rel: &[Release], tools: &Tools) -> Result<Target> {
+    let stable = rel.iter().find(|r| !r.prerelease);
+    let pre = rel.iter().find(|r| r.prerelease).filter(|_| app.prerelease);
+    let mut best: Option<Target> = None;
+    let mut errors = Vec::new();
+    for r in [stable, pre].into_iter().flatten() {
+        // One of the two without a matching asset does not hide the other.
+        let a = match asset_of(app, &r.tag, tools) {
+            Ok(a) => a,
+            Err(e) => {
+                errors.push(format!("{e:#}"));
+                continue;
+            }
+        };
+        let t = Target {
+            tag: r.tag.clone(),
+            version: a.version,
+        };
+        if best
+            .as_ref()
+            .is_none_or(|b| cmp_versions(&t.version, &b.version) == Ordering::Greater)
+        {
+            best = Some(t);
+        }
+    }
+    match best {
+        Some(t) => Ok(t),
+        None if errors.is_empty() => bail!("{}: no release published", app.github),
+        None => bail!("{}", errors.join("; ")),
+    }
+}
+
+/// Where the installed version stands against the target.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum Standing {
+    Missing,
+    Behind,
+    UpToDate,
+    /// Newer than the target (a pre-release, a local build): never moved back.
+    Ahead,
+    /// Not a published release, and no safe order with the target (`1.0.0` against
+    /// `1.0.0-local.<hash>`): shown, left alone.
+    Unknown,
+}
+
+/// Compares by version; when both are the versions of published tags, by release order (a
+/// `1.0.0-local.<hash>` scheme has no version order).
+pub fn standing(installed: Option<&str>, t: &Target, rel: &[Release]) -> Standing {
+    let Some(i) = installed else {
+        return Standing::Missing;
+    };
+    if i == t.version {
+        return Standing::UpToDate;
+    }
+    let pos = |v: &str| rel.iter().position(|r| norm(&r.tag) == v);
+    let (bi, si) = split_pre(i);
+    let (bt, st) = split_pre(&t.version);
+    // Same base, and a suffix that carries a commit hash on one side: `1.0.0-local.<hash>`
+    // has no version order, only the order of its releases; without both in the list, unknown.
+    if bi == bt && (has_hash(si) || has_hash(st)) {
+        let pt = pos(&norm(&t.tag)).filter(|_| norm(&t.tag) == t.version);
+        return match (pos(i), pt) {
+            // Newest first: the installed one is older when it comes after the target.
+            (Some(pi), Some(pt)) => from_order(pt.cmp(&pi)),
+            _ => Standing::Unknown,
+        };
+    }
+    from_order(cmp_versions(i, &t.version))
+}
+
+fn from_order(o: Ordering) -> Standing {
+    match o {
+        Ordering::Less => Standing::Behind,
+        Ordering::Equal => Standing::UpToDate,
+        Ordering::Greater => Standing::Ahead,
+    }
+}
+
+/// `1.0.0-local.abc` -> (`1.0.0`, `local.abc`); no `-`: an empty suffix.
+fn split_pre(v: &str) -> (&str, &str) {
+    v.split_once('-').unwrap_or((v, ""))
+}
+
+/// A segment that looks like a commit hash: 7 hex characters or more, digits and letters.
+fn has_hash(s: &str) -> bool {
+    s.split(|c: char| !c.is_ascii_alphanumeric()).any(|w| {
+        w.len() >= 7
+            && w.chars().all(|c| c.is_ascii_hexdigit())
+            && w.chars().any(|c| c.is_ascii_digit())
+            && w.chars().any(|c| c.is_ascii_alphabetic())
+    })
+}
+
+fn sha256_file(p: &Path) -> Result<String> {
+    let mut f = std::fs::File::open(p).with_context(|| format!("reading {}", p.display()))?;
+    let mut h = Sha256::new();
+    std::io::copy(&mut f, &mut h)?;
+    Ok(h.finalize().iter().map(|b| format!("{b:02x}")).collect())
+}
+
+/// Downloads the asset of `tag` into `dir` and checks its sha256; returns its path.
+pub fn download(app: &App, tag: &str, dir: &Path, tools: &Tools) -> Result<PathBuf> {
+    let a = asset_of(app, tag, tools)?;
     std::fs::create_dir_all(dir)?;
-    let file = dir.join(&name);
+    let file = dir.join(&a.name);
     let _ = std::fs::remove_file(&file);
     let d = dir.to_string_lossy();
     output(
@@ -269,32 +502,36 @@ pub fn download(app: &App, tag: &str, dir: &Path, tools: &Tools) -> Result<PathB
             "-R",
             &app.github,
             "--pattern",
-            &name,
+            &a.name,
             "-D",
             &d,
             "--clobber",
         ],
     )?;
     let got = sha256_file(&file)?;
-    if got != sum {
+    if got != a.sum {
         let _ = std::fs::remove_file(&file);
-        bail!("{name}: wrong sha256 ({got}, expected {sum}), removed, nothing installed");
+        bail!(
+            "{}: wrong sha256 ({got}, expected {}), removed, nothing installed",
+            a.name,
+            a.sum
+        );
     }
     Ok(file)
 }
 
-/// What an installation left to do by hand (a pacman package: the `sudo` command).
+/// What an installation did, and what it left to run with sudo (a pacman package).
 pub struct Installed {
-    pub tag: String,
-    pub by_hand: Option<String>,
+    pub target: Target,
+    pub by_hand: Option<Vec<String>>,
 }
 
-/// Installs the release `tag` (the latest if `None`). `busy` and paths already substituted.
-/// `cache` keeps the packages to install by hand; the other archives go through a temporary
-/// folder in it, removed after.
+/// Installs `target` (the one `target()` picks if `None`). `busy` and paths already
+/// substituted. `cache` keeps the packages to install with sudo; the other archives go through
+/// a temporary folder in it, removed after.
 pub fn install(
     app: &App,
-    tag: Option<&str>,
+    target: Option<&Target>,
     busy: &[String],
     bin_dir: &Path,
     cache: &Path,
@@ -307,21 +544,26 @@ pub fn install(
             app.id
         );
     }
-    let tag = match tag {
-        Some(t) => t.to_string(),
-        None => latest_tag(app, tools)?,
+    let t = match target {
+        Some(t) => t.clone(),
+        None => self::target(app, &releases(app, tools)?, tools)?,
     };
     if let Install::Package(_) = how {
-        let file = download(app, &tag, &cache.join("apps"), tools)?;
+        let file = download(app, &t.tag, &cache.join("apps"), tools)?;
         return Ok(Installed {
-            by_hand: Some(format!("sudo pacman -U {}", file.display())),
-            tag,
+            by_hand: Some(vec![
+                "sudo".into(),
+                "pacman".into(),
+                "-U".into(),
+                file.to_string_lossy().into_owned(),
+            ]),
+            target: t,
         });
     }
     let tmp = cache.join(format!("apps/.{}-{}", app.id, std::process::id()));
     let _ = std::fs::remove_dir_all(&tmp);
     let res = (|| {
-        let archive = download(app, &tag, &tmp, tools)?;
+        let archive = download(app, &t.tag, &tmp, tools)?;
         let x = tmp.join("x");
         std::fs::create_dir_all(&x)?;
         let st = Command::new("tar")
@@ -349,7 +591,7 @@ pub fn install(
                 std::fs::rename(&new, bin_dir.join(name))?;
             }
             Install::Script(s) => {
-                let script = x.join(s.replace("{version}", &norm(&tag)));
+                let script = x.join(s.replace("{version}", &t.version));
                 if !script.is_file() {
                     bail!("{}: not in the archive", script.display());
                 }
@@ -366,7 +608,10 @@ pub fn install(
         Ok(())
     })();
     let _ = std::fs::remove_dir_all(&tmp);
-    res.map(|()| Installed { tag, by_hand: None })
+    res.map(|()| Installed {
+        target: t,
+        by_hand: None,
+    })
 }
 
 // ------------------------------------------------------------------ plugins
@@ -374,9 +619,10 @@ pub fn install(
 /// Target of a plugin without a pinned commit: its most recent version tag if it has tags,
 /// otherwise the head of its default branch. From `git ls-remote --tags --sort=-v:refname
 /// origin` then `git ls-remote origin HEAD`: (name, commit).
-pub fn plugin_target(tags: &str, head: &str) -> Option<(String, String)> {
-    // A release first (no `-rc1`, `-beta` suffix), a pre-release only if there is nothing else.
-    first_tag(tags, false)
+pub fn plugin_target(tags: &str, head: &str, prerelease: bool) -> Option<(String, String)> {
+    // A release first (no `-rc1`, `-beta` suffix), unless pre-releases are followed; a
+    // pre-release also when there is nothing else.
+    first_tag(tags, prerelease)
         .or_else(|| first_tag(tags, true))
         .or_else(|| {
             let sha = head.split_whitespace().next()?;
@@ -423,7 +669,7 @@ pub struct PluginState {
     pub ahead: bool,
 }
 
-pub fn plugin_state(dir: &Path, tools: &Tools) -> Result<PluginState> {
+pub fn plugin_state(dir: &Path, prerelease: bool, tools: &Tools) -> Result<PluginState> {
     let d = dir.to_string_lossy();
     let head = output(&tools.git, &["-C", &d, "rev-parse", "HEAD"])?;
     let tags = output(
@@ -445,7 +691,7 @@ pub fn plugin_state(dir: &Path, tools: &Tools) -> Result<PluginState> {
     } else {
         String::new()
     };
-    let target = plugin_target(&tags, &remote_head);
+    let target = plugin_target(&tags, &remote_head, prerelease);
     let ahead = target.as_ref().is_some_and(|(_, c)| {
         *c != head
             && output(
@@ -643,9 +889,22 @@ mod tests {
         let listing = "v-0.2.0-1-x86_64.pkg.tar.zst sha256:abc\nnotes.txt sha256:def\n";
         assert_eq!(
             pick_asset(&a, "v0.2.0", listing).unwrap(),
-            ("v-0.2.0-1-x86_64.pkg.tar.zst".into(), "abc".into())
+            Asset {
+                name: "v-0.2.0-1-x86_64.pkg.tar.zst".into(),
+                sum: "abc".into(),
+                version: "0.2.0".into()
+            }
         );
-        assert!(pick_asset(&a, "v0.3.0", listing).is_err(), "absent");
+        // A rolling pre-release: the version is in the asset, not in the tag.
+        let dev = "v-0.1.2.r3.gb8f455d-1-x86_64.pkg.tar.zst sha256:abc\n";
+        assert_eq!(
+            pick_asset(&a, "dev-latest", dev).unwrap().version,
+            "0.1.2.r3.gb8f455d"
+        );
+        assert!(
+            pick_asset(&a, "v0.3.0", "notes.txt sha256:d\n").is_err(),
+            "absent"
+        );
         assert!(
             pick_asset(&a, "v0.2.0", "v-0.2.0-1-x86_64.pkg.tar.zst none\n").is_err(),
             "no checksum, no install"
@@ -658,24 +917,32 @@ mod tests {
     fn plugin_target_prefers_the_latest_tag() {
         let tags = "aaa\trefs/tags/v1.2.0\nbbb\trefs/tags/v1.2.0^{}\nccc\trefs/tags/v1.1.0\n";
         assert_eq!(
-            plugin_target(tags, "fff\tHEAD"),
+            plugin_target(tags, "fff\tHEAD", false),
             Some(("v1.2.0".into(), "bbb".into()))
         );
         let light = "ddd\trefs/tags/v2.0.0\nccc\trefs/tags/v1.1.0\n";
         assert_eq!(
-            plugin_target(light, "fff\tHEAD"),
+            plugin_target(light, "fff\tHEAD", false),
             Some(("v2.0.0".into(), "ddd".into()))
         );
         assert_eq!(
-            plugin_target("", "fff\tHEAD"),
+            plugin_target("", "fff\tHEAD", false),
             Some(("default branch".into(), "fff".into()))
         );
-        assert_eq!(plugin_target("", ""), None);
+        assert_eq!(plugin_target("", "", false), None);
         // A release before a pre-release; a pre-release only when there is nothing else.
         let rc = "eee\trefs/tags/v3.0.0-rc1\nddd\trefs/tags/v2.0.0\n";
-        assert_eq!(plugin_target(rc, ""), Some(("v2.0.0".into(), "ddd".into())));
         assert_eq!(
-            plugin_target("eee\trefs/tags/v3.0.0-rc1\n", ""),
+            plugin_target(rc, "", false),
+            Some(("v2.0.0".into(), "ddd".into()))
+        );
+        assert_eq!(
+            plugin_target(rc, "", true),
+            Some(("v3.0.0-rc1".into(), "eee".into())),
+            "pre-releases followed"
+        );
+        assert_eq!(
+            plugin_target("eee\trefs/tags/v3.0.0-rc1\n", "", false),
             Some(("v3.0.0-rc1".into(), "eee".into()))
         );
     }
@@ -688,7 +955,7 @@ mod tests {
             format!(
                 "#!/bin/sh\n\
                  case \"$*\" in\n\
-                 *'--json tagName'*) echo '{tag}' ;;\n\
+                 *'--json tagName,isPrerelease'*) echo '{tag} false' ;;\n\
                  *'--json assets'*) echo \"$(basename '{a}') {digest}\" ;;\n\
                  *download*) while [ \"$1\" != -D ]; do shift; done; cp '{a}' \"$2/\" ;;\n\
                  *) exit 1 ;;\n\
@@ -735,7 +1002,8 @@ mod tests {
         ));
         assert_eq!(installed(&app, &app.version, &tools), None);
         let done = install(&app, None, &[], &bin, &d.path().join("cache"), &tools).unwrap();
-        assert_eq!(done.tag, "v1.2.0");
+        assert_eq!(done.target.tag, "v1.2.0");
+        assert_eq!(done.target.version, "1.2.0");
         assert!(done.by_hand.is_none());
         assert_eq!(
             installed(&app, &app.version, &tools).as_deref(),
@@ -792,8 +1060,120 @@ mod tests {
         let kept = cache.join("apps/v-0.2.0-1-x86_64.pkg.tar.zst");
         assert!(kept.is_file());
         assert_eq!(
-            done.by_hand.unwrap(),
+            done.by_hand.unwrap().join(" "),
             format!("sudo pacman -U {}", kept.display())
+        );
+    }
+
+    #[test]
+    fn versions_are_ordered_like_pacman_then_semver() {
+        use Ordering::*;
+        let c = cmp_versions;
+        assert_eq!(c("0.1.2", "0.1.2.r3.gb8f455d"), Less);
+        assert_eq!(c("0.1.2.r3.gb8f455d", "0.1.2.r10.g0000000"), Less);
+        assert_eq!(c("0.1.2.r10.g0000000", "0.1.3"), Less);
+        assert_eq!(c("0.1.1-beta.9", "0.1.1-beta.10"), Less);
+        assert_eq!(c("0.1.1-beta.10", "0.1.1"), Less);
+        assert_eq!(c("0.1.0", "0.1.1-beta.9"), Less);
+        assert_eq!(c("1.10.0", "1.9.0"), Greater);
+        assert_eq!(c("1.0a", "1.0"), Less);
+        assert_eq!(c("2.0", "2.0"), Equal);
+    }
+
+    #[test]
+    fn asset_version_is_read_from_the_name() {
+        let t = "v-{version}-*-x86_64.pkg.tar.zst";
+        assert_eq!(
+            asset_version(t, "v-0.1.2.r3.gb8f455d-1-x86_64.pkg.tar.zst").as_deref(),
+            Some("0.1.2.r3.gb8f455d")
+        );
+        assert_eq!(asset_version(t, "other-1-1-x86_64.pkg.tar.zst"), None);
+        assert_eq!(
+            asset_version("m-{version}-linux.tar.gz", "m-0.1.1-beta.10-linux.tar.gz").as_deref(),
+            Some("0.1.1-beta.10")
+        );
+        assert_eq!(asset_version("s.tar.gz", "s.tar.gz").as_deref(), Some(""));
+        // The debug package of the same release is not version `debug`.
+        assert_eq!(asset_version(t, "v-debug-0.1.2-1-x86_64.pkg.tar.zst"), None);
+        assert_eq!(
+            asset_version("*-{version}-linux.tar.gz", "tool-2.1.0-linux.tar.gz").as_deref(),
+            Some("2.1.0")
+        );
+    }
+
+    #[test]
+    fn never_moved_back() {
+        let rel = |l: &str| parse_releases(l);
+        let t = |tag: &str, v: &str| Target {
+            tag: tag.into(),
+            version: v.into(),
+        };
+        let none: Vec<Release> = vec![];
+        assert_eq!(standing(None, &t("v1", "1"), &none), Standing::Missing);
+        // A beta installed, the channel stable: the older stable is not an update.
+        let m = rel("v0.1.1-beta.10 true\nv0.1.0 false\n");
+        assert_eq!(
+            standing(Some("0.1.1-beta.9"), &t("v0.1.0", "0.1.0"), &m),
+            Standing::Ahead
+        );
+        assert_eq!(
+            standing(
+                Some("0.1.1-beta.9"),
+                &t("v0.1.1-beta.10", "0.1.1-beta.10"),
+                &m
+            ),
+            Standing::Behind
+        );
+        // A dev build installed, the stable it starts from is older.
+        let v = rel("dev-latest true\nv0.1.2 false\n");
+        assert_eq!(
+            standing(Some("0.1.2.r3.gb8f455d"), &t("v0.1.2", "0.1.2"), &v),
+            Standing::Ahead
+        );
+        assert_eq!(
+            standing(
+                Some("0.1.2.r3.gb8f455d"),
+                &t("dev-latest", "0.1.2.r3.gb8f455d"),
+                &v
+            ),
+            Standing::UpToDate
+        );
+        // A version that is no release, against a suffixed one of the same base: unknown.
+        assert_eq!(
+            standing(
+                Some("1.0.0"),
+                &t("v1.0.0-local.8b31b95", "1.0.0-local.8b31b95"),
+                &rel("v1.0.0-local.8b31b95 false\n")
+            ),
+            Standing::Unknown
+        );
+        // A hotfix of an older line published after a newer release: no step back.
+        assert_eq!(
+            standing(
+                Some("2.0.0"),
+                &t("v1.2.5", "1.2.5"),
+                &rel("v1.2.5 false\nv2.0.0 false\n")
+            ),
+            Standing::Ahead
+        );
+        // Hashes and no release to place the installed one: unknown, left alone.
+        assert_eq!(
+            standing(
+                Some("1.0.0-local.8561a63"),
+                &t("v1.0.0-local.3b24e32", "1.0.0-local.3b24e32"),
+                &none
+            ),
+            Standing::Unknown
+        );
+        // Versions without an order (a hash): the release order decides.
+        let s = rel("v1.0.0-local.3b24e32 false\nv1.0.0-local.8561a63 false\n");
+        assert_eq!(
+            standing(
+                Some("1.0.0-local.8561a63"),
+                &t("v1.0.0-local.3b24e32", "1.0.0-local.3b24e32"),
+                &s
+            ),
+            Standing::Behind
         );
     }
 
@@ -849,7 +1229,7 @@ mod tests {
         sh(&up, &["add", "."]);
         sh(&up, &["commit", "-q", "-m", "2"]);
         sh(&up, &["tag", "v2"]);
-        let st = plugin_state(&plug, &tools).unwrap();
+        let st = plugin_state(&plug, false, &tools).unwrap();
         let (name, c2) = st.target.unwrap();
         assert_eq!(name, "v2");
         assert_ne!(st.head, c2);

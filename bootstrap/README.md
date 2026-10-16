@@ -24,6 +24,8 @@ Step families (details and comments in `steps.toml`):
   `~/.local/bin`) or `script` (the archive extracted, that script of it run). `version`: command
   whose output gives the installed version (not needed with `package`: `pacman -Q`); `busy`:
   command that succeeds while it must not be replaced. Installed by `setup` only if absent.
+- A `[[user]]` step with both `check` and `trigger` runs when its `check` fails, and again when
+  one of its triggers has just been done (Omamail's backend after its plugin moved).
 - `[[file]]`: user file put in place if it is absent; if it exists and differs, it is left and reported.
   `mode = "755"` (octal): permissions of the written file, put back if only they differ.
 - `[[user]]`: without sudo. `check` (code 0 = already done), otherwise `run`, started by poste after confirmation.
@@ -41,10 +43,20 @@ one from its source. An update made by hand or by `yay` is therefore always seen
 
 - `poste sys outdated`: apps, plugins, then the packages of the repositories (`checkupdates`,
   Omarchy included) and of the AUR (`yay -Qua`), with the command to run for those.
-- `poste sys update [<id>…] [--yes] [--dry-run]`: moves the apps and plugins that are behind (all, or
-  the cited ones) to their latest version, after a preview (for a plugin: its new commits) and a
-  confirmation. An app is downloaded through `gh` and checked against the sha256 GitHub publishes
-  (no checksum, no install). A plugin's patch is taken off, the plugin moved, the patch put back;
-  if it no longer applies, the plugin is put back where it was and the update fails. A plugin
-  already past its latest tag is up to date (never a step back). The packages of the
-  repositories are never updated by poste: `omarchy update` (or `yay -Syu`).
+- `poste sys update [--yes] [--dry-run]`: everything at once, after one preview (for a plugin:
+  its new commits) and one confirmation: the apps and plugins that are behind, then, in the
+  terminal (your password), the `sudo pacman -U` of the downloaded packages and `omarchy update`
+  (or `yay -Syu`) when the packages of the repositories or the AUR are behind. The only command of
+  poste that runs `sudo`.
+- `poste sys update <id>…`: only these apps and plugins (no system packages).
+- An app is downloaded through `gh` and checked against the sha256 GitHub publishes (no
+  checksum, no install). A plugin's patch is taken off, the plugin moved, the patch put back; if
+  it no longer applies, the plugin is put back where it was and the update fails.
+- Versions are compared, never moved back: pacman's order (`0.1.2` < `0.1.2.r3.g<hash>` <
+  `0.1.3`), a release above its pre-releases (`0.1.1-beta.9` < `0.1.1`), and the order of the
+  releases for tags without an order (`1.0.0-local.<hash>`). The available version is the one
+  the asset's name carries (`{version}`), not the tag: a rolling pre-release such as
+  `dev-latest` works. A plugin already past its latest tag is up to date.
+- Stable or pre-release: `prerelease = true` on an `[[app]]` or a `[[plugin]]`, in the steps file.
+  Without it, only releases (for a plugin, tags without `-rc1`, `-beta`).
+
