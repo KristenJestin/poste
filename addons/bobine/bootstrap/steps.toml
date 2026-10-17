@@ -1,0 +1,21 @@
+# Steps of the bobine add-on, merged with bootstrap/steps.toml when the add-on is chosen.
+
+# Installed at its latest release (the beta included, which is the patch after it) if absent,
+# then moved by `poste sys update`. install.sh puts bobine in ~/.local/bin, bobine.desktop (the
+# launcher's app, which MPRIS's DesktopEntry names) in ~/.local/share/applications and its icons
+# in ~/.local/share/icons/hicolor; it never touches the account, the settings nor the keyring.
+# A running Bobine keeps its old binary: while a film plays, nothing is replaced (`busy`), so
+# that the film is never cut by a restart; run the update again later.
+[[app]]
+id = "bobine"
+title = "Bobine (film and series player) in ~/.local/bin"
+github = "KristenJestin/bobine"
+prerelease = true
+asset = "bobine-{version}-linux-x86_64.tar.gz"
+script = "bobine-{version}-linux-x86_64/install.sh"
+version = ["@HOME@/.local/bin/bobine", "--version"]
+busy = ["sh", "-c", "busctl --user get-property org.mpris.MediaPlayer2.bobine /org/mpris/MediaPlayer2 org.mpris.MediaPlayer2.Player PlaybackStatus 2>/dev/null | grep -q Playing"]
+
+[[manual]]
+id = "bobine-login"
+title = "Bobine: sign in to the media server (Jellyfin) in its window, once"

@@ -1,0 +1,3 @@
+# Packages Bobine needs (merged with bootstrap/packages.toml when the add-on is chosen).
+[packages]
+mpv = "libmpv: Bobine's playback"

@@ -1,0 +1,3 @@
+#!/bin/sh
+# Module bobine of poste: passes the command as is to Bobine.
+exec bobine "$@"

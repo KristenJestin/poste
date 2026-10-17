@@ -131,6 +131,7 @@ stays installed. `poste sys addons` shows each add-on and its state on this mach
 
 | Add-on | Plugs in |
 | --- | --- |
+| [`bobine`](addons/bobine/README.md) | the [Bobine](https://github.com/KristenJestin/bobine) film and series player: its app in the launcher, the film playing on the player card. Installs its latest release (`poste sys update` moves it, never during a film). For Bobine 0.1.0 and later. |
 | [`melodie`](addons/melodie/README.md) | the [Mélodie](https://github.com/KristenJestin/melodie) music player: launcher search, quality and heart on the player card. Installs its latest release (`poste sys update` moves it). |
 | [`navette`](addons/navette/README.md) | the [Navette](https://github.com/KristenJestin/navette) work-from-home mode, on both machines: its service always running, a bubble left of the island when the other machine is there (click: start the mode), its mic and stop. Installs its latest release (`poste sys update` moves it, never during a mode). For Navette 0.2.0 and later. |
 | [`vocaline`](addons/vocaline/README.md) | the [Vocaline](https://github.com/KristenJestin/vocaline) dictation: SUPER+A, animated pill at the bottom of the screen, dictated text live under the island. poste downloads and checks its package (`poste sys update` installs it with sudo). |
