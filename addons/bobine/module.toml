@@ -1,6 +1,6 @@
 name = "bobine"
 requires = "bobine"
-description = "Plugs the Bobine film and series player into the desktop: its app in the launcher, its films on the player card"
+description = "Plugs the Bobine film and series player into the desktop: launcher search and resume, its app in the launcher, its films on the player card"
 commands = [
   { name = "<arguments>", description = "passed as is to Bobine (bobine --version)" },
 ]

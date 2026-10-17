@@ -1,0 +1,35 @@
+{
+  "//": "Launcher extension of this module (same format as ~/.config/poste-island/launcher/launcher.json: items, extensions, engines). Merged by the island from ~/.local/share/poste/modules/<name>/island/launcher.json. Needs Bobine 0.2.0: before it, any command but --version opens Bobine's window, and the launcher runs `command` each time it opens.",
+  "extensions": [
+    {
+      "id": "bobine",
+      "name": "Films",
+      "subtitle": "Bobine · resume, films and series",
+      "icon": "󰿎",
+      "keywords": [
+        "bobine",
+        "film",
+        "films",
+        "movie",
+        "movies",
+        "series",
+        "show",
+        "tv",
+        "episode",
+        "jellyfin"
+      ],
+      "ttl": 30,
+      "requires": "bobine",
+      "source": {
+        "type": "script",
+        "command": "bobine home --json",
+        "search": "bobine search --json"
+      },
+      "keyword": [
+        "watch",
+        "film"
+      ],
+      "rootItems": false
+    }
+  ]
+}
