@@ -89,8 +89,9 @@ Item {
 
   // Same connection as Vocaline's: a Quickshell Socket keeps a dead connection and no longer
   // retries, so a new one is made at each try, and only once the socket exists (each failure
-  // would write a warning to the log). poste starts Navette with the session: the probe only
-  // runs while it is not there.
+  // would write a warning to the log). A stopped Navette may leave its socket file behind, so the
+  // probe asks `navette watch --once`, which says `off` when nothing answers on it. poste starts
+  // Navette with the session: the probe only runs while it is not there.
   property bool linked: !!link.item && link.item.connected
   Loader {
     id: link
@@ -104,7 +105,8 @@ Item {
   }
   Process {
     id: probe
-    command: ["test", "-S", nav.socketPath]
+    command: ["sh", "-c", "[ -S \"$1\" ] && out=$(timeout 5 navette watch --json --once) && case $out in *'\"state\":\"off\"'*) exit 1 ;; esac",
+      "sh", nav.socketPath]
     onExited: function(code) {
       if (code !== 0 || nav.linked) return
       link.active = false

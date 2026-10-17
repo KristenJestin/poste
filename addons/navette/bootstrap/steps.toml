@@ -17,11 +17,11 @@ busy = ["sh", "-c", "out=$(timeout 5 \"@HOME@/.local/bin/navette\" watch --json 
 
 # One unit, the same on both machines: `navette run --audio` reads the role of the pairing and
 # runs `serve` (desk) or `agent` (remote). poste never decides when it runs: away from the
-# desk's network, the agent sleeps (`away`). Not paired yet: it exits without looping.
+# desk's network, the agent sleeps (`away`). Not paired yet: it exits without looping. No
+# `requires`: it is read when the plan is made, before the install above on a first setup.
 [[user]]
 id = "navette-enable"
 title = "Navette: service enabled and started"
-requires = "navette"
 check = ["systemctl", "--user", "is-enabled", "--quiet", "navette.service"]
 run = [["systemctl", "--user", "daemon-reload"], ["systemctl", "--user", "enable", "--now", "navette.service"]]
 

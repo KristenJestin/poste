@@ -360,7 +360,13 @@ Rectangle {
     Flow {
       id: remoteActions
       anchors.horizontalCenter: parent.horizontalCenter
-      width: parent.width
+      // As wide as its chips, up to the card: centered under the text, wrapped when too many.
+      width: Math.min(parent.width, natural)
+      readonly property real natural: {
+        var w = 0, n = 0
+        for (var i = 0; i < children.length; i++) if (children[i].visible && children[i].width > 0) { w += children[i].width; n++ }
+        return w + Math.max(0, n - 1) * spacing
+      }
       spacing: 8
       visible: remoteCol.desk && (remoteCol.rm.phase === "linked" || remoteCol.rm.phase === "mode")
       // There: one chip per mode the provider lists (its default mode when it lists none).
@@ -377,7 +383,7 @@ Rectangle {
       }
       // Running: the mic, then stop.
       Chip {
-        visible: remoteCol.desk && remoteCol.rm.phase === "mode"
+        visible: remoteCol.desk && remoteCol.rm.phase === "mode" && remoteCol.rm.mic !== "off"
         label: !remoteCol.rm ? "" : remoteCol.rm.mic === "remote" ? "Mic to " + remoteCol.rm.peer
           : remoteCol.rm.mic === "failed" ? "Mic failed" : "Mic here"
         accent: !!remoteCol.rm && remoteCol.rm.mic === "remote"
