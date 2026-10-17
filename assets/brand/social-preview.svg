@@ -1,16 +1,21 @@
 <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1280" height="640" viewBox="0 0 1280 640">
-<!-- The mark, the name, the tagline, and below them the island of screen.svg, framed on its
-     launcher and the song playing. -->
+<!-- The mark, the name, the tagline, and below them the island of screen.svg on a plain screen,
+     framed on its launcher and the song playing. -->
 <defs>
+<pattern id="dots" width="19" height="19" patternUnits="userSpaceOnUse"><circle cx="9.5" cy="9.5" r="1.05" fill="#2a2520"/></pattern>
+<radialGradient id="glow" cx="940.0" cy="551.4" r="666.8" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#fb9f44" stop-opacity="0.13"/><stop offset="1" stop-color="#fb9f44" stop-opacity="0"/></radialGradient>
 <clipPath id="frame"><rect x="96" y="290" width="1088" height="400" rx="18"/></clipPath>
 </defs>
 <rect width="1280" height="640" fill="#14120f"/>
 <g transform="translate(372 70) scale(0.95) translate(-20 -72.1)"><rect x="20" y="72.1" width="160" height="55.8" rx="27.9" fill="#fb9f44"/><circle cx="49.8" cy="100" r="12.1" fill="#14120f"/><rect x="72.1" y="92.6" width="59.5" height="14.9" rx="7.4" fill="#14120f"/><circle cx="152.1" cy="100" r="7.4" fill="#14120f"/></g>
 <text x="560" y="136" font-family="Unbounded" font-weight="600" font-size="100" fill="#ece5d8">poste</text>
 <text x="640" y="236" text-anchor="middle" font-family="Open Sauce Sans" font-size="25" fill="#a39b8c">My Arch Linux and Omarchy setup, rebuilt in Rust, installed in one command.</text>
-<!-- screen.svg from (360, 152), scaled so 1240 of its width fill the 1088 of the frame. -->
+<!-- screen.svg from (280, 152), scaled so 1240 of its width fill the 1088 of the frame. -->
 <g clip-path="url(#frame)">
-<image href="screen.svg" xlink:href="screen.svg" x="-219.9" y="156.6" width="1403.9" height="877.4"/>
+<rect x="96" y="290" width="1088" height="400" fill="#1a1714"/>
+<rect x="96" y="290" width="1088" height="400" fill="url(#dots)"/>
+<rect x="96" y="290" width="1088" height="400" fill="url(#glow)"/>
+<image href="screen.svg" xlink:href="screen.svg" x="-149.7" y="156.6" width="1403.9" height="877.4"/>
 </g>
 <rect x="96" y="290" width="1088" height="400" rx="18" fill="none" stroke="#2e2a24" stroke-width="2"/>
 </svg>

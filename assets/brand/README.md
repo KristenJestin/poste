@@ -11,7 +11,7 @@ text `#ece5d8`.
 | `icon.svg` | the icon: the mark on a dark rounded square |
 | `icon-full.svg` | the full icon: an orange square with a dark pill |
 | `favicon.svg`, `favicon.ico` | the favicon, drawn for 16 to 64 pixels |
-| `screen.svg` | the island on a plain screen, no wallpaper: what plays, the workspaces, the time and a timer, the launcher unfolded on a search, and the song playing, drawn (no capture); the header of the poste article on kristenjestin.fr |
+| `screen.svg` | the island on a transparent ground, no wallpaper and no screen: what plays, the workspaces, the time and a timer, the launcher unfolded on a search, and the song playing, drawn (no capture); the header of the poste article on kristenjestin.fr |
 | `social-preview.svg` | the social preview of the repository and the banner of the README: the mark, the name, the tagline, and `screen.svg` framed below them |
 
 `png/` holds the icon at 128, 256, 512 and 1024 pixels, `apple-touch-icon.png`, the favicon at 16

@@ -1,27 +1,15 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1000" viewBox="0 0 1600 1000">
-<!-- The island of poste on a plain screen, no wallpaper: what plays, the workspaces, the time and a
+<!-- The island of poste, no wallpaper and no screen: what plays, the workspaces, the time and a
      timer, the launcher unfolded on a search anyone reads, and the song playing. Drawn, no capture.
+     The ground is transparent, so the page shows through; social-preview.svg puts a screen under it.
      The left part is left quiet: on a wide page a title sits over it. -->
 <defs>
-<pattern id="dots" width="22" height="22" patternUnits="userSpaceOnUse"><circle cx="11" cy="11" r="1.2" fill="#2a2520"/></pattern>
-<radialGradient id="glow" cx="1242" cy="450" r="760" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#fb9f44" stop-opacity="0.13"/><stop offset="1" stop-color="#fb9f44" stop-opacity="0"/></radialGradient>
 <linearGradient id="cover" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#e0645a"/><stop offset="1" stop-color="#7b3fa0"/></linearGradient>
 <linearGradient id="browser" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff7a2f"/><stop offset="1" stop-color="#c2307a"/></linearGradient>
-<clipPath id="screen"><rect x="90" y="150" width="1600" height="1000" rx="24"/></clipPath>
 <filter id="shadow" x="-20%" y="-20%" width="140%" height="150%"><feDropShadow dx="0" dy="24" stdDeviation="28" flood-color="#000" flood-opacity="0.55"/></filter>
 </defs>
-<rect width="1600" height="1000" fill="#14120f"/>
 
-<g clip-path="url(#screen)">
-<rect x="90" y="150" width="1600" height="1000" fill="#1a1714"/>
-<rect x="90" y="150" width="1600" height="1000" fill="url(#dots)"/>
-<rect x="90" y="150" width="1600" height="1000" fill="url(#glow)"/>
 
-<!-- Windows behind, only their outline. -->
-<rect x="210" y="410" width="560" height="600" rx="14" fill="#1f1b17" stroke="#26221d" stroke-width="2"/>
-<rect x="238" y="436" width="202" height="12" rx="6" fill="#2a2520"/><rect x="238" y="464" width="403" height="12" rx="6" fill="#2a2520"/><rect x="238" y="492" width="328" height="12" rx="6" fill="#2a2520"/><rect x="238" y="520" width="363" height="12" rx="6" fill="#2a2520"/>
-<rect x="1380" y="480" width="520" height="560" rx="14" fill="#1f1b17" stroke="#26221d" stroke-width="2"/>
-<rect x="1408" y="506" width="162" height="12" rx="6" fill="#2a2520"/><rect x="1408" y="534" width="325" height="12" rx="6" fill="#2a2520"/><rect x="1408" y="562" width="255" height="12" rx="6" fill="#2a2520"/>
 
 <!-- The island: the song playing, the workspaces and the time, a timer. -->
 <g filter="url(#shadow)">
@@ -75,13 +63,11 @@
 </g>
 
 <!-- The song playing, unfolded from its pill. -->
-<rect x="380" y="244" width="360" height="160" rx="26" fill="#050505" filter="url(#shadow)"/>
-<rect x="406" y="268" width="76" height="76" rx="14" fill="url(#cover)"/>
-<text x="500" y="302" font-family="Open Sauce Sans" font-weight="600" font-size="23" fill="#ece5d8">We Will Rock You</text>
-<text x="500" y="330" font-family="Open Sauce Sans" font-size="18" fill="#8a847c">Queen</text>
-<g font-family="Open Sauce Sans" font-size="14" fill="#8a847c"><text x="406" y="379">0:46</text><text x="714" y="379" text-anchor="end">−1:15</text></g>
-<rect x="451" y="371" width="209" height="6" rx="3" fill="#262321"/>
-<rect x="451" y="371" width="79" height="6" rx="3" fill="#9fd36b"/>
-</g>
-<rect x="90" y="150" width="1600" height="1000" rx="24" fill="none" stroke="#2c2722" stroke-width="2"/>
+<rect x="300" y="244" width="360" height="160" rx="26" fill="#050505" filter="url(#shadow)"/>
+<rect x="326" y="268" width="76" height="76" rx="14" fill="url(#cover)"/>
+<text x="420" y="302" font-family="Open Sauce Sans" font-weight="600" font-size="23" fill="#ece5d8">We Will Rock You</text>
+<text x="420" y="330" font-family="Open Sauce Sans" font-size="18" fill="#8a847c">Queen</text>
+<g font-family="Open Sauce Sans" font-size="14" fill="#8a847c"><text x="326" y="379">0:46</text><text x="634" y="379" text-anchor="end">−1:15</text></g>
+<rect x="371" y="371" width="209" height="6" rx="3" fill="#262321"/>
+<rect x="371" y="371" width="79" height="6" rx="3" fill="#9fd36b"/>
 </svg>
