@@ -1,8 +1,56 @@
-# poste
+<div align="center">
 
-`poste` is my work environment (Arch Linux, Hyprland, Omarchy), in Rust.
-It replaced the dotfiles repository managed by chezmoi: config, packages and machine setup
-are described here.
+<img src="assets/brand/png/social-preview.png" alt="poste: the island at the top of the screen, a song playing and a timer running, and the launcher unfolded on a search" width="100%">
+
+[![Archive of main](https://github.com/KristenJestin/poste/actions/workflows/archive.yml/badge.svg?branch=main)](https://github.com/KristenJestin/poste/actions/workflows/archive.yml)
+[![Latest build](https://img.shields.io/badge/build-latest-fb9f44)](https://github.com/KristenJestin/poste/releases/tag/latest)
+[![Last commit](https://img.shields.io/github/last-commit/KristenJestin/poste)](https://github.com/KristenJestin/poste/commits/main)
+
+</div>
+
+## What it is
+
+My Arch Linux and Omarchy setup, rebuilt in Rust. It replaced a dotfiles repository managed by
+chezmoi: the config of `~`, the Hyprland settings, the Quickshell island that replaces Omarchy's
+bar, the packages, the steps that rebuild a machine, and small modules for the everyday stuff
+(screen recording, AI agent quotas, file search, battery alerts). One command installs it on a
+fresh Omarchy, and the same command brings a machine up to date.
+
+Three rules shape it:
+
+- **`poste` knows no module.** It is a thin dispatcher, like git: `poste record start` runs the
+  program `poste-record`. A module is a folder with its program, its card, and the pieces it brings
+  to the island and to Hyprland. Take the folder away and nothing of it is left on the machine.
+- **Setup never overwrites what it did not put there, and never runs `sudo`.** It shows what it
+  will do, asks about every conflict, keeps a copy of what it replaces, and prints the root
+  commands for you to run.
+- **The repository is the same on every machine.** What belongs to one machine (screens, mounts,
+  its own steps) lives in a second, private repository, `poste-data`, laid over this one.
+
+## How it fits together
+
+```mermaid
+flowchart LR
+    repo[(poste: this repository)] --> setup{{poste sys setup}}
+    data[(poste-data: one per machine, private)] --> setup
+    setup -- "symbolic links" --> home["~/.config"]
+    setup -- "programs and cards" --> modules["~/.local/share/poste/modules"]
+    setup -- "prints, never runs" --> root[sudo and yay commands]
+    modules -- "island/" --> island[The island]
+    modules -- "hypr/" --> hypr[Hyprland]
+    you([You]) -- "poste record start" --> dispatcher[poste] -- "poste-record" --> modules
+```
+
+1. **The config is linked, not copied.** Editing a file in `~` edits the repository; there is no
+   drift and nothing to send back.
+2. **Each module carries its own pieces.** The island and Hyprland load whatever the installed
+   modules bring (launcher entries, island slots, shortcuts, systemd units), without naming any.
+3. **Two sources of truth, one per audience.** This public repository says how the machine works;
+   `poste-data` says what is specific to one machine. `poste sys sync` pulls both and runs setup.
+4. **Run from a clone or from a release.** A machine can follow the clone (`dev`) or an archive
+   built by GitHub Actions on every push to `main` (`release`), and roll back to an earlier one.
+
+Quick start on a fresh Omarchy: [Install on a new PC](#install-on-a-new-pc).
 
 ## The dispatcher
 
