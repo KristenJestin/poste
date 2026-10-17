@@ -1,7 +1,10 @@
 #!/bin/bash
 # Omarchy screenshot + 'snap' sound (poste-sfx) if a file was actually
 # created (no sound when the selection is cancelled).
-dir="${OMARCHY_SCREENSHOT_DIR:-${XDG_PICTURES_DIR:-$HOME/Pictures}}"
+# Screenshots go to Pictures/Screenshots (also set in environment.d, which
+# only reaches the session after a new login).
+export OMARCHY_SCREENSHOT_DIR="${OMARCHY_SCREENSHOT_DIR:-$HOME/Pictures/Screenshots}"
+dir=$OMARCHY_SCREENSHOT_DIR
 mark=$(mktemp)
 omarchy-capture-screenshot "$@"
 if [[ -n $(find "$dir" -maxdepth 1 -type f -newer "$mark" -print -quit 2>/dev/null) ]]; then
