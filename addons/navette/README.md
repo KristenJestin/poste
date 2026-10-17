@@ -59,6 +59,7 @@ In the machine's data repository, never in poste:
    sudo ufw allow in proto tcp from <remote address> to <desk address> port <port> comment navette
    ```
 
-   then `poste sys done navette-firewall`.
+   `setup` sees the rule by its `navette` comment and counts the step done (where
+   `/etc/ufw/user.rules` cannot be read without root: `poste sys done navette-firewall`).
 
 Removing it from the list removes the bubble; Navette and its service stay installed.

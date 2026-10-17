@@ -43,7 +43,9 @@ title = "Navette: pair the two machines (navette pair), systemctl --user restart
 
 # The desk only: its firewall lets the remote reach the pairing port. The rule holds the
 # machines' addresses: printed from the README, typed with sudo, never in this repository.
-# On the remote: `poste sys skip add navette-firewall`.
+# Done by itself once ufw holds a rule commented `navette` (ufw writes the comment in hex in
+# its rules file, readable without root on Omarchy; where it is not, `poste sys done navette-firewall`). On the remote: `poste sys skip add navette-firewall`.
 [[manual]]
 id = "navette-firewall"
-title = "Navette, desk only: ufw rule for the remote (addons/navette/README.md), then poste sys done navette-firewall"
+title = "Navette, desk only: ufw rule for the remote, commented navette (addons/navette/README.md), or poste sys done navette-firewall"
+check = ["grep", "-q", "comment=6e617665747465", "/etc/ufw/user.rules"]
