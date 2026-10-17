@@ -1,0 +1,87 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1000" viewBox="0 0 1600 1000">
+<!-- The island of poste on a plain screen, no wallpaper: what plays, the workspaces, the time and a
+     timer, the launcher unfolded on a search anyone reads, and the song playing. Drawn, no capture.
+     The left part is left quiet: on a wide page a title sits over it. -->
+<defs>
+<pattern id="dots" width="22" height="22" patternUnits="userSpaceOnUse"><circle cx="11" cy="11" r="1.2" fill="#2a2520"/></pattern>
+<radialGradient id="glow" cx="1242" cy="450" r="760" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#fb9f44" stop-opacity="0.13"/><stop offset="1" stop-color="#fb9f44" stop-opacity="0"/></radialGradient>
+<linearGradient id="cover" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#e0645a"/><stop offset="1" stop-color="#7b3fa0"/></linearGradient>
+<linearGradient id="browser" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff7a2f"/><stop offset="1" stop-color="#c2307a"/></linearGradient>
+<clipPath id="screen"><rect x="90" y="150" width="1600" height="1000" rx="24"/></clipPath>
+<filter id="shadow" x="-20%" y="-20%" width="140%" height="150%"><feDropShadow dx="0" dy="24" stdDeviation="28" flood-color="#000" flood-opacity="0.55"/></filter>
+</defs>
+<rect width="1600" height="1000" fill="#14120f"/>
+
+<g clip-path="url(#screen)">
+<rect x="90" y="150" width="1600" height="1000" fill="#1a1714"/>
+<rect x="90" y="150" width="1600" height="1000" fill="url(#dots)"/>
+<rect x="90" y="150" width="1600" height="1000" fill="url(#glow)"/>
+
+<!-- Windows behind, only their outline. -->
+<rect x="210" y="410" width="560" height="600" rx="14" fill="#1f1b17" stroke="#26221d" stroke-width="2"/>
+<rect x="238" y="436" width="202" height="12" rx="6" fill="#2a2520"/><rect x="238" y="464" width="403" height="12" rx="6" fill="#2a2520"/><rect x="238" y="492" width="328" height="12" rx="6" fill="#2a2520"/><rect x="238" y="520" width="363" height="12" rx="6" fill="#2a2520"/>
+<rect x="1380" y="480" width="520" height="560" rx="14" fill="#1f1b17" stroke="#26221d" stroke-width="2"/>
+<rect x="1408" y="506" width="162" height="12" rx="6" fill="#2a2520"/><rect x="1408" y="534" width="325" height="12" rx="6" fill="#2a2520"/><rect x="1408" y="562" width="255" height="12" rx="6" fill="#2a2520"/>
+
+<!-- The island: the song playing, the workspaces and the time, a timer. -->
+<g filter="url(#shadow)">
+<rect x="912" y="174" width="110" height="46" rx="23" fill="#050505"/>
+<rect x="1035" y="174" width="230" height="46" rx="23" fill="#050505"/>
+<rect x="1278" y="174" width="114" height="46" rx="23" fill="#050505"/>
+</g>
+<rect x="930" y="183" width="28" height="28" rx="7" fill="url(#cover)"/>
+<g fill="#9fd36b"><rect x="972" y="192" width="3" height="10" rx="1.5"/><rect x="978" y="188" width="3" height="18" rx="1.5"/><rect x="984" y="190.5" width="3" height="13" rx="1.5"/><rect x="990" y="187" width="3" height="20" rx="1.5"/><rect x="996" y="192.5" width="3" height="9" rx="1.5"/><rect x="1002" y="189.5" width="3" height="15" rx="1.5"/></g>
+<g font-family="Open Sauce Sans" font-weight="600" font-size="17" fill="#ece5d8">
+<text x="1057" y="203" text-anchor="middle">1</text>
+<circle cx="1088" cy="197" r="14" fill="#fb9f44"/><text x="1088" y="203" text-anchor="middle" fill="#0a0908">2</text>
+<text x="1120" y="203" text-anchor="middle">3</text>
+<text x="1144" y="203" text-anchor="middle" fill="#5a554f">4</text>
+<text x="1179" y="204" font-size="19">17:54</text>
+<text x="1334" y="204" font-size="19">8:12</text>
+</g>
+<rect x="1164" y="186" width="1" height="22" fill="#2f2a25"/>
+<circle cx="1243" cy="197" r="4.5" fill="#fb9f44"/>
+<circle cx="1307" cy="197" r="10" fill="none" stroke="#3a2a1a" stroke-width="4"/>
+<path d="M1307 187 A10 10 0 1 1 1297 197" fill="none" stroke="#fb9f44" stroke-width="4" stroke-linecap="round"/>
+
+<!-- The launcher, unfolded under the island. -->
+<rect x="862" y="244" width="580" height="450" rx="30" fill="#050505" filter="url(#shadow)"/>
+<g fill="none" stroke="#8a847c" stroke-width="2.2" stroke-linecap="round"><circle cx="899" cy="283.5" r="6.5"/><path d="M908.5 293 l-4.6 -4.6"/></g>
+<text x="928" y="294" font-family="Open Sauce Sans" font-size="24" fill="#ece5d8">fi</text>
+<rect x="945" y="273" width="2" height="26" fill="#fb9f44"/>
+<rect x="1241" y="270" width="66" height="30" rx="15" fill="#1d1c1b"/>
+<g font-family="Open Sauce Sans" font-weight="600" font-size="16"><text x="1274" y="291" text-anchor="middle" fill="#ece5d8">Apps</text><text x="1329" y="291" fill="#8a847c">Clipboard</text></g>
+<rect x="862" y="322" width="580" height="1" fill="#1d1b19"/>
+
+<rect x="878" y="338" width="548" height="70" rx="14" fill="#161514"/>
+<rect x="884" y="354" width="4" height="38" rx="2" fill="#fb9f44"/>
+<rect x="894" y="350" width="46" height="46" rx="12" fill="#3a6fd8"/>
+<path transform="translate(904 360) scale(1.083)" d="M3 6.5A1.5 1.5 0 0 1 4.5 5H9l2 2h8.5A1.5 1.5 0 0 1 21 8.5v9a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5z" fill="#fff"/>
+<rect x="894" y="421" width="46" height="46" rx="12" fill="url(#browser)"/>
+<g transform="translate(904 431) scale(1.083)" fill="none" stroke="#fff" stroke-width="2"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.6 2.4 2.6 14.6 0 17M12 3.5c-2.6 2.4-2.6 14.6 0 17"/></g>
+<rect x="894" y="492" width="46" height="46" rx="12" fill="#2a2725"/>
+<path transform="translate(905 503)" d="M5 5h14M5 12h14M5 19h9" fill="none" stroke="#e9e3da" stroke-width="2" stroke-linecap="round"/>
+<rect x="894" y="563" width="46" height="46" rx="12" fill="#2a2725"/>
+<g transform="translate(905 574)" fill="none" stroke="#e9e3da" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></g>
+<g font-family="Open Sauce Sans">
+<g font-weight="600" font-size="21" fill="#ece5d8"><text x="958" y="370">Files</text><text x="958" y="441">Firefox</text><text x="958" y="512">Find a window</text><text x="958" y="583">Timer</text></g>
+<g font-size="16" fill="#8a847c"><text x="958" y="393">Browse your folders</text><text x="958" y="464">Web browser</text><text x="958" y="535">Search open windows by title</text><text x="958" y="606">Start a timer on the island</text></g>
+</g>
+<rect x="862" y="640" width="580" height="1" fill="#1d1b19"/>
+<g font-family="Open Sauce Sans" font-size="15" fill="#8a847c">
+<rect x="1082" y="656" width="22" height="22" rx="6" fill="#1d1c1b"/><text x="1093" y="672" text-anchor="middle" font-size="13" font-weight="600" fill="#bdb6ad">↵</text><text x="1114" y="672">Open</text>
+<rect x="1173" y="656" width="49" height="22" rx="6" fill="#1d1c1b"/><text x="1197.5" y="672" text-anchor="middle" font-size="13" font-weight="600" fill="#bdb6ad">Ctrl B</text><text x="1230" y="672">Actions</text>
+<rect x="1303" y="656" width="37" height="22" rx="6" fill="#1d1c1b"/><text x="1321.5" y="672" text-anchor="middle" font-size="13" font-weight="600" fill="#bdb6ad">Tab</text><text x="1348" y="672">Clipboard</text>
+</g>
+
+<!-- The song playing, unfolded from its pill. -->
+<rect x="380" y="244" width="360" height="160" rx="26" fill="#050505" filter="url(#shadow)"/>
+<rect x="406" y="268" width="76" height="76" rx="14" fill="url(#cover)"/>
+<text x="500" y="302" font-family="Open Sauce Sans" font-weight="600" font-size="23" fill="#ece5d8">We Will Rock You</text>
+<text x="500" y="330" font-family="Open Sauce Sans" font-size="18" fill="#8a847c">Queen</text>
+<g font-family="Open Sauce Sans" font-size="14" fill="#8a847c"><text x="406" y="379">0:46</text><text x="714" y="379" text-anchor="end">−1:15</text></g>
+<rect x="451" y="371" width="209" height="6" rx="3" fill="#262321"/>
+<rect x="451" y="371" width="79" height="6" rx="3" fill="#9fd36b"/>
+</g>
+<rect x="90" y="150" width="1600" height="1000" rx="24" fill="none" stroke="#2c2722" stroke-width="2"/>
+</svg>

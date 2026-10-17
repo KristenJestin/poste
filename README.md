@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="assets/brand/png/social-preview.png" alt="poste: the island unfolded into the launcher on the Record extension, the selected preset framing its window on the screen" width="100%">
+<img src="assets/brand/png/social-preview.png" alt="poste: the island at the top of the screen, a song playing and a timer running, and the launcher unfolded on a search" width="100%">
 
 [![Archive of main](https://github.com/KristenJestin/poste/actions/workflows/archive.yml/badge.svg?branch=main)](https://github.com/KristenJestin/poste/actions/workflows/archive.yml)
 [![Latest build](https://img.shields.io/badge/build-latest-fb9f44)](https://github.com/KristenJestin/poste/releases/tag/latest)
