@@ -1,6 +1,5 @@
 # Steps of the navette add-on, merged with bootstrap/steps.toml when the add-on is chosen.
-# Written for Navette 0.2.0 (`install.sh`, `navette run`, `navette.service`, `events.sock`):
-# do not choose the add-on on a machine before that version is released.
+# Written for Navette 0.2.0 and later (`install.sh`, `navette run`, `navette.service`, `events.sock`).
 
 # Installed at its latest release if absent, then moved by `poste sys update`. The archive's
 # install.sh puts navette in ~/.local/bin, its icon and its user units, then `daemon-reload`; it

@@ -17,9 +17,10 @@ Item {
                                      // linked, starting, mode; both: incompatible; or a newer one, never shown
   property string peer: ""           // label of the other machine
   property string peerVersion: ""
+  property string version: ""        // Navette here: with peerVersion, which machine is behind
   property string mode: ""
   property var monitors: []
-  property var modes: []             // [{ name, monitors }], on the desk
+  property var modes: []             // [{ name, monitors }], on the desk; name "" for the unnamed mode
   property string mic: "off"         // desk, remote, failed, off
 
   // A session starts, runs or stops; something to show: that, the other machine there to drive
@@ -36,6 +37,7 @@ Item {
     phase = "off"
     peer = ""
     peerVersion = ""
+    version = ""
     mode = ""
     monitors = []
     modes = []
@@ -44,27 +46,45 @@ Item {
 
   function word(v) { return v === "home" ? "desk" : String(v) }
 
+  // The machine to update when the two do not talk: the one with the older minor version ("" when
+  // it cannot be told, or with a local build). "here" or "peer".
+  function behind() {
+    if (version.indexOf("-dev") !== -1 || peerVersion.indexOf("-dev") !== -1) return ""
+    var a = version.split("."), b = peerVersion.split(".")
+    for (var i = 0; i < 2; i++) {
+      var x = parseInt(a[i]), y = parseInt(b[i])
+      if (isNaN(x) || isNaN(y)) return ""
+      if (x !== y) return x < y ? "here" : "peer"
+    }
+    return ""
+  }
+
+  // Each line is the whole state: every field is read again, a missing or null one is empty. A line
+  // of another contract version is not guessed at: nothing is shown.
   function handle(line) {
     if (line.charAt(0) !== "{") return
     var ev
     try { ev = JSON.parse(line) } catch (e) { return }
     if (!ev || typeof ev !== "object") return
-    if (typeof ev.role === "string") role = word(ev.role)
-    if (typeof ev.state === "string") {
-      // An unknown state is kept as is: nothing is shown for it (`shown`), rather than the last
-      // known one. Out of a session, what belonged to it goes, unless this line says it again.
-      phase = ev.state
-      if (["starting", "mode", "stopping"].indexOf(ev.state) === -1) { mode = ""; monitors = []; mic = "off" }
+    if (ev.v !== 1) {
+      console.warn("navette: events contract v" + ev.v + " is not known here; update poste")
+      reset()
+      return
     }
-    if (typeof ev.peer === "string") peer = ev.peer
-    if (typeof ev.peer_version === "string") peerVersion = ev.peer_version
-    if ("mode" in ev) mode = typeof ev.mode === "string" ? ev.mode : ""
-    if (Array.isArray(ev.monitors)) monitors = ev.monitors.map(String)
-    if (Array.isArray(ev.modes)) modes = ev.modes.filter(function(m) { return m && typeof m.name === "string" })
-    if (typeof ev.mic === "string") {
-      var m = word(ev.mic)
-      if (["desk", "remote", "failed", "off"].indexOf(m) !== -1) mic = m
-    }
+    function str(v) { return typeof v === "string" ? v : "" }
+    role = word(str(ev.role))
+    // An unknown state is kept as is: nothing is shown for it (`shown`), rather than the last one.
+    phase = str(ev.state)
+    peer = str(ev.peer) || (role === "remote" ? "Desk" : "Remote")
+    peerVersion = str(ev.peer_version)
+    version = str(ev.version)
+    mode = str(ev.mode)
+    monitors = Array.isArray(ev.monitors) ? ev.monitors.map(String) : []
+    modes = !Array.isArray(ev.modes) ? [] : ev.modes
+      .filter(function(m) { return m && typeof m === "object" })
+      .map(function(m) { return { name: str(m.name), monitors: Array.isArray(m.monitors) ? m.monitors.map(String) : [] } })
+    var m = word(str(ev.mic))
+    mic = ["desk", "remote", "failed"].indexOf(m) !== -1 ? m : "off"
   }
 
   // Same connection as Vocaline's: a Quickshell Socket keeps a dead connection and no longer

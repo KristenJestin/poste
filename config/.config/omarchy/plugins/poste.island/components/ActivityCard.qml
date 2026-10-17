@@ -331,7 +331,11 @@ Rectangle {
         if (!rm) return ""
         if (rm.phase === "starting") return "Starting…"
         if (rm.phase === "stopping") return "Stopping…"
-        if (rm.phase === "incompatible") return "Other version" + (rm.peerVersion ? " (" + rm.peerVersion + ")" : "") + ": update both"
+        if (rm.phase === "incompatible") {
+          var late = rm.behind()
+          return "Other version" + (rm.peerVersion ? " (" + rm.peerVersion + ")" : "") + ": update "
+            + (late === "here" ? "this machine" : late === "peer" ? rm.peer : "one of them")
+        }
         if (rm.phase === "mode") return remoteCol.desk
           ? (rm.mode ? rm.mode + "  ·  " : "") + rm.monitors.join(", ")
           : "Driven from"

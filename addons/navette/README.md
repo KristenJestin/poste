@@ -5,8 +5,7 @@ Hyprland machines, into the desktop: a bubble left of the island when the other 
 its mode and its mic. Navette itself (the link, the pictures, the keyboard, the sound) is not in
 poste: this add-on installs it, keeps its service running and shows what it says.
 
-Written for Navette 0.2.0 (`install.sh`, `navette run`, `navette.service`, `events.sock`): do not
-choose it on a machine before that version is released.
+Written for Navette 0.2.0 and later (`install.sh`, `navette run`, `navette.service`, `events.sock`).
 
 ## How it works
 

@@ -739,8 +739,9 @@ Item {
   // mode). Contract of the loaded element: read properties `shown` (something to show: the other
   // machine is there, or a session runs), `role` (desk, remote), `phase` (linked, starting, mode,
   // stopping, incompatible…), `peer` (the other machine's label), `peerVersion`, `mode`,
-  // `monitors`, `modes` ([{ name, monitors }], on the desk), `mic` (desk, remote, failed, off);
-  // functions `start(name)`, `stop()`, `toggleMic()`. The bubble, left of the island, follows the
+  // `version` (this machine's), `monitors`, `modes` ([{ name, monitors }], on the desk, name "" for
+  // the unnamed mode), `mic` (desk, remote, failed, off); functions `behind()` ("here", "peer" or ""),
+  // `start(name)`, `stop()`, `toggleMic()`. The bubble, left of the island, follows the
   // first one that has something to show.
   property var remoteItems: []
   function collectRemotes() {
