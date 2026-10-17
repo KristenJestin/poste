@@ -81,11 +81,11 @@ Item {
   }
 
   // Click on the remote bubble: starts the mode at once when the desk has only one to start;
-  // otherwise (several modes, a session running) the card opens.
+  // otherwise (no mode or several, a session running) the card opens.
   function quickStart() {
     var rm = host.remote
-    if (!rm || rm.role !== "desk" || rm.phase !== "linked" || rm.modes.length > 1) return false
-    rm.start(rm.modes.length === 1 ? rm.modes[0].name : "")
+    if (!rm || rm.role !== "desk" || rm.phase !== "linked" || rm.modes.length !== 1) return false
+    rm.start(rm.modes[0].name)
     return true
   }
 

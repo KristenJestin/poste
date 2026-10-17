@@ -339,7 +339,7 @@ Rectangle {
         if (rm.phase === "mode") return remoteCol.desk
           ? (rm.mode ? rm.mode + "  ·  " : "") + rm.monitors.join(", ")
           : "Driven from"
-        return "Here"
+        return remoteCol.desk && !rm.modes.length ? "No mode: write one in Navette's mode.conf" : "Here"
       }
       color: remoteCol.rm && remoteCol.rm.phase === "incompatible" ? "#ff9f0a" : card.host.colorMuted
       font.family: card.host.uiFont
@@ -368,11 +368,10 @@ Rectangle {
         return w + Math.max(0, n - 1) * spacing
       }
       spacing: 8
-      visible: remoteCol.desk && (remoteCol.rm.phase === "linked" || remoteCol.rm.phase === "mode")
-      // There: one chip per mode the provider lists (its default mode when it lists none).
+      visible: remoteCol.desk && ((remoteCol.rm.phase === "linked" && remoteCol.rm.modes.length > 0) || remoteCol.rm.phase === "mode")
+      // There: one chip per mode the provider lists (none listed: nothing to start).
       Repeater {
-        model: remoteCol.desk && remoteCol.rm.phase === "linked"
-          ? (remoteCol.rm.modes.length ? remoteCol.rm.modes : [{ name: "" }]) : []
+        model: remoteCol.desk && remoteCol.rm.phase === "linked" ? remoteCol.rm.modes : []
         delegate: Chip {
           required property var modelData
           required property int index

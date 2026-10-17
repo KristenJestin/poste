@@ -28,9 +28,14 @@ Item {
   readonly property bool running: phase === "starting" || phase === "mode" || phase === "stopping"
   readonly property bool shown: running || phase === "incompatible" || (role === "desk" && phase === "linked")
 
-  function start(name) { Quickshell.execDetached(name ? ["navette", "mode", "start", name] : ["navette", "mode", "start"]) }
-  function stop() { Quickshell.execDetached(["navette", "mode", "stop"]) }
-  function toggleMic() { Quickshell.execDetached(["navette", "mic", "toggle"]) }
+  // The actions run the navette command; when it fails, what it says (`navette: ...` on stderr)
+  // comes up as a notification, rather than a click that does nothing.
+  function run(args) {
+    Quickshell.execDetached(["sh", "-c", "out=$(navette \"$@\" 2>&1) || notify-send -a Navette -i navette Navette \"${out#navette: }\"", "sh"].concat(args))
+  }
+  function start(name) { run(name ? ["mode", "start", name] : ["mode", "start"]) }
+  function stop() { run(["mode", "stop"]) }
+  function toggleMic() { run(["mic", "toggle"]) }
 
   function reset() {
     role = ""
