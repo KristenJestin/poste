@@ -135,16 +135,32 @@ impl Index {
         &self.text[s.name as usize..s.end as usize]
     }
 
+    /// The query without the home folder in front of its words: the index keeps the paths
+    /// inside it relative, so a pasted `/home/<user>/x` or `~/x` must look for `x`.
+    fn strip_home(&self, query: &str) -> String {
+        let bare = self.home.trim_end_matches('/');
+        query
+            .split_whitespace()
+            .filter(|w| *w != "~" && *w != bare && *w != self.home)
+            .map(|w| {
+                w.strip_prefix(self.home.as_str())
+                    .or_else(|| w.strip_prefix("~/"))
+                    .unwrap_or(w)
+            })
+            .collect::<Vec<_>>()
+            .join(" ")
+    }
+
     /// The `limit` best results. Each word of the query must be found, letters in order, in
     /// the path; a matching file name comes before a matching path, and at equal score the
     /// shortest wins. Few results and a word of 6 letters or more: try again allowing one typo
     /// in each such word, the other words still required.
     pub fn search(&self, query: &str, limit: usize) -> Vec<Hit> {
-        let query = query.trim();
+        let query = self.strip_home(query);
         if query.is_empty() || limit == 0 {
             return Vec::new();
         }
-        let patterns = Pattern::parse_query(query);
+        let patterns = Pattern::parse_query(&query);
         if patterns.is_empty() {
             return Vec::new();
         }
@@ -308,6 +324,16 @@ mod tests {
             .iter()
             .all(|h| !h.path.starts_with("/h/Doc")));
         assert!(ix.search("   ", 10).is_empty());
+        // A pasted absolute path, or one from "~", finds what its relative form finds.
+        for q in ["/h/Documents/invoice", "~/Documents/invoice", "/h Documents/invoice"] {
+            assert_eq!(
+                ix.search(q, 10)[0].path,
+                "/h/Documents/invoice-2026.pdf",
+                "{q}"
+            );
+        }
+        assert!(ix.search("/h/", 10).is_empty());
+        assert!(ix.search("~", 10).is_empty());
         // Mixed case: ignored.
         assert_eq!(
             ix.search("InVoice", 10)[0].path,
