@@ -436,9 +436,13 @@ Item {
   }
   function engineUrlFor(engine, text) { return engine.url.replace("%s", encodeURIComponent(String(text).trim())) }
 
-  // extCache[id] = { items: [...], at: ms, loading: bool }
+  // extCache[id] = { items: [...], at: ms, loading: bool, started: ms }
   property var extCache: ({})
   property var extQueue: []
+  // A source that has not finished after this long is given up: the queue
+  // runs one source at a time, so one that never ends would freeze every
+  // extension (Record, refreshed at each opening, kept its first list).
+  readonly property int sourceTimeout: 20000
   function setCache(id, entry) {
     var next = {}
     for (var k in extCache) next[k] = extCache[k]
@@ -450,29 +454,47 @@ Item {
       var ext = extensions[i]
       var c = extCache[ext.id]
       var ttl = (Number(ext.ttl) || 300) * 1000
-      if (!force && c && (c.loading || Date.now() - c.at < ttl)) continue
+      var loading = c && c.loading && Date.now() - (c.started || 0) < sourceTimeout
+      if (!force && c && (loading || Date.now() - c.at < ttl)) continue
       if (extQueue.indexOf(ext.id) === -1) extQueue = extQueue.concat([ext.id])
     }
     runNextSource()
   }
   function runNextSource() {
-    if (sourceProc.running || extQueue.length === 0) return
+    if (extQueue.length === 0) return
+    if (sourceProc.running) {
+      if (Date.now() - sourceProc.startedAt < sourceTimeout) return
+      console.warn("poste.island: source " + sourceProc.extId + " still running after " + sourceTimeout / 1000 + " s, stopped")
+      var stuck = extCache[sourceProc.extId]
+      if (stuck) setCache(sourceProc.extId, { items: stuck.items, at: stuck.at, loading: false })
+      // Its output, if any comes, is dropped; the next source starts on its
+      // exit, or at the next opening if it never says it exited.
+      sourceProc.stopped = true
+      sourceProc.running = false
+      return
+    }
     var id = extQueue[0]
     extQueue = extQueue.slice(1)
     var ext = extensionById(id)
     if (!ext || ext.source.type !== "script") { runNextSource(); return }
     var prior = extCache[id]
-    setCache(id, { items: prior ? prior.items : [], at: prior ? prior.at : 0, loading: true })
+    if (prior && prior.loading) console.warn("poste.island: source " + id + " never finished, run again")
+    setCache(id, { items: prior ? prior.items : [], at: prior ? prior.at : 0, loading: true, started: Date.now() })
     sourceProc.extId = id
+    sourceProc.startedAt = Date.now()
+    sourceProc.stopped = false
     sourceProc.command = ["bash", "-c", expandHome(ext.source.command)]
     sourceProc.running = true
   }
   Process {
     id: sourceProc
     property string extId: ""
+    property real startedAt: 0
+    property bool stopped: false
     stdout: StdioCollector {
       waitForEnd: true
       onStreamFinished: {
+        if (sourceProc.stopped) return
         var list = []
         try { list = JSON.parse(text) } catch (e) { console.warn("poste.island: source " + sourceProc.extId + " printed invalid JSON") }
         launcher.setCache(sourceProc.extId, { items: Array.isArray(list) ? list : [], at: Date.now(), loading: false })
