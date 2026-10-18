@@ -441,8 +441,12 @@ Item {
   property var extQueue: []
   // A source that has not finished after this long is given up: the queue
   // runs one source at a time, so one that never ends would freeze every
-  // extension (Record, refreshed at each opening, kept its first list).
+  // extension.
   readonly property int sourceTimeout: 20000
+  // Whether a time is less than `ms` ago. A time in the future counts as old:
+  // a clock set back (a boot with the hardware clock in local time, then NTP)
+  // would otherwise keep a list fresh for hours.
+  function recent(t, ms) { var age = Date.now() - t; return age >= 0 && age < ms }
   function setCache(id, entry) {
     var next = {}
     for (var k in extCache) next[k] = extCache[k]
@@ -454,8 +458,8 @@ Item {
       var ext = extensions[i]
       var c = extCache[ext.id]
       var ttl = (Number(ext.ttl) || 300) * 1000
-      var loading = c && c.loading && Date.now() - (c.started || 0) < sourceTimeout
-      if (!force && c && (loading || Date.now() - c.at < ttl)) continue
+      var loading = c && c.loading && recent(c.started || 0, sourceTimeout)
+      if (!force && c && (loading || recent(c.at, ttl))) continue
       if (extQueue.indexOf(ext.id) === -1) extQueue = extQueue.concat([ext.id])
     }
     runNextSource()
@@ -463,7 +467,7 @@ Item {
   function runNextSource() {
     if (extQueue.length === 0) return
     if (sourceProc.running) {
-      if (Date.now() - sourceProc.startedAt < sourceTimeout) return
+      if (recent(sourceProc.startedAt, sourceTimeout)) return
       console.warn("poste.island: source " + sourceProc.extId + " still running after " + sourceTimeout / 1000 + " s, stopped")
       var stuck = extCache[sourceProc.extId]
       if (stuck) setCache(sourceProc.extId, { items: stuck.items, at: stuck.at, loading: false })
