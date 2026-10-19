@@ -136,16 +136,22 @@ impl Index {
     }
 
     /// The query without the home folder in front of its words: the index keeps the paths
-    /// inside it relative, so a pasted `/home/<user>/x` or `~/x` must look for `x`.
+    /// inside it relative, so a pasted `/home/<user>/x` or `~/x` must look for `x`, also behind
+    /// an operator (`^~/x`, `!~/x`).
     fn strip_home(&self, query: &str) -> String {
         let bare = self.home.trim_end_matches('/');
         query
             .split_whitespace()
-            .filter(|w| *w != "~" && *w != bare && *w != self.home)
-            .map(|w| {
-                w.strip_prefix(self.home.as_str())
-                    .or_else(|| w.strip_prefix("~/"))
-                    .unwrap_or(w)
+            .filter_map(|w| {
+                let (op, rest) = w.split_at(w.len() - w.trim_start_matches(['!', '^', '\'']).len());
+                if rest == "~" || rest == bare {
+                    return None;
+                }
+                let rest = rest
+                    .strip_prefix(self.home.as_str())
+                    .or_else(|| rest.strip_prefix("~/"))
+                    .unwrap_or(rest);
+                Some(format!("{op}{rest}"))
             })
             .collect::<Vec<_>>()
             .join(" ")
@@ -325,7 +331,11 @@ mod tests {
             .all(|h| !h.path.starts_with("/h/Doc")));
         assert!(ix.search("   ", 10).is_empty());
         // A pasted absolute path, or one from "~", finds what its relative form finds.
-        for q in ["/h/Documents/invoice", "~/Documents/invoice", "/h Documents/invoice"] {
+        for q in [
+            "/h/Documents/invoice",
+            "~/Documents/invoice",
+            "/h Documents/invoice",
+        ] {
             assert_eq!(
                 ix.search(q, 10)[0].path,
                 "/h/Documents/invoice-2026.pdf",
@@ -334,6 +344,18 @@ mod tests {
         }
         assert!(ix.search("/h/", 10).is_empty());
         assert!(ix.search("~", 10).is_empty());
+        // Also behind an operator: anchored at the start, or excluded.
+        for q in ["^/h/Documents/invoice", "^~/Documents/invoice"] {
+            assert_eq!(
+                ix.search(q, 10)[0].path,
+                "/h/Documents/invoice-2026.pdf",
+                "{q}"
+            );
+        }
+        assert!(ix
+            .search("bind !~/Projects", 10)
+            .iter()
+            .all(|h| !h.path.starts_with("/h/Projects")));
         // Mixed case: ignored.
         assert_eq!(
             ix.search("InVoice", 10)[0].path,
