@@ -10,10 +10,10 @@ Written for Bobine 0.2.0 and later (`install.sh` in its release archive, and its
 
 ## What it brings
 
-- **Launcher** (`island/launcher.json`): the 'Films and series' extension, keyword `watch`, `film` or
-  `series`.
+- **Launcher** (`island/launcher.json`): the 'Movies and shows' extension, keyword `watch`,
+  `movie`, `film` or `series`.
   Without typing, `bobine home --json` (Continue Watching, then Next Up); while typing,
-  `bobine search --json` (films and series). The entries and their actions (resume, play from the
+  `bobine search --json` (movies and shows). The entries and their actions (resume, play from the
   start, open the page) come as they are from Bobine, in the launcher's JSON format; `open` and
   `play` go to the Bobine window already running, or open one when none is.
 - **App**: Bobine's `install.sh` puts 'Bobine' (its window) among the launcher's apps, with its
