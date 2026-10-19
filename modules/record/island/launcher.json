@@ -15,8 +15,7 @@
         "recording",
         "capture",
         "video",
-        "screen",
-        "unity"
+        "screen"
       ],
       "ttl": 1,
       "source": {

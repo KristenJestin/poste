@@ -1,0 +1,6 @@
+name = "unity"
+requires = "unity"
+description = "Unity projects in the launcher: the ones Unity Hub knows plus the ones found under the roots"
+commands = [
+  { name = "projects", description = "the Unity projects, newest first (--json for the launcher)" },
+]

@@ -46,29 +46,6 @@
   ],
   "extensions": [
     {
-      "id": "unity",
-      "name": "Unity Projects",
-      "subtitle": "Open a project in the editor",
-      "icon": "unityhub",
-      "keywords": [
-        "editor",
-        "unity",
-        "game",
-        "project",
-        "projects"
-      ],
-      "ttl": 300,
-      "source": {
-        "type": "script",
-        "command": "~/.config/poste-island/launcher/extensions/unity-projects"
-      },
-      "keyword": [
-        "open",
-        "proj"
-      ],
-      "requires": "unity"
-    },
-    {
       "id": "ssh",
       "name": "SSH",
       "subtitle": "Connect to a server",

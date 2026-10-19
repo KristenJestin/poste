@@ -116,9 +116,17 @@ Item {
       }
     }
   }
+  // Desktop ids hidden by a shown extension ("hiddenApps"; "prefix*" for a family of ids):
+  // entries a program installs and that the extension replaces.
+  property var docHiddenApps: []
   function isHidden(entry) {
     var id = String(entry.id || "")
-    return entry.noDisplay || desktopHidden[id] === true || blacklist.indexOf(id) !== -1
+    if (entry.noDisplay || desktopHidden[id] === true || blacklist.indexOf(id) !== -1) return true
+    for (var i = 0; i < docHiddenApps.length; i++) {
+      var h = docHiddenApps[i]
+      if (h.charAt(h.length - 1) === "*" ? id.indexOf(h.slice(0, -1)) === 0 : id === h) return true
+    }
+    return false
   }
   Component.onCompleted: Quickshell.execDetached(["mkdir", "-p", Quickshell.env("HOME") + "/.local/state/poste-island"])
   function saveState() {
@@ -375,6 +383,10 @@ Item {
       engs = engs.concat((doc.engines || []).filter(function(e) { return e && e.enabled !== false && e.keyword && e.name && String(e.url || "").indexOf("%s") !== -1 && launcher.shownHere(e) }))
     }
     launcher.userItems = items
+    var hiddenApps = []
+    for (var x = 0; x < exts.length; x++)
+      if (Array.isArray(exts[x].hiddenApps)) hiddenApps = hiddenApps.concat(exts[x].hiddenApps.map(String).filter(function(h) { return h.length > 0 }))
+    launcher.docHiddenApps = hiddenApps
     launcher.extensions = exts
     launcher.engines = engs
     launcher.extCache = ({})
@@ -909,7 +921,13 @@ Item {
         var cached = (extCache[extensions[ey].id] || {}).items || []
         for (var ci = 0; ci < cached.length; ci++) {
           var ns = q ? matchScore(cached[ci], q) : 0
-          if (ns >= 0) cands.push({ row: itemRow(cached[ci], extensions[ey].name + " › " + String(cached[ci].subtitle || cached[ci].name), extensions[ey].id), s: ns })
+          if (ns < 0) continue
+          var irow = itemRow(cached[ci], extensions[ey].name + " › " + String(cached[ci].subtitle || cached[ci].name), extensions[ey].id)
+          // Out of its extension, an entry with a verb says what Enter does ('Record Unity'),
+          // so it is not mistaken for the app of the same name ('Stop recording' stays as is).
+          var verb = String(cached[ci].verb || "")
+          if (verb && irow.title.toLowerCase().indexOf(verb.toLowerCase() + " ") !== 0) irow.title = verb + " " + irow.title
+          cands.push({ row: irow, s: ns })
         }
       }
       for (var c2 = 0; c2 < cands.length; c2++) cands[c2].f = frecency(cands[c2].row.key)

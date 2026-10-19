@@ -1,0 +1,31 @@
+{
+  "//": "Launcher extension of the unity module (format: docs/launcher-format.md). While it is shown, the editors Unity Hub installs as desktop entries are hidden: a project opens with its own editor from here.",
+  "extensions": [
+    {
+      "id": "unity",
+      "name": "Unity Projects",
+      "subtitle": "Open a project in the editor",
+      "icon": "unityhub",
+      "keywords": [
+        "editor",
+        "unity",
+        "game",
+        "project",
+        "projects"
+      ],
+      "keyword": [
+        "open",
+        "proj"
+      ],
+      "ttl": 300,
+      "requires": "unity",
+      "source": {
+        "type": "script",
+        "command": "poste unity projects --json"
+      },
+      "hiddenApps": [
+        "unityhub-unity-editor*"
+      ]
+    }
+  ]
+}

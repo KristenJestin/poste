@@ -40,6 +40,9 @@ The reference implementation is `components/Launcher.qml` of the island.
 - `rootItems: false`: the results only show inside the extension, not in the main list.
 - `requires` (optional): a command that must be in the `PATH` (or `plugin:<id>`, an installed
   Omarchy plugin), one value or a list; otherwise the extension is hidden.
+- `hiddenApps` (optional): desktop ids (without `.desktop`) the launcher no longer lists as apps
+  while the extension is shown, `prefix*` for a family of ids. For entries a program installs and
+  that the extension replaces (`"hiddenApps": ["unityhub-unity-editor*"]`).
 
 ### Nothing typed yet
 
@@ -78,7 +81,7 @@ Both commands print, on stdout, a JSON array of entries:
 | `subtitle` | second line, muted |
 | `icon` | an icon name of the theme, a file path (`/…` or `~/…`), or a glyph / emoji |
 | `keywords` | more words matched by the fuzzy filter |
-| `verb` | label of the main action (`Open` by default; `Play` shows a play glyph) |
+| `verb` | label of the main action (`Open` when missing; `Play` shows a play glyph). When set, the main list (outside the extension) reads `<verb> <name>`, unless the name already starts with it |
 | `action` | what Enter does (see below) |
 | `actions` | secondary actions, shown with →: `{ "label", "icon", "action" }` |
 | `highlight` | optional `{ x, y, w, h, window }`: a frame drawn on screen around the target while the line is selected (only when the extension has `"highlight": true`) |

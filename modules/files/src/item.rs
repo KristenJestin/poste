@@ -40,18 +40,6 @@ pub fn icon_for(path: &str, is_dir: bool) -> &'static str {
     }
 }
 
-/// Quotes a word for the shell when it holds anything but safe characters.
-pub fn shell_word(s: &str) -> String {
-    if !s.is_empty()
-        && s.chars()
-            .all(|c| c.is_ascii_alphanumeric() || "_./:-+@".contains(c))
-    {
-        s.to_string()
-    } else {
-        format!("'{}'", s.replace('\'', "'\\''"))
-    }
-}
-
 /// A launcher entry: Enter opens it (default application, file manager for a folder) and
 /// remembers it in the recent files; four secondary actions.
 pub fn to_json(env: &Env, hit: &Hit) -> Value {
@@ -63,7 +51,7 @@ pub fn to_json(env: &Env, hit: &Hit) -> Value {
     let parent = p.parent().unwrap_or(p);
     // Terminal: in the folder itself, or in the file's folder.
     let term_dir = if hit.is_dir { p } else { parent };
-    let quoted = shell_word(&hit.path);
+    let quoted = poste_core::shell::word(&hit.path);
     json!({
         "id": format!("file:{}", hit.path),
         "name": name,

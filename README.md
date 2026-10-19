@@ -100,6 +100,7 @@ commands = [{ name = "status", description = "state of the repository" }]   # op
 | [`record`](modules/record/README.md) | screen recording (gpu-screen-recorder) driven by the island: presets, windows, screens, region. |
 | [`usage`](modules/usage/README.md) | AI agent quotas (Claude Code, Codex…) read from Omarchy's collector, their history, and the consumption read back from the agents' logs (calls, 5 h windows, comparisons). |
 | [`power`](modules/power/README.md) | battery alerts (low, critical, plugged in but draining) and almost-full disk; light daemon (laptops). |
+| [`unity`](modules/unity/README.md) | the Unity projects of the machine (Unity Hub's and the ones under `~/Projects`) in the island launcher; hides the editor entries Unity Hub installs. |
 | [`files`](modules/files/README.md) | fast file search in the island launcher (SUPER+D): index on disk rebuilt at each opening, no daemon, exclusions in .gitignore syntax. |
 
 A module is a separate application, in `modules/<name>/`, with its `README.md`,

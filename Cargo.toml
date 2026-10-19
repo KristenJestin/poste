@@ -1,7 +1,7 @@
 [workspace]
 resolver = "2"
 # Rust modules only: a script module (condense…) has no Cargo.toml and is not listed.
-members = ["core", "poste", "modules/sys", "modules/record", "modules/power", "modules/usage", "modules/files"]
+members = ["core", "poste", "modules/sys", "modules/record", "modules/power", "modules/usage", "modules/files", "modules/unity"]
 
 [workspace.package]
 version = "0.1.0"

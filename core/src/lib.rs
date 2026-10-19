@@ -5,6 +5,7 @@ pub mod config;
 pub mod env;
 pub mod modules;
 pub mod notify;
+pub mod shell;
 pub mod time;
 
 pub use config::{Config, Source};

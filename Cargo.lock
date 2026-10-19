@@ -762,6 +762,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "poste-unity"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "poste-core",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "toml",
+]
+
+[[package]]
 name = "poste-usage"
 version = "0.1.0"
 dependencies = [
