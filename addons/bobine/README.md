@@ -10,7 +10,8 @@ Written for Bobine 0.2.0 and later (`install.sh` in its release archive, and its
 
 ## What it brings
 
-- **Launcher** (`island/launcher.json`): the 'Films' extension, keyword `watch` or `film`.
+- **Launcher** (`island/launcher.json`): the 'Films and series' extension, keyword `watch`, `film` or
+  `series`.
   Without typing, `bobine home --json` (Continue Watching, then Next Up); while typing,
   `bobine search --json` (films and series). The entries and their actions (resume, play from the
   start, open the page) come as they are from Bobine, in the launcher's JSON format; `open` and

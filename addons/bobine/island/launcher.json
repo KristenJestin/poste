@@ -3,8 +3,8 @@
   "extensions": [
     {
       "id": "bobine",
-      "name": "Films",
-      "subtitle": "Bobine · resume, films and series",
+      "name": "Films and series",
+      "subtitle": "Bobine · resume and search",
       "icon": "󰿎",
       "keywords": [
         "bobine",
@@ -27,7 +27,8 @@
       },
       "keyword": [
         "watch",
-        "film"
+        "film",
+        "series"
       ],
       "rootItems": false
     }
