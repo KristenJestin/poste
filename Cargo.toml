@@ -6,7 +6,7 @@ members = ["core", "poste", "modules/sys", "modules/record", "modules/power", "m
 [workspace.package]
 version = "0.1.0"
 edition = "2021"
-license = "MIT"
+license = "AGPL-3.0-only"
 publish = false
 
 [workspace.dependencies]
