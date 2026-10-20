@@ -413,3 +413,7 @@ managed so far by chezmoi. `bootstrap/` describes the rest of the machine (packa
 ## Coming
 
 A `poste sys` command planned, not there yet: `install <module>`.
+
+## Licence
+
+Free software under the [AGPL-3.0](LICENSE). Some pieces keep their own licence, with their notice beside them: parts of the island plugin are adapted from [Island](https://github.com/Guilhermerisu/island) (MIT, [`LICENSE-island`](config/.config/omarchy/plugins/poste.island/LICENSE-island)), the island's icons are Tabler icons (MIT, [`LICENSE`](config/.config/omarchy/plugins/poste.island/assets/tabler/LICENSE)), and the fonts in `config/.local/share/fonts/poste` are Tabler icons (MIT) and Fira Code (SIL Open Font License 1.1, [`LICENSE-firacode`](config/.local/share/fonts/poste/LICENSE-firacode)). The sounds are CC0.
