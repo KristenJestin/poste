@@ -1,4 +1,5 @@
 import QtQuick
+import Quickshell
 import Quickshell.Widgets
 
 // An island activity unfolded, under its bubble (hover or click):
@@ -32,7 +33,7 @@ Rectangle {
 
   width: kind === "ai" ? 360 : kind === "music" ? 360 : kind === "obs" ? 330 : 320
   // Music without a known duration (YouTube…): no progress bar, shorter card.
-  height: kind === "remote" ? remoteCol.implicitHeight + 36 : kind === "obs" ? 132 : kind === "timer" ? 132 : kind === "battery" || kind === "device" ? 64 : kind === "music" ? (musicCard.length > 0 ? 132 : 100) : aiCol.implicitHeight + 28
+  height: kind === "remote" ? remoteCol.implicitHeight + 36 : kind === "obs" ? 132 : kind === "timer" ? 132 : kind === "battery" || kind === "device" ? 64 : kind === "music" ? Math.max(100, musicCard.implicitHeight) : aiCol.implicitHeight + 28
   radius: kind === "battery" || kind === "device" ? height / 2 : 28
   color: host.colorIsland
   border.width: kind === "timer" ? 0 : 1
@@ -397,150 +398,33 @@ Rectangle {
   }
 
   // ================================================ music
-  Item {
+  // One tile per player with a track (MusicTile), the island's first, so each can be paused.
+  Column {
     id: musicCard
-    anchors.fill: parent
+    anchors.left: parent.left
+    anchors.right: parent.right
     visible: card.kind === "music"
-    readonly property var mpris: card.host.player
-    // Wheel on the card: player volume, 5 % per notch.
-    WheelHandler { onWheel: function(event) { card.host.wheelPlayerVolume(event.angleDelta.y) } }
-    readonly property real length: mpris && mpris.lengthSupported ? mpris.length : 0
-    property real position: 0
-    // MPRIS only reports the position at jumps: it is read again as long as the card is there.
-    Timer {
-      interval: 500
-      repeat: true
-      triggeredOnStart: true
-      running: musicCard.visible && card.visible
-      onTriggered: musicCard.position = musicCard.mpris ? musicCard.mpris.position : 0
-    }
-    function clock(sec) { sec = Math.max(0, Math.floor(sec || 0)); return Math.floor(sec / 60) + ":" + String(sec % 60).padStart(2, "0") }
-    ClippingRectangle {
-      id: bigCover
-      x: 18
-      y: 18
-      width: 64; height: 64; radius: 14
-      color: card.host.withAlpha(card.host.colorAccent, 0.3)
-      Image {
-        id: bigArt
-        anchors.fill: parent
-        source: card.kind === "music" ? card.host.mediaArt : ""
-        sourceSize.width: 128
-        sourceSize.height: 128
-        fillMode: Image.PreserveAspectCrop
-        asynchronous: true
-        cache: false
-        visible: status === Image.Ready
-      }
-      // Level after a wheel notch, over the cover.
-      Rectangle {
-        anchors.fill: parent
-        color: Qt.rgba(0, 0, 0, 0.55)
-        opacity: card.host.playerVolumeHintShown ? 1 : 0
-        Behavior on opacity { NumberAnimation { duration: 120 } }
-        Text {
-          anchors.centerIn: parent
-          text: Math.round(Math.max(0, card.host.playerVolume) * 100) + " %"
-          color: "#ffffff"
-          font.family: card.host.uiFont
-          font.pixelSize: 14
-          font.weight: Font.DemiBold
-          font.features: { "tnum": 1 }
-        }
-      }
-      Glyph { anchors.centerIn: parent; visible: bigArt.status !== Image.Ready; glyph: "󰝚"; color: card.host.colorAccentText; fontFamily: card.host.fontFamily; pixelSize: 24 }
-      MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: { card.openPlayer(); card.done() } }
-    }
-    Column {
-      anchors.left: bigCover.right
-      anchors.leftMargin: 14
-      anchors.right: parent.right
-      anchors.rightMargin: 18
-      y: 22
-      spacing: 2
-      Text {
-        width: parent.width - (card.host.playerHasAction ? 28 : 0)
-        elide: Text.ElideRight
-        text: musicCard.mpris ? String(musicCard.mpris.trackTitle || "Unknown track") : ""
-        color: card.host.colorText
-        font.family: card.host.uiFont
-        font.pixelSize: 15
-        font.weight: Font.DemiBold
-      }
-      Text {
-        width: parent.width
-        elide: Text.ElideRight
-        text: musicCard.mpris ? String(musicCard.mpris.trackArtist || musicCard.mpris.identity || "") : ""
-        color: card.host.colorMuted
-        font.family: card.host.uiFont
-        font.pixelSize: 13
-      }
-      // Detail line declared by a module (`player` in its island.json), in the width the controls leave.
-      Text {
-        width: parent.width - 104
-        visible: text !== ""
-        elide: Text.ElideRight
-        text: card.host.playerDetail
-        textFormat: Text.PlainText
-        color: card.host.withAlpha(card.host.colorText, 0.4)
-        font.family: card.host.uiFont
-        font.pixelSize: 11
-      }
-    }
-    // Action button of a module (favorites heart), at the top right: the title leaves it room.
-    Glyph {
-      id: cardHeart
-      visible: card.host.playerHasAction
-      x: parent.width - 18 - width
-      y: 20
-      glyph: card.host.playerActionGlyph
-      color: card.host.playerActionOn ? card.host.colorAccent : card.host.withAlpha(card.host.colorText, 0.6)
-      fontFamily: card.host.fontFamily
-      pixelSize: 18
-      stroke: 1.75
-      MouseArea { anchors.fill: parent; anchors.margins: -8; cursorShape: Qt.PointingHandCursor; onClicked: card.host.playerAction() }
-    }
-    // Controls, on the right under the title.
-    Row {
-      anchors.right: parent.right
-      anchors.rightMargin: 14
-      y: 58
-      spacing: 4
-      Repeater {
-        model: [{ g: "󰑟", a: "previous" }, { g: card.host.mediaPlaying ? "󰏤" : "󰐊", a: "playPause" }, { g: "󰈑", a: "next" }]
-        delegate: Rectangle {
-          required property var modelData
-          width: 32; height: 32; radius: 16
-          color: ctlMouse.containsMouse ? card.host.withAlpha(card.host.colorText, 0.12) : "transparent"
-          Glyph { anchors.centerIn: parent; glyph: modelData.g; color: card.host.colorText; fontFamily: card.host.fontFamily; pixelSize: modelData.a === "playPause" ? 20 : 16; stroke: 1.5 }
-          MouseArea { id: ctlMouse; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: card.host.mediaAction(modelData.a) }
-        }
-      }
-    }
-    // Progression
-    Item {
-      x: 18
-      y: 98
-      width: parent.width - 36
-      height: 18
-      visible: musicCard.length > 0
-      Text { id: elapsed; anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter; text: musicCard.clock(musicCard.position); color: card.host.colorMuted; font.family: card.host.uiFont; font.pixelSize: 11; font.features: { "tnum": 1 } }
-      Text { id: remaining; anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; text: "−" + musicCard.clock(musicCard.length - musicCard.position); color: card.host.colorMuted; font.family: card.host.uiFont; font.pixelSize: 11; font.features: { "tnum": 1 } }
-      Rectangle {
-        anchors.left: elapsed.right
-        anchors.leftMargin: 10
-        anchors.right: remaining.left
-        anchors.rightMargin: 10
-        anchors.verticalCenter: parent.verticalCenter
-        height: 4
-        radius: 2
-        color: card.host.withAlpha(card.host.colorText, 0.14)
+    Repeater {
+      model: ScriptModel { values: card.kind === "music" ? card.host.shownPlayers : [] }
+      delegate: Item {
+        required property var modelData
+        required property int index
+        width: musicCard.width
+        height: tile.implicitHeight
         Rectangle {
-          width: parent.width * Math.max(0, Math.min(1, musicCard.length > 0 ? musicCard.position / musicCard.length : 0))
-          height: parent.height
-          radius: 2
-          color: card.host.mediaTint
-          Behavior on width { NumberAnimation { duration: 450 } }
+          visible: index > 0
+          x: 18
+          width: parent.width - 36
+          height: 1
+          color: card.host.withAlpha(card.host.colorText, 0.08)
+        }
+        MusicTile {
+          id: tile
+          anchors.fill: parent
+          host: card.host
+          mpris: modelData
+          shown: musicCard.visible && card.visible
+          onOpenPlayer: { card.openPlayer(); card.done() }
         }
       }
     }

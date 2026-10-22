@@ -75,7 +75,29 @@ Item {
 
   // ---------------------------------------------------------------- media
   readonly property var media: shell ? shell.firstPartyServiceFor("omarchy.media") : null
+  // Every player with a track, without the playerctld proxy that repeats one of them.
+  readonly property var mediaPlayers: (media && media.sourcePlayers || []).filter(function(p) {
+    var proxy = String(p.dbusName || "").toLowerCase().indexOf("playerctld") !== -1
+      || String(p.desktopEntry || "").toLowerCase() === "playerctld"
+    return !proxy && String(p.trackTitle || "") !== ""
+  })
   readonly property var player: media ? media.activePlayer : null
+  // The player view and the music card show every player, in the order they appeared:
+  // the cards never swap places when one is paused.
+  property var playerOrder: []
+  onMediaPlayersChanged: {
+    var alive = mediaPlayers.map(function(p) { return media.playerKey(p) })
+    var next = playerOrder.filter(function(k) { return alive.indexOf(k) !== -1 })
+    alive.forEach(function(k) { if (next.indexOf(k) === -1) next.push(k) })
+    if (next.join("\n") !== playerOrder.join("\n")) playerOrder = next
+  }
+  readonly property var shownPlayers: {
+    var keyed = mediaPlayers.map(function(p) { return { p: p, i: playerOrder.indexOf(media.playerKey(p)) } })
+    keyed.sort(function(a, b) { return a.i - b.i })
+    return keyed.length > 0 ? keyed.map(function(e) { return e.p }) : (player ? [player] : [])
+  }
+  // Playing players besides the shown one (also right when the shown one is the proxy).
+  readonly property int otherPlayingCount: Math.max(0, mediaPlayers.filter(function(p) { return p.isPlaying }).length - (mediaPlaying ? 1 : 0))
   readonly property bool mediaPlaying: !!(player && player.isPlaying)
   readonly property string reportedArt: player && player.trackArtUrl ? String(player.trackArtUrl) : ""
   readonly property string mediaTitle: player ? String(player.trackTitle || "") : ""
@@ -98,9 +120,9 @@ Item {
     rescaleSize: 64
   }
   // The wave takes the cover's most vivid color, the theme accent otherwise.
-  readonly property color mediaTint: {
+  function tintOf(colors) {
     var best = null, bestScore = -1
-    var colors = coverColors.colors || []
+    colors = colors || []
     for (var i = 0; i < colors.length; i++) {
       var c = colors[i]
       var score = c.hsvSaturation * 0.7 + c.hsvValue * 0.3
@@ -109,23 +131,20 @@ Item {
     if (!best || best.hsvSaturation < 0.12) return colorAccent
     return Qt.hsva(best.hsvHue, Math.min(1, best.hsvSaturation), Math.max(0.75, best.hsvValue), 1)
   }
-  function mediaAction(name) { if (media) media.runAction(name, false, "") }
+  readonly property color mediaTint: tintOf(coverColors.colors)
+  function actionOf(p, name) { if (media && p) media.runAction(name, false, media.playerKey(p)) }
+  // Cover of a player: the shown one keeps its last cover between tracks (mediaArt).
+  function artOf(p) { return !p ? "" : p === player ? mediaArt : String(p.trackArtUrl || "") }
 
   // Player card extras declared by a module (`player` in its island/island.json, see
   // components/ModuleRegistry.qml): the quality line, the heart and the launcher extension of
   // the player whose MPRIS bus name matches. Without such a module, the card stays generic.
-  readonly property var playerExtras: ModulePlayers.extras(moduleRegistry.players, player ? String(player.dbusName || "") : "", player ? player.metadata : null)
-  readonly property string playerDetail: playerExtras.detail
-  readonly property bool playerHasAction: playerExtras.hasAction
-  readonly property bool playerActionOn: playerExtras.actionOn
-  readonly property string playerActionGlyph: playerHasAction ? (playerActionOn ? "󰋑" : "󰋕") : ""
-  readonly property string playerSourceExt: playerExtras.launcher
-  // Desktop entry of the player's app, for a player whose MPRIS has no DesktopEntry.
-  readonly property string playerApp: playerExtras.app
-  function playerAction() { if (playerHasAction) Quickshell.execDetached(playerExtras.like) }
+  function extrasOf(p) { return ModulePlayers.extras(moduleRegistry.players, p ? String(p.dbusName || "") : "", p ? p.metadata : null) }
+  function actionGlyph(extras) { return extras.hasAction ? (extras.actionOn ? "󰋑" : "󰋕") : "" }
+  function playerActionOf(p) { var e = extrasOf(p); if (e.hasAction) Quickshell.execDetached(e.like) }
 
   // ---------------------------------------------------------------- player volume
-  // Volume of the current player's application: its PipeWire stream(s)
+  // Volume of a player's application: its PipeWire stream(s)
   // (nodes 'Stream/Output/Audio' whose `application.name` matches
   // the MPRIS identity or desktop entry: 'Music', 'Zen'...), otherwise
   // the MPRIS `volume` property if the player handles it, otherwise -1 (nothing to adjust).
@@ -149,58 +168,53 @@ Item {
     }
     return false
   }
-  readonly property var playerStreams: {
-    var p = player
+  function streamsOf(p) {
     if (!p) return []
     return pwAllStreams.filter(function(n) { return n.audio && streamMatchesPlayer(n, p) })
   }
-  readonly property bool playerMprisVolume: !!player && !!player.canControl && !!player.volumeSupported
-  readonly property real playerVolume: {
-    if (playerStreams.length > 0) {
+  function mprisVolumeOf(p) { return !!p && !!p.canControl && !!p.volumeSupported }
+  function volumeOf(p) {
+    var s = streamsOf(p)
+    if (s.length > 0) {
       var m = 0
-      for (var i = 0; i < playerStreams.length; i++) m = Math.max(m, playerStreams[i].audio.volume)
+      for (var i = 0; i < s.length; i++) m = Math.max(m, s[i].audio.volume)
       return m
     }
-    return playerMprisVolume ? Number(player.volume) : -1
+    return mprisVolumeOf(p) ? Number(p.volume) : -1
   }
-  readonly property bool playerMuted: {
-    if (playerStreams.length > 0) return playerStreams.every(function(n) { return n.audio.muted })
-    return playerMprisVolume && Number(player.volume) <= 0
+  function mutedOf(p) {
+    var s = streamsOf(p)
+    if (s.length > 0) return s.every(function(n) { return n.audio.muted })
+    return mprisVolumeOf(p) && Number(p.volume) <= 0
   }
-  // Last level before the MPRIS mute (which has no 'muted').
-  property real mprisVolumeBeforeMute: 0.5
-  function setPlayerVolume(v) {
+  function setVolumeOf(p, v) {
     v = Math.max(0, Math.min(1, v))
-    if (playerStreams.length > 0) {
-      for (var i = 0; i < playerStreams.length; i++) playerStreams[i].audio.volume = v
-    } else if (playerMprisVolume) {
-      player.volume = v
+    var s = streamsOf(p)
+    if (s.length > 0) {
+      for (var i = 0; i < s.length; i++) s[i].audio.volume = v
+    } else if (mprisVolumeOf(p)) {
+      p.volume = v
     }
-  }
-  function stepPlayerVolume(delta) {
-    if (playerVolume < 0) return
-    setPlayerVolume(Math.round((playerVolume + delta) * 100) / 100)
-    playerVolumeHint.restart()
   }
   // Wheel: 120 units = one notch = 5 % (touchpads accumulate their small steps).
+  // Returns true when the level changed.
   property real wheelAccum: 0
-  function wheelPlayerVolume(dy) {
-    if (playerVolume < 0) return
+  property var wheelTarget: null
+  function wheelVolumeOf(p, dy) {
+    if (p !== wheelTarget) { wheelTarget = p; wheelAccum = 0 }
+    var level = volumeOf(p)
+    if (level < 0) { wheelAccum = 0; return false }
     wheelAccum += dy
     var notches = Math.trunc(wheelAccum / 120)
-    if (notches === 0) return
+    if (notches === 0) return false
     wheelAccum -= notches * 120
-    stepPlayerVolume(notches * 0.05)
+    setVolumeOf(p, Math.round((level + notches * 0.05) * 100) / 100)
+    return true
   }
-  function togglePlayerMute() {
-    if (playerStreams.length > 0) {
-      var mute = !playerMuted
-      for (var i = 0; i < playerStreams.length; i++) playerStreams[i].audio.muted = mute
-    } else if (playerMprisVolume) {
-      if (playerMuted) setPlayerVolume(mprisVolumeBeforeMute)
-      else { mprisVolumeBeforeMute = Math.max(0.05, Number(player.volume)); setPlayerVolume(0) }
-    }
-  }
+
+  // The shown player (the island's pill).
+  readonly property real playerVolume: volumeOf(player)
+  function wheelPlayerVolume(dy) { if (wheelVolumeOf(player, dy)) playerVolumeHint.restart() }
   // Brief 'NN %' pill after a wheel notch (pill and card).
   readonly property bool playerVolumeHintShown: playerVolumeHint.running
   Timer { id: playerVolumeHint; interval: 1200 }

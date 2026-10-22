@@ -180,6 +180,7 @@ Rectangle {
 
   // ------------------------------------------------ music: cover (+ wave as a capsule)
   ClippingRectangle {
+    id: musicCover
     visible: bubble.kind === "music"
     x: bubble.compact ? 9 : (bubble.width - width) / 2
     anchors.verticalCenter: parent.verticalCenter
@@ -206,6 +207,27 @@ Rectangle {
       color: bubble.host.colorAccentText
       fontFamily: bubble.host.fontFamily
       pixelSize: 11
+    }
+  }
+  // Other players playing at the same time: their count on the cover's corner.
+  Rectangle {
+    visible: bubble.kind === "music" && bubble.host.otherPlayingCount > 0
+    x: musicCover.x + musicCover.width - width / 2 - 1
+    y: musicCover.y - height / 2 + 1
+    width: Math.max(12, otherCount.implicitWidth + 6)
+    height: 12
+    radius: 6
+    color: bubble.host.colorAccent
+    border.width: 1.5
+    border.color: bubble.host.colorIsland
+    Text {
+      id: otherCount
+      anchors.centerIn: parent
+      text: "+" + bubble.host.otherPlayingCount
+      color: bubble.host.colorAccentText
+      font.family: bubble.host.uiFont
+      font.pixelSize: 8
+      font.weight: Font.Bold
     }
   }
   SoundWave {
